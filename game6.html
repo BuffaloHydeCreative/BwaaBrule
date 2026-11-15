@@ -1,825 +1,4403 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Bonami!</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Le Roi des Traiteurs — Red River FurTrade Freetrade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
 <style>
+  :root {
+    --font-pixel: 'Press Start 2P', 'Courier New', monospace;
+  }
+
+  * {
+    box-sizing: border-box;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   body {
-    margin: 0; padding: 0;
+    font-family: var(--font-pixel);
     background: transparent;
-    display: flex; justify-content: center; align-items: center;
-    height: 100vh; width: 100vw;
-    font-family: 'Courier New', Courier, monospace;
-    user-select: none; touch-action: manipulation; overflow: hidden;
+    color: #f4f1de;
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    width: 100vw;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
   }
+
   #game-container {
-    width: 100%; height: 100%; max-width: 500px;
-    display: flex; flex-direction: column; justify-content: center;
-    box-sizing: border-box; padding: 10px;
+    width: 100%;
+    height: 100%;
+    max-width: 520px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 8px;
+    gap: 6px;
   }
+
+  /* Persistent Arcade HUD */
   #header {
-    flex: 0 0 auto; display: flex; flex-direction: column; gap: 5px;
-    color: #F7C844; font-weight: bold; margin-bottom: 10px;
-    border-bottom: 2px solid #3D5948; padding-bottom: 5px;
-    font-size: 14px; text-transform: uppercase;
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    color: #ffcd75;
+    font-size: 8px;
+    border-bottom: 2px solid #3b5dc9;
+    padding-bottom: 4px;
+    text-transform: uppercase;
     text-shadow: 1px 1px 0 #000;
   }
-  .header-row { display: flex; justify-content: space-between; align-items: center; }
-  .energy-bar { width: 100px; height: 12px; background: #222; border: 2px solid #D4D0C5; position: relative; }
-  .energy-fill { height: 100%; background: #12AEA2; width: 100%; transition: width 0.1s; }
-  
-  #screen-container {
-    flex: 0 0 auto; width: 100%;
-    aspect-ratio: 1 / 1; 
-    border: 4px solid #D4D0C5; 
-    position: relative; background: #387C44; 
-    overflow: hidden; box-sizing: border-box;
+  .header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 4px;
   }
-  canvas {
-    width: 100%; height: 100%;
-    display: block; image-rendering: pixelated;
+
+  /* 240x240 Cover & Freetrade Checkpoint Viewport */
+  #weir-wrapper {
+    flex: 0 0 auto;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    max-height: calc(100vh - 54px);
+    margin: 0 auto;
+    border: 4px solid #f4f4f4;
+    border-radius: 6px;
+    position: relative;
+    background: #1a1c2c;
+    overflow: hidden;
+    box-shadow: 0 6px 0 rgba(0, 0, 0, 0.55);
   }
+
+  canvas#gameCanvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+
+  /* 480x336 GBC/SNES Settlement Map View */
+  #map-view {
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+  }
+
+  #screenWrapper {
+    position: relative;
+    width: 100%;
+    border: 4px solid #f4f4f4;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #0f1324;
+    box-shadow: 0 6px 0 rgba(0, 0, 0, 0.55);
+  }
+
+  canvas#mapCanvas {
+    image-rendering: -moz-crisp-edges;
+    image-rendering: -webkit-crisp-edges;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    width: 100%;
+    height: auto;
+    display: block;
+    cursor: pointer;
+  }
+
+  /* Classic SNES / GBC RPG Window Frame for 6 Checkpoints */
+  .rpg-window {
+    background-color: #1a1c2c;
+    border: 3px solid #f4f4f4;
+    box-shadow:
+      inset 0 0 0 2px #3b5dc9,
+      inset 0 0 0 4px #1a1c2c,
+      0 5px 0 rgba(0, 0, 0, 0.55);
+    border-radius: 6px;
+    padding: 7px;
+  }
+
+  .cycle-row {
+    display: flex;
+    align-items: stretch;
+    gap: 5px;
+  }
+
+  .checkpoint-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    flex: 1;
+  }
+
+  .checkpoint-box {
+    font-family: var(--font-pixel);
+    background: #29366f;
+    color: #f4f4f4;
+    border: 2px solid #7f8ec9;
+    box-shadow: 0 2px 0 #0f1324;
+    border-radius: 4px;
+    padding: 4px 3px;
+    min-height: 36px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    transition: transform 0.06s ease, background-color 0.1s ease, border-color 0.1s ease;
+  }
+
+  .checkpoint-box:hover {
+    background: #3b5dc9;
+    border-color: #f4f4f4;
+  }
+
+  .checkpoint-box.active {
+    background: #ffcd75;
+    color: #1a1c2c;
+    border-color: #ffffff;
+    box-shadow: 0 2px 0 #7a4b12;
+    transform: translateY(-1px);
+  }
+
+  .cp-num {
+    font-size: 6px;
+    opacity: 0.85;
+    margin-bottom: 2px;
+  }
+
+  .cp-name {
+    font-size: 6.5px;
+    line-height: 1.25;
+  }
+
+  .cp-mini-bar {
+    width: 82%;
+    height: 3px;
+    background: #0f1324;
+    margin-top: 3px;
+    border-radius: 1px;
+    overflow: hidden;
+  }
+
+  .cp-mini-fill {
+    height: 100%;
+    width: 0%;
+    background: #73eff7;
+  }
+
+  .cycle-btn {
+    font-family: var(--font-pixel);
+    background: #232a4d;
+    color: #73eff7;
+    border: 2px solid #41a6f6;
+    box-shadow: 0 2px 0 #0f1324;
+    border-radius: 4px;
+    font-size: 9px;
+    padding: 0 6px;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .cycle-btn:hover {
+    background: #3b5dc9;
+    color: #ffffff;
+  }
+
+  .cycle-btn:active {
+    transform: translateY(1px);
+  }
+
+  /* Classic RPG Double-Sided Text Box Overlay (Briefing & Game Over) */
   .overlay {
-    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0, 0, 0, 0.85); 
-    display: flex; flex-direction: column; justify-content: center; align-items: center;
-    color: #fff; text-align: center; padding: 15px; box-sizing: border-box;
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(15, 19, 36, 0.92);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: #f4f4f4;
+    text-align: center;
+    padding: 12px;
     z-index: 10;
   }
-  h2 { color: #F7C844; margin: 0 0 10px 0; font-size: 18px; text-transform: uppercase; }
-  p { font-size: 12px; line-height: 1.5; margin: 0 0 15px 0; color: #D4D0C5; }
-  .blink-text { font-weight: bold; color: #12AEA2; font-size: 14px; animation: blink 1s infinite; }
+
+  .rpg-dialog-box {
+    width: 100%;
+    min-height: 186px;
+    background-color: #1a1c2c;
+    border: 3px solid #f4f4f4;
+    box-shadow:
+      inset 0 0 0 2px #3b5dc9,
+      inset 0 0 0 4px #1a1c2c,
+      0 4px 0 #090b14;
+    border-radius: 4px;
+    padding: 12px 11px 10px 11px;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .dialog-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #ffcd75;
+    font-size: 8.5px;
+    border-bottom: 1px solid #3b5dc9;
+    padding-bottom: 5px;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+  }
+
+  .dialog-page-tag {
+    color: #73eff7;
+    font-size: 7.5px;
+  }
+
+  .dialog-body {
+    color: #f4f1de;
+    font-size: 7.8px;
+    line-height: 1.72;
+    margin: 0;
+    flex: 1;
+  }
+
+  .dialog-body.instructions {
+    color: #e6f7ff;
+    font-size: 7.5px;
+    line-height: 1.72;
+  }
+
+  .dialog-footer {
+    border-top: 1px dashed #7f8ec9;
+    padding-top: 7px;
+    margin-top: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 7.5px;
+  }
+
+  .flip-hint {
+    color: #73eff7;
+    cursor: pointer;
+  }
+
+  .start-hint {
+    color: #ffcd75;
+    cursor: pointer;
+    animation: blink 1s infinite;
+  }
+
+  .rank-headline {
+    color: #ffcd75;
+    margin: 0 0 8px 0;
+    font-size: 13px;
+    text-transform: uppercase;
+    line-height: 1.45;
+    text-shadow: 2px 2px 0 #090b14;
+  }
+
+  .gameover-sub {
+    color: #ff6b6b;
+    font-size: 7.5px;
+    margin: 0 0 10px 0;
+    text-transform: uppercase;
+  }
+
+  p {
+    font-size: 8px;
+    line-height: 1.7;
+    margin: 0 0 12px 0;
+  }
+
+  .blink-text {
+    font-size: 8px;
+    color: #ffcd75;
+    text-align: center;
+    animation: blink 1s infinite;
+  }
+
   @keyframes blink { 50% { opacity: 0; } }
 </style>
 </head>
 <body>
 <div id="game-container">
+  <!-- Persistent Arcade Header -->
   <div id="header">
     <div class="header-row">
-      <span id="title-display">RIVERLOT</span>
-      <span id="score-display">GOODS: 0 | SCORE: 0</span>
+      <span id="time-display">TIME:5:00</span>
+      <span id="rank-display" style="color: #ff6b6b;">SCARCE &amp; STARVATION</span>
+      <span id="hbc-display" style="color: #f4f4f4;">BUSTS:0/3</span>
     </div>
     <div class="header-row">
-      <span>ENERGY</span>
-      <div class="energy-bar"><div id="energy-fill" class="energy-fill"></div></div>
+      <span id="loc-display" style="color: #73eff7;">LE ROI DES TRAITEURS</span>
+      <span id="goods-display" style="color: #ffcd75;">PELTS:0 ROBES:0</span>
     </div>
   </div>
-  
-  <div id="screen-container">
+
+  <!-- 1. Cover Screen, Double-Sided RPG Briefing Box, Freetrade Checkpoint Scenes & Game Over (240x240) -->
+  <div id="weir-wrapper">
     <canvas id="gameCanvas" width="240" height="240"></canvas>
-    
-    <div id="intro-screen" class="overlay">
-      <h2>Riverlot & Upper Fort</h2>
-      <p>Explore your lot, neighbor's land, The Forks & Upper Fort.<br>Cross the Assiniboine River via stepping stones!<br>Stand at the Fort Gate to trade goods for score!<br>Rest at the Homestead cabin to recharge.</p>
-      <div class="blink-text">PRESS 'A' TO START</div>
+
+    <!-- Double-Sided RPG Text Box Overlay (Toggled via B-Button) -->
+    <div id="briefing-screen" class="overlay" style="display: none;">
+      <div class="rpg-dialog-box">
+        <div>
+          <div class="dialog-header">
+            <span id="dialog-heading">THE FREETRADERS</span>
+            <span id="dialog-page" class="dialog-page-tag">[B] 1/2</span>
+          </div>
+
+          <!-- Side 1: Expanded Historical Lore -->
+          <div id="dialog-side-1" class="dialog-body">
+            In the 1850 Red River Settlement, fearless Michif freetraders rose up to challenge the Hudson's Bay Company monopoly. Rolling wooden Red River carts from parish to parish, they traded directly with prairie hunters for prized pelts and warm buffalo robes—earning their boldest leader the title Le Roi des Traiteurs.
+          </div>
+
+          <!-- Side 2: Simple, Non-Technical Instructions -->
+          <div id="dialog-side-2" class="dialog-body instructions" style="display: none;">
+            Cycle the parishes on the settlement map with the D-Pad and press A to visit.<br><br>
+            Set your Red River Cart on the road and trade discreetly, but be careful—your cart can only hold so much weight! Haul your load before winter sets in or an HBC Officer seizes your trade.
+          </div>
+        </div>
+
+        <div class="dialog-footer">
+          <span id="flip-label" class="flip-hint" onclick="toggleBriefingSide()">[B] INSTRUCTIONS</span>
+          <span class="start-hint" onclick="handleActionA()">[A] RIDE OUT</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Game Over Menu -->
+    <div id="gameover-screen" class="overlay" style="display: none;">
+      <div id="gameover-sub" class="gameover-sub">WINTER HAS ARRIVED</div>
+      <h2 id="gameover-rank" class="rank-headline">SCARCE &amp; STARVATION</h2>
+      <p id="final-stats"></p>
+      <div class="blink-text">PRESS 'A' TO PLAY AGAIN</div>
+    </div>
+  </div>
+
+  <!-- 2. 1850 Red River Settlement GBC/SNES Pixel Map (480x336) + 6-Checkpoint Cycle Window -->
+  <div id="map-view">
+    <div id="screenWrapper">
+      <canvas id="mapCanvas" width="480" height="336"></canvas>
+    </div>
+
+    <div class="rpg-window">
+      <div class="cycle-row">
+        <button
+          type="button"
+          onclick="cycleCheckpoint(-1)"
+          class="cycle-btn"
+          aria-label="Previous Checkpoint"
+        >◄</button>
+
+        <div id="checkpointGrid" class="checkpoint-grid"></div>
+
+        <button
+          type="button"
+          onclick="cycleCheckpoint(1)"
+          class="cycle-btn"
+          aria-label="Next Checkpoint"
+        >►</button>
+      </div>
     </div>
   </div>
 </div>
 
 <script>
-  // ==========================================
-  // TRIFORCE JIG CHIPTUNE AUDIO ENGINE
-  // ==========================================
-  let chiptuneAudioCtx = null;
-  let chiptuneInterval = null;
-  let chiptuneIsPlaying = false;
-  let currentChiptuneStep = 0;
+  // =========================================================================
+  // DOM & CANVAS REFERENCES
+  // =========================================================================
+  const weirWrapper = document.getElementById('weir-wrapper');
+  const mapView = document.getElementById('map-view');
 
-  const CHIPTUNE_BPM = 145;
-  const CHIPTUNE_NOTE_LEN = 60 / CHIPTUNE_BPM / 2;
-
-  const CHIPTUNE_NOTES = {
-      'A3': 220.00, 'B3': 246.94, 'C#4': 277.18, 'D4': 293.66, 'E4': 329.63, 'F#4': 369.99, 'G4': 392.00,
-      'A4': 440.00, 'B4': 493.88, 'C#5': 554.37, 'D5': 587.33, 'E5': 659.25, 'F#5': 739.99, 'G5': 783.99, 'A5': 880.00
-  };
-
-  const leadPattern = [
-      'A5', 'E5', 'A5', 'A5', 'B5', 'C#5', 'D5', 'E5', 
-      'F#5', 'F#5', 'F#5', 'E5', 'D5', 'E5', 'C#5', 'A4',
-      'A4', 'C#4', 'E4', 'A4', 'G4', 'E4', 'G4', 'B4',
-      'A4', 'C#4', 'E4', 'A4', 'E5', 'D5', 'B4', 'G4'
-  ];
-
-  const bassPattern = [
-      'A3', 'A4', 'E4', 'A4', 'A3', 'A4', 'E4', 'A4',
-      'A3', 'A4', 'F#4', 'A4', 'A3', 'G4', 'E4', 'G4',
-      'A3', null, 'A3', 'A4', 'G3', null, 'G3', 'B3',
-      'A3', null, 'A3', 'A4', 'E4', 'D4', 'B3', 'G3'
-  ];
-
-  function initChiptuneAudio() {
-      if (!chiptuneAudioCtx) {
-          chiptuneAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      }
-      if (chiptuneAudioCtx.state === 'suspended') {
-          chiptuneAudioCtx.resume();
-      }
-  }
-
-  function playChiptuneTone(freq, type, duration, volume) {
-      if (!freq || !chiptuneAudioCtx) return;
-      const osc = chiptuneAudioCtx.createOscillator();
-      const gainNode = chiptuneAudioCtx.createGain();
-      osc.type = type;
-      osc.frequency.setValueAtTime(freq, chiptuneAudioCtx.currentTime);
-      gainNode.gain.setValueAtTime(volume, chiptuneAudioCtx.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.0001, chiptuneAudioCtx.currentTime + duration - 0.015);
-      osc.connect(gainNode);
-      gainNode.connect(chiptuneAudioCtx.destination);
-      osc.start();
-      osc.stop(chiptuneAudioCtx.currentTime + duration);
-  }
-
-  function stepChiptuneTrack() {
-      const leadNote = leadPattern[currentChiptuneStep];
-      const bassNote = bassPattern[currentChiptuneStep];
-
-      if (leadNote && CHIPTUNE_NOTES[leadNote]) {
-          playChiptuneTone(CHIPTUNE_NOTES[leadNote], 'square', CHIPTUNE_NOTE_LEN, 0.04);
-      }
-      if (bassNote && CHIPTUNE_NOTES[bassNote]) {
-          playChiptuneTone(CHIPTUNE_NOTES[bassNote], 'triangle', CHIPTUNE_NOTE_LEN * 1.2, 0.15);
-      }
-      currentChiptuneStep = (currentChiptuneStep + 1) % 32;
-  }
-
-  function startChiptuneTrack() {
-      initChiptuneAudio();
-      if (!chiptuneIsPlaying) {
-          chiptuneIsPlaying = true;
-          currentChiptuneStep = 0;
-          chiptuneInterval = setInterval(stepChiptuneTrack, CHIPTUNE_NOTE_LEN * 1000);
-      }
-  }
-
-  function stopChiptuneTrack() {
-      if (chiptuneIsPlaying) {
-          clearInterval(chiptuneInterval);
-          chiptuneIsPlaying = false;
-          currentChiptuneStep = 0;
-      }
-  }
-
-  // ==========================================
-  // GAME ENGINE & 4x4 OVERWORLD SETUP
-  // ==========================================
   const cvs = document.getElementById('gameCanvas');
   const ctx = cvs.getContext('2d');
-  const introScreen = document.getElementById('intro-screen');
-  const scoreDisplay = document.getElementById('score-display');
-  const titleDisplay = document.getElementById('title-display');
-  const energyFill = document.getElementById('energy-fill');
-  
-  const TILE = 24; 
-  const SCREEN_SIZE = 240; 
-  const WORLD_COLS = 4; // Lot 0: Home, Lot 1: Neighbour, Lot 2: The Forks, Lot 3: Upper Fort Garry
-  const WORLD_ROWS = 4; // Zone 0: Woods, Zone 1: Hay Priv., Zone 2: Homestead/Fort, Zone 3: Riverbank
-  const WORLD_WIDTH = SCREEN_SIZE * WORLD_COLS;
-  const WORLD_HEIGHT = SCREEN_SIZE * WORLD_ROWS; 
-  
-  const C = {
-    GRASS: '#387C44',
-    GRASS_LIGHT: '#4E9E5E',
-    DIRT: '#E4A672',
-    DIRT_DARK: '#A86D3F',
-    WOOD: '#7A4B29',
-    WOOD_LIGHT: '#A26D3F',
-    LEAVES: '#1E5928',
-    WATER: '#1A4D94',
-    WATER_LIGHT: '#3475D1',
-    SHORE_SAND: '#C29B38',
-    SKIN: '#F7D0A0',
-    CAPOT_BLUE: '#0F6F9E', 
-    SASH_RED: '#AD1C21',   
-    GOLD: '#F7C844',
-    VEGGIE_ORANGE: '#FB6604',
-    VEGGIE_GREEN: '#12AEA2',
-    STUMP: '#A26D3F',
-    WOLF_FUR: '#6C757D',
-    WOLF_EYE: '#AD1C21',
-    STONE: '#6A6B6E',
-    STONE_DARK: '#4A4B4E',
-    STONE_ROOF: '#3A3B3D'
+  ctx.imageSmoothingEnabled = false;
+
+  const MAP_WIDTH = 480;
+  const MAP_HEIGHT = 336;
+  const mapCanvas = document.getElementById('mapCanvas');
+  const mapCtx = mapCanvas.getContext('2d');
+  mapCtx.imageSmoothingEnabled = false;
+
+  const terrainCanvas = document.createElement('canvas');
+  terrainCanvas.width = MAP_WIDTH;
+  terrainCanvas.height = MAP_HEIGHT;
+  const tCtx = terrainCanvas.getContext('2d');
+  tCtx.imageSmoothingEnabled = false;
+
+  const briefingScreen = document.getElementById('briefing-screen');
+  const dialogHeading = document.getElementById('dialog-heading');
+  const dialogPage = document.getElementById('dialog-page');
+  const dialogSide1 = document.getElementById('dialog-side-1');
+  const dialogSide2 = document.getElementById('dialog-side-2');
+  const flipLabel = document.getElementById('flip-label');
+
+  const gameoverScreen = document.getElementById('gameover-screen');
+  const gameoverSub = document.getElementById('gameover-sub');
+  const gameoverRank = document.getElementById('gameover-rank');
+
+  const timeDisplay = document.getElementById('time-display');
+  const rankDisplay = document.getElementById('rank-display');
+  const hbcDisplay = document.getElementById('hbc-display');
+  const locDisplay = document.getElementById('loc-display');
+  const goodsDisplay = document.getElementById('goods-display');
+
+  // =========================================================================
+  // UNIFIED GBC / SNES ALTTP COLOR PALETTE + DYNAMIC SEASONAL THEME ENGINE
+  // =========================================================================
+  const PALETTE = {
+    bgOuter: '#2d3b2d',
+    bgOuterSpeck: '#3d5239',
+    prairieBase: '#7ec850',
+    prairieLight: '#a7f070',
+    prairieGold: '#c8d45d',
+    cultivatedBase: '#e09f5a',
+    cultivatedLight: '#f2be7e',
+    cultivatedDark: '#b8763e',
+    woodlandBase: '#256d3b',
+    woodlandDark: '#164526',
+    woodlandHighlight: '#38984c',
+    parishBorder: '#3a2818',
+    waterDeep: '#2456c9',
+    waterMid: '#3b7ef2',
+    waterBank: '#173687',
+    waterFoam: '#9be8ff',
+    sandBank: '#e8cfa6',
+    road: '#d4b483',
+    roadDark: '#b5925e',
+    roofRed: '#d9383a',
+    roofBlue: '#3b5dc9',
+    capoteBlueBright: '#6c8ef5',
+    wallWhite: '#f4f4f4',
+    wallShade: '#cfd4dc',
+    compassGold: '#ffcd75',
+    teal: '#73eff7',
+    stoneDark: '#3b3e4a',
+    stoneMid: '#686f80',
+    stoneLight: '#9ba3b5',
+    // Tyndall Limestone palette for Upper Fort Garry
+    limestoneDark: '#8a816c',
+    limestoneMid: '#cfc6b0',
+    limestoneLight: '#ebe4d3',
+    woodDark: '#4a2c16',
+    woodMid: '#734625',
+    woodLight: '#9c653b',
+    black: '#0f1324'
   };
 
-  let state = 'START'; 
-  let score = 0;
-  let inventory = 0;
-  let energy = 100;
-  const MAX_ENERGY = 100;
-  
-  let camera = { x: 0, y: SCREEN_SIZE * 2 }; 
-  let isShifting = false;
-  let shiftTargetX = 0;
-  let shiftTargetY = 0;
-  let frame = 0;
-  
-  let player = { 
-    x: 96, y: camera.y + 96, 
-    targetX: 96, targetY: camera.y + 96,
-    w: 16, h: 18, 
-    speed: 3, dir: 'down',
-    moving: false,
-    slashing: false, slashTimer: 0,
-    animFrame: 0 
-  };
-
-  let mapObjects = [];
-  let drops = [];
-  let enemies = [];
-  let sparkles = [];
-
-  const drawSprite = (x, y, matrix, paletteMap) => {
-    const s = TILE / 8; 
-    for(let r=0; r<8; r++) {
-      for(let c=0; c<8; c++) {
-        let v = matrix[r][c];
-        if(v > 0) {
-          ctx.fillStyle = paletteMap[v];
-          ctx.fillRect(x + c*s, y + r*s, s, s);
-        }
-      }
-    }
-  };
-
-  const sprPlayerDown = [
-    [
-      [0,0,1,1,1,1,0,0],
-      [0,1,2,2,2,2,1,0],
-      [0,1,1,1,1,1,1,0],
-      [0,3,3,3,3,3,3,0],
-      [3,3,4,4,4,4,3,3],
-      [3,3,3,3,3,3,3,3],
-      [0,1,1,0,0,1,1,0],
-      [0,1,1,0,0,1,1,0]
-    ],
-    [
-      [0,0,1,1,1,1,0,0],
-      [0,1,2,2,2,2,1,0],
-      [0,1,1,1,1,1,1,0],
-      [0,3,3,3,3,3,3,0],
-      [3,3,4,4,4,4,3,3],
-      [3,3,3,3,3,3,3,3],
-      [0,1,1,0,0,0,0,0],
-      [0,0,0,0,0,1,1,0]
-    ]
-  ]; 
-  
-  const sprBush = [[0,0,1,1,1,0,0,0],[0,1,2,1,2,1,0,0],[1,2,1,2,1,2,1,0],[1,1,2,1,2,1,1,0],[1,2,1,2,1,2,1,0],[1,1,1,1,1,1,1,0],[0,1,1,1,1,1,0,0],[0,0,0,0,0,0,0,0]]; 
-  const sprTree = [[0,0,1,1,1,1,0,0],[0,1,2,1,1,2,1,0],[1,1,1,2,2,1,1,1],[1,2,1,1,1,1,2,1],[1,1,1,2,2,1,1,1],[0,1,1,1,1,1,1,0],[0,0,0,3,3,0,0,0],[0,0,0,3,3,0,0,0]]; 
-  const sprVeggie = [[0,0,0,1,1,0,0,0],[0,0,1,1,1,1,0,0],[0,0,0,2,2,0,0,0],[0,0,2,2,2,2,0,0],[0,2,2,2,2,2,2,0],[0,0,2,2,2,2,0,0],[0,0,0,2,2,0,0,0],[0,0,0,0,0,0,0,0]];
-  const sprLoot = [[0,0,0,0,0,0,0,0],[0,0,1,1,1,0,0,0],[0,1,2,2,2,1,0,0],[0,1,2,2,2,1,0,0],[0,1,2,2,2,1,0,0],[0,0,1,1,1,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]]; 
-
-  const sprWolf = [
-    [0,0,1,1,0,1,1,0],
-    [0,1,2,2,1,2,2,1],
-    [0,1,3,2,2,3,2,1],
-    [1,2,2,2,2,2,2,1],
-    [1,2,2,2,2,2,2,1],
-    [0,1,2,2,2,2,1,0],
-    [0,1,2,0,0,2,1,0],
-    [0,1,1,0,0,1,1,0]
-  ];
-
-  function isSpaceOccupied(x, y, w, h, ignoreObj = null) {
-    let testBox = { x, y, w, h };
-    for (let obj of mapObjects) {
-      if (obj === ignoreObj) continue;
-      if (isColliding(testBox, obj)) return true;
-    }
-    return false;
+  function hexToRgb(hex) {
+    const clean = hex.replace('#', '');
+    return [
+      parseInt(clean.substring(0, 2), 16),
+      parseInt(clean.substring(2, 4), 16),
+      parseInt(clean.substring(4, 6), 16)
+    ];
   }
 
-  function generateMap() {
-    mapObjects = [];
-    enemies = [];
+  function lerpHex(hexA, hexB, t) {
+    const clamped = Math.max(0, Math.min(1, t));
+    const [r1, g1, b1] = hexToRgb(hexA);
+    const [r2, g2, b2] = hexToRgb(hexB);
+    const r = Math.round(r1 + (r2 - r1) * clamped);
+    const g = Math.round(g1 + (g2 - g1) * clamped);
+    const b = Math.round(b1 + (b2 - b1) * clamped);
+    return `rgb(${r}, ${g}, ${b})`;
+  }
 
-    // Red River Water Barrier across full bottom of world (Zone 3)
-    mapObjects.push({ x: 0, y: (SCREEN_SIZE * 3) + 30, w: WORLD_WIDTH, h: 210, type: 'water_barrier', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: -1 });
+  function getSeasonalTheme() {
+    if (timeLeft > 240) {
+      const t = (300 - timeLeft) / 60;
+      return {
+        stage: 0,
+        t,
+        outerBg: '#2e261d',
+        outerSpeck: '#45392b',
+        grassBase: lerpHex('#69583c', '#5e6b3c', t),
+        grassTuft: '#7d6b48',
+        grassAccent: '#485430',
+        wetPatch: '#4a3d29',
+        cultivated: '#634832',
+        cultivatedLight: '#7a5a40',
+        road: '#9e845c',
+        roadDark: '#7a6342',
+        sandBank: '#9c8565',
+        waterDeep: '#1f4b9e',
+        waterMid: '#3773d9',
+        waterSurfaceRgba: 'rgba(55, 115, 217, 0.46)',
+        waterLevelOffset: 0,
+        hasIceChunks: true,
+        freezeRatio: 0,
+        snowAmount: 0
+      };
+    } else if (timeLeft > 180) {
+      const t = (240 - timeLeft) / 60;
+      return {
+        stage: 1,
+        t,
+        outerBg: '#273b27',
+        outerSpeck: '#365236',
+        grassBase: lerpHex('#6ec447', '#7ec850', t),
+        grassTuft: '#a7f070',
+        grassAccent: '#56a836',
+        wetPatch: null,
+        cultivated: '#c4894d',
+        cultivatedLight: '#dfa66b',
+        road: '#ccb082',
+        roadDark: '#a88a5b',
+        sandBank: '#d9c098',
+        waterDeep: '#1e4cc2',
+        waterMid: '#387ef5',
+        waterSurfaceRgba: 'rgba(56, 126, 245, 0.46)',
+        waterLevelOffset: 5,
+        hasIceChunks: false,
+        freezeRatio: 0,
+        snowAmount: 0
+      };
+    } else if (timeLeft > 120) {
+      const t = (180 - timeLeft) / 60;
+      return {
+        stage: 2,
+        t,
+        outerBg: '#2d3b2d',
+        outerSpeck: '#3d5239',
+        grassBase: lerpHex('#7ec850', '#c7bd46', t),
+        grassTuft: lerpHex('#a7f070', '#f0df65', t),
+        grassAccent: lerpHex('#c8d45d', '#b89f35', t),
+        wetPatch: null,
+        cultivated: '#e09f5a',
+        cultivatedLight: '#f2be7e',
+        road: '#d4b483',
+        roadDark: '#b5925e',
+        sandBank: '#e8cfa6',
+        waterDeep: '#2456c9',
+        waterMid: '#3b7ef2',
+        waterSurfaceRgba: 'rgba(59, 126, 242, 0.45)',
+        waterLevelOffset: 0,
+        hasIceChunks: false,
+        freezeRatio: 0,
+        snowAmount: 0
+      };
+    } else if (timeLeft > 60) {
+      const t = (120 - timeLeft) / 60;
+      return {
+        stage: 3,
+        t,
+        outerBg: '#362a1d',
+        outerSpeck: '#4f3d29',
+        grassBase: lerpHex('#cfa142', '#8c6330', t),
+        grassTuft: lerpHex('#f7c844', '#b3823e', t),
+        grassAccent: '#a84323',
+        wetPatch: null,
+        cultivated: lerpHex('#c98542', '#8f5d2e', t),
+        cultivatedLight: '#de9d59',
+        road: '#c4a270',
+        roadDark: '#9c7c4e',
+        sandBank: '#dfc398',
+        waterDeep: '#1e4a9e',
+        waterMid: '#346ec7',
+        waterSurfaceRgba: 'rgba(52, 110, 199, 0.45)',
+        waterLevelOffset: -7,
+        hasIceChunks: false,
+        freezeRatio: 0,
+        snowAmount: 0
+      };
+    } else {
+      const t = (60 - timeLeft) / 60;
+      return {
+        stage: 4,
+        t,
+        outerBg: lerpHex('#2b2a29', '#4a525d', t),
+        outerSpeck: '#7b8794',
+        grassBase: lerpHex('#786e5a', '#9aa5b1', t),
+        grassTuft: '#e6eef5',
+        grassAccent: '#5c5343',
+        wetPatch: null,
+        cultivated: lerpHex('#756654', '#b0bcc7', t),
+        cultivatedLight: '#dce6f0',
+        road: lerpHex('#b09c80', '#cfd8e0', t),
+        roadDark: '#877864',
+        sandBank: '#d8e4ed',
+        waterDeep: '#1a3b70',
+        waterMid: '#3a6ea5',
+        waterSurfaceRgba: 'rgba(58, 110, 165, 0.50)',
+        waterLevelOffset: -3,
+        hasIceChunks: true,
+        freezeRatio: 0.25 + t * 0.55,
+        snowAmount: 0.35 + t * 0.65
+      };
+    }
+  }
 
-    // Vertical Assiniboine River CENTERED in Lot 2 (Lot 2 spans x: 480 to 720, center is x: 570)
-    let assx = SCREEN_SIZE * 2 + 90; // x: 570, width: 60 (spans 570 to 630, perfectly in the lot center)
-    
-    // Top segment (Zone 0 & 1)
-    mapObjects.push({ x: assx, y: 0, w: 60, h: SCREEN_SIZE * 2 + 80, type: 'assiniboine_river', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 2 });
-    
-    // Stepping Stones Crossing in Zone 2
-    mapObjects.push({ x: assx + 10, y: SCREEN_SIZE * 2 + 88, w: 40, h: 40, type: 'stepping_stones', solid: false, hitOffsetX: 0, hitOffsetY: 0, lot: 2 });
-    
-    // Bottom segment (Zone 2 bottom to Zone 3)
-    mapObjects.push({ x: assx, y: SCREEN_SIZE * 2 + 128, w: 60, h: SCREEN_SIZE * 2, type: 'assiniboine_river', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 2 });
+  let lastBakedSeasonBucket = -1;
 
-    // --- LOT 0 & 1 (User Home Lot & Neighbour Lot) ---
-    for (let lot = 0; lot < 2; lot++) {
-      let ox = lot * SCREEN_SIZE;
+  const snowFlakes = [];
+  for (let i = 0; i < 65; i++) {
+    snowFlakes.push({
+      x: (i * 37) % 480,
+      y: (i * 53) % 336,
+      speedY: 0.45 + (i % 4) * 0.2,
+      driftPhase: i * 0.7
+    });
+  }
 
-      // Zone 0: Woods
-      let trees = 0, attempts = 0;
-      while (trees < 10 && attempts < 100) {
-        let x = ox + Math.floor(Math.random() * (SCREEN_SIZE / TILE - 2) + 1) * TILE;
-        let y = Math.floor(Math.random() * (SCREEN_SIZE / TILE - 2) + 1) * TILE;
-        if (!isSpaceOccupied(x, y, TILE, TILE)) {
-          mapObjects.push({ x, y, w: 16, h: 16, type: 'tree', solid: true, hitOffsetX: 4, hitOffsetY: 4, lot });
-          trees++;
+  // =========================================================================
+  // WEB AUDIO CHIPTUNE & SFX ENGINE
+  // =========================================================================
+  let audioCtx = null;
+  let bgmTimer = null;
+  let bgmStep = 0;
+
+  const melodyNotes = [
+    293.66, 329.63, 392.00, 329.63, 293.66, 246.94, 220.00, 246.94,
+    293.66, 392.00, 440.00, 392.00, 329.63, 293.66, 246.94, 196.00
+  ];
+  const bassNotes = [
+    146.83, null, 146.83, null, 110.00, null, 110.00, null,
+    146.83, null, 196.00, null, 164.81, null, 146.83, null
+  ];
+
+  function initAudio() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  }
+
+  function playTone(freq, type, dur, vol) {
+    if (!audioCtx || !freq) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + dur);
+  }
+
+  function sfxCursor() { playTone(520, 'square', 0.04, 0.12); }
+  function sfxStep() { playTone(120, 'triangle', 0.04, 0.08); }
+  function sfxSetCart() {
+    playTone(220, 'square', 0.08, 0.2);
+    setTimeout(() => playTone(330, 'square', 0.12, 0.2), 70);
+  }
+  function sfxTrade() {
+    playTone(392.00, 'triangle', 0.07, 0.18);
+    setTimeout(() => playTone(523.25, 'triangle', 0.1, 0.18), 65);
+  }
+  function sfxHarvest() {
+    playTone(440, 'square', 0.08, 0.25);
+    setTimeout(() => playTone(554.37, 'square', 0.08, 0.25), 75);
+    setTimeout(() => playTone(659.25, 'square', 0.16, 0.25), 150);
+  }
+  function sfxHbcAlert() {
+    playTone(587.33, 'sawtooth', 0.12, 0.28);
+    setTimeout(() => playTone(440.00, 'sawtooth', 0.16, 0.28), 110);
+  }
+  function sfxScareHbc() {
+    playTone(196.00, 'square', 0.08, 0.26);
+    setTimeout(() => playTone(146.83, 'sawtooth', 0.14, 0.26), 60);
+  }
+  function sfxBust() {
+    playTone(130, 'sawtooth', 0.25, 0.35);
+    setTimeout(() => playTone(82, 'sawtooth', 0.35, 0.35), 140);
+  }
+  function sfxWorkTick() {
+    playTone(280, 'triangle', 0.05, 0.15);
+  }
+  function sfxHorseWhinny() {
+    playTone(659.25, 'triangle', 0.09, 0.14);
+    setTimeout(() => playTone(880.00, 'triangle', 0.12, 0.14), 70);
+    setTimeout(() => playTone(587.33, 'triangle', 0.16, 0.12), 160);
+  }
+
+  function startBGM() {
+    initAudio();
+    if (bgmTimer) clearInterval(bgmTimer);
+    bgmStep = 0;
+    bgmTimer = setInterval(() => {
+      playTone(melodyNotes[bgmStep], 'square', 0.18, 0.032);
+      if (bassNotes[bgmStep]) playTone(bassNotes[bgmStep], 'triangle', 0.28, 0.12);
+      bgmStep = (bgmStep + 1) % melodyNotes.length;
+    }, 260);
+  }
+
+  function stopBGM() {
+    if (bgmTimer) { clearInterval(bgmTimer); bgmTimer = null; }
+  }
+
+  // =========================================================================
+  // 1850 RED RIVER SETTLEMENT GEOGRAPHIC DATA (480 x 336)
+  // =========================================================================
+  const ASSINIBOINE_POINTS = [
+    [34, 141], [54, 147], [78, 152], [102, 150], [126, 156],
+    [152, 164], [176, 166], [202, 162], [226, 165], [244, 174],
+    [256, 182], [268, 173], [279, 166], [292, 175], [306, 178],
+    [320, 170], [333, 167], [344, 166]
+  ];
+
+  const RED_RIVER_POINTS = [
+    [281, 326], [283, 316], [296, 313], [312, 319], [322, 313],
+    [318, 298], [301, 290], [282, 286], [271, 276], [276, 263],
+    [295, 256], [318, 255], [338, 259], [354, 267], [362, 259],
+    [357, 244], [340, 232], [323, 219], [317, 206], [326, 192],
+    [341, 178], [346, 165],
+    [344, 152], [347, 138], [358, 132], [376, 133], [391, 138],
+    [402, 132], [399, 118], [385, 106], [371, 93],  [369, 80],
+    [382, 74],  [398, 76]
+  ];
+
+  const PARISH_BLOCKS = [
+    { id: 'st_james_west', poly: [[4, 38], [232, 76], [202, 162], [152, 164], [78, 152], [34, 141], [18, 102]] },
+    { id: 'st_james_east', poly: [[224, 98], [302, 116], [292, 175], [268, 173], [244, 174], [202, 162]] },
+    { id: 'south_assiniboine', poly: [[164, 165], [244, 174], [210, 273], [138, 254]] },
+    { id: 'st_boniface_west', poly: [[244, 174], [344, 166], [317, 206], [340, 232], [357, 244], [318, 255], [271, 276], [318, 298], [281, 326], [181, 328], [210, 273]] },
+    { id: 'st_boniface_east', poly: [[346, 165], [358, 132], [376, 133], [391, 138], [412, 154], [386, 165], [382, 232], [376, 296], [283, 316], [318, 298], [271, 276], [354, 267], [340, 232], [317, 206]] },
+    { id: 'st_john_west', poly: [[318, 4], [398, 76], [371, 93], [399, 118], [358, 132], [344, 152], [302, 116], [268, 92]] },
+    { id: 'st_john_east', poly: [[382, 74], [474, 164], [448, 184], [386, 165], [391, 138], [399, 118], [371, 93]] }
+  ];
+
+  const CULTIVATED_ZONES = [
+    [[28, 126], [204, 148], [202, 162], [34, 141]],
+    [[202, 144], [296, 154], [292, 175], [202, 162]],
+    [[288, 102], [326, 72], [398, 76], [371, 93], [404, 124], [358, 134], [346, 166], [286, 174]],
+    [[346, 165], [356, 132], [376, 132], [394, 138], [412, 154], [386, 166], [378, 224], [322, 214], [341, 178]],
+    [[295, 248], [362, 246], [368, 278], [282, 286]],
+    [[372, 86], [394, 82], [434, 134], [392, 142]]
+  ];
+
+  const WOODLAND_ZONES = [
+    [[56, 76], [186, 98], [176, 134], [64, 114]],
+    [[22, 54], [46, 62], [42, 92], [20, 82]],
+    [[154, 218], [218, 232], [208, 268], [142, 250]],
+    [[216, 266], [276, 262], [272, 318], [192, 322]],
+    [[356, 222], [382, 226], [374, 292], [332, 286]],
+    [[404, 96], [462, 152], [444, 176], [396, 126]]
+  ];
+
+  // =========================================================================
+  // 6 PARISH CHECKPOINTS & SPECIFIC SPAWN / DEAL / SPECIAL MODIFIERS
+  // =========================================================================
+  const WEIGHT_SMALL_FUR = 2;
+  const WEIGHT_BUFFALO_ROBE = 5;
+  const CART_CAPACITY = 10;
+  const CART_BUST_WEIGHT = 15;
+  const SET_TIME_REQUIRED = 7.0;
+  const HBC_RAID_DURATION = 5.0;
+
+  function rollRange([min, max]) {
+    return min + Math.random() * (max - min);
+  }
+
+  // Checkpoint-Specific Modifiers:
+  // 01 Upper Fort Garry: Higher HBC Officers, all 4 small game hunters (cree, saulteaux, voyageur, kilt), higher HBC deal, low/no buffalo hunter
+  // 02 St. Boniface: Lower HBC Officers, 50/50 small game (cree, voyageur), higher Player deal, lower buffalo hunter
+  // 03 St. Vital: Lower HBC Officers, 50/50 small game (cree, voyageur), higher Player deal, higher buffalo hunter ratio with overall spawn rate halved
+  // 04 Kildonan: Average-to-high HBC Officers, Saulteaux & Kilt small game hunters, higher HBC deal, low buffalo hunter
+  // 05 St. James: Average-to-high HBC Officers, Kilt small game hunter, higher HBC deal, high buffalo hunter
+  // 06 St. Francois-Xavier: Low HBC Officers, Cree small game hunter, higher Player deal, high buffalo hunter, Warden of the Plains every 2 min (120s), rare Spirited White Horse
+  const CHECKPOINTS = [
+    {
+      id: 'upper_fort_garry',
+      name: 'UPPER FORT GARRY',
+      x: 334, y: 162,
+      hbcIconX: 348, hbcIconY: 150,
+      flow: 'WE',
+      entrySide: 'NORTH',
+      smallGameSkins: ['cree', 'saulteaux', 'voyageur', 'kilt'],
+      smallGameRange: [16, 24],
+      buffaloRange: [150, 210], // Low to no buffalo hunter spawn
+      hbcRange: [38, 52],       // Higher HBC Officer spawn
+      hbcDealChance: 0.78,      // Higher HBC deal rate
+      status: 'UNSET',
+      cartX: 112, cartY: 64,
+      setProgress: 0,
+      isWorking: false,
+      raidTimer: 0,
+      furs: 0,
+      robes: 0,
+      smallGameTimer: 7 + Math.random() * 5,
+      buffaloTimer: 125 + Math.random() * 45,
+      hbcTimer: 16 + Math.random() * 10,
+      hbcActiveTimer: 0,
+      hbcTriggeredPass: false
+    },
+    {
+      id: 'st_boniface',
+      name: 'ST. BONIFACE',
+      x: 365, y: 184,
+      hbcIconX: 379, hbcIconY: 172,
+      flow: 'NS',
+      entrySide: 'EAST',
+      smallGameSkins: ['cree', 'voyageur'], // 50/50 small game hunter
+      smallGameRange: [16, 24],
+      buffaloRange: [68, 88],   // Lower buffalo hunter spawn
+      hbcRange: [105, 135],     // Lower HBC Officer spawn
+      hbcDealChance: 0.25,      // Higher Player deal (75% player)
+      status: 'UNSET',
+      cartX: 186, cartY: 146,
+      setProgress: 0,
+      isWorking: false,
+      raidTimer: 0,
+      furs: 0,
+      robes: 0,
+      smallGameTimer: 8 + Math.random() * 6,
+      buffaloTimer: 32 + Math.random() * 12,
+      hbcTimer: 48 + Math.random() * 16,
+      hbcActiveTimer: 0,
+      hbcTriggeredPass: false
+    },
+    {
+      id: 'st_vital',
+      name: 'ST. VITAL',
+      x: 318, y: 266,
+      hbcIconX: 300, hbcIconY: 254,
+      flow: 'NS',
+      entrySide: 'WEST',
+      smallGameSkins: ['cree', 'voyageur'], // 50/50 small game hunter
+      smallGameRange: [44, 58], // Overall spawn rate halved, Buffalo favored over Small Game
+      buffaloRange: [34, 46],   // Higher buffalo hunter ratio within halved overall spawn rate
+      hbcRange: [140, 175],     // Lower HBC Officer spawn (halved overall rate)
+      hbcDealChance: 0.25,      // Higher Player deal (75% player)
+      status: 'UNSET',
+      cartX: 54, cartY: 146,
+      setProgress: 0,
+      isWorking: false,
+      raidTimer: 0,
+      furs: 0,
+      robes: 0,
+      smallGameTimer: 16 + Math.random() * 8,
+      buffaloTimer: 14 + Math.random() * 8,
+      hbcTimer: 65 + Math.random() * 20,
+      hbcActiveTimer: 0,
+      hbcTriggeredPass: false
+    },
+    {
+      id: 'kildonan',
+      name: 'KILDONAN',
+      x: 382, y: 92,
+      hbcIconX: 396, hbcIconY: 80,
+      flow: 'NS',
+      entrySide: 'EAST',
+      smallGameSkins: ['saulteaux', 'kilt'], // Saulteaux & Scottish Kilt small game hunters
+      smallGameRange: [16, 24],
+      buffaloRange: [85, 115],  // Low buffalo hunter spawn
+      hbcRange: [48, 64],       // Average to high HBC Officer spawn
+      hbcDealChance: 0.75,      // Higher HBC deal
+      status: 'UNSET',
+      cartX: 186, cartY: 146,
+      setProgress: 0,
+      isWorking: false,
+      raidTimer: 0,
+      furs: 0,
+      robes: 0,
+      smallGameTimer: 9 + Math.random() * 6,
+      buffaloTimer: 42 + Math.random() * 14,
+      hbcTimer: 26 + Math.random() * 12,
+      hbcActiveTimer: 0,
+      hbcTriggeredPass: false
+    },
+    {
+      id: 'st_james',
+      name: 'ST. JAMES',
+      x: 196, y: 150,
+      hbcIconX: 210, hbcIconY: 136,
+      flow: 'WE',
+      entrySide: 'NORTH',
+      smallGameSkins: ['kilt'], // Kilt-wearing small game hunter
+      smallGameRange: [16, 24],
+      buffaloRange: [24, 32],   // High buffalo hunter spawn
+      hbcRange: [48, 64],       // Average to high HBC Officer spawn
+      hbcDealChance: 0.75,      // Higher HBC deal
+      status: 'UNSET',
+      cartX: 120, cartY: 64,
+      setProgress: 0,
+      isWorking: false,
+      raidTimer: 0,
+      furs: 0,
+      robes: 0,
+      smallGameTimer: 10 + Math.random() * 6,
+      buffaloTimer: 14 + Math.random() * 8,
+      hbcTimer: 30 + Math.random() * 12,
+      hbcActiveTimer: 0,
+      hbcTriggeredPass: false
+    },
+    {
+      id: 'st_francois_xavier',
+      name: 'ST. FRANCOIS-XAVIER',
+      x: 52, y: 135,
+      hbcIconX: 66, hbcIconY: 121,
+      flow: 'WE',
+      entrySide: 'NORTH',
+      smallGameSkins: ['cree'], // Cree small game hunter
+      smallGameRange: [16, 24],
+      buffaloRange: [24, 32],   // High buffalo hunter spawn
+      hbcRange: [110, 140],     // Low regular HBC Officer spawn
+      hbcDealChance: 0.20,      // Higher Player deal (80% player)
+      status: 'UNSET',
+      cartX: 120, cartY: 64,
+      setProgress: 0,
+      isWorking: false,
+      raidTimer: 0,
+      furs: 0,
+      robes: 0,
+      smallGameTimer: 8 + Math.random() * 6,
+      buffaloTimer: 14 + Math.random() * 8,
+      hbcTimer: 75 + Math.random() * 20,
+      hbcActiveTimer: 0,
+      hbcTriggeredPass: false,
+      // Warden of the Plains (once every 2 minutes = 120s)
+      wardenTimer: 55,
+      wardenActiveTimer: 0,
+      wardenTriggeredPass: false
+    }
+  ];
+
+  const clouds = [
+    { x: 60, y: 42, speed: 0.08, w: 28 },
+    { x: 240, y: 26, speed: 0.06, w: 34 },
+    { x: 410, y: 215, speed: 0.07, w: 26 },
+    { x: 110, y: 285, speed: 0.05, w: 30 }
+  ];
+
+  const cursor = { x: 334, y: 162, targetX: 334, targetY: 162 };
+
+  // =========================================================================
+  // 16-BIT PIXEL ART MATRICES (All 4 Small-Game Skins + Warden + White Horse)
+  // =========================================================================
+  const sprCoverCart = [
+    [0,0,0,0,0,7,7,8,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,7,7,8,8,3,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,0,8,8,7,7,3,4,4,4,4,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,7,7,8,8,3,4,4,6,6,4,4,4,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,3,3,4,4,4,3,3,4,4,3,3,4,4,4,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,5,5,5,5,5,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,5,5,2,2,5,2,2,5,5,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,5,2,2,2,2,5,2,2,2,2,5,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,5,2,2,2,5,2,5,2,5,2,2,2,5,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0],
+    [0,0,0,0,5,5,5,5,5,5,6,5,5,5,5,5,5,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0],
+    [0,0,0,0,5,2,2,2,5,2,5,2,5,2,2,2,5,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0],
+    [0,0,0,0,0,5,2,2,2,2,5,2,2,2,2,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0],
+    [0,0,0,0,0,0,5,5,2,2,5,2,2,5,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,5],
+    [0,0,0,0,0,0,0,0,5,5,5,5,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+  ];
+
+  // User Player: Métis Freetrader (14x15)
+  const sprFreetrader = [
+    [0,0,0,0,1,1,1,1,1,1,0,0,0,0],
+    [0,0,1,1,1,1,1,1,1,1,1,1,0,0],
+    [0,0,0,0,1,2,2,2,2,1,0,0,0,0],
+    [0,0,0,0,1,2,1,2,1,1,0,0,0,0],
+    [0,0,0,0,0,2,2,2,2,0,0,0,0,0],
+    [0,0,0,3,3,3,3,3,3,3,3,0,0,0],
+    [0,0,3,3,3,3,6,3,3,3,3,3,0,0],
+    [0,0,3,2,3,3,3,3,3,3,2,3,0,0],
+    [0,0,3,2,3,3,6,3,3,3,2,3,0,0],
+    [0,0,0,2,4,4,4,4,4,4,2,0,0,0],
+    [0,0,0,3,3,4,3,3,4,3,3,0,0,0],
+    [0,0,0,3,3,4,3,3,4,3,3,0,0,0],
+    [0,0,0,0,5,5,0,0,5,5,0,0,0,0],
+    [0,0,0,0,5,5,0,0,5,5,0,0,0,0],
+    [0,0,0,5,5,5,0,0,5,5,5,0,0,0]
+  ];
+
+  // NPC 1: Buffalo Hunter (16x15)
+  const sprBuffaloHunter = [
+    [0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0],
+    [0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0],
+    [0,0,0,0,1,1,2,2,2,2,1,1,0,0,0,0],
+    [0,0,0,0,1,1,1,2,2,1,1,1,0,0,0,0],
+    [0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0],
+    [0,0,0,4,3,3,3,3,3,3,3,4,0,0,0,0],
+    [0,0,4,3,3,3,3,3,3,3,3,3,4,0,5,0],
+    [0,0,4,3,3,5,5,5,5,5,5,5,5,5,5,0],
+    [0,0,4,3,5,5,3,3,3,3,3,3,4,0,0,0],
+    [0,0,4,3,3,3,6,6,6,6,3,3,4,0,0,0],
+    [0,0,0,4,3,3,3,3,3,3,3,4,0,0,0,0],
+    [0,0,0,0,4,3,3,3,3,3,4,0,0,0,0,0],
+    [0,0,0,0,0,1,1,0,0,1,1,0,0,0,0,0],
+    [0,0,0,0,0,1,1,0,0,1,1,0,0,0,0,0],
+    [0,0,0,0,1,1,1,0,0,1,1,1,0,0,0,0]
+  ];
+
+  // NPC 2A: Indigenous Cree Hunter (Fringed Buckskin & Bow & Arrow) (16x15)
+  const sprCreeHunter = [
+    [0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0],
+    [0,0,0,0,1,1,1,1,1,1,1,0,0,5,0,0],
+    [0,0,0,0,1,2,2,2,2,1,1,0,0,0,5,0],
+    [0,0,0,0,1,2,1,2,1,1,0,0,0,0,5,0],
+    [0,0,0,0,1,0,2,2,0,1,0,0,0,0,5,0],
+    [0,0,0,3,3,3,6,6,3,3,3,5,5,5,5,5],
+    [0,0,3,3,3,3,3,3,3,3,3,0,0,0,5,0],
+    [0,0,4,2,3,3,3,3,3,3,2,0,0,0,5,0],
+    [0,0,4,2,4,4,4,4,4,4,2,0,0,5,0,0],
+    [0,0,0,0,3,3,3,3,3,3,0,0,0,0,0,0],
+    [0,0,0,0,4,3,4,3,4,3,0,0,0,0,0,0],
+    [0,0,0,0,4,0,4,0,4,0,0,0,0,0,0,0],
+    [0,0,0,0,0,4,4,0,4,4,0,0,0,0,0,0],
+    [0,0,0,0,0,4,4,0,4,4,0,0,0,0,0,0],
+    [0,0,0,0,4,4,4,0,4,4,4,0,0,0,0,0]
+  ];
+
+  // NPC 2B: 3-Stripe Capote Wearing Voyageur (16x15)
+  const sprVoyageur = [
+    [0,0,0,0,0,4,4,4,4,0,0,0,0,0,0,0],
+    [0,0,0,0,4,4,4,4,4,4,0,0,0,0,0,0],
+    [0,0,0,0,1,2,2,2,2,1,0,0,0,0,0,0],
+    [0,0,0,0,1,2,1,2,1,1,0,0,0,0,0,0],
+    [0,0,0,0,0,2,2,2,2,0,0,0,0,0,0,0],
+    [0,0,0,3,3,3,3,3,3,3,3,0,0,0,0,0],
+    [0,0,3,3,3,3,3,3,3,3,3,3,0,0,0,0],
+    [0,0,3,2,4,4,4,4,4,4,2,3,0,0,0,0],
+    [0,0,3,2,3,3,4,3,3,3,2,3,0,0,0,0],
+    [0,0,0,5,5,5,5,5,5,5,5,0,0,0,0,0],
+    [0,0,0,6,6,6,6,6,6,6,6,0,0,0,0,0],
+    [0,0,0,7,7,7,7,7,7,7,7,0,0,0,0,0],
+    [0,0,0,0,1,1,0,0,1,1,0,0,0,0,0,0],
+    [0,0,0,0,1,1,0,0,1,1,0,0,0,0,0,0],
+    [0,0,0,1,1,1,0,0,1,1,1,0,0,0,0,0]
+  ];
+
+  // NPC 2C: Saulteaux Small Game Hunter (Floral-Beaded Bandolier, Feathered Headband & Spear) (16x15)
+  // 1: Dark Hair/Leggings, 2: Skin, 3: Deep Indigo/Charcoal Capote, 4: Crimson & Gold Floral Bandolier,
+  // 5: White/Gold Eagle Feather, 6: Wooden Hunting Spear
+  const sprSaulteauxHunter = [
+    [0,0,0,5,0,1,1,1,1,1,0,0,0,0,6,0],
+    [0,0,0,0,5,4,4,4,4,4,1,0,0,0,6,0],
+    [0,0,0,0,1,2,2,2,2,1,1,0,0,0,6,0],
+    [0,0,0,0,1,2,1,2,1,1,0,0,0,0,6,0],
+    [0,0,0,0,1,0,2,2,0,1,0,0,0,0,6,0],
+    [0,0,0,3,3,4,3,3,3,3,3,0,0,0,6,0],
+    [0,0,3,3,3,3,4,3,3,3,3,3,0,0,6,0],
+    [0,0,3,2,3,3,3,4,3,3,2,3,6,6,6,6],
+    [0,0,3,2,4,4,4,4,4,4,2,3,0,0,6,0],
+    [0,0,0,0,3,3,3,3,3,3,0,0,0,0,6,0],
+    [0,0,0,0,3,3,4,4,3,3,0,0,0,0,6,0],
+    [0,0,0,0,1,1,0,0,1,1,0,0,0,0,0,0],
+    [0,0,0,0,1,1,0,0,1,1,0,0,0,0,0,0],
+    [0,0,0,0,1,1,0,0,1,1,0,0,0,0,0,0],
+    [0,0,0,1,1,1,0,0,1,1,1,0,0,0,0,0]
+  ];
+
+  // NPC 2D: Scottish Kilt Small Game Hunter (Tam o' Shanter Bonnet, Tartan Kilt & Fowling Piece) (16x15)
+  // 1: Dark Bonnet/Boots, 2: Skin, 3: Earth-Brown Jacket, 4: Red Tartan Kilt & Pom-Pom,
+  // 5: Green & Gold Tartan Check, 6: White Wool Hose, 7: Fowling Gun
+  const sprKiltHunter = [
+    [0,0,0,0,0,0,4,4,0,0,0,0,0,0,0,0],
+    [0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0],
+    [0,0,0,0,0,2,2,2,2,0,0,0,0,0,0,0],
+    [0,0,0,0,0,2,1,2,1,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,2,2,0,0,0,0,0,0,0,0],
+    [0,0,0,3,3,3,6,6,3,3,3,0,0,0,7,0],
+    [0,0,3,3,3,3,3,3,3,3,3,3,0,7,0,0],
+    [0,0,3,2,3,3,3,3,3,3,2,3,7,0,0,0],
+    [0,0,3,2,3,3,3,3,3,3,2,7,0,0,0,0],
+    [0,0,0,0,4,5,4,5,4,5,0,0,0,0,0,0],
+    [0,0,0,0,5,4,5,4,5,4,0,0,0,0,0,0],
+    [0,0,0,0,4,5,4,5,4,5,0,0,0,0,0,0],
+    [0,0,0,0,0,6,6,0,0,6,6,0,0,0,0,0],
+    [0,0,0,0,0,4,6,0,0,4,6,0,0,0,0,0],
+    [0,0,0,0,1,1,1,0,0,1,1,1,0,0,0,0]
+  ];
+
+  // NPC 3: Standard HBC Officer (Tall Black Top Hat & Scarlet Red Coat) (14x16)
+  const sprHbcOfficer = [
+    [0,0,0,0,1,1,1,1,1,1,0,0,0,0],
+    [0,0,0,0,1,1,1,1,1,1,0,0,0,0],
+    [0,0,0,0,1,4,4,4,4,1,0,0,0,0],
+    [0,0,1,1,1,1,1,1,1,1,1,1,0,0],
+    [0,0,0,0,0,2,2,2,2,0,0,0,0,0],
+    [0,0,0,0,0,2,1,2,1,0,0,0,0,0],
+    [0,0,0,0,0,0,5,5,0,0,0,0,0,0],
+    [0,0,4,3,3,3,5,5,3,3,3,4,0,0],
+    [0,0,3,3,3,3,4,3,3,3,3,3,0,0],
+    [0,0,3,2,3,3,4,3,3,3,2,3,0,0],
+    [0,0,3,2,3,3,4,3,3,3,2,3,0,0],
+    [0,0,0,3,3,3,5,5,3,3,3,0,0,0],
+    [0,0,0,3,3,0,0,0,0,3,3,0,0,0],
+    [0,0,0,0,5,5,0,0,5,5,0,0,0,0],
+    [0,0,0,0,1,1,0,0,1,1,0,0,0,0],
+    [0,0,0,1,1,1,0,0,1,1,1,0,0,0]
+  ];
+
+  // Special Wildcard NPC: Warden of the Plains (Gold-Sashed & Plumed Top Hat HBC Commander) (14x17)
+  const sprWardenPlains = [
+    [0,0,0,6,6,0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,1,1,1,1,1,1,0,0,0,0],
+    [0,0,0,0,1,1,1,1,1,1,0,0,0,0],
+    [0,0,0,0,1,4,4,4,4,1,0,0,0,0],
+    [0,0,1,1,1,1,1,1,1,1,1,1,0,0],
+    [0,0,0,0,0,2,2,2,2,0,0,0,0,0],
+    [0,0,0,0,0,2,1,2,1,0,0,0,0,0],
+    [0,0,0,0,0,0,5,5,0,0,0,0,0,0],
+    [0,0,4,3,4,3,5,5,3,3,3,4,0,0],
+    [0,0,3,3,3,4,4,3,3,3,3,3,0,0],
+    [0,0,3,2,3,3,4,4,3,3,2,3,0,0],
+    [0,0,3,2,3,3,4,3,4,3,2,3,0,0],
+    [0,0,0,3,3,3,5,5,3,3,3,0,0,0],
+    [0,0,0,3,3,0,0,0,0,3,3,0,0,0],
+    [0,0,0,0,5,5,0,0,5,5,0,0,0,0],
+    [0,0,0,0,1,1,0,0,1,1,0,0,0,0],
+    [0,0,0,1,1,1,0,0,1,1,1,0,0,0]
+  ];
+
+  // Rare Spirited White Horse for St. Francois-Xavier (20x16, naturally facing right)
+  // 1: Pure Snow-White Coat, 2: Silver-Grey Shading, 3: Flowing Cream/Silver Mane & Tail,
+  // 4: Dark Expressive Eye/Hooves, 5: Soft Pink/Grey Muzzle
+  const sprWhiteHorse = [
+    [0,0,0,0,0,0,0,0,0,0,0,0,0,3,3,1,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0,0,0,0,3,3,1,1,1,0,0,0],
+    [0,0,0,0,0,0,0,0,0,0,0,3,3,1,1,4,1,1,0,0],
+    [0,3,3,0,0,0,0,0,0,0,3,3,1,1,1,1,1,1,5,0],
+    [3,3,3,3,1,1,1,1,1,1,3,1,1,1,1,1,1,5,5,0],
+    [3,3,1,1,1,1,1,1,1,1,1,1,1,1,1,2,2,0,0,0],
+    [3,1,1,1,1,1,1,1,1,1,1,1,1,1,2,0,0,0,0,0],
+    [3,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0],
+    [0,0,1,2,1,1,2,2,2,2,1,1,2,1,0,0,0,0,0,0],
+    [0,0,1,2,0,1,0,0,0,0,1,0,1,2,0,0,0,0,0,0],
+    [0,0,1,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,0],
+    [0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,0],
+    [0,4,0,0,0,4,0,0,0,0,4,0,0,0,4,0,0,0,0,0]
+  ];
+
+  // Ambient Underwater Fish
+  const sprWhitefishNorth = [
+    [0,0,0,0,1,0,0,0,0],
+    [0,0,0,1,2,1,0,0,0],
+    [0,0,1,2,3,2,1,0,0],
+    [0,0,1,2,3,2,1,0,0],
+    [0,1,2,2,3,2,2,1,0],
+    [1,2,2,2,3,2,2,2,1],
+    [0,1,2,2,3,2,2,1,0],
+    [0,0,1,2,3,2,1,0,0],
+    [0,0,1,2,2,2,1,0,0],
+    [0,0,0,1,2,1,0,0,0],
+    [0,0,0,1,2,1,0,0,0],
+    [0,0,1,2,1,2,1,0,0],
+    [0,1,2,0,0,0,2,1,0]
+  ];
+
+  const sprWhitefishHoriz = [
+    [1,0,0,0,0,0,0,1,0,0,0,0,0],
+    [2,1,0,0,0,0,1,2,1,0,0,0,0],
+    [0,2,1,1,1,1,2,2,2,1,1,0,0],
+    [0,0,1,2,2,2,2,2,2,2,2,1,0],
+    [0,0,0,1,3,3,3,3,3,3,3,2,1],
+    [0,0,1,2,2,2,2,2,2,2,2,1,0],
+    [0,2,1,1,1,1,2,2,2,1,1,0,0],
+    [2,1,0,0,0,0,1,2,1,0,0,0,0],
+    [1,0,0,0,0,0,0,1,0,0,0,0,0]
+  ];
+
+  const sprSturgeonNorth = [
+    [0,0,0,0,0,1,0,0,0,0,0],
+    [0,0,0,0,1,2,1,0,0,0,0],
+    [0,0,0,1,2,4,2,1,0,0,0],
+    [0,0,0,1,2,2,2,1,0,0,0],
+    [0,0,1,2,2,4,2,2,1,0,0],
+    [0,1,2,2,2,2,2,2,2,1,0],
+    [1,2,2,1,2,4,2,1,2,2,1],
+    [0,0,1,2,2,2,2,2,1,0,0],
+    [0,0,1,2,2,4,2,2,1,0,0],
+    [0,0,1,2,2,2,2,2,1,0,0],
+    [0,0,0,1,2,4,2,1,0,0,0],
+    [0,0,0,1,2,2,2,1,0,0,0],
+    [0,0,1,2,1,4,1,2,1,0,0],
+    [0,0,0,0,1,2,1,0,0,0,0],
+    [0,0,0,0,1,2,1,0,0,0,0],
+    [0,0,0,1,2,1,2,1,0,0,0],
+    [0,0,1,2,0,0,0,2,1,0,0],
+    [0,1,2,0,0,0,0,0,0,0,0]
+  ];
+
+  const sprSturgeonHoriz = [
+    [0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0],
+    [1,0,0,0,0,0,0,0,0,0,1,2,1,0,0,0,0,0],
+    [2,1,0,0,0,1,0,0,1,1,2,2,2,1,0,0,0,0],
+    [0,2,1,0,1,2,1,1,2,2,2,1,2,2,1,0,0,0],
+    [0,0,2,1,2,2,2,2,2,2,2,2,2,2,2,1,1,0],
+    [0,0,0,1,2,4,2,4,2,4,2,4,2,4,2,4,2,1],
+    [0,0,2,1,2,2,2,2,2,2,2,2,2,2,2,1,1,0],
+    [0,2,1,0,1,2,1,1,2,2,2,1,2,2,1,0,0,0],
+    [0,1,0,0,0,1,0,0,1,1,2,2,2,1,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0,0,1,2,1,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0]
+  ];
+
+  function drawMatrix(matrix, x, y, palette, scale = 1, flipX = false) {
+    const h = matrix.length;
+    const w = matrix[0].length;
+    for (let r = 0; r < h; r++) {
+      for (let c = 0; c < w; c++) {
+        const val = matrix[r][c];
+        if (val > 0 && palette[val]) {
+          ctx.fillStyle = palette[val];
+          const drawC = flipX ? (w - 1 - c) : c;
+          ctx.fillRect(Math.floor(x + drawC * scale), Math.floor(y + r * scale), scale, scale);
         }
-        attempts++;
       }
+    }
+  }
 
-      // Zone 1: Hay Privilege
-      let bushes = 0; attempts = 0;
-      while (bushes < 8 && attempts < 100) {
-        let x = ox + Math.floor(Math.random() * (SCREEN_SIZE / TILE - 2) + 1) * TILE;
-        let y = SCREEN_SIZE + Math.floor(Math.random() * (SCREEN_SIZE / TILE - 2) + 1) * TILE;
-        if (!isSpaceOccupied(x, y, TILE, TILE)) {
-          mapObjects.push({ x, y, w: TILE, h: TILE, type: 'bush', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot });
-          bushes++;
+  // =========================================================================
+  // DIRT-ROAD-ONLY VALIDATION (CHECKPOINT-SPECIFIC ROADS)
+  // =========================================================================
+  function isOnDirtRoad(cp, x, y) {
+    if (cp.id === 'upper_fort_garry') {
+      // Upper Fort Garry: Red River left bank is at x=178, so E-W roads run x: 12..172
+      if (x >= 12 && x <= 172 && y >= 56 && y <= 72) return true;
+      if (x >= 112 && x <= 128 && y >= 14 && y <= 58) return true;
+      if (x >= 12 && x <= 172 && y >= 164 && y <= 180) return true;
+      return false;
+    }
+
+    if (cp.flow === 'NS') {
+      // West bank N-S road (in St. Boniface, Assiniboine enters at y=136..182, so West road runs y: 16..132 & 184..228)
+      if (cp.id === 'st_boniface') {
+        if (x >= 46 && x <= 62 && ((y >= 16 && y <= 132) || (y >= 184 && y <= 228))) return true;
+      } else {
+        if (x >= 46 && x <= 62 && y >= 16 && y <= 228) return true;
+      }
+      if (x >= 46 && x <= 72 && y >= 112 && y <= 128) return true;
+      if (cp.entrySide === 'WEST' && x >= 6 && x <= 46 && y >= 112 && y <= 128) return true;
+
+      // East bank N-S road
+      if (x >= 178 && x <= 194 && y >= 16 && y <= 228) return true;
+      if (x >= 168 && x <= 194 && y >= 112 && y <= 128) return true;
+      if (cp.entrySide === 'EAST' && x >= 194 && x <= 234 && y >= 112 && y <= 128) return true;
+
+      // St. Boniface: West-East road on the north side of the Cathedral (y: 2..15, x: 168..236)
+      if (cp.id === 'st_boniface' && x >= 168 && x <= 236 && y >= 2 && y <= 16) return true;
+
+      return false;
+    } else {
+      if (x >= 12 && x <= 228 && y >= 56 && y <= 72) return true;
+      if (x >= 112 && x <= 128 && y >= 14 && y <= 58) return true;
+      if (x >= 12 && x <= 228 && y >= 164 && y <= 180) return true;
+      return false;
+    }
+  }
+
+  // =========================================================================
+  // BASELINE RANK STANDING SYSTEM (PELT & ROBE TRACKING)
+  // =========================================================================
+  function getBaselineTradeStanding() {
+    return totalFurs + (totalRobes * 2);
+  }
+
+  function getTraderRankInfo() {
+    const standing = getBaselineTradeStanding();
+    if (standing >= 40) {
+      return { title: 'KING OF THE TRADERS', color: PALETTE.compassGold };
+    }
+    if (standing >= 10) {
+      return { title: 'SURVIVED THE WINTER', color: PALETTE.teal };
+    }
+    return { title: 'SCARCE & STARVATION', color: '#ff6b6b' };
+  }
+
+  // =========================================================================
+  // GAME STATE & REAL-TIME SIMULATION
+  // =========================================================================
+  let gameState = 'TITLE'; // TITLE, BRIEFING, MAP, WEIR, GAMEOVER
+  let briefingSide = 1;
+  let frameTick = 0;
+  let timeLeft = 300;
+  let lastSecondTimestamp = 0;
+
+  let totalFurs = 0;
+  let totalRobes = 0;
+  let hbcBrokenCount = 0;
+
+  let activeCheckpointIndex = 0;
+  let player = { x: 54, y: 120, dir: 'right', moving: false };
+
+  let sceneNPCs = [];
+  let riverFish = [];
+  let floatingPopups = [];
+
+  // Rare Spirited White Horse state (once every gameplay at St. Francois-Xavier)
+  let whiteHorseTriggeredThisRun = false;
+  let whiteHorse = null;
+
+  function setViewMode(mode) {
+    gameState = mode;
+    if (mode === 'MAP') {
+      weirWrapper.style.display = 'none';
+      mapView.style.display = 'flex';
+      const bucket = Math.floor((300 - timeLeft) / 5);
+      if (bucket !== lastBakedSeasonBucket) {
+        bakeStaticMap();
+      }
+      updateCheckpointBoxesUI();
+    } else {
+      mapView.style.display = 'none';
+      weirWrapper.style.display = 'block';
+    }
+    updateHUD();
+  }
+
+  function setBriefingSide(side) {
+    briefingSide = side;
+    if (side === 1) {
+      dialogHeading.textContent = 'THE FREETRADERS';
+      dialogPage.textContent = '[B] 1/2';
+      dialogSide1.style.display = 'block';
+      dialogSide2.style.display = 'none';
+      flipLabel.textContent = '[B] HOW TO PLAY';
+    } else {
+      dialogHeading.textContent = 'HOW TO PLAY';
+      dialogPage.textContent = '[B] 2/2';
+      dialogSide1.style.display = 'none';
+      dialogSide2.style.display = 'block';
+      flipLabel.textContent = '[B] HISTORY';
+    }
+  }
+
+  function toggleBriefingSide() {
+    if (gameState !== 'BRIEFING') return;
+    sfxCursor();
+    setBriefingSide(briefingSide === 1 ? 2 : 1);
+  }
+
+  function getCartWeight(cp) {
+    return (cp.furs * WEIGHT_SMALL_FUR) + (cp.robes * WEIGHT_BUFFALO_ROBE);
+  }
+
+  function getCheckpointHbcPresence(cp, idx) {
+    // Returns 'warden' if Warden of the Plains is active/in frame, 'hbc' if regular HBC officer, or null
+    if (gameState === 'WEIR' && activeCheckpointIndex === idx) {
+      if (sceneNPCs.some(n => n.role === 'warden')) return 'warden';
+      if (sceneNPCs.some(n => n.role === 'hbc')) return 'hbc';
+    }
+    if (cp.wardenActiveTimer > 0) return 'warden';
+    if (cp.status === 'HBC_RAID' || cp.hbcActiveTimer > 0) return 'hbc';
+    return null;
+  }
+
+  function resetAllCheckpoints() {
+    CHECKPOINTS.forEach((cp, idx) => {
+      cp.status = 'UNSET';
+      cp.cartX = cp.id === 'upper_fort_garry'
+        ? 112
+        : (cp.flow === 'NS' ? (cp.entrySide === 'EAST' ? 186 : 54) : 120);
+      cp.cartY = cp.flow === 'NS' ? 146 : 64;
+      cp.setProgress = 0;
+      cp.isWorking = false;
+      cp.raidTimer = 0;
+      cp.furs = 0;
+      cp.robes = 0;
+      cp.smallGameTimer = rollRange(cp.smallGameRange) * (0.4 + idx * 0.08);
+      cp.buffaloTimer   = rollRange(cp.buffaloRange) * (0.45 + idx * 0.08);
+      cp.hbcTimer       = rollRange(cp.hbcRange) * (0.45 + idx * 0.1);
+      cp.hbcActiveTimer = 0;
+      cp.hbcTriggeredPass = false;
+      if (cp.id === 'st_francois_xavier') {
+        cp.wardenTimer = 55; // First appearance ~4:05, then every 120s (2 minutes)
+        cp.wardenActiveTimer = 0;
+        cp.wardenTriggeredPass = false;
+      }
+    });
+    whiteHorseTriggeredThisRun = false;
+    whiteHorse = null;
+  }
+
+  function isPlayerNearCart(cp) {
+    return Math.hypot(player.x - cp.cartX, player.y - cp.cartY) <= 28;
+  }
+
+  let lastFrameTime = performance.now();
+
+  function updateSimulation(now) {
+    const dt = Math.min(0.1, (now - lastFrameTime) / 1000);
+    lastFrameTime = now;
+    frameTick++;
+
+    if (gameState !== 'MAP' && gameState !== 'WEIR') return;
+
+    const secNow = Math.floor(now / 1000);
+    if (secNow > lastSecondTimestamp) {
+      timeLeft--;
+      lastSecondTimestamp = secNow;
+      if (timeLeft <= 0) {
+        timeLeft = 0;
+        triggerGameOver(false);
+        return;
+      }
+      const bucket = Math.floor((300 - timeLeft) / 5);
+      if (bucket !== lastBakedSeasonBucket) {
+        bakeStaticMap();
+      }
+    }
+
+    // Update all 6 checkpoints independently in real time
+    for (let idx = 0; idx < CHECKPOINTS.length; idx++) {
+      const cp = CHECKPOINTS[idx];
+      const isViewingThis = (gameState === 'WEIR' && activeCheckpointIndex === idx);
+
+      if (cp.status === 'SETTING') {
+        if (isViewingThis && cp.isWorking && isPlayerNearCart(cp)) {
+          cp.setProgress += dt;
+          if (Math.floor(cp.setProgress * 2) !== Math.floor((cp.setProgress - dt) * 2)) {
+            sfxWorkTick();
+          }
+          if (cp.setProgress >= SET_TIME_REQUIRED) {
+            cp.status = 'ACTIVE';
+            cp.setProgress = 0;
+            cp.isWorking = false;
+            sfxSetCart();
+          }
+        } else {
+          cp.isWorking = false;
         }
-        attempts++;
-      }
+      } else if (cp.status === 'HBC_RAID') {
+        cp.raidTimer -= dt;
+        if (cp.raidTimer <= 0) {
+          cp.status = 'BUSTED';
+          cp.raidTimer = 0;
+          cp.furs = 0;
+          cp.robes = 0;
+          cp.isWorking = false;
+          hbcBrokenCount++;
+          sfxBust();
+          updateHUD();
 
-      // Zone 2: Homestead
-      let cabinX = ox + 24 + Math.floor(Math.random() * 2) * 48;
-      let cabinY = (SCREEN_SIZE * 2) + 36 + Math.floor(Math.random() * 2) * 48;
-      if (lot === 0 && Math.hypot(cabinX - 96, cabinY - (camera.y + 96)) < 48) cabinX = ox + 24;
-
-      mapObjects.push({ x: cabinX, y: cabinY, w: 60, h: 40, type: 'cabin', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot });
-
-      let gardenX = cabinX + 64;
-      let gardenY = cabinY;
-      if (gardenX + 64 > ox + SCREEN_SIZE) gardenX = cabinX - 68;
-
-      mapObjects.push({ x: gardenX, y: gardenY, w: 64, h: 48, type: 'garden_soil', solid: false, hitOffsetX: 0, hitOffsetY: 0, lot });
-      
-      for (let gx = 4; gx < 64; gx += 20) {
-        for (let gy = 4; gy < 48; gy += 20) {
-          if (!isSpaceOccupied(gardenX + gx, gardenY + gy, TILE, TILE)) {
-            mapObjects.push({ x: gardenX + gx, y: gardenY + gy, w: TILE, h: TILE, type: 'veggie', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot });
+          if (hbcBrokenCount >= 3) {
+            triggerGameOver(true);
+            return;
           }
         }
       }
 
-      // Enemies
-      for (let eCount = 0; eCount < 2; eCount++) {
-        let isWoodSpawn = Math.random() < 0.7;
-        let wolfZoneY = isWoodSpawn ? 0 : Math.floor(Math.random() * 2 + 1) * SCREEN_SIZE;
-        let wolfX = ox + 36 + Math.random() * 120;
-        let wolfY = wolfZoneY + 36 + Math.random() * 120;
-        enemies.push({ x: wolfX, y: wolfY, w: 16, h: 16, dx: 1, dy: 1, changeTimer: 60, lot, bounceX: 0, bounceY: 0, hp: 1 });
+      if (cp.hbcActiveTimer > 0) {
+        cp.hbcActiveTimer -= dt;
+        if (!isViewingThis && cp.status === 'ACTIVE' && !cp.hbcTriggeredPass && cp.hbcActiveTimer <= 7.0) {
+          cp.hbcTriggeredPass = true;
+          cp.status = 'HBC_RAID';
+          cp.raidTimer = HBC_RAID_DURATION;
+        }
+        if (cp.hbcActiveTimer <= 0) {
+          cp.hbcActiveTimer = 0;
+          cp.hbcTriggeredPass = false;
+        }
+      }
+
+      // St. Francois-Xavier: Warden of the Plains (once every 2 minutes = 120s)
+      if (cp.id === 'st_francois_xavier') {
+        if (cp.wardenActiveTimer > 0) {
+          cp.wardenActiveTimer -= dt;
+          // Offscreen wildcard check: 50/50 turns a blind eye to player's cart!
+          if (!isViewingThis && cp.status === 'ACTIVE' && !cp.wardenTriggeredPass && cp.wardenActiveTimer <= 8.0) {
+            cp.wardenTriggeredPass = true;
+            if (Math.random() >= 0.5) {
+              cp.status = 'HBC_RAID';
+              cp.raidTimer = HBC_RAID_DURATION;
+            }
+          }
+          if (cp.wardenActiveTimer <= 0) {
+            cp.wardenActiveTimer = 0;
+            cp.wardenTriggeredPass = false;
+          }
+        }
+
+        cp.wardenTimer -= dt;
+        if (cp.wardenTimer <= 0) {
+          cp.wardenTimer = 120.0; // Strictly once every 2 minutes
+          if (isViewingThis) {
+            spawnCheckpointNPC(cp, 'warden');
+          } else {
+            cp.wardenActiveTimer = 16.0;
+            cp.wardenTriggeredPass = false;
+          }
+        }
+      }
+
+      // 1) SmallGameHunter (Checkpoint-specific skin pool & HBC deal odds)
+      cp.smallGameTimer -= dt;
+      if (cp.smallGameTimer <= 0) {
+        cp.smallGameTimer = rollRange(cp.smallGameRange);
+        const skins = cp.smallGameSkins;
+        const variant = skins[Math.floor(Math.random() * skins.length)];
+        if (isViewingThis) {
+          spawnCheckpointNPC(cp, variant);
+        } else if (cp.status === 'ACTIVE') {
+          const hasAuthority = (cp.hbcActiveTimer > 0 || cp.wardenActiveTimer > 0);
+          if (hasAuthority && Math.random() < cp.hbcDealChance) {
+            // Traded fur to HBC Officer offscreen
+          } else {
+            applyOffscreenNpcTrade(cp, variant);
+          }
+        }
+      }
+
+      // 2) BuffaloHunter (Checkpoint-specific spawn interval)
+      cp.buffaloTimer -= dt;
+      if (cp.buffaloTimer <= 0) {
+        cp.buffaloTimer = rollRange(cp.buffaloRange);
+        if (isViewingThis) {
+          spawnCheckpointNPC(cp, 'buffalo');
+        } else {
+          if (cp.hbcActiveTimer > 0) {
+            cp.hbcActiveTimer = 0;
+            cp.hbcTriggeredPass = false;
+          }
+          if (cp.wardenActiveTimer > 0 && Math.random() < 0.5) {
+            // 50/50 Warden gets spooked by Buffalo Hunter offscreen
+            cp.wardenActiveTimer = 0;
+            cp.wardenTriggeredPass = false;
+          }
+          if (cp.status === 'ACTIVE') {
+            applyOffscreenNpcTrade(cp, 'buffalo');
+          }
+        }
+      }
+
+      // 3) Regular HBC Officer (Checkpoint-specific spawn interval)
+      cp.hbcTimer -= dt;
+      if (cp.hbcTimer <= 0) {
+        cp.hbcTimer = rollRange(cp.hbcRange);
+        if (isViewingThis) {
+          spawnCheckpointNPC(cp, 'hbc');
+        } else {
+          cp.hbcActiveTimer = 14.0;
+          cp.hbcTriggeredPass = false;
+        }
       }
     }
 
-    // --- LOT 2 (The Forks & St. Boniface) ---
-    let forksOx = SCREEN_SIZE * 2;
-    mapObjects.push({ x: forksOx + 12, y: SCREEN_SIZE * 2 + 36, w: 54, h: 36, type: 'fort_building', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 2, label: 'HALL' });
-    mapObjects.push({ x: forksOx + 12, y: SCREEN_SIZE * 2 + 130, w: 54, h: 36, type: 'fort_building', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 2, label: 'POST' });
+    if (gameState === 'WEIR') {
+      const cp = CHECKPOINTS[activeCheckpointIndex];
+      updateSceneNPCs(cp, dt);
+      updateSceneFish(cp);
+      updateWhiteHorse(cp, dt);
+    } else if (gameState === 'MAP' && frameTick % 12 === 0) {
+      updateCheckpointBoxesUI();
+    }
 
-    for (let wTree = 0; wTree < 6; wTree++) {
-      let tx = forksOx + 24 + (wTree % 2) * 48;
-      let ty = 24 + Math.floor(wTree / 2) * 48;
-      if (!isSpaceOccupied(tx, ty, TILE, TILE)) {
-        mapObjects.push({ x: tx, y: ty, w: 16, h: 16, type: 'tree', solid: true, hitOffsetX: 4, hitOffsetY: 4, lot: 2 });
+    for (let i = floatingPopups.length - 1; i >= 0; i--) {
+      floatingPopups[i].y -= 0.35;
+      floatingPopups[i].life -= dt;
+      if (floatingPopups[i].life <= 0) floatingPopups.splice(i, 1);
+    }
+
+    updateHUD();
+  }
+
+  function applyOffscreenNpcTrade(cp, role) {
+    if (cp.status !== 'ACTIVE') return;
+    if (role === 'buffalo') {
+      cp.robes++;
+      if (getCartWeight(cp) >= CART_BUST_WEIGHT) {
+        cp.status = 'BUSTED';
+        cp.furs = 0;
+        cp.robes = 0;
+      }
+    } else if (isSmallGameRole(role)) {
+      cp.furs++;
+      if (getCartWeight(cp) >= CART_BUST_WEIGHT) {
+        cp.status = 'BUSTED';
+        cp.furs = 0;
+        cp.robes = 0;
       }
     }
-    enemies.push({ x: forksOx + 48, y: 48, w: 16, h: 16, dx: 1, dy: 1, changeTimer: 60, lot: 2, bounceX: 0, bounceY: 0, hp: 1 });
+  }
 
-    // --- LOT 3 (Upper Fort Garry - Resized & Compacted directly into Homestead Zone 2) ---
-    let fortOx = SCREEN_SIZE * 3;
-    let fortBaseX = fortOx + 64;
-    let fortBaseY = (SCREEN_SIZE * 2) + 40;
+  function isSmallGameRole(role) {
+    return role === 'cree' || role === 'voyageur' || role === 'saulteaux' || role === 'kilt';
+  }
 
-    // Compact Fort Outer Walls
-    mapObjects.push({ x: fortBaseX, y: fortBaseY, w: 24, h: 80, type: 'fort_wall', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 3 });
-    mapObjects.push({ x: fortBaseX + 88, y: fortBaseY, w: 24, h: 80, type: 'fort_wall', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 3 });
-    // Upper Arch Gate
-    mapObjects.push({ x: fortBaseX + 24, y: fortBaseY, w: 64, h: 24, type: 'fort_gate_top', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 3 });
-    // Active Trade Gate Entrance
-    mapObjects.push({ x: fortBaseX + 40, y: fortBaseY + 24, w: 32, h: 32, type: 'fort_trade_gate', solid: false, hitOffsetX: 0, hitOffsetY: 0, lot: 3 });
+  function isOfficerRole(role) {
+    return role === 'hbc' || role === 'warden';
+  }
 
-    // Trees in Woods (Zone 0) & Hay Priv. (Zone 1) for Lot 3
-    for (let wTree = 0; wTree < 8; wTree++) {
-      let tx = fortOx + 24 + (wTree % 4) * 48;
-      let ty = 24 + Math.floor(wTree / 4) * 60;
-      if (!isSpaceOccupied(tx, ty, TILE, TILE)) {
-        mapObjects.push({ x: tx, y: ty, w: 16, h: 16, type: 'tree', solid: true, hitOffsetX: 4, hitOffsetY: 4, lot: 3 });
+  // =========================================================================
+  // RARE SPIRITED WHITE HORSE (ST. FRANCOIS-XAVIER — ONCE EVERY GAMEPLAY)
+  // =========================================================================
+  function maybeSpawnSpiritedWhiteHorse(cp) {
+    if (cp.id !== 'st_francois_xavier') return;
+    if (whiteHorseTriggeredThisRun || whiteHorse) return;
+
+    whiteHorseTriggeredThisRun = true;
+    sfxHorseWhinny();
+    whiteHorse = {
+      x: 248,
+      y: 34,
+      dir: 'left',
+      phase: 'enter',
+      timer: 0,
+      waypoints: [
+        { x: 196, y: 28 },
+        { x: 158, y: 38 },
+        { x: 142, y: 24 },
+        { x: 86,  y: 36 },
+        { x: 24,  y: 28 },
+        { x: -24, y: 34 }
+      ],
+      wpIndex: 0
+    };
+  }
+
+  function updateWhiteHorse(cp, dt) {
+    if (!whiteHorse || cp.id !== 'st_francois_xavier') return;
+
+    if (whiteHorse.timer > 0) {
+      whiteHorse.timer -= dt;
+      return;
+    }
+
+    const target = whiteHorse.waypoints[whiteHorse.wpIndex];
+    if (!target) {
+      whiteHorse = null;
+      return;
+    }
+
+    const dx = target.x - whiteHorse.x;
+    const dy = target.y - whiteHorse.y;
+    const dist = Math.hypot(dx, dy);
+
+    if (dist <= 2) {
+      whiteHorse.x = target.x;
+      whiteHorse.y = target.y;
+      // Spirited pause in the middle of the field to toss its mane
+      if (whiteHorse.wpIndex === 2) {
+        whiteHorse.timer = 1.3;
+        sfxHorseWhinny();
+      }
+      whiteHorse.wpIndex++;
+    } else {
+      const speed = 0.68;
+      const vx = (dx / dist) * speed;
+      const vy = (dy / dist) * speed;
+      whiteHorse.x += vx;
+      whiteHorse.y += vy;
+      if (Math.abs(vx) > 0.05) {
+        whiteHorse.dir = vx < 0 ? 'left' : 'right';
       }
     }
-    enemies.push({ x: fortOx + 36, y: 36, w: 16, h: 16, dx: 1, dy: 1, changeTimer: 60, lot: 3, bounceX: 0, bounceY: 0, hp: 1 });
   }
 
-  function isColliding(a, b) {
-    let bx = b.x + (b.hitOffsetX || 0);
-    let by = b.y + (b.hitOffsetY || 0);
-    return (a.x < bx + b.w && a.x + a.w > bx &&
-            a.y < by + b.h && a.y + a.h > by);
+  function drawSpiritedWhiteHorse() {
+    if (!whiteHorse) return;
+    const gallop = Math.floor(frameTick / 7) % 2 === 0 ? 0 : -2;
+    const flip = whiteHorse.dir === 'left';
+
+    // Ground shadow in prairie grass
+    ctx.fillStyle = 'rgba(15, 19, 36, 0.35)';
+    ctx.fillRect(Math.round(whiteHorse.x - 8), Math.round(whiteHorse.y - 1), 16, 3);
+
+    drawMatrix(sprWhiteHorse, whiteHorse.x - 10, whiteHorse.y - 13 + gallop, {
+      1: '#ffffff',
+      2: '#cfd8e3',
+      3: '#e8f1f8',
+      4: '#1a1c2c',
+      5: '#e0a899'
+    }, 1, flip);
   }
 
-  function moveTile(dirStr) {
-    if (isShifting || player.slashing || player.moving) return;
+  // =========================================================================
+  // STRICT DIRT-ROAD & STEPPING-STONE NPC ROUTING (NEVER CROSSES OPEN WATER)
+  // =========================================================================
+  function buildExitWaypointsFrom(cp, x, y, avoidX = null, avoidY = null) {
+    if (cp.flow === 'NS') {
+      const pts = [];
+      let bankX;
+      if (x > 58 && x < 182) {
+        if (avoidX !== null) {
+          bankX = avoidX < x ? 186 : 54;
+        } else {
+          bankX = x < 120 ? 54 : 186;
+        }
+        pts.push({ x: bankX, y: 120 });
+      } else {
+        bankX = x < 120 ? 54 : 186;
+        if (Math.abs(x - bankX) > 3) {
+          pts.push({ x: bankX, y });
+        }
+      }
+      // In St. Boniface, West bank has Assiniboine at y=136..182, so West bank exits North (-14)
+      let exitY;
+      if (cp.id === 'st_boniface' && bankX === 54) {
+        exitY = -14;
+      } else {
+        exitY = avoidY !== null ? (avoidY < y ? 254 : -14) : (y < 120 ? -14 : 254);
+      }
+      pts.push({ x: bankX, y: exitY });
+      return pts;
+    } else {
+      const pts = [];
+      let bankY;
+      if (y > 68 && y < 168) {
+        if (avoidY !== null) {
+          bankY = avoidY < y ? 172 : 64;
+        } else {
+          bankY = y < 120 ? 64 : 172;
+        }
+        pts.push({ x: 120, y: bankY });
+      } else {
+        bankY = y < 120 ? 64 : 172;
+        if (Math.abs(y - bankY) > 3) {
+          pts.push({ x, y: bankY });
+        }
+      }
+      // In Upper Fort Garry, Red River is on the right edge (x>=174), so exit West (-14) or North gate
+      if (cp.id === 'upper_fort_garry') {
+        pts.push({ x: -14, y: bankY });
+      } else {
+        const exitX = avoidX !== null ? (avoidX < x ? 254 : -14) : (x < 120 ? -14 : 254);
+        pts.push({ x: exitX, y: bankY });
+      }
+      return pts;
+    }
+  }
 
-    let nextX = player.targetX;
-    let nextY = player.targetY;
+  function getNextWalkableSubtarget(cp, ax, ay, tx, ty) {
+    if (cp.flow === 'NS') {
+      const onWest = ax <= 58;
+      const onEast = ax >= 182;
+      const onBridge = !onWest && !onEast;
+      const targetWest = tx < 120;
+      const targetRoadX = targetWest ? 54 : 186;
 
-    if (dirStr === 'DPAD_UP' || dirStr === 'up') { nextY -= TILE; player.dir = 'up'; }
-    else if (dirStr === 'DPAD_DOWN' || dirStr === 'down') { nextY += TILE; player.dir = 'down'; }
-    else if (dirStr === 'DPAD_LEFT' || dirStr === 'left') { nextX -= TILE; player.dir = 'left'; }
-    else if (dirStr === 'DPAD_RIGHT' || dirStr === 'right') { nextX += TILE; player.dir = 'right'; }
+      if (onBridge) {
+        if (Math.abs(ay - 120) > 2) return { x: ax, y: 120 };
+        return { x: targetRoadX, y: 120 };
+      }
 
-    if (nextX < 0 || nextX + player.w > WORLD_WIDTH || nextY < 0 || nextY + player.h > WORLD_HEIGHT) return;
+      if ((onWest && !targetWest) || (onEast && targetWest)) {
+        const ownRoadX = onWest ? 54 : 186;
+        if (Math.abs(ax - ownRoadX) > 2) return { x: ownRoadX, y: ay };
+        if (Math.abs(ay - 120) > 2) return { x: ownRoadX, y: 120 };
+        return { x: targetRoadX, y: 120 };
+      }
 
-    let testBox = { x: nextX, y: nextY, w: player.w, h: player.h };
-    for (let obj of mapObjects) {
-      if (obj.solid && isColliding(testBox, obj)) return;
+      const ownRoadX = onWest ? 54 : 186;
+      if (Math.abs(ay - ty) > 2 && Math.abs(ax - ownRoadX) > 2) return { x: ownRoadX, y: ay };
+      if (Math.abs(ay - ty) > 2) return { x: ownRoadX, y: ty };
+      return { x: tx, y: ty };
+    } else {
+      const onNorth = ay <= 68;
+      const onSouth = ay >= 168;
+      const onBridge = !onNorth && !onSouth;
+      const targetNorth = ty < 120;
+      const targetRoadY = targetNorth ? 64 : 172;
+
+      if (onBridge) {
+        if (Math.abs(ax - 120) > 2) return { x: 120, y: ay };
+        return { x: 120, y: targetRoadY };
+      }
+
+      if ((onNorth && !targetNorth) || (onSouth && targetNorth)) {
+        const ownRoadY = onNorth ? 64 : 172;
+        if (Math.abs(ay - ownRoadY) > 2) return { x: ax, y: ownRoadY };
+        if (Math.abs(ax - 120) > 2) return { x: 120, y: ownRoadY };
+        return { x: 120, y: targetRoadY };
+      }
+
+      const ownRoadY = onNorth ? 64 : 172;
+      if (Math.abs(ax - tx) > 2 && Math.abs(ay - ownRoadY) > 2) return { x: ax, y: ownRoadY };
+      if (Math.abs(ax - tx) > 2) return { x: tx, y: ownRoadY };
+      return { x: tx, y: ty };
+    }
+  }
+
+  function moveActorWalkablyToward(cp, actor, tx, ty, moveSpeed) {
+    const sub = getNextWalkableSubtarget(cp, actor.x, actor.y, tx, ty);
+    const dx = sub.x - actor.x;
+    const dy = sub.y - actor.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 0.1) {
+      const stepDist = Math.min(dist, moveSpeed);
+      const vx = (dx / dist) * stepDist;
+      const vy = (dy / dist) * stepDist;
+      actor.x += vx;
+      actor.y += vy;
+      if (Math.abs(vx) >= Math.abs(vy)) {
+        actor.dir = vx < 0 ? 'left' : 'right';
+      }
+    }
+  }
+
+  function spawnCheckpointNPC(cp, role) {
+    const fromSideA = Math.random() < 0.5;
+    let waypoints = [];
+    let startX = 0;
+    let startY = 0;
+
+    if (cp.flow === 'NS') {
+      // In St. Boniface, West side has Assiniboine at y=136..182, so West spawns/exits from North (y=-10)
+      const startOnWest = fromSideA;
+      startX = startOnWest ? 54 : 186;
+      if (cp.id === 'st_boniface' && startOnWest) {
+        startY = -10;
+      } else {
+        startY = Math.random() < 0.5 ? -10 : 250;
+      }
+
+      const crossRiver = Math.random() < 0.45;
+      if (crossRiver) {
+        const destX = startOnWest ? 186 : 54;
+        const destY = (cp.id === 'st_boniface' && destX === 54)
+          ? -12
+          : (Math.random() < 0.5 ? -12 : 252);
+        waypoints = [
+          { x: startX, y: 120 },
+          { x: destX, y: 120 },
+          { x: destX, y: destY }
+        ];
+      } else {
+        const destY = (cp.id === 'st_boniface' && startOnWest)
+          ? -12
+          : (startY < 120 ? 252 : -12);
+        waypoints = [
+          { x: startX, y: 120 },
+          { x: startX, y: destY }
+        ];
+      }
+    } else {
+      // In Upper Fort Garry, Red River is on the right edge (x >= 174), so spawn/exit from West (-10)
+      const startOnNorth = fromSideA;
+      startY = startOnNorth ? 64 : 172;
+      if (cp.id === 'upper_fort_garry') {
+        startX = -10;
+      } else {
+        startX = Math.random() < 0.5 ? -10 : 250;
+      }
+
+      const crossRiver = Math.random() < 0.45;
+      if (crossRiver) {
+        const destY = startOnNorth ? 172 : 64;
+        const destX = cp.id === 'upper_fort_garry'
+          ? -12
+          : (Math.random() < 0.5 ? -12 : 252);
+        waypoints = [
+          { x: 120, y: startY },
+          { x: 120, y: destY },
+          { x: destX, y: destY }
+        ];
+      } else {
+        const destX = cp.id === 'upper_fort_garry'
+          ? -12
+          : (startX < 120 ? 252 : -12);
+        waypoints = [
+          { x: 120, y: startY },
+          { x: destX, y: startY }
+        ];
+      }
     }
 
-    player.targetX = nextX;
-    player.targetY = nextY;
-    player.moving = true;
+    const newNpc = {
+      role,
+      x: startX,
+      y: startY,
+      speed: isOfficerRole(role) ? 0.46 : 0.40,
+      dir: startX < 120 ? 'right' : 'left',
+      waypoints,
+      wpIndex: 0,
+      hasInteracted: false,
+      routedToCart: false,
+      pauseTimer: 0,
+      chasingHbc: null,
+      spooked: false,
+      scaredByBuffalo: false,
+      discussingWithHbc: null,
+      hbcPreference: undefined
+    };
+
+    // Priority Rule 1: If HBC Officer or Warden was already in frame first, when BuffaloHunter appears:
+    // - Regular HBC Officer always gets spooked
+    // - Warden of the Plains has a 50/50 chance to get spooked or stand his ground!
+    if (role === 'buffalo') {
+      sceneNPCs.forEach(existing => {
+        if (isOfficerRole(existing.role) && !existing.spooked && !existing.scaredByBuffalo) {
+          if (existing.role === 'warden' && Math.random() < 0.5) {
+            addPopup('FEARLESS!', existing.x - 18, existing.y - 20, PALETTE.compassGold);
+            return;
+          }
+          existing.spooked = true;
+          existing.hasInteracted = true;
+          existing.routedToCart = true;
+          existing.speed = 0.72;
+          existing.pauseTimer = 0.25;
+          existing.waypoints = buildExitWaypointsFrom(cp, existing.x, existing.y, startX, startY);
+          existing.wpIndex = 0;
+          sfxScareHbc();
+          addPopup('!', existing.x - 2, existing.y - 20, PALETTE.roofRed);
+        }
+      });
+    }
+
+    // Priority Rule 2: If BuffaloHunter is already on screen when HBC Officer / Warden appears:
+    // BuffaloHunter prioritizes going toward them to scare them!
+    if (isOfficerRole(role)) {
+      const existingBuffalo = sceneNPCs.find(existing => existing.role === 'buffalo' && !existing.chasingHbc);
+      if (existingBuffalo) {
+        existingBuffalo.chasingHbc = newNpc;
+        existingBuffalo.pauseTimer = 0;
+      }
+    }
+
+    sceneNPCs.push(newNpc);
   }
 
-  function stopTileMovement() {
-    if (player.x === player.targetX && player.y === player.targetY) {
-      player.moving = false;
+  function buildCartApproachWaypoints(cp, npc) {
+    if (cp.flow === 'NS') {
+      const pts = [];
+      const cartOnWest = cp.cartX < 120;
+      const cartBankX = cartOnWest ? 54 : 186;
+
+      if (npc.x > 58 && npc.x < 182) {
+        pts.push({ x: cartBankX, y: 120 });
+      } else {
+        const npcOnWest = npc.x < 120;
+        const startBankX = npcOnWest ? 54 : 186;
+        if (Math.abs(npc.x - startBankX) > 3) {
+          pts.push({ x: startBankX, y: npc.y });
+        }
+        if (npcOnWest !== cartOnWest) {
+          pts.push({ x: startBankX, y: 120 });
+          pts.push({ x: cartBankX, y: 120 });
+        }
+      }
+
+      pts.push({ x: cartBankX, y: cp.cartY });
+      if (Math.abs(cp.cartX - cartBankX) > 2) {
+        pts.push({ x: cp.cartX, y: cp.cartY, isCartTarget: true });
+        pts.push({ x: cartBankX, y: cp.cartY });
+      } else {
+        pts[pts.length - 1].isCartTarget = true;
+      }
+
+      const exitY = (cp.id === 'st_boniface' && cartBankX === 54)
+        ? -14
+        : (Math.random() < 0.5 ? -14 : 254);
+      pts.push({ x: cartBankX, y: exitY });
+      return pts;
+    } else {
+      const pts = [];
+      const cartOnNorth = cp.cartY < 120;
+      const cartBankY = cartOnNorth ? 64 : 172;
+
+      if (npc.y > 68 && npc.y < 168) {
+        pts.push({ x: 120, y: cartBankY });
+      } else {
+        const npcOnNorth = npc.y < 120;
+        const startBankY = npcOnNorth ? 64 : 172;
+        if (Math.abs(npc.y - startBankY) > 3) {
+          pts.push({ x: npc.x, y: startBankY });
+        }
+        if (npcOnNorth !== cartOnNorth) {
+          pts.push({ x: 120, y: startBankY });
+          pts.push({ x: 120, y: cartBankY });
+        }
+      }
+
+      pts.push({ x: cp.cartX, y: cartBankY });
+      if (Math.abs(cp.cartY - cartBankY) > 2) {
+        pts.push({ x: cp.cartX, y: cp.cartY, isCartTarget: true });
+        pts.push({ x: cp.cartX, y: cartBankY });
+      } else {
+        pts[pts.length - 1].isCartTarget = true;
+      }
+      const exitX = cp.id === 'upper_fort_garry'
+        ? -14
+        : (Math.random() < 0.5 ? -14 : 254);
+      pts.push({ x: exitX, y: cartBankY });
+      return pts;
     }
   }
 
-  function spawnTradeSparkles(x, y) {
-    for (let i = 0; i < 4; i++) {
-      sparkles.push({
-        x: x + 8 + (Math.random() * 16 - 8),
-        y: y + 8 + (Math.random() * 16 - 8),
-        size: Math.random() * 3 + 2,
-        life: 20,
-        color: Math.random() > 0.5 ? C.GOLD : '#FFFFFF'
+  function updateSceneNPCs(cp, dt) {
+    for (let i = sceneNPCs.length - 1; i >= 0; i--) {
+      const npc = sceneNPCs[i];
+
+      if (npc.pauseTimer > 0) {
+        npc.pauseTimer -= dt;
+        continue;
+      }
+
+      // PRIORITY 1: Buffalo Hunter chasing & scaring HBC Officer / Warden along walkable paths
+      if (npc.role === 'buffalo' && npc.chasingHbc) {
+        const hbc = npc.chasingHbc;
+        const stillHere = sceneNPCs.includes(hbc) && !hbc.scaredByBuffalo && !hbc.spooked;
+        if (!stillHere) {
+          npc.chasingHbc = null;
+          npc.routedToCart = false;
+        } else {
+          moveActorWalkablyToward(cp, npc, hbc.x, hbc.y, 0.58);
+          if (Math.hypot(npc.x - hbc.x, npc.y - hbc.y) <= 13) {
+            if (hbc.role === 'warden' && Math.random() < 0.5) {
+              // 50/50 Warden refuses to be spooked!
+              npc.chasingHbc = null;
+              npc.pauseTimer = 0.4;
+              npc.routedToCart = false;
+              addPopup('UNFAZED!', hbc.x - 18, hbc.y - 20, PALETTE.compassGold);
+            } else {
+              hbc.scaredByBuffalo = true;
+              hbc.spooked = true;
+              hbc.hasInteracted = true;
+              hbc.routedToCart = true;
+              hbc.speed = 0.74;
+              hbc.waypoints = buildExitWaypointsFrom(cp, hbc.x, hbc.y, npc.x, npc.y);
+              hbc.wpIndex = 0;
+
+              npc.chasingHbc = null;
+              npc.pauseTimer = 0.4;
+              npc.routedToCart = false;
+
+              sfxScareHbc();
+              addPopup('SCARED!', hbc.x - 16, hbc.y - 20, PALETTE.compassGold);
+            }
+          }
+          continue;
+        }
+      }
+
+      // PRIORITY 2: SmallGameHunter & HBC Officer / Warden "Discussion" Trade (checkpoint-specific deal odds!)
+      if (isSmallGameRole(npc.role) && !npc.hasInteracted) {
+        const availableHbc = sceneNPCs.find(
+          other => isOfficerRole(other.role) && !other.spooked && !other.scaredByBuffalo
+        );
+
+        if (availableHbc && npc.hbcPreference === undefined) {
+          npc.hbcPreference = Math.random() < cp.hbcDealChance;
+          if (npc.hbcPreference) {
+            npc.discussingWithHbc = availableHbc;
+          }
+        }
+
+        if (npc.discussingWithHbc) {
+          const targetHbc = npc.discussingWithHbc;
+          const validHbc = sceneNPCs.includes(targetHbc) && !targetHbc.spooked && !targetHbc.scaredByBuffalo;
+          if (!validHbc) {
+            npc.discussingWithHbc = null;
+            npc.hbcPreference = false;
+            npc.routedToCart = false;
+          } else {
+            moveActorWalkablyToward(cp, npc, targetHbc.x, targetHbc.y, npc.speed);
+            if (Math.hypot(npc.x - targetHbc.x, npc.y - targetHbc.y) <= 13) {
+              npc.hasInteracted = true;
+              npc.discussingWithHbc = null;
+              npc.routedToCart = true;
+              npc.pauseTimer = 1.05;
+              targetHbc.pauseTimer = Math.max(targetHbc.pauseTimer, 1.05);
+              npc.waypoints = buildExitWaypointsFrom(cp, npc.x, npc.y);
+              npc.wpIndex = 0;
+
+              sfxTrade();
+              addPopup('HBC DEAL', npc.x - 18, npc.y - 20, PALETTE.wallWhite);
+            }
+            continue;
+          }
+        }
+      }
+
+      // PRIORITY 3: Standard Path to Player's Active Red River Cart
+      if (cp.status === 'ACTIVE' && !npc.hasInteracted && !npc.routedToCart && !npc.spooked) {
+        npc.routedToCart = true;
+        npc.waypoints = buildCartApproachWaypoints(cp, npc);
+        npc.wpIndex = 0;
+      }
+
+      const target = npc.waypoints[npc.wpIndex];
+      if (!target) {
+        sceneNPCs.splice(i, 1);
+        continue;
+      }
+
+      const dx = target.x - npc.x;
+      const dy = target.y - npc.y;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist <= 2) {
+        npc.x = target.x;
+        npc.y = target.y;
+
+        if (target.isCartTarget && !npc.hasInteracted && !npc.spooked) {
+          npc.hasInteracted = true;
+          npc.pauseTimer = 0.65;
+          resolveNpcCartInteraction(cp, npc);
+        }
+        npc.wpIndex++;
+      } else {
+        const vx = (dx / dist) * npc.speed;
+        const vy = (dy / dist) * npc.speed;
+        npc.x += vx;
+        npc.y += vy;
+        if (Math.abs(vx) >= Math.abs(vy)) {
+          npc.dir = vx < 0 ? 'left' : 'right';
+        }
+      }
+    }
+  }
+
+  function resolveNpcCartInteraction(cp, npc) {
+    if (cp.status !== 'ACTIVE') return;
+
+    if (npc.role === 'buffalo') {
+      cp.robes++;
+      sfxTrade();
+      addPopup('+1 ROBE', cp.cartX - 18, cp.cartY - 18, PALETTE.compassGold);
+
+      if (getCartWeight(cp) >= CART_BUST_WEIGHT) {
+        cp.status = 'BUSTED';
+        cp.furs = 0;
+        cp.robes = 0;
+        sfxBust();
+      }
+    } else if (isSmallGameRole(npc.role)) {
+      cp.furs++;
+      sfxTrade();
+      addPopup('+1 PELT', cp.cartX - 18, cp.cartY - 18, PALETTE.teal);
+
+      if (getCartWeight(cp) >= CART_BUST_WEIGHT) {
+        cp.status = 'BUSTED';
+        cp.furs = 0;
+        cp.robes = 0;
+        sfxBust();
+      }
+    } else if (npc.role === 'warden') {
+      // Warden of the Plains: 50/50 turns a blind eye to the freetrader!
+      if (Math.random() < 0.5) {
+        sfxCursor();
+        addPopup('BLIND EYE', cp.cartX - 20, cp.cartY - 18, PALETTE.teal);
+      } else {
+        cp.status = 'HBC_RAID';
+        cp.raidTimer = HBC_RAID_DURATION;
+        sfxHbcAlert();
+        addPopup('WARDEN RAID!', cp.cartX - 24, cp.cartY - 18, PALETTE.roofRed);
+      }
+    } else if (npc.role === 'hbc') {
+      cp.status = 'HBC_RAID';
+      cp.raidTimer = HBC_RAID_DURATION;
+      sfxHbcAlert();
+      addPopup('HBC RAID!', cp.cartX - 22, cp.cartY - 18, PALETTE.roofRed);
+    }
+
+    updateCheckpointBoxesUI();
+  }
+
+  // =========================================================================
+  // AMBIENT UNDERWATER FISH
+  // =========================================================================
+  function spawnRiverFish(flow, cpId) {
+    const isSturgeon = Math.random() < 0.35;
+    const speed = isSturgeon ? 0.55 : 0.85;
+    if (flow === 'WE') {
+      const maxX = cpId === 'upper_fort_garry' ? 182 : 252;
+      riverFish.push({
+        isSturgeon, flow, maxX,
+        x: -16,
+        y: 90 + Math.random() * 52,
+        speed,
+        phase: Math.random() * Math.PI * 2
+      });
+    } else {
+      riverFish.push({
+        isSturgeon, flow,
+        x: 88 + Math.random() * 64,
+        y: 248,
+        speed,
+        phase: Math.random() * Math.PI * 2
       });
     }
   }
 
-  function update() {
-    if (state !== 'PLAYING') return;
-    frame++;
-
-    if (player.moving) {
-      let stepX = Math.sign(player.targetX - player.x) * player.speed;
-      let stepY = Math.sign(player.targetY - player.y) * player.speed;
-
-      player.x += stepX;
-      player.y += stepY;
-
-      if (Math.abs(player.x - player.targetX) < player.speed) player.x = player.targetX;
-      if (Math.abs(player.y - player.targetY) < player.speed) player.y = player.targetY;
-
-      if (player.x === player.targetX && player.y === player.targetY) {
-        player.moving = false;
-      }
-
-      if (frame % 8 === 0) player.animFrame = 1 - player.animFrame;
-    } else {
-      player.animFrame = 0;
+  function updateSceneFish(cp) {
+    if (frameTick % 140 === 0 && riverFish.length < 4) {
+      spawnRiverFish(cp.flow, cp.id);
     }
 
-    if (isShifting) {
-      if (camera.x < shiftTargetX) camera.x = Math.min(shiftTargetX, camera.x + 8);
-      else if (camera.x > shiftTargetX) camera.x = Math.max(shiftTargetX, camera.x - 8);
-
-      if (camera.y < shiftTargetY) camera.y = Math.min(shiftTargetY, camera.y + 8);
-      else if (camera.y > shiftTargetY) camera.y = Math.max(shiftTargetY, camera.y - 8);
-
-      if (camera.x === shiftTargetX && camera.y === shiftTargetY) isShifting = false;
-    } else {
-      let currentCol = Math.floor(camera.x / SCREEN_SIZE);
-      let currentRow = Math.floor(camera.y / SCREEN_SIZE);
-      let playerCol = Math.floor(player.x / SCREEN_SIZE);
-      let playerRow = Math.floor(player.y / SCREEN_SIZE);
-      
-      if (playerCol !== currentCol || playerRow !== currentRow) {
-        isShifting = true;
-        shiftTargetX = playerCol * SCREEN_SIZE;
-        shiftTargetY = playerRow * SCREEN_SIZE;
-        
-        mapObjects.forEach(obj => {
-           if (obj.type === 'cut_bush') {
-               obj.type = (obj.prevType || 'bush'); 
-               obj.solid = true; 
-           }
-        });
-      }
-    }
-
-    let activeCol = Math.floor(player.x / SCREEN_SIZE);
-    let activeRow = Math.floor(player.y / SCREEN_SIZE);
-    
-    const zoneNames = ["WOODS", "HAY PRIVILEGE", "HOMESTEAD", "RIVERBANK"];
-    const lotNames = ["HOME LOT", "NEIGHBOUR LOT", "THE FORKS", "UPPER FORT GARRY"];
-    titleDisplay.innerText = `${lotNames[activeCol]} - ${zoneNames[activeRow]}`;
-
-    if (player.slashing) {
-      player.slashTimer--;
-      if (player.slashTimer <= 0) player.slashing = false;
-    }
-
-    // Homestead Energy Recovery (Lot 0, Zone 2)
-    if (activeCol === 0 && activeRow === 2 && frame % 60 === 0 && energy < MAX_ENERGY) {
-      energy++;
-      updateUI();
-    }
-
-    // Fort Gate Trade Conversion Mechanic
-    if (activeCol === 3 && inventory > 0) {
-      let fortGate = mapObjects.find(o => o.type === 'fort_trade_gate');
-      if (fortGate && isColliding(player, fortGate)) {
-        if (frame % 60 === 0) {
-          inventory--;
-          score += 100;
-          spawnTradeSparkles(player.x, player.y);
-          updateUI();
-        }
-      }
-    }
-
-    for (let i = sparkles.length - 1; i >= 0; i--) {
-      let sp = sparkles[i];
-      sp.life--;
-      sp.y -= 0.5;
-      if (sp.life <= 0) sparkles.splice(i, 1);
-    }
-
-    for (let i = drops.length - 1; i >= 0; i--) {
-      let d = drops[i];
-      if (isColliding(player, d)) {
-        inventory++;
-        drops.splice(i, 1);
-        updateUI();
-      }
-    }
-
-    for (let i = enemies.length - 1; i >= 0; i--) {
-      let e = enemies[i];
-
-      if (Math.abs(e.bounceX) > 0.1 || Math.abs(e.bounceY) > 0.1) {
-        e.x += e.bounceX;
-        e.y += e.bounceY;
-        e.bounceX *= 0.8;
-        e.bounceY *= 0.8;
+    for (let i = riverFish.length - 1; i >= 0; i--) {
+      const f = riverFish[i];
+      if (f.flow === 'WE') {
+        f.x += f.speed;
+        f.y += Math.sin(frameTick * 0.05 + f.phase) * 0.16;
+        if (f.x > (f.maxX || 252)) riverFish.splice(i, 1);
       } else {
-        e.bounceX = 0;
-        e.bounceY = 0;
-
-        e.changeTimer--;
-        if (e.changeTimer <= 0) {
-          e.dx = (Math.random() > 0.5 ? 1 : -1) * (Math.random() > 0.3 ? 1 : 0);
-          e.dy = (Math.random() > 0.5 ? 1 : -1) * (Math.random() > 0.3 ? 1 : 0);
-          e.changeTimer = Math.floor(Math.random() * 60) + 30;
-        }
-        
-        e.x += e.dx;
-        e.y += e.dy;
-      }
-
-      for (let obj of mapObjects) {
-        if (obj.solid && isColliding(e, obj)) {
-          e.x -= e.dx * 2;
-          e.y -= e.dy * 2;
-          e.dx *= -1;
-          e.dy *= -1;
-          break;
-        }
-      }
-
-      let minX = e.lot * SCREEN_SIZE;
-      let maxX = minX + SCREEN_SIZE - e.w;
-      if (e.x < minX || e.x > maxX) { e.dx *= -1; e.x += e.dx; }
-      if (e.y < 0 || e.y > WORLD_HEIGHT - e.h) { e.dy *= -1; e.y += e.dy; }
-
-      if (isColliding(player, e) && !isShifting) {
-        energy = Math.max(0, energy - 10);
-        updateUI();
-
-        let angle = Math.atan2(e.y - player.y, e.x - player.x);
-        e.bounceX = Math.cos(angle) * 8;
-        e.bounceY = Math.sin(angle) * 8;
-        player.x -= Math.cos(angle) * 6;
-        player.y -= Math.sin(angle) * 6;
-        player.targetX = player.x;
-        player.targetY = player.y;
+        f.y -= f.speed;
+        f.x += Math.sin(frameTick * 0.05 + f.phase) * 0.16;
+        if (f.y < -18) riverFish.splice(i, 1);
       }
     }
   }
 
-  function doAction() {
-    if (state !== 'PLAYING' || isShifting || player.slashing) return;
-    if (energy <= 0) return; 
+  function addPopup(text, x, y, color = PALETTE.compassGold) {
+    floatingPopups.push({ text, x: Math.max(12, Math.min(182, x)), y, color, life: 1.4 });
+  }
 
-    energy--;
-    player.slashing = true;
-    player.slashTimer = 10;
-    updateUI();
+  function updateHUD() {
+    const mins = Math.floor(timeLeft / 60);
+    const secs = timeLeft % 60;
+    const rankInfo = getTraderRankInfo();
 
-    let hitbox = { x: player.x, y: player.y, w: 24, h: 24 };
-    if (player.dir === 'up') hitbox.y -= 16;
-    if (player.dir === 'down') hitbox.y += 16;
-    if (player.dir === 'left') hitbox.x -= 16;
-    if (player.dir === 'right') hitbox.x += 16;
+    timeDisplay.innerText = `TIME:${mins}:${secs.toString().padStart(2, '0')}`;
+    rankDisplay.innerText = rankInfo.title;
+    rankDisplay.style.color = rankInfo.color;
+    hbcDisplay.innerText = `BUSTS:${hbcBrokenCount}/3`;
+    goodsDisplay.innerText = `PELTS:${totalFurs} ROBES:${totalRobes}`;
 
-    for (let obj of mapObjects) {
-      if ((obj.type === 'bush' || obj.type === 'veggie') && isColliding(hitbox, obj)) {
-        obj.prevType = obj.type;
-        obj.type = 'cut_bush';
-        obj.solid = false; 
-        if (Math.random() > 0.4) drops.push({ x: obj.x + 4, y: obj.y + 4, w: 16, h: 16 });
-      }
-    }
-
-    for (let i = enemies.length - 1; i >= 0; i--) {
-      let e = enemies[i];
-      if (isColliding(hitbox, e)) {
-        let angle = Math.atan2(e.y - player.y, e.x - player.x);
-        e.bounceX = Math.cos(angle) * 12;
-        e.bounceY = Math.sin(angle) * 12;
-        
-        e.hp--;
-        if (e.hp <= 0) {
-          drops.push({ x: e.x, y: e.y, w: 16, h: 16 });
-          enemies.splice(i, 1);
-        }
-      }
+    if (gameState === 'MAP' || gameState === 'WEIR') {
+      locDisplay.innerText = CHECKPOINTS[activeCheckpointIndex].name;
+    } else {
+      locDisplay.innerText = 'LE ROI DES TRAITEURS';
     }
   }
 
-  function draw() {
-    ctx.save();
-    ctx.translate(-camera.x, -camera.y);
+  // =========================================================================
+  // 1850 RED RIVER SETTLEMENT MINIMAP (480 x 336 SEASONAL GBC/SNES RENDERER)
+  // =========================================================================
+  function fillPoly(context, pts, color) {
+    context.fillStyle = color;
+    context.beginPath();
+    context.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) context.lineTo(pts[i][0], pts[i][1]);
+    context.closePath();
+    context.fill();
+  }
 
-    for (let c = 0; c < WORLD_COLS; c++) {
-      let xOff = c * SCREEN_SIZE;
-      for (let r = 0; r < WORLD_ROWS; r++) {
-        let yOff = r * SCREEN_SIZE;
-        
-        if (r === 0 || r === 1) { // Woods & Hay Privilege
-          ctx.fillStyle = C.GRASS;
-          ctx.fillRect(xOff, yOff, SCREEN_SIZE, SCREEN_SIZE);
-          ctx.fillStyle = C.GRASS_LIGHT;
-          for(let g=0; g<12; g++) {
-             let gx = (c*17 + r*13 + g*31) % SCREEN_SIZE; 
-             let gy = (c*23 + r*19 + g*47) % SCREEN_SIZE;
-             ctx.fillRect(xOff + gx, yOff + gy, 4, 4);
+  function strokePoly(context, pts, color, width = 1) {
+    context.strokeStyle = color;
+    context.lineWidth = width;
+    context.beginPath();
+    context.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) context.lineTo(pts[i][0], pts[i][1]);
+    context.closePath();
+    context.stroke();
+  }
+
+  function drawRiverPath(context, pts, width, color) {
+    context.strokeStyle = color;
+    context.lineWidth = width;
+    context.lineCap = 'round';
+    context.lineJoin = 'round';
+    context.beginPath();
+    context.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) context.lineTo(pts[i][0], pts[i][1]);
+    context.stroke();
+  }
+
+  function bakeStaticMap() {
+    const pal = PALETTE;
+    const season = getSeasonalTheme();
+    lastBakedSeasonBucket = Math.floor((300 - timeLeft) / 5);
+
+    tCtx.clearRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
+
+    tCtx.fillStyle = season.outerBg;
+    tCtx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
+
+    for (let y = 4; y < MAP_HEIGHT - 4; y += 6) {
+      for (let x = 4; x < MAP_WIDTH - 4; x += 6) {
+        const hash = ((x * 73856093) ^ (y * 19349663)) & 15;
+        if (hash === 0) {
+          tCtx.fillStyle = season.outerSpeck;
+          tCtx.fillRect(x, y, 2, 1);
+          tCtx.fillRect(x + 1, y - 1, 1, 1);
+        }
+      }
+    }
+
+    PARISH_BLOCKS.forEach(block => fillPoly(tCtx, block.poly, season.grassBase));
+
+    for (let y = 12; y < MAP_HEIGHT - 12; y += 5) {
+      for (let x = 12; x < MAP_WIDTH - 12; x += 5) {
+        const h = ((x * 374761393) + (y * 668265263)) & 31;
+        if (h < 3 && x > 25 && x < 455 && y > 20 && y < 318) {
+          tCtx.fillStyle = h === 0 ? season.grassTuft : season.grassAccent;
+          tCtx.fillRect(x, y, 2, 1);
+        }
+      }
+    }
+
+    tCtx.save();
+    tCtx.beginPath();
+    PARISH_BLOCKS.forEach(block => {
+      tCtx.moveTo(block.poly[0][0], block.poly[0][1]);
+      for (let i = 1; i < block.poly.length; i++) tCtx.lineTo(block.poly[i][0], block.poly[i][1]);
+      tCtx.closePath();
+    });
+    tCtx.clip();
+
+    CULTIVATED_ZONES.forEach(zone => {
+      fillPoly(tCtx, zone, season.cultivated);
+      const minX = Math.min(...zone.map(p => p[0]));
+      const maxX = Math.max(...zone.map(p => p[0]));
+      const minY = Math.min(...zone.map(p => p[1]));
+      const maxY = Math.max(...zone.map(p => p[1]));
+      for (let py = minY; py < maxY; py += 4) {
+        for (let px = minX; px < maxX; px += 4) {
+          if (((px + py) & 7) === 0) {
+            tCtx.fillStyle = season.cultivatedLight;
+            tCtx.fillRect(px, py, 2, 1);
           }
-        } else if (r === 2) { // Homestead & Fort Grounds
-          ctx.fillStyle = (c >= 2) ? '#5A6351' : C.DIRT; 
-          ctx.fillRect(xOff, yOff, SCREEN_SIZE, SCREEN_SIZE);
-        } else if (r === 3) { // Riverbank & Red River
-          ctx.fillStyle = C.DIRT;
-          ctx.fillRect(xOff, yOff, SCREEN_SIZE, 20); 
+        }
+      }
+    });
 
-          for (let px = 0; px < SCREEN_SIZE; px += 4) {
-            ctx.fillStyle = (px % 8 === 0) ? C.SHORE_SAND : C.DIRT_DARK;
-            ctx.fillRect(xOff + px, yOff + 20, 4, 4);
-            ctx.fillStyle = (px % 8 === 4) ? C.WATER : C.SHORE_SAND;
-            ctx.fillRect(xOff + px, yOff + 24, 4, 4);
-            ctx.fillStyle = (px % 8 === 0) ? C.WATER : C.WATER_LIGHT;
-            ctx.fillRect(xOff + px, yOff + 28, 4, 4);
+    if (season.stage === 0) {
+      tCtx.fillStyle = season.wetPatch;
+      for (let y = 40; y < 300; y += 22) {
+        for (let x = 40; x < 440; x += 28) {
+          if (((x * 3 + y * 5) % 11) === 0) {
+            tCtx.fillRect(x, y, 6, 3);
           }
-
-          ctx.fillStyle = C.WATER;
-          ctx.fillRect(xOff, yOff + 32, SCREEN_SIZE, 208); 
-          ctx.fillStyle = C.WATER_LIGHT;
-          ctx.fillRect(xOff + ((Date.now()/20)%240), yOff+60, 16, 2);
-          ctx.fillRect(xOff + ((Date.now()/15+100)%240), yOff+120, 12, 2);
         }
       }
     }
 
-    // Assiniboine River (Centered in Lot 2 across all 4 zones)
-    let assx = SCREEN_SIZE * 2 + 90;
-    ctx.fillStyle = C.WATER;
-    ctx.fillRect(assx, 0, 60, WORLD_HEIGHT);
-    ctx.fillStyle = C.WATER_LIGHT;
-    ctx.fillRect(assx + 10, (Date.now()/25)% WORLD_HEIGHT, 16, 4);
+    WOODLAND_ZONES.forEach((zone, zIdx) => {
+      const zoneBg = season.stage === 4
+        ? lerpHex('#4a4339', '#8a96a3', season.t)
+        : (season.stage === 3 ? '#5c4223' : (season.stage === 0 ? '#3d3324' : pal.woodlandBase));
+      fillPoly(tCtx, zone, zoneBg);
 
-    for (let obj of mapObjects) {
-      if (obj.type === 'tree') {
-        drawSprite(obj.x, obj.y, sprTree, {1:C.LEAVES, 2:C.GRASS_LIGHT, 3:C.WOOD});
-      } else if (obj.type === 'bush') {
-        drawSprite(obj.x, obj.y, sprBush, {1:C.LEAVES, 2:C.GRASS_LIGHT});
-      } else if (obj.type === 'veggie') {
-        drawSprite(obj.x, obj.y, sprVeggie, {1:C.VEGGIE_GREEN, 2:C.VEGGIE_ORANGE});
-      } else if (obj.type === 'cut_bush') {
-        ctx.fillStyle = C.STUMP;
-        ctx.fillRect(obj.x+8, obj.y+10, 8, 8);
-      } else if (obj.type === 'cabin') {
-        ctx.fillStyle = C.WOOD; ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
-        ctx.fillStyle = C.WOOD_LIGHT; ctx.fillRect(obj.x+4, obj.y+4, obj.w-8, obj.h-8);
-        ctx.fillStyle = '#000'; ctx.fillRect(obj.x+24, obj.y+20, 12, 20); 
-      } else if (obj.type === 'fort_building') {
-        ctx.fillStyle = C.STONE; ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
-        ctx.fillStyle = C.STONE_ROOF; ctx.fillRect(obj.x+2, obj.y+2, obj.w-4, 8);
-        ctx.fillStyle = '#000'; ctx.fillRect(obj.x+22, obj.y+18, 10, 18); 
-      } else if (obj.type === 'fort_wall') {
-        ctx.fillStyle = C.STONE; ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
-        ctx.fillStyle = C.STONE_DARK; ctx.fillRect(obj.x + 2, obj.y + 2, obj.w - 4, 12);
-        ctx.fillStyle = C.STONE_ROOF; ctx.fillRect(obj.x, obj.y, obj.w, 6);
-      } else if (obj.type === 'fort_gate_top') {
-        ctx.fillStyle = C.STONE_DARK; ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
-        ctx.fillStyle = C.STONE_ROOF; ctx.fillRect(obj.x - 2, obj.y - 2, obj.w + 4, 6);
-      } else if (obj.type === 'fort_trade_gate') {
-        ctx.fillStyle = C.DIRT; ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
-        ctx.fillStyle = C.GOLD; ctx.fillRect(obj.x + 10, obj.y + 10, 12, 12); 
-      } else if (obj.type === 'stepping_stones') {
-        ctx.fillStyle = C.STONE;
-        ctx.fillRect(obj.x + 4, obj.y + 4, 14, 12);
-        ctx.fillRect(obj.x + 22, obj.y + 20, 14, 12);
-      } else if (obj.type === 'garden_soil') {
-        ctx.fillStyle = C.DIRT_DARK; ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
-        ctx.fillStyle = C.DIRT;
-        for (let gy = 4; gy < obj.h; gy += 10) {
-          ctx.fillRect(obj.x, obj.y + gy, obj.w, 2);
+      const minX = Math.min(...zone.map(p => p[0]));
+      const maxX = Math.max(...zone.map(p => p[0]));
+      const minY = Math.min(...zone.map(p => p[1]));
+      const maxY = Math.max(...zone.map(p => p[1]));
+
+      for (let ty = minY + 3; ty < maxY - 3; ty += 6) {
+        for (let tx = minX + 3; tx < maxX - 3; tx += 6) {
+          const offset = ((ty / 6) % 2) * 3;
+          const cx = tx + offset;
+          if (pointInPoly(cx, ty, zone)) {
+            drawMapSeasonalTree(tCtx, cx, ty, season, (cx + ty + zIdx) % 5);
+          }
+        }
+      }
+    });
+
+    tCtx.restore();
+
+    PARISH_BLOCKS.forEach(block => strokePoly(tCtx, block.poly, pal.parishBorder, 1));
+    drawHistoricTrails(tCtx, season);
+
+    const wShift = Math.round(season.waterLevelOffset * 0.35);
+    const assiniSand = 10;
+    const redSand = 13;
+    const assiniWater = Math.max(4, 6 + wShift);
+    const redWater = Math.max(6, 9 + wShift);
+
+    drawRiverPath(tCtx, ASSINIBOINE_POINTS, assiniSand, season.sandBank);
+    drawRiverPath(tCtx, RED_RIVER_POINTS, redSand, season.sandBank);
+
+    drawRiverPath(tCtx, ASSINIBOINE_POINTS, assiniWater + 2, pal.waterBank);
+    drawRiverPath(tCtx, RED_RIVER_POINTS, redWater + 2, pal.waterBank);
+
+    drawRiverPath(tCtx, ASSINIBOINE_POINTS, assiniWater, season.waterDeep);
+    drawRiverPath(tCtx, RED_RIVER_POINTS, redWater, season.waterDeep);
+
+    drawRiverPath(tCtx, ASSINIBOINE_POINTS, Math.max(2, assiniWater - 3), season.waterMid);
+    drawRiverPath(tCtx, RED_RIVER_POINTS, Math.max(2, redWater - 4), season.waterMid);
+
+    if (season.stage === 4) {
+      drawRiverPath(tCtx, ASSINIBOINE_POINTS, assiniWater, '#cde6f7');
+      drawRiverPath(tCtx, RED_RIVER_POINTS, redWater, '#cde6f7');
+      const openAssini = Math.max(1, Math.round(assiniWater * (1 - season.freezeRatio)));
+      const openRed = Math.max(2, Math.round(redWater * (1 - season.freezeRatio)));
+      drawRiverPath(tCtx, ASSINIBOINE_POINTS, openAssini, season.waterDeep);
+      drawRiverPath(tCtx, RED_RIVER_POINTS, openRed, season.waterDeep);
+    }
+
+    drawLandmarkSprites(tCtx, pal, season);
+
+    tCtx.strokeStyle = pal.parishBorder;
+    tCtx.lineWidth = 2;
+    tCtx.strokeRect(3, 3, MAP_WIDTH - 6, MAP_HEIGHT - 6);
+    tCtx.strokeRect(6, 6, MAP_WIDTH - 12, MAP_HEIGHT - 12);
+  }
+
+  function drawMapSeasonalTree(context, x, y, season, variant) {
+    if (season.stage === 0) {
+      context.fillStyle = '#3d2817';
+      context.fillRect(x, y - 2, 1, 5);
+      context.fillRect(x - 2, y - 1, 5, 1);
+      context.fillStyle = '#9fd468';
+      context.fillRect(x - 2, y - 2, 1, 1);
+      context.fillRect(x + 2, y - 2, 1, 1);
+      context.fillRect(x, y - 3, 1, 1);
+    } else if (season.stage === 1) {
+      context.fillStyle = '#1d5c32';
+      context.fillRect(x - 2, y + 1, 5, 2);
+      context.fillStyle = '#2e8544';
+      context.fillRect(x - 2, y - 2, 5, 3);
+      context.fillRect(x - 1, y - 3, 3, 1);
+      context.fillStyle = variant % 2 === 0 ? '#ffb7c5' : '#ffffff';
+      context.fillRect(x - 1, y - 2, 2, 1);
+      context.fillRect(x + 1, y - 1, 1, 1);
+    } else if (season.stage === 2) {
+      context.fillStyle = PALETTE.woodlandDark;
+      context.fillRect(x - 2, y + 1, 5, 2);
+      context.fillStyle = PALETTE.woodlandBase;
+      context.fillRect(x - 2, y - 2, 5, 3);
+      context.fillRect(x - 1, y - 3, 3, 1);
+      context.fillStyle = PALETTE.woodlandHighlight;
+      context.fillRect(x - 1, y - 2, 2, 1);
+    } else if (season.stage === 3) {
+      const fallColors = ['#c9382a', '#e67e22', '#f1c40f', '#d94e28', '#ffcd75'];
+      const fallHighlights = ['#ff6b5b', '#f7a54a', '#fff08a', '#f2784b', '#fff5b8'];
+      context.fillStyle = '#5c2616';
+      context.fillRect(x - 2, y + 1, 5, 2);
+      context.fillStyle = fallColors[variant % fallColors.length];
+      context.fillRect(x - 2, y - 2, 5, 3);
+      context.fillRect(x - 1, y - 3, 3, 1);
+      context.fillStyle = fallHighlights[variant % fallHighlights.length];
+      context.fillRect(x - 1, y - 2, 2, 1);
+    } else {
+      context.fillStyle = '#3a2818';
+      context.fillRect(x, y - 2, 1, 5);
+      context.fillRect(x - 2, y - 1, 5, 1);
+      context.fillRect(x - 1, y - 3, 1, 1);
+      context.fillRect(x + 1, y - 3, 1, 1);
+      if (season.t > 0.35) {
+        context.fillStyle = '#f4f8fc';
+        context.fillRect(x - 2, y - 2, 2, 1);
+        context.fillRect(x + 1, y - 2, 2, 1);
+      }
+    }
+  }
+
+  function drawHistoricTrails(context, season) {
+    context.strokeStyle = season.road;
+    context.lineWidth = 2;
+
+    context.beginPath();
+    context.moveTo(46, 134);
+    context.lineTo(198, 152);
+    context.lineTo(298, 156);
+    context.lineTo(328, 156);
+    context.stroke();
+
+    context.beginPath();
+    context.moveTo(332, 160);
+    context.lineTo(334, 134);
+    context.lineTo(366, 76);
+    context.stroke();
+  }
+
+  function drawLandmarkSprites(context, pal, season) {
+    const isSnow = season.stage === 4;
+
+    // Upper Fort Garry (Tyndall Limestone Fort on minimap)
+    const fx = 331, fy = 158;
+    context.fillStyle = pal.limestoneDark;
+    context.fillRect(fx - 5, fy - 4, 10, 8);
+    context.fillStyle = pal.limestoneLight;
+    context.fillRect(fx - 4, fy - 3, 8, 6);
+    context.fillStyle = isSnow ? '#e8f1f8' : pal.roofRed;
+    context.fillRect(fx - 3, fy - 4, 6, 3);
+    context.fillStyle = pal.limestoneMid;
+    context.fillRect(fx - 6, fy - 5, 2, 2);
+    context.fillRect(fx + 4, fy - 5, 2, 2);
+    context.fillRect(fx - 6, fy + 3, 2, 2);
+    context.fillRect(fx + 4, fy + 3, 2, 2);
+
+    const bx = 365, by = 182;
+    context.fillStyle = pal.parishBorder;
+    context.fillRect(bx - 5, by - 6, 10, 10);
+    context.fillStyle = pal.wallWhite;
+    context.fillRect(bx - 4, by - 3, 8, 6);
+    context.fillStyle = isSnow ? '#dce8f2' : pal.roofBlue;
+    context.fillRect(bx - 4, by - 6, 3, 3);
+    context.fillRect(bx + 1, by - 6, 3, 3);
+    context.fillStyle = pal.compassGold;
+    context.fillRect(bx - 3, by - 8, 1, 2);
+    context.fillRect(bx + 2, by - 8, 1, 2);
+
+    const vx = 318, vy = 264;
+    context.fillStyle = pal.parishBorder;
+    context.fillRect(vx - 4, vy - 4, 8, 7);
+    context.fillStyle = pal.wallWhite;
+    context.fillRect(vx - 3, vy - 1, 6, 3);
+    context.fillStyle = isSnow ? '#e8f1f8' : pal.roofRed;
+    context.fillRect(vx - 3, vy - 4, 6, 3);
+
+    const kx = 382, ky = 90;
+    context.fillStyle = pal.parishBorder;
+    context.fillRect(kx - 4, ky - 5, 8, 8);
+    context.fillStyle = pal.wallWhite;
+    context.fillRect(kx - 3, ky - 2, 6, 4);
+    context.fillStyle = isSnow ? '#e8f1f8' : pal.roofRed;
+    context.fillRect(kx - 2, ky - 5, 4, 3);
+
+    const sx = 196, sy = 148;
+    context.fillStyle = pal.parishBorder;
+    context.fillRect(sx - 4, sy - 5, 8, 8);
+    context.fillStyle = pal.wallWhite;
+    context.fillRect(sx - 3, sy - 2, 6, 4);
+    context.fillStyle = isSnow ? '#e8f1f8' : pal.roofRed;
+    context.fillRect(sx - 2, sy - 5, 4, 3);
+
+    const fxx = 52, fxy = 133;
+    context.fillStyle = pal.parishBorder;
+    context.fillRect(fxx - 4, fxy - 5, 8, 8);
+    context.fillStyle = pal.wallWhite;
+    context.fillRect(fxx - 3, fxy - 2, 6, 4);
+    context.fillStyle = isSnow ? '#dce8f2' : pal.roofBlue;
+    context.fillRect(fxx - 2, fxy - 5, 4, 3);
+    context.fillStyle = pal.compassGold;
+    context.fillRect(fxx, fxy - 7, 1, 2);
+
+    const cottages = [
+      [98, 138], [148, 144], [242, 154], [278, 158],
+      [356, 206], [386, 152], [344, 248], [296, 276],
+      [342, 118], [362, 114], [408, 138]
+    ];
+    cottages.forEach(([cx, cy]) => {
+      context.fillStyle = pal.parishBorder;
+      context.fillRect(cx - 2, cy - 2, 4, 4);
+      context.fillStyle = pal.wallWhite;
+      context.fillRect(cx - 1, cy, 2, 2);
+      context.fillStyle = isSnow ? '#e8f1f8' : pal.roofRed;
+      context.fillRect(cx - 2, cy - 2, 4, 2);
+    });
+  }
+
+  function pointInPoly(x, y, poly) {
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const xi = poly[i][0], yi = poly[i][1];
+      const xj = poly[j][0], yj = poly[j][1];
+      const intersect = ((yi > y) !== (yj > y)) &&
+        (x < (xj - xi) * (y - yi) / (yj - yi + 0.00001) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+
+  function drawAnimatedWaterEffects(pal, tick, season) {
+    if (season.hasIceChunks) {
+      for (let i = 0; i < ASSINIBOINE_POINTS.length - 1; i += 2) {
+        const [x1, y1] = ASSINIBOINE_POINTS[i];
+        const [x2, y2] = ASSINIBOINE_POINTS[i + 1];
+        const t = ((tick * 0.012) + i * 0.41) % 1;
+        const wx = Math.round(x1 + (x2 - x1) * t);
+        const wy = Math.round(y1 + (y2 - y1) * t);
+        mapCtx.fillStyle = '#a8d8f0';
+        mapCtx.fillRect(wx - 2, wy - 1, 4, 3);
+        mapCtx.fillStyle = '#ffffff';
+        mapCtx.fillRect(wx - 1, wy - 1, 3, 2);
+      }
+
+      for (let i = 0; i < RED_RIVER_POINTS.length - 1; i += 2) {
+        const [x1, y1] = RED_RIVER_POINTS[i];
+        const [x2, y2] = RED_RIVER_POINTS[i + 1];
+        const t = ((tick * 0.012) + i * 0.31) % 1;
+        const wx = Math.round(x1 + (x2 - x1) * t);
+        const wy = Math.round(y1 + (y2 - y1) * t);
+        mapCtx.fillStyle = '#a8d8f0';
+        mapCtx.fillRect(wx - 2, wy - 1, 5, 3);
+        mapCtx.fillStyle = '#ffffff';
+        mapCtx.fillRect(wx - 1, wy - 1, 3, 2);
+      }
+      return;
+    }
+
+    mapCtx.fillStyle = pal.waterFoam;
+    for (let i = 0; i < ASSINIBOINE_POINTS.length - 1; i++) {
+      const [x1, y1] = ASSINIBOINE_POINTS[i];
+      const [x2, y2] = ASSINIBOINE_POINTS[i + 1];
+      const t = ((tick * 0.025) + i * 0.37) % 1;
+      const wx = Math.round(x1 + (x2 - x1) * t);
+      const wy = Math.round(y1 + (y2 - y1) * t);
+      mapCtx.fillRect(wx, wy, 2, 1);
+    }
+
+    for (let i = 0; i < RED_RIVER_POINTS.length - 1; i++) {
+      const [x1, y1] = RED_RIVER_POINTS[i];
+      const [x2, y2] = RED_RIVER_POINTS[i + 1];
+      const t = ((tick * 0.025) + i * 0.29) % 1;
+      const wx = Math.round(x1 + (x2 - x1) * t);
+      const wy = Math.round(y1 + (y2 - y1) * t);
+      mapCtx.fillRect(wx - 1, wy, 3, 1);
+    }
+  }
+
+  function drawMapSeasonalSnow(tick, season) {
+    if (season.stage !== 4) return;
+    const activeFlakes = Math.floor(snowFlakes.length * season.snowAmount);
+    mapCtx.fillStyle = '#ffffff';
+    for (let i = 0; i < activeFlakes; i++) {
+      const sf = snowFlakes[i];
+      const sy = Math.round((sf.y + tick * sf.speedY) % MAP_HEIGHT);
+      const sx = Math.round((sf.x + Math.sin(tick * 0.03 + sf.driftPhase) * 6 + MAP_WIDTH) % MAP_WIDTH);
+      mapCtx.fillRect(sx, sy, (i % 4 === 0) ? 2 : 1, (i % 4 === 0) ? 2 : 1);
+    }
+  }
+
+  function drawClouds(pal) {
+    clouds.forEach(c => {
+      c.x += c.speed;
+      if (c.x > MAP_WIDTH + 30) c.x = -40;
+      const cx = Math.round(c.x);
+      const cy = Math.round(c.y);
+
+      mapCtx.fillStyle = 'rgba(0, 0, 0, 0.16)';
+      mapCtx.fillRect(cx + 3, cy + 12, c.w - 4, 4);
+
+      mapCtx.fillStyle = pal.wallWhite;
+      mapCtx.globalAlpha = 0.72;
+      mapCtx.fillRect(cx + 4, cy, c.w - 8, 6);
+      mapCtx.fillRect(cx, cy + 2, c.w, 4);
+      mapCtx.globalAlpha = 1.0;
+    });
+  }
+
+  function drawMapHbcOfficerIcon(x, y, tick, isWarden = false) {
+    const bob = Math.floor(tick / 12) % 2 === 0 ? 0 : -1;
+    const iy = y + bob;
+
+    mapCtx.fillStyle = isWarden ? PALETTE.compassGold : PALETTE.black;
+    mapCtx.fillRect(x - 4, iy - 7, 8, 13);
+
+    if (isWarden) {
+      mapCtx.fillStyle = PALETTE.black;
+      mapCtx.fillRect(x - 3, iy - 6, 6, 11);
+      // White/Gold Plume on Warden's top hat
+      mapCtx.fillStyle = '#ffffff';
+      mapCtx.fillRect(x - 3, iy - 8, 2, 2);
+    }
+
+    mapCtx.fillStyle = '#0f1324';
+    mapCtx.fillRect(x - 2, iy - 6, 4, 3);
+    mapCtx.fillRect(x - 3, iy - 3, 6, 1);
+    mapCtx.fillStyle = PALETTE.compassGold;
+    mapCtx.fillRect(x - 2, iy - 4, 4, 1);
+
+    mapCtx.fillStyle = '#F2C699';
+    mapCtx.fillRect(x - 2, iy - 2, 4, 2);
+
+    mapCtx.fillStyle = PALETTE.roofRed;
+    mapCtx.fillRect(x - 3, iy, 6, 4);
+    mapCtx.fillStyle = PALETTE.compassGold;
+    if (isWarden) {
+      // Gold diagonal sash for Warden of the Plains
+      mapCtx.fillRect(x - 2, iy, 2, 1);
+      mapCtx.fillRect(x - 1, iy + 1, 2, 1);
+      mapCtx.fillRect(x, iy + 2, 2, 1);
+    } else {
+      mapCtx.fillRect(x, iy + 1, 1, 2);
+    }
+
+    mapCtx.fillStyle = PALETTE.wallWhite;
+    mapCtx.fillRect(x - 2, iy + 4, 4, 2);
+  }
+
+  function drawInteractiveMapOverlay(pal, tick) {
+    const pulse = Math.floor(tick / 18) % 2;
+
+    CHECKPOINTS.forEach((cp, idx) => {
+      const isSelected = idx === activeCheckpointIndex;
+      mapCtx.strokeStyle = isSelected
+        ? (pulse === 0 ? pal.roofBlue : pal.capoteBlueBright)
+        : pal.wallWhite;
+      mapCtx.lineWidth = 1;
+      mapCtx.strokeRect(cp.x - 6, cp.y - 6, 12, 12);
+
+      const presence = getCheckpointHbcPresence(cp, idx);
+      if (presence) {
+        drawMapHbcOfficerIcon(cp.hbcIconX, cp.hbcIconY, tick, presence === 'warden');
+      }
+
+      if (cp.status !== 'UNSET') {
+        const bx = cp.x - 11;
+        const by = cp.y - 13;
+        mapCtx.fillStyle = pal.black;
+        mapCtx.fillRect(bx, by, 22, 4);
+
+        if (cp.status === 'SETTING') {
+          const pct = Math.min(1, cp.setProgress / SET_TIME_REQUIRED);
+          mapCtx.fillStyle = pal.teal;
+          mapCtx.fillRect(bx + 1, by + 1, Math.round(20 * pct), 2);
+        } else if (cp.status === 'HBC_RAID') {
+          const remPct = Math.max(0, cp.raidTimer / HBC_RAID_DURATION);
+          mapCtx.fillStyle = Math.floor(tick / 5) % 2 === 0 ? pal.roofRed : pal.compassGold;
+          mapCtx.fillRect(bx + 1, by + 1, Math.max(2, Math.round(20 * remPct)), 2);
+        } else if (cp.status === 'BUSTED') {
+          mapCtx.fillStyle = pal.roofRed;
+          mapCtx.fillRect(bx + 1, by + 1, 20, 2);
+        } else if (cp.status === 'ACTIVE') {
+          const wt = getCartWeight(cp);
+          const pct = Math.min(1, wt / CART_CAPACITY);
+          const isOver = wt > CART_CAPACITY;
+          mapCtx.fillStyle = isOver && Math.floor(tick / 8) % 2 === 0
+            ? pal.roofRed
+            : (wt >= CART_CAPACITY ? pal.compassGold : pal.teal);
+          mapCtx.fillRect(bx + 1, by + 1, Math.max(2, Math.round(20 * pct)), 2);
+        }
+      }
+    });
+
+    cursor.x += (cursor.targetX - cursor.x) * 0.24;
+    cursor.y += (cursor.targetY - cursor.y) * 0.24;
+
+    const cx = Math.round(cursor.x);
+    const cy = Math.round(cursor.y);
+    const bracketOffset = pulse === 0 ? 8 : 10;
+
+    mapCtx.fillStyle = pulse === 0 ? pal.roofBlue : pal.capoteBlueBright;
+    mapCtx.fillRect(cx - bracketOffset, cy - bracketOffset, 4, 2);
+    mapCtx.fillRect(cx - bracketOffset, cy - bracketOffset, 2, 4);
+
+    mapCtx.fillRect(cx + bracketOffset - 4, cy - bracketOffset, 4, 2);
+    mapCtx.fillRect(cx + bracketOffset - 2, cy - bracketOffset, 2, 4);
+
+    mapCtx.fillRect(cx - bracketOffset, cy + bracketOffset - 2, 4, 2);
+    mapCtx.fillRect(cx - bracketOffset, cy + bracketOffset - 4, 2, 4);
+
+    mapCtx.fillRect(cx + bracketOffset - 4, cy + bracketOffset - 2, 4, 2);
+    mapCtx.fillRect(cx + bracketOffset - 2, cy + bracketOffset - 4, 2, 4);
+  }
+
+  function renderMapCanvas() {
+    const pal = PALETTE;
+    const season = getSeasonalTheme();
+
+    mapCtx.clearRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
+    mapCtx.drawImage(terrainCanvas, 0, 0);
+
+    drawAnimatedWaterEffects(pal, frameTick, season);
+    drawClouds(pal);
+    drawMapSeasonalSnow(frameTick, season);
+    drawInteractiveMapOverlay(pal, frameTick);
+  }
+
+  // =========================================================================
+  // 6-CHECKPOINT RPG SELECTION WINDOW BUILDER & SYNC
+  // =========================================================================
+  function buildCheckpointBoxes() {
+    const grid = document.getElementById('checkpointGrid');
+    grid.innerHTML = '';
+
+    CHECKPOINTS.forEach((cp, idx) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.id = `cp-box-${idx}`;
+      btn.className = 'checkpoint-box';
+      btn.onclick = () => {
+        if (activeCheckpointIndex === idx) enterSelectedCheckpoint();
+        else setCheckpoint(idx);
+      };
+
+      const numSpan = document.createElement('span');
+      numSpan.className = 'cp-num';
+      numSpan.textContent = `0${idx + 1}`;
+
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'cp-name';
+      nameSpan.textContent = cp.name;
+
+      const barWrap = document.createElement('div');
+      barWrap.className = 'cp-mini-bar';
+      barWrap.id = `cp-bar-${idx}`;
+      barWrap.style.visibility = 'hidden';
+
+      const barFill = document.createElement('div');
+      barFill.className = 'cp-mini-fill';
+      barFill.id = `cp-fill-${idx}`;
+
+      barWrap.appendChild(barFill);
+      btn.appendChild(numSpan);
+      btn.appendChild(nameSpan);
+      btn.appendChild(barWrap);
+      grid.appendChild(btn);
+    });
+  }
+
+  function setCheckpoint(index) {
+    activeCheckpointIndex = ((index % CHECKPOINTS.length) + CHECKPOINTS.length) % CHECKPOINTS.length;
+    const cp = CHECKPOINTS[activeCheckpointIndex];
+    cursor.targetX = cp.x;
+    cursor.targetY = cp.y;
+    sfxCursor();
+    updateCheckpointBoxesUI();
+    updateHUD();
+  }
+
+  function cycleCheckpoint(step = 1) {
+    setCheckpoint(activeCheckpointIndex + step);
+  }
+
+  function updateCheckpointBoxesUI() {
+    CHECKPOINTS.forEach((cp, idx) => {
+      const el = document.getElementById(`cp-box-${idx}`);
+      if (el) el.classList.toggle('active', idx === activeCheckpointIndex);
+
+      const barWrap = document.getElementById(`cp-bar-${idx}`);
+      const barFill = document.getElementById(`cp-fill-${idx}`);
+      if (!barWrap || !barFill) return;
+
+      if (cp.status === 'UNSET') {
+        barWrap.style.visibility = 'hidden';
+      } else {
+        barWrap.style.visibility = 'visible';
+        if (cp.status === 'SETTING') {
+          barFill.style.width = `${Math.round((cp.setProgress / SET_TIME_REQUIRED) * 100)}%`;
+          barFill.style.background = PALETTE.teal;
+        } else if (cp.status === 'HBC_RAID') {
+          barFill.style.width = `${Math.max(10, Math.round((cp.raidTimer / HBC_RAID_DURATION) * 100))}%`;
+          barFill.style.background = PALETTE.roofRed;
+        } else if (cp.status === 'BUSTED') {
+          barFill.style.width = '100%';
+          barFill.style.background = '#555';
+        } else if (cp.status === 'ACTIVE') {
+          const wt = getCartWeight(cp);
+          const pct = Math.min(100, Math.round((wt / CART_CAPACITY) * 100));
+          barFill.style.width = `${Math.max(8, pct)}%`;
+          barFill.style.background = wt > CART_CAPACITY
+            ? PALETTE.roofRed
+            : (wt >= CART_CAPACITY ? '#38984c' : '#3b5dc9');
+        }
+      }
+    });
+  }
+
+  mapCanvas.addEventListener('click', (e) => {
+    if (gameState !== 'MAP') return;
+    const rect = mapCanvas.getBoundingClientRect();
+    const scaleX = MAP_WIDTH / rect.width;
+    const scaleY = MAP_HEIGHT / rect.height;
+    const clickX = (e.clientX - rect.left) * scaleX;
+    const clickY = (e.clientY - rect.top) * scaleY;
+
+    let clickedIdx = -1;
+    let minDist = 30;
+    CHECKPOINTS.forEach((cp, idx) => {
+      const d = Math.hypot(clickX - cp.x, clickY - cp.y);
+      if (d < minDist) {
+        minDist = d;
+        clickedIdx = idx;
+      }
+    });
+
+    if (clickedIdx !== -1) {
+      if (clickedIdx === activeCheckpointIndex) enterSelectedCheckpoint();
+      else setCheckpoint(clickedIdx);
+    } else {
+      cycleCheckpoint(1);
+    }
+  });
+
+  // =========================================================================
+  // COVER SCREEN ("LE ROI DES TRAITEURS" — STATIONARY CART + SWAYING GRASS)
+  // =========================================================================
+  function drawTitleScreen() {
+    ctx.fillStyle = '#0f1324';
+    ctx.fillRect(0, 0, 240, 240);
+
+    const treeShift = Math.floor(frameTick * 0.05) % 24;
+    ctx.fillStyle = PALETTE.woodlandDark;
+    ctx.fillRect(0, 92, 240, 40);
+    ctx.fillStyle = PALETTE.woodlandBase;
+    for (let tx = -24; tx < 264; tx += 24) {
+      ctx.fillRect(tx - treeShift + 4, 86, 16, 14);
+      ctx.fillRect(tx - treeShift + 7, 82, 10, 6);
+    }
+
+    ctx.fillStyle = PALETTE.prairieBase;
+    ctx.fillRect(0, 124, 240, 56);
+    ctx.fillStyle = PALETTE.prairieLight;
+    for (let gx = 10; gx < 236; gx += 26) {
+      ctx.fillRect(gx, 130, 4, 2);
+    }
+
+    ctx.fillStyle = PALETTE.roadDark;
+    ctx.fillRect(0, 152, 240, 24);
+    ctx.fillStyle = PALETTE.road;
+    ctx.fillRect(0, 154, 240, 20);
+
+    ctx.fillStyle = PALETTE.sandBank;
+    ctx.fillRect(0, 176, 240, 4);
+    ctx.fillStyle = PALETTE.waterBank;
+    ctx.fillRect(0, 180, 240, 2);
+    ctx.fillStyle = PALETTE.waterDeep;
+    ctx.fillRect(0, 182, 240, 58);
+
+    ctx.fillStyle = PALETTE.waterMid;
+    for (let y = 188; y < 236; y += 11) {
+      const shift = Math.floor(Math.sin(frameTick * 0.04 + y) * 10);
+      ctx.fillRect(18 + shift, y, 64, 2);
+      ctx.fillRect(128 - shift, y + 4, 76, 2);
+    }
+
+    drawRoiDesTraiteursTitle();
+
+    ctx.fillStyle = PALETTE.teal;
+    ctx.font = 'bold 9px Courier New';
+    ctx.fillText('RED RIVER FURTRADE', 70, 74);
+
+    drawSwayingCoverGrass(52, 154, 9, PALETTE.woodlandBase);
+    drawSwayingCoverGrass(162, 154, 8, PALETTE.woodlandBase);
+
+    const cartX = 66;
+    const cartY = 108;
+
+    ctx.fillStyle = 'rgba(15, 19, 36, 0.45)';
+    ctx.fillRect(cartX + 14, cartY + 55, 92, 4);
+
+    drawMatrix(sprCoverCart, cartX, cartY, {
+      1: PALETTE.woodMid,
+      2: PALETTE.woodLight,
+      3: '#3A2314',
+      4: '#6E472B',
+      5: PALETTE.woodDark,
+      6: PALETTE.compassGold,
+      7: PALETTE.wallWhite,
+      8: PALETTE.road
+    }, 3);
+
+    drawSwayingCoverGrass(58, 168, 7, PALETTE.prairieLight);
+    drawSwayingCoverGrass(116, 170, 6, PALETTE.prairieGold);
+    drawSwayingCoverGrass(172, 168, 8, PALETTE.prairieLight);
+
+    if (Math.floor(frameTick / 25) % 2 === 0) {
+      ctx.fillStyle = PALETTE.compassGold;
+      ctx.font = 'bold 12px Courier New';
+      ctx.fillText("PRESS 'A' TO START", 54, 204);
+    }
+
+    ctx.fillStyle = PALETTE.wallWhite;
+    ctx.font = '9px Courier New';
+    ctx.fillText('FURTRADE FREETRADERS', 65, 224);
+  }
+
+  function drawSwayingCoverGrass(baseX, baseY, bladeCount, color) {
+    ctx.fillStyle = color;
+    for (let i = 0; i < bladeCount; i++) {
+      const bx = baseX + i * 4;
+      const h = 8 + ((i * 5) % 7);
+      const sway = Math.round(Math.sin(frameTick * 0.06 + i * 0.9) * 1.5);
+      ctx.fillRect(bx, baseY - Math.floor(h / 2), 2, Math.floor(h / 2));
+      ctx.fillRect(bx + sway, baseY - h, 2, Math.ceil(h / 2));
+    }
+  }
+
+  function drawRoiDesTraiteursTitle() {
+    const GLYPHS = {
+      'L': [[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[1,1,1,1,1]],
+      'E': [[1,1,1,1,1],[1,0,0,0,0],[1,0,0,0,0],[1,1,1,1,0],[1,0,0,0,0],[1,0,0,0,0],[1,1,1,1,1]],
+      'R': [[1,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,1,1,1,0],[1,0,1,0,0],[1,0,0,1,0],[1,0,0,0,1]],
+      'O': [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0]],
+      'I': [[1,1,1,1,1],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[1,1,1,1,1]],
+      'D': [[1,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,1,1,1,0]],
+      'S': [[0,1,1,1,1],[1,0,0,0,0],[1,0,0,0,0],[0,1,1,1,0],[0,0,0,0,1],[0,0,0,0,1],[1,1,1,1,0]],
+      'T': [[1,1,1,1,1],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0]],
+      'A': [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,1,1,1,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1]],
+      'U': [[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0]]
+    };
+
+    const line1 = 'LE ROI DES';
+    const s1 = 3;
+    const step1 = 18;
+    for (let i = 0; i < line1.length; i++) {
+      const ch = line1[i];
+      if (ch === ' ') continue;
+      const g = GLYPHS[ch];
+      const gx = 31 + i * step1;
+      const gy = 14;
+      for (let r = 0; r < 7; r++) {
+        for (let c = 0; c < 5; c++) {
+          if (g[r][c]) {
+            ctx.fillStyle = '#040D09';
+            ctx.fillRect(gx + c * s1 + 1, gy + r * s1 + 1, s1, s1);
+            ctx.fillStyle = r < 2 ? '#FFF3B0' : (r < 5 ? PALETTE.compassGold : '#C9961A');
+            ctx.fillRect(gx + c * s1, gy + r * s1, s1, s1);
+          }
         }
       }
     }
 
-    for (let d of drops) drawSprite(d.x, d.y, sprLoot, {1:C.WOOD, 2:C.GOLD});
+    const line2 = 'TRAITEURS';
+    const s2 = 4;
+    const step2 = 23;
+    for (let i = 0; i < line2.length; i++) {
+      const ch = line2[i];
+      const g = GLYPHS[ch];
+      const gx = 18 + i * step2;
+      const gy = 38;
+      for (let r = 0; r < 7; r++) {
+        for (let c = 0; c < 5; c++) {
+          if (g[r][c]) {
+            ctx.fillStyle = '#040D09';
+            ctx.fillRect(gx + c * s2 + 2, gy + r * s2 + 2, s2, s2);
+            ctx.fillStyle = r < 2 ? '#FFF3B0' : (r < 5 ? PALETTE.compassGold : '#C9961A');
+            ctx.fillRect(gx + c * s2, gy + r * s2, s2, s2);
+          }
+        }
+      }
+    }
+  }
 
-    for (let e of enemies) {
-      drawSprite(e.x, e.y, sprWolf, {1:'#000', 2:C.WOLF_FUR, 3:C.WOLF_EYE});
+  // =========================================================================
+  // SEASONAL & CHECKPOINT-SPECIFIC 16-BIT GBC/SNES SCENES
+  // =========================================================================
+  function drawWeirScene() {
+    const cp = CHECKPOINTS[activeCheckpointIndex];
+    const season = getSeasonalTheme();
+
+    if (cp.flow === 'WE') {
+      drawAssiniboineCheckpointScene(cp, season);
+    } else {
+      drawRedRiverCheckpointScene(cp, season);
     }
 
-    for (let sp of sparkles) {
-      ctx.fillStyle = sp.color;
-      ctx.fillRect(sp.x, sp.y, sp.size, sp.size);
+    // Rare Spirited White Horse at St. Francois-Xavier (once every gameplay)
+    if (cp.id === 'st_francois_xavier' && whiteHorse) {
+      drawSpiritedWhiteHorse();
     }
 
-    if (player.slashing) {
-      ctx.fillStyle = '#fff';
-      if (player.dir === 'up') ctx.fillRect(player.x+6, player.y-10, 6, 12);
-      else if (player.dir === 'down') ctx.fillRect(player.x+6, player.y+18, 6, 12);
-      else if (player.dir === 'left') ctx.fillRect(player.x-10, player.y+8, 12, 6);
-      else if (player.dir === 'right') ctx.fillRect(player.x+16, player.y+8, 12, 6);
+    if (season.stage === 4) {
+      const activeFlakes = Math.floor(42 * season.snowAmount);
+      ctx.fillStyle = '#ffffff';
+      for (let i = 0; i < activeFlakes; i++) {
+        const sf = snowFlakes[i];
+        const sy = Math.round((sf.y + frameTick * sf.speedY) % 240);
+        const sx = Math.round((sf.x + Math.sin(frameTick * 0.04 + sf.driftPhase) * 6 + 240) % 240);
+        ctx.fillRect(sx, sy, (i % 4 === 0) ? 2 : 1, (i % 4 === 0) ? 2 : 1);
+      }
     }
-    
-    let currentAnim = sprPlayerDown[player.animFrame];
-    drawSprite(player.x - 3, player.y - 4, currentAnim, {1:C.WOOD, 2:C.SKIN, 3:C.CAPOT_BLUE, 4:C.SASH_RED});
 
-    ctx.restore();
+    ctx.font = 'bold 9px Courier New';
+    floatingPopups.forEach(p => {
+      ctx.fillStyle = PALETTE.black;
+      ctx.fillText(p.text, p.x + 1, p.y + 1);
+      ctx.fillStyle = p.color;
+      ctx.fillText(p.text, p.x, p.y);
+    });
   }
 
-  function loop() {
-    update();
-    draw();
-    requestAnimationFrame(loop);
+  // -------------------------------------------------------------------------
+  // A. RED RIVER CHECKPOINTS (St. Boniface, St. Vital, Kildonan — North-Up Flow)
+  // -------------------------------------------------------------------------
+  function drawRedRiverCheckpointScene(cp, season) {
+    const waterLeft = 76 - season.waterLevelOffset;
+    const waterRight = 164 + season.waterLevelOffset;
+    const waterWidth = waterRight - waterLeft;
+
+    ctx.fillStyle = season.waterDeep;
+    ctx.fillRect(waterLeft, 0, waterWidth, 240);
+
+    // St. Boniface: Assiniboine River / Forks joining from the Left (West) Bank!
+    const hasWestForks = (cp.id === 'st_boniface');
+    const forkTop = 140 - Math.round(season.waterLevelOffset * 0.6);
+    const forkBottom = 180 + Math.round(season.waterLevelOffset * 0.6);
+    if (hasWestForks) {
+      ctx.fillStyle = season.waterDeep;
+      ctx.fillRect(0, forkTop, waterLeft + 4, forkBottom - forkTop);
+    }
+
+    ctx.fillStyle = 'rgba(15, 32, 74, 0.35)';
+    for (let i = 0; i < 18; i++) {
+      const px = waterLeft + 6 + ((i * 37) % Math.max(16, waterWidth - 14));
+      const py = 12 + ((i * 41) % 216);
+      ctx.fillRect(px, py, 6, 4);
+    }
+
+    // Submerged Underwater Fish swimming NORTH-UP in Red River
+    riverFish.forEach(f => {
+      if (f.isSturgeon) {
+        drawMatrix(sprSturgeonNorth, f.x - 5, f.y, {
+          1: '#162922', 2: '#3D5C4E', 3: '#B8B4A9', 4: '#D9AF36'
+        }, 1);
+      } else {
+        drawMatrix(sprWhitefishNorth, f.x - 4, f.y, {
+          1: '#1E4863', 2: '#8FAAB5', 3: '#D8E6EB'
+        }, 1);
+      }
+    });
+
+    // Translucent Water Surface Layer
+    ctx.fillStyle = season.waterSurfaceRgba;
+    ctx.fillRect(waterLeft, 0, waterWidth, 240);
+    if (hasWestForks) {
+      ctx.fillRect(0, forkTop, waterLeft + 4, forkBottom - forkTop);
+    }
+
+    // Animated NORTH-UP Current Streaks & Foam Ripples in Red River
+    ctx.fillStyle = season.waterMid;
+    for (let col = 0; col < 5; col++) {
+      const rx = waterLeft + 8 + ((col * 16) % Math.max(12, waterWidth - 12));
+      const ry = 240 - ((frameTick * 1.6 + col * 43) % 240);
+      ctx.fillRect(rx, ry, 2, 16);
+    }
+    ctx.fillStyle = PALETTE.waterFoam;
+    for (let col = 0; col < 4; col++) {
+      const fx = waterLeft + 12 + ((col * 20) % Math.max(12, waterWidth - 16));
+      const fy = 240 - ((frameTick * 2.3 + col * 59) % 240);
+      ctx.fillRect(fx, fy, 2, 5);
+    }
+
+    // Assiniboine West-to-East current streaks at St. Boniface Forks
+    if (hasWestForks) {
+      ctx.fillStyle = season.waterMid;
+      for (let r = 0; r < 2; r++) {
+        const fy = forkTop + 8 + r * 16;
+        const fx = (frameTick * 1.4 + r * 35) % (waterLeft + 2);
+        ctx.fillRect(fx, fy, 12, 2);
+      }
+      ctx.fillStyle = PALETTE.waterFoam;
+      const foamX = (frameTick * 1.9) % (waterLeft + 2);
+      ctx.fillRect(foamX, forkTop + 14, 4, 2);
+    }
+
+    if (season.hasIceChunks) {
+      for (let ic = 0; ic < 6; ic++) {
+        const ix = waterLeft + 8 + ((ic * 23) % Math.max(16, waterWidth - 20));
+        const iy = 240 - ((frameTick * 0.9 + ic * 41) % 240);
+        if (iy < 104 || iy > 132) {
+          ctx.fillStyle = '#a8d8f0';
+          ctx.fillRect(ix, iy, 9, 6);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(ix + 1, iy, 7, 4);
+        }
+      }
+    }
+
+    if (season.stage === 4) {
+      const shelfW = Math.round((waterWidth * 0.42) * season.freezeRatio);
+      for (let y = 0; y < 240; y += 6) {
+        if (y >= 110 && y <= 130) continue;
+        const jag = ((y * 7) % 5) - 2;
+        ctx.fillStyle = '#9ad1f0';
+        ctx.fillRect(waterLeft, y, shelfW + jag + 2, 6);
+        ctx.fillRect(waterRight - (shelfW - jag + 2), y, shelfW - jag + 2, 6);
+        ctx.fillStyle = '#e8f6ff';
+        ctx.fillRect(waterLeft, y, Math.max(2, shelfW + jag), 6);
+        ctx.fillRect(waterRight - Math.max(2, shelfW - jag), y, Math.max(2, shelfW - jag), 6);
+      }
+    }
+
+    drawRedRiverRichShores(cp, season, waterLeft, waterRight, hasWestForks, forkTop, forkBottom);
+    drawNaturalHorizontalStones(season);
+
+    if (cp.status !== 'UNSET') {
+      drawRedRiverCart(cp, cp.cartX, cp.cartY);
+    } else if (isOnDirtRoad(cp, player.x, player.y)) {
+      drawCartPlacementOutline(player.x, player.y);
+    }
+
+    drawDepthSortedActors();
   }
 
-  function updateUI() {
-    scoreDisplay.innerText = `GOODS: ${inventory} | SCORE: ${score}`;
-    energyFill.style.width = Math.min(100, Math.max(0, (energy/MAX_ENERGY)*100)) + '%';
+  function drawRedRiverRichShores(cp, season, waterLeft, waterRight, hasWestForks, forkTop, forkBottom) {
+    ctx.fillStyle = season.grassBase;
+    if (hasWestForks) {
+      // West bank split into Point Douglas / Upper Fort Garry peninsula (above forkTop) & South-West bank (below forkBottom)
+      ctx.fillRect(0, 0, 72, forkTop - 4);
+      ctx.fillRect(0, forkBottom + 4, 72, 240 - (forkBottom + 4));
+    } else {
+      ctx.fillRect(0, 0, 72, 240);
+    }
+    ctx.fillRect(168, 0, 72, 240);
+
+    if (season.stage === 0) {
+      ctx.fillStyle = season.wetPatch;
+      ctx.fillRect(10, 68, 18, 8);
+      ctx.fillRect(204, 172, 22, 9);
+      if (!hasWestForks) ctx.fillRect(14, 182, 16, 7);
+    }
+
+    if (season.stage === 4) {
+      ctx.fillStyle = '#e8f1f8';
+      ctx.fillRect(6, 66, 28, 12);
+      ctx.fillRect(198, 64, 34, 14);
+      if (!hasWestForks) ctx.fillRect(8, 166, 36, 16);
+      ctx.fillRect(196, 168, 36, 18);
+    }
+
+    // Cultivated Farm Plots
+    ctx.fillStyle = season.cultivated;
+    if (!hasWestForks) {
+      ctx.fillRect(6, 152, 42, 64);
+    } else {
+      ctx.fillRect(6, 190, 42, 42);
+    }
+    ctx.fillRect(184, 152, 46, 64);
+    ctx.fillStyle = season.cultivatedLight;
+    if (!hasWestForks) {
+      for (let py = 158; py < 212; py += 8) ctx.fillRect(10, py, 34, 2);
+    } else {
+      for (let py = 196; py < 228; py += 8) ctx.fillRect(10, py, 34, 2);
+    }
+    for (let py = 158; py < 212; py += 8) {
+      ctx.fillRect(188, py, 38, 2);
+    }
+
+    // Meadow Grass & Seasonal Leaf/Frost Tufts
+    for (let y = 10; y < 232; y += 14) {
+      for (let x = 8; x < 66; x += 18) {
+        if (hasWestForks && y >= forkTop - 6 && y <= forkBottom + 6) continue;
+        ctx.fillStyle = (x + y) % 28 === 0 ? season.grassTuft : season.grassAccent;
+        ctx.fillRect(x, y, 3, 2);
+      }
+      for (let x = 176; x < 232; x += 18) {
+        ctx.fillStyle = (x + y) % 28 === 0 ? season.grassTuft : season.grassAccent;
+        ctx.fillRect(x, y, 3, 2);
+      }
+    }
+
+    if (season.stage === 3) {
+      for (let ly = 16; ly < 228; ly += 19) {
+        if (!hasWestForks || ly < forkTop - 8 || ly > forkBottom + 8) {
+          ctx.fillStyle = (ly % 2 === 0) ? '#c9382a' : '#ffcd75';
+          ctx.fillRect(14 + (ly % 22), ly, 2, 2);
+        }
+        ctx.fillStyle = (ly % 2 === 0) ? '#c9382a' : '#ffcd75';
+        ctx.fillRect(202 + (ly % 24), ly + 5, 2, 2);
+      }
+    }
+
+    // Dirt Roads
+    ctx.fillStyle = season.roadDark;
+    if (hasWestForks) {
+      ctx.fillRect(46, 0, 16, forkTop - 6);
+      ctx.fillRect(46, forkBottom + 6, 16, 240 - (forkBottom + 6));
+    } else {
+      ctx.fillRect(46, 0, 16, 240);
+    }
+    ctx.fillRect(178, 0, 16, 240);
+    ctx.fillRect(46, 112, 30, 16);
+    ctx.fillRect(164, 112, 30, 16);
+
+    ctx.fillStyle = season.road;
+    if (hasWestForks) {
+      ctx.fillRect(48, 0, 12, forkTop - 6);
+      ctx.fillRect(48, forkBottom + 6, 12, 240 - (forkBottom + 6));
+    } else {
+      ctx.fillRect(48, 0, 12, 240);
+    }
+    ctx.fillRect(180, 0, 12, 240);
+    ctx.fillRect(48, 114, 28, 12);
+    ctx.fillRect(164, 114, 28, 12);
+
+    // St. Boniface: West-East Dirt Road on the North Side of the Cathedral (y: 2..14, x: 168..240)
+    if (cp.id === 'st_boniface') {
+      ctx.fillStyle = season.roadDark;
+      ctx.fillRect(168, 2, 72, 13);
+      ctx.fillStyle = season.road;
+      ctx.fillRect(168, 3, 72, 10);
+    }
+
+    if (cp.entrySide === 'EAST') {
+      ctx.fillStyle = season.roadDark;
+      ctx.fillRect(194, 112, 46, 16);
+      ctx.fillStyle = season.road;
+      ctx.fillRect(194, 114, 46, 12);
+    } else {
+      ctx.fillStyle = season.roadDark;
+      ctx.fillRect(0, 112, 46, 16);
+      ctx.fillStyle = season.road;
+      ctx.fillRect(0, 114, 46, 12);
+    }
+
+    // Sandbanks & Shorelines
+    ctx.fillStyle = season.sandBank;
+    if (hasWestForks) {
+      if (waterLeft > 70) {
+        ctx.fillRect(70, 0, waterLeft - 70, forkTop);
+        ctx.fillRect(70, forkBottom, waterLeft - 70, 240 - forkBottom);
+      }
+      // North & South banks of the Assiniboine on the West side
+      ctx.fillRect(0, forkTop - 4, waterLeft, 4);
+      ctx.fillRect(0, forkBottom, waterLeft, 4);
+    } else if (waterLeft > 70) {
+      ctx.fillRect(70, 0, waterLeft - 70, 240);
+    }
+    if (waterRight < 170) {
+      ctx.fillRect(waterRight, 0, 170 - waterRight, 240);
+    }
+
+    ctx.fillStyle = PALETTE.waterBank;
+    if (hasWestForks) {
+      ctx.fillRect(waterLeft, 0, 2, forkTop);
+      ctx.fillRect(waterLeft, forkBottom, 2, 240 - forkBottom);
+      ctx.fillRect(0, forkTop - 1, waterLeft + 2, 2);
+      ctx.fillRect(0, forkBottom - 1, waterLeft + 2, 2);
+    } else {
+      ctx.fillRect(waterLeft, 0, 2, 240);
+    }
+    ctx.fillRect(waterRight - 2, 0, 2, 240);
+
+    if (!hasWestForks) {
+      drawHorizontalFence(8, 149, 36);
+    }
+    drawHorizontalFence(186, 149, 42);
+
+    if (cp.id === 'st_boniface') {
+      // St. Boniface Cathedral positioned just south of the new North W-E road (y=18)
+      drawDetailedStBoniface(196, 18, season);
+      drawDetailedSeasonalTree(198, 84, season, 0);
+      drawDetailedSeasonalTree(202, 198, season, 1);
+      // Trees on opposite West bank (Point Douglas peninsula & South-West bank)
+      drawDetailedSeasonalTree(12, 24, season, 2);
+      drawDetailedSeasonalTree(16, 82, season, 3);
+      drawDetailedSeasonalTree(14, 196, season, 4);
+    } else if (cp.id === 'kildonan') {
+      drawDetailedKildonanKirk(196, 20, season);
+      drawDetailedSeasonalTree(200, 82, season, 1);
+      drawDetailedSeasonalTree(202, 198, season, 2);
+      drawDetailedSeasonalTree(12, 22, season, 3);
+      drawDetailedSeasonalTree(16, 84, season, 4);
+      drawDetailedSeasonalTree(14, 198, season, 0);
+    } else {
+      drawDetailedStVitalHomestead(6, 20, season);
+      drawDetailedSeasonalTree(14, 82, season, 2);
+      drawDetailedSeasonalTree(12, 198, season, 3);
+      drawDetailedSeasonalTree(200, 24, season, 4);
+      drawDetailedSeasonalTree(204, 84, season, 0);
+      drawDetailedSeasonalTree(200, 198, season, 1);
+    }
   }
 
-  function startGame() {
-    state = 'PLAYING';
-    score = 0;
-    inventory = 0;
-    energy = 100;
-    startChiptuneTrack();
-    generateMap();
-    updateUI();
-    introScreen.style.display = 'none';
+  // -------------------------------------------------------------------------
+  // B. ASSINIBOINE RIVER CHECKPOINTS (Upper Fort Garry, St. James, St. Francois-Xavier)
+  // -------------------------------------------------------------------------
+  function drawAssiniboineCheckpointScene(cp, season) {
+    const isUFG = (cp.id === 'upper_fort_garry');
+    const waterTop = 84 - season.waterLevelOffset;
+    const waterBottom = 156 + season.waterLevelOffset;
+    const waterHeight = waterBottom - waterTop;
+
+    // In Upper Fort Garry, the Red River & The Forks confluence occupy the right side (x: 182..240, y: 0..240)!
+    const assiniRight = isUFG ? 184 : 240;
+
+    ctx.fillStyle = season.waterDeep;
+    ctx.fillRect(0, waterTop, assiniRight, waterHeight);
+
+    if (isUFG) {
+      // Red River channel on the right-hand side of Upper Fort Garry
+      const redLeft = 182 - Math.round(season.waterLevelOffset * 0.4);
+      ctx.fillRect(redLeft, 0, 240 - redLeft, 240);
+    }
+
+    ctx.fillStyle = 'rgba(15, 32, 74, 0.35)';
+    for (let i = 0; i < 18; i++) {
+      const px = 12 + ((i * 43) % Math.max(24, assiniRight - 24));
+      const py = waterTop + 5 + ((i * 29) % Math.max(16, waterHeight - 10));
+      ctx.fillRect(px, py, 6, 4);
+    }
+
+    // Submerged Underwater Fish
+    riverFish.forEach(f => {
+      if (f.isSturgeon) {
+        drawMatrix(sprSturgeonHoriz, f.x, f.y - 5, {
+          1: '#162922', 2: '#3D5C4E', 3: '#B8B4A9', 4: '#D9AF36'
+        }, 1);
+      } else {
+        drawMatrix(sprWhitefishHoriz, f.x, f.y - 4, {
+          1: '#1E4863', 2: '#8FAAB5', 3: '#D8E6EB'
+        }, 1);
+      }
+    });
+
+    // Translucent Water Surface Layer
+    ctx.fillStyle = season.waterSurfaceRgba;
+    ctx.fillRect(0, waterTop, assiniRight, waterHeight);
+    if (isUFG) {
+      const redLeft = 182 - Math.round(season.waterLevelOffset * 0.4);
+      ctx.fillRect(redLeft, 0, 240 - redLeft, 240);
+    }
+
+    // Assiniboine West-to-East Current Streaks
+    ctx.fillStyle = season.waterMid;
+    for (let row = 0; row < 4; row++) {
+      const ry = waterTop + 8 + ((row * 16) % Math.max(12, waterHeight - 10));
+      const rx = (frameTick * 1.6 + row * 47) % assiniRight;
+      ctx.fillRect(rx, ry, Math.min(16, assiniRight - rx), 2);
+    }
+    ctx.fillStyle = PALETTE.waterFoam;
+    for (let row = 0; row < 3; row++) {
+      const fy = waterTop + 12 + ((row * 20) % Math.max(12, waterHeight - 12));
+      const fx = (frameTick * 2.3 + row * 61) % assiniRight;
+      ctx.fillRect(fx, fy, 5, 2);
+    }
+
+    // Red River North-Up Current Streaks on the right-hand side of Upper Fort Garry
+    if (isUFG) {
+      const redLeft = 182 - Math.round(season.waterLevelOffset * 0.4);
+      ctx.fillStyle = season.waterMid;
+      for (let col = 0; col < 3; col++) {
+        const rx = redLeft + 8 + col * 16;
+        const ry = 240 - ((frameTick * 1.6 + col * 43) % 240);
+        ctx.fillRect(rx, ry, 2, 16);
+      }
+      ctx.fillStyle = PALETTE.waterFoam;
+      for (let col = 0; col < 2; col++) {
+        const fx = redLeft + 14 + col * 20;
+        const fy = 240 - ((frameTick * 2.3 + col * 59) % 240);
+        ctx.fillRect(fx, fy, 2, 5);
+      }
+    }
+
+    // Floating Ice Chunks
+    if (season.hasIceChunks) {
+      for (let ic = 0; ic < 6; ic++) {
+        const ix = (frameTick * 0.9 + ic * 43) % assiniRight;
+        const iy = waterTop + 6 + ((ic * 19) % Math.max(14, waterHeight - 14));
+        if (ix < 104 || ix > 134) {
+          ctx.fillStyle = '#a8d8f0';
+          ctx.fillRect(ix, iy, 9, 6);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(ix + 1, iy, 7, 4);
+        }
+      }
+    }
+
+    // Early Winter Shelf Freeze
+    if (season.stage === 4) {
+      const shelfH = Math.round((waterHeight * 0.42) * season.freezeRatio);
+      for (let x = 0; x < assiniRight; x += 6) {
+        if (x >= 110 && x <= 130) continue;
+        const jag = ((x * 7) % 5) - 2;
+        ctx.fillStyle = '#9ad1f0';
+        ctx.fillRect(x, waterTop, 6, shelfH + jag + 2);
+        ctx.fillRect(x, waterBottom - (shelfH - jag + 2), 6, shelfH - jag + 2);
+        ctx.fillStyle = '#e8f6ff';
+        ctx.fillRect(x, waterTop, 6, Math.max(2, shelfH + jag));
+        ctx.fillRect(x, waterBottom - Math.max(2, shelfH - jag), 6, Math.max(2, shelfH - jag));
+      }
+      if (isUFG) {
+        const redLeft = 182 - Math.round(season.waterLevelOffset * 0.4);
+        const shelfW = Math.round(22 * season.freezeRatio);
+        for (let y = 0; y < 240; y += 6) {
+          ctx.fillStyle = '#9ad1f0';
+          ctx.fillRect(redLeft, y, shelfW + 2, 6);
+          ctx.fillStyle = '#e8f6ff';
+          ctx.fillRect(redLeft, y, shelfW, 6);
+        }
+      }
+    }
+
+    drawAssiniboineRichShores(cp, season, waterTop, waterBottom);
+    drawNaturalVerticalStones(season);
+
+    if (cp.status !== 'UNSET') {
+      drawRedRiverCart(cp, cp.cartX, cp.cartY);
+    } else if (isOnDirtRoad(cp, player.x, player.y)) {
+      drawCartPlacementOutline(player.x, player.y);
+    }
+
+    drawDepthSortedActors();
   }
 
+  function drawAssiniboineRichShores(cp, season, waterTop, waterBottom) {
+    const isUFG = (cp.id === 'upper_fort_garry');
+    const redLeft = isUFG ? (182 - Math.round(season.waterLevelOffset * 0.4)) : 240;
+    const landWidth = isUFG ? (redLeft - 4) : 240;
+
+    ctx.fillStyle = season.grassBase;
+    ctx.fillRect(0, 0, landWidth, 80);
+    ctx.fillRect(0, 160, landWidth, 80);
+
+    if (season.stage === 0) {
+      ctx.fillStyle = season.wetPatch;
+      ctx.fillRect(108, 194, 24, 9);
+      if (!isUFG) ctx.fillRect(184, 188, 22, 8);
+    }
+
+    if (season.stage === 4) {
+      ctx.fillStyle = '#e8f1f8';
+      if (!isUFG) ctx.fillRect(144, 8, 86, 42);
+      ctx.fillRect(12, 188, 86, 44);
+    }
+
+    ctx.fillStyle = season.cultivated;
+    if (!isUFG) ctx.fillRect(146, 10, 82, 40);
+    ctx.fillRect(14, 190, 82, 40);
+    ctx.fillStyle = season.cultivatedLight;
+    if (!isUFG) {
+      for (let py = 16; py < 46; py += 8) ctx.fillRect(150, py, 74, 2);
+    }
+    for (let py = 196; py < 226; py += 8) ctx.fillRect(18, py, 74, 2);
+
+    for (let x = 10; x < landWidth - 8; x += 22) {
+      ctx.fillStyle = season.grassTuft;
+      ctx.fillRect(x, 12, 3, 2);
+      ctx.fillRect(x + 8, 226, 3, 2);
+    }
+
+    if (season.stage === 3) {
+      for (let lx = 16; lx < landWidth - 10; lx += 21) {
+        ctx.fillStyle = (lx % 2 === 0) ? '#c9382a' : '#ffcd75';
+        ctx.fillRect(lx, 18 + (lx % 16), 2, 2);
+        ctx.fillRect(lx + 4, 212 + (lx % 18), 2, 2);
+      }
+    }
+
+    // East-West Portage Dirt Roads
+    const roadRight = isUFG ? (landWidth - 2) : 240;
+    ctx.fillStyle = season.roadDark;
+    ctx.fillRect(0, 56, roadRight, 16);
+    ctx.fillRect(0, 164, roadRight, 16);
+    ctx.fillRect(112, 0, 16, 58);
+
+    ctx.fillStyle = season.road;
+    ctx.fillRect(0, 58, roadRight, 12);
+    ctx.fillRect(0, 166, roadRight, 12);
+    ctx.fillRect(114, 0, 12, 58);
+
+    // Sandbanks & Shorelines
+    ctx.fillStyle = season.sandBank;
+    if (waterTop > 78) {
+      ctx.fillRect(0, 78, landWidth, waterTop - 78);
+    }
+    if (waterBottom < 162) {
+      ctx.fillRect(0, waterBottom, landWidth, 162 - waterBottom);
+    }
+    // Left Bank of the Red River on the right side of Upper Fort Garry
+    if (isUFG) {
+      ctx.fillRect(landWidth, 0, 4, waterTop + 2);
+      ctx.fillRect(landWidth, waterBottom - 2, 4, 240 - (waterBottom - 2));
+    }
+
+    ctx.fillStyle = PALETTE.waterBank;
+    ctx.fillRect(0, waterTop, landWidth + 2, 2);
+    ctx.fillRect(0, waterBottom - 2, landWidth + 2, 2);
+    if (isUFG) {
+      ctx.fillRect(redLeft, 0, 2, waterTop + 2);
+      ctx.fillRect(redLeft, waterBottom - 2, 2, 240 - (waterBottom - 2));
+    }
+
+    if (!isUFG) drawHorizontalFence(146, 52, 80);
+    drawHorizontalFence(14, 186, 80);
+
+    if (isUFG) {
+      // Upper Fort Garry rendered in bright Tyndall Limestone!
+      drawDetailedUpperFortGarry(16, 6, season);
+      drawDetailedSeasonalTree(146, 16, season, 0);
+      drawDetailedSeasonalTree(136, 192, season, 2);
+    } else if (cp.id === 'st_james') {
+      drawDetailedParishChurch(36, 8, PALETTE.roofRed, season);
+      drawDetailedSeasonalTree(12, 14, season, 0);
+      drawDetailedSeasonalTree(82, 16, season, 1);
+      drawDetailedSeasonalTree(156, 192, season, 4);
+      drawDetailedSeasonalTree(198, 196, season, 1);
+    } else {
+      drawDetailedParishChurch(36, 8, PALETTE.roofBlue, season);
+      drawDetailedSeasonalTree(12, 14, season, 2);
+      drawDetailedSeasonalTree(82, 16, season, 3);
+      drawDetailedSeasonalTree(156, 192, season, 4);
+      drawDetailedSeasonalTree(198, 196, season, 1);
+    }
+  }
+
+  // =========================================================================
+  // 16-BIT SEASONAL TREES & ARCHITECTURAL SPRITES
+  // =========================================================================
+  function drawDetailedSeasonalTree(x, y, season, variant) {
+    ctx.fillStyle = 'rgba(15, 19, 36, 0.35)';
+    ctx.fillRect(x + 2, y + 18, 18, 5);
+
+    ctx.fillStyle = PALETTE.woodDark;
+    ctx.fillRect(x + 8, y + 10, 6, 11);
+    ctx.fillStyle = PALETTE.woodMid;
+    ctx.fillRect(x + 9, y + 10, 2, 11);
+
+    if (season.stage === 0) {
+      ctx.fillStyle = PALETTE.woodDark;
+      ctx.fillRect(x + 4, y + 6, 4, 2);
+      ctx.fillRect(x + 14, y + 5, 4, 2);
+      ctx.fillRect(x + 6, y + 3, 2, 7);
+      ctx.fillRect(x + 13, y + 3, 2, 7);
+      ctx.fillRect(x + 10, y + 1, 2, 9);
+
+      ctx.fillStyle = '#9fd468';
+      ctx.fillRect(x + 3, y + 5, 2, 2);
+      ctx.fillRect(x + 17, y + 4, 2, 2);
+      ctx.fillRect(x + 5, y + 2, 2, 2);
+      ctx.fillRect(x + 13, y + 2, 2, 2);
+      ctx.fillStyle = '#d4f296';
+      ctx.fillRect(x + 10, y, 2, 2);
+      ctx.fillRect(x + 8, y + 6, 2, 2);
+      return;
+    }
+
+    if (season.stage === 4) {
+      ctx.fillStyle = PALETTE.woodDark;
+      ctx.fillRect(x + 4, y + 6, 4, 2);
+      ctx.fillRect(x + 14, y + 5, 4, 2);
+      ctx.fillRect(x + 6, y + 3, 2, 7);
+      ctx.fillRect(x + 13, y + 3, 2, 7);
+      ctx.fillRect(x + 10, y + 1, 2, 9);
+
+      if (season.t > 0.3) {
+        ctx.fillStyle = '#f4f8fc';
+        ctx.fillRect(x + 4, y + 5, 4, 1);
+        ctx.fillRect(x + 14, y + 4, 4, 1);
+        ctx.fillRect(x + 10, y, 2, 1);
+      }
+      return;
+    }
+
+    let darkC = PALETTE.woodlandDark;
+    let midC = PALETTE.woodlandBase;
+    let highC = PALETTE.woodlandHighlight;
+
+    if (season.stage === 1) {
+      darkC = '#1d5c32';
+      midC = '#2e8544';
+      highC = '#47a858';
+    } else if (season.stage === 3) {
+      const fallSets = [
+        { d: '#7a1c17', m: '#c9382a', h: '#ff6b5b' },
+        { d: '#8c4314', m: '#e67e22', h: '#f7a54a' },
+        { d: '#9c7816', m: '#f1c40f', h: '#fff08a' },
+        { d: '#7a1c17', m: '#d94e28', h: '#ffcd75' },
+        { d: '#8c6b14', m: '#ffcd75', h: '#fff5b8' }
+      ];
+      const fSet = fallSets[variant % fallSets.length];
+      darkC = fSet.d;
+      midC = fSet.m;
+      highC = fSet.h;
+    }
+
+    ctx.fillStyle = darkC;
+    ctx.fillRect(x + 2, y + 4, 18, 10);
+    ctx.fillStyle = midC;
+    ctx.fillRect(x + 1, y + 2, 20, 10);
+    ctx.fillRect(x + 4, y, 14, 12);
+    ctx.fillStyle = highC;
+    ctx.fillRect(x + 4, y + 1, 10, 5);
+    ctx.fillRect(x + 3, y + 4, 5, 3);
+
+    if (season.stage === 1) {
+      ctx.fillStyle = '#ffb7c5';
+      ctx.fillRect(x + 4, y + 3, 2, 2);
+      ctx.fillRect(x + 14, y + 4, 2, 2);
+      ctx.fillRect(x + 9, y + 8, 2, 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(x + 8, y + 2, 2, 2);
+      ctx.fillRect(x + 16, y + 7, 2, 2);
+      ctx.fillRect(x + 3, y + 7, 2, 2);
+    }
+  }
+
+  function drawHorizontalFence(x, y, width) {
+    ctx.fillStyle = PALETTE.woodDark;
+    ctx.fillRect(x, y + 2, width, 1);
+    ctx.fillRect(x, y + 5, width, 1);
+    for (let px = x; px <= x + width; px += 8) {
+      ctx.fillStyle = PALETTE.woodLight;
+      ctx.fillRect(px, y, 2, 7);
+    }
+  }
+
+  // Upper Fort Garry: Warm Creamy Tyndall Limestone Palette (#ebe4d3 / #cfc6b0 / #8a816c)
+  function drawDetailedUpperFortGarry(x, y, season) {
+    const isSnow = season.stage === 4;
+    // Outer limestone shadow base
+    ctx.fillStyle = PALETTE.limestoneDark;
+    ctx.fillRect(x, y + 8, 86, 38);
+    // Main warm Tyndall limestone curtain wall
+    ctx.fillStyle = PALETTE.limestoneMid;
+    ctx.fillRect(x + 2, y + 10, 82, 34);
+    // Sunlit cream limestone top parapet
+    ctx.fillStyle = isSnow ? '#f4f8fc' : PALETTE.limestoneLight;
+    ctx.fillRect(x + 2, y + 10, 82, 9);
+
+    // Subtle limestone ashlar block courses & fossil-mottled highlights
+    ctx.fillStyle = PALETTE.limestoneDark;
+    ctx.fillRect(x + 2, y + 20, 82, 1);
+    ctx.fillRect(x + 2, y + 31, 82, 1);
+    for (let sx = x + 12; sx < x + 78; sx += 14) {
+      ctx.fillRect(sx, y + 12, 1, 8);
+      ctx.fillRect(sx + 6, y + 21, 1, 10);
+      ctx.fillRect(sx, y + 32, 1, 11);
+    }
+    ctx.fillStyle = PALETTE.limestoneLight;
+    ctx.fillRect(x + 16, y + 23, 5, 3);
+    ctx.fillRect(x + 62, y + 24, 5, 3);
+
+    // Corner limestone bastions
+    ctx.fillStyle = PALETTE.limestoneDark;
+    ctx.fillRect(x - 3, y + 4, 16, 42);
+    ctx.fillRect(x + 73, y + 4, 16, 42);
+    ctx.fillStyle = PALETTE.limestoneMid;
+    ctx.fillRect(x - 1, y + 6, 12, 38);
+    ctx.fillRect(x + 75, y + 6, 12, 38);
+    ctx.fillStyle = isSnow ? '#f4f8fc' : PALETTE.limestoneLight;
+    ctx.fillRect(x - 1, y + 6, 12, 8);
+    ctx.fillRect(x + 75, y + 6, 12, 8);
+
+    // Timber Gatehouse & HBC Flag
+    ctx.fillStyle = PALETTE.woodDark;
+    ctx.fillRect(x + 33, y + 22, 20, 24);
+    ctx.fillStyle = PALETTE.woodLight;
+    ctx.fillRect(x + 35, y + 24, 16, 22);
+    ctx.fillStyle = PALETTE.black;
+    ctx.fillRect(x + 39, y + 32, 8, 14);
+    ctx.fillStyle = PALETTE.wallWhite;
+    ctx.fillRect(x + 42, y, 1, 10);
+    ctx.fillStyle = PALETTE.roofRed;
+    ctx.fillRect(x + 43, y, 9, 5);
+  }
+
+  function drawDetailedStBoniface(x, y, season) {
+    const isSnow = season.stage === 4;
+    ctx.fillStyle = PALETTE.parishBorder;
+    ctx.fillRect(x, y + 20, 38, 34);
+    ctx.fillStyle = PALETTE.wallWhite;
+    ctx.fillRect(x + 2, y + 22, 34, 30);
+    ctx.fillStyle = PALETTE.wallShade;
+    ctx.fillRect(x + 2, y + 44, 34, 8);
+    ctx.fillStyle = PALETTE.roofBlue;
+    ctx.fillRect(x + 7, y + 30, 4, 8);
+    ctx.fillRect(x + 27, y + 30, 4, 8);
+    ctx.fillStyle = PALETTE.parishBorder;
+    ctx.fillRect(x + 3, y + 6, 12, 18);
+    ctx.fillRect(x + 23, y + 6, 12, 18);
+    ctx.fillStyle = isSnow ? '#e8f1f8' : '#D4DCE0';
+    ctx.fillRect(x + 5, y + 8, 8, 15);
+    ctx.fillRect(x + 25, y + 8, 8, 15);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(x + 6, y + 8, 3, 15);
+    ctx.fillRect(x + 26, y + 8, 3, 15);
+    ctx.fillStyle = PALETTE.compassGold;
+    ctx.fillRect(x + 8, y + 1, 2, 5);
+    ctx.fillRect(x + 7, y + 2, 4, 1);
+    ctx.fillRect(x + 28, y + 1, 2, 5);
+    ctx.fillRect(x + 27, y + 2, 4, 1);
+    ctx.fillStyle = PALETTE.woodDark;
+    ctx.fillRect(x + 15, y + 38, 8, 14);
+  }
+
+  function drawDetailedKildonanKirk(x, y, season) {
+    const isSnow = season.stage === 4;
+    ctx.fillStyle = PALETTE.parishBorder;
+    ctx.fillRect(x + 2, y + 14, 34, 36);
+    ctx.fillStyle = PALETTE.stoneLight;
+    ctx.fillRect(x + 4, y + 22, 30, 26);
+    ctx.fillStyle = PALETTE.stoneMid;
+    ctx.fillRect(x + 4, y + 40, 30, 8);
+    ctx.fillStyle = isSnow ? '#e8f1f8' : PALETTE.roofRed;
+    ctx.fillRect(x + 2, y + 12, 34, 10);
+    ctx.fillRect(x + 14, y + 4, 10, 8);
+    ctx.fillStyle = PALETTE.compassGold;
+    ctx.fillRect(x + 18, y, 2, 4);
+    ctx.fillStyle = PALETTE.woodDark;
+    ctx.fillRect(x + 15, y + 36, 8, 12);
+  }
+
+  function drawDetailedStVitalHomestead(x, y, season) {
+    const isSnow = season.stage === 4;
+    ctx.fillStyle = PALETTE.parishBorder;
+    ctx.fillRect(x + 2, y + 14, 36, 32);
+    ctx.fillStyle = PALETTE.wallWhite;
+    ctx.fillRect(x + 4, y + 22, 32, 22);
+    ctx.fillStyle = isSnow ? '#e8f1f8' : PALETTE.roofRed;
+    ctx.fillRect(x + 2, y + 12, 36, 10);
+    ctx.fillStyle = PALETTE.stoneMid;
+    ctx.fillRect(x + 28, y + 6, 5, 8);
+    ctx.fillStyle = PALETTE.compassGold;
+    ctx.fillRect(x + 9, y + 27, 6, 6);
+    ctx.fillStyle = PALETTE.woodDark;
+    ctx.fillRect(x + 22, y + 28, 7, 16);
+  }
+
+  function drawDetailedParishChurch(x, y, roofColor, season) {
+    const isSnow = season.stage === 4;
+    ctx.fillStyle = PALETTE.parishBorder;
+    ctx.fillRect(x + 2, y + 12, 36, 32);
+    ctx.fillStyle = PALETTE.wallWhite;
+    ctx.fillRect(x + 4, y + 20, 32, 22);
+    ctx.fillStyle = isSnow ? '#e8f1f8' : roofColor;
+    ctx.fillRect(x + 2, y + 11, 36, 9);
+    ctx.fillRect(x + 14, y + 4, 12, 8);
+    ctx.fillStyle = PALETTE.compassGold;
+    ctx.fillRect(x + 19, y, 2, 4);
+    ctx.fillStyle = PALETTE.woodDark;
+    ctx.fillRect(x + 16, y + 30, 8, 12);
+  }
+
+  function drawNaturalHorizontalStones(season) {
+    const boulders = [
+      { x: 78,  y: 114, w: 14, h: 11, sub: [{x: 76, y: 120, w: 6, h: 5}] },
+      { x: 96,  y: 117, w: 15, h: 11, sub: [{x: 108, y: 114, w: 6, h: 5}] },
+      { x: 115, y: 114, w: 16, h: 12, sub: [{x: 112, y: 121, w: 7, h: 5}] },
+      { x: 135, y: 117, w: 15, h: 11, sub: [{x: 147, y: 114, w: 6, h: 5}] },
+      { x: 152, y: 114, w: 13, h: 11, sub: [{x: 150, y: 121, w: 6, h: 5}] }
+    ];
+    boulders.forEach(b => drawIrregularRiverBoulder(b, true, season));
+  }
+
+  function drawNaturalVerticalStones(season) {
+    const boulders = [
+      { x: 113, y: 86,  w: 14, h: 10, sub: [{x: 124, y: 84, w: 6, h: 5}] },
+      { x: 111, y: 101, w: 16, h: 11, sub: [{x: 109, y: 107, w: 6, h: 5}] },
+      { x: 114, y: 117, w: 15, h: 11, sub: [{x: 125, y: 115, w: 6, h: 5}] },
+      { x: 111, y: 133, w: 16, h: 11, sub: [{x: 109, y: 139, w: 6, h: 5}] },
+      { x: 113, y: 148, w: 14, h: 10, sub: [{x: 124, y: 147, w: 6, h: 5}] }
+    ];
+    boulders.forEach(b => drawIrregularRiverBoulder(b, false, season));
+  }
+
+  function drawIrregularRiverBoulder(b, northFlow, season) {
+    const isWinter = season && season.stage === 4;
+    b.sub.forEach(s => {
+      ctx.fillStyle = PALETTE.stoneDark;
+      ctx.fillRect(s.x, s.y, s.w, s.h);
+      ctx.fillStyle = isWinter ? '#dce8f2' : PALETTE.stoneMid;
+      ctx.fillRect(s.x + 1, s.y + 1, s.w - 2, s.h - 2);
+    });
+
+    ctx.fillStyle = PALETTE.stoneDark;
+    ctx.fillRect(b.x + 2, b.y, b.w - 4, b.h);
+    ctx.fillRect(b.x, b.y + 2, b.w, b.h - 4);
+
+    ctx.fillStyle = PALETTE.stoneMid;
+    ctx.fillRect(b.x + 3, b.y + 1, b.w - 6, b.h - 3);
+    ctx.fillRect(b.x + 1, b.y + 3, b.w - 2, b.h - 6);
+
+    ctx.fillStyle = isWinter ? '#f0f6fa' : PALETTE.stoneLight;
+    ctx.fillRect(b.x + 4, b.y + 2, b.w - 8, b.h - 6);
+
+    ctx.fillStyle = 'rgba(155, 232, 255, 0.8)';
+    if (northFlow) {
+      ctx.fillRect(b.x + 3, b.y + b.h, b.w - 6, 1);
+    } else {
+      ctx.fillRect(b.x - 1, b.y + 2, 1, b.h - 4);
+    }
+  }
+
+  function drawCartPlacementOutline(cx, cy) {
+    if (Math.floor(frameTick / 15) % 2 === 0) {
+      ctx.strokeStyle = PALETTE.teal;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(cx - 14, cy - 10, 28, 20);
+    }
+  }
+
+  function drawRedRiverCart(cp, cx, cy) {
+    const bx = Math.round(cx - 14);
+    const by = Math.round(cy - 10);
+
+    const wt = getCartWeight(cp);
+    const isRaid = cp.status === 'HBC_RAID';
+    const isOver = cp.status === 'ACTIVE' && wt > CART_CAPACITY;
+    const shake = (isRaid || isOver) ? (Math.floor(frameTick / 2) % 2 === 0 ? -1 : 1) : 0;
+
+    if (cp.status === 'SETTING') {
+      ctx.strokeStyle = PALETTE.teal;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(bx, by, 28, 20);
+      const bars = Math.floor((cp.setProgress / SET_TIME_REQUIRED) * 5);
+      ctx.fillStyle = PALETTE.woodLight;
+      for (let i = 0; i < bars; i++) {
+        ctx.fillRect(bx + 3 + i * 5, by + 3, 3, 14);
+      }
+      drawCartGaugeBar(cx - 16, by - 9, 32, 6, cp.setProgress / SET_TIME_REQUIRED, PALETTE.teal, false);
+      return;
+    }
+
+    if (cp.status === 'BUSTED') {
+      ctx.fillStyle = PALETTE.woodDark;
+      ctx.fillRect(bx + 2, by + 10, 12, 8);
+      ctx.fillRect(bx + 15, by + 8, 11, 10);
+      ctx.fillStyle = PALETTE.woodMid;
+      ctx.fillRect(bx + 5, by + 13, 18, 4);
+      ctx.fillStyle = PALETTE.roofRed;
+      ctx.fillRect(bx + 11, by + 11, 6, 3);
+      drawCartGaugeBar(cx - 16, by - 9, 32, 6, 1, PALETTE.roofRed, true);
+      return;
+    }
+
+    ctx.fillStyle = PALETTE.woodMid;
+    ctx.fillRect(bx + 24 + shake, by + 8, 8, 2);
+    ctx.fillRect(bx + 24 + shake, by + 13, 8, 2);
+
+    ctx.fillStyle = PALETTE.woodDark;
+    ctx.fillRect(bx + 2 + shake, by + 2, 22, 12);
+    ctx.fillStyle = PALETTE.woodLight;
+    ctx.fillRect(bx + 3 + shake, by + 3, 20, 3);
+    for (let sx = bx + 4; sx <= bx + 20; sx += 4) {
+      ctx.fillStyle = PALETTE.woodMid;
+      ctx.fillRect(sx + shake, by + 3, 2, 10);
+    }
+
+    for (let i = 0; i < Math.min(4, cp.furs); i++) {
+      ctx.fillStyle = PALETTE.wallWhite;
+      ctx.fillRect(bx + 4 + i * 4 + shake, by + 4, 3, 4);
+    }
+    for (let i = 0; i < Math.min(2, cp.robes); i++) {
+      ctx.fillStyle = '#3A2314';
+      ctx.fillRect(bx + 5 + i * 9 + shake, by + 1, 7, 5);
+      ctx.fillStyle = PALETTE.compassGold;
+      ctx.fillRect(bx + 7 + i * 9 + shake, by + 2, 3, 2);
+    }
+
+    const wx = bx + 13 + shake;
+    const wy = by + 14;
+    ctx.fillStyle = PALETTE.woodDark;
+    ctx.fillRect(wx - 6, wy - 5, 12, 11);
+    ctx.fillStyle = PALETTE.woodLight;
+    ctx.fillRect(wx - 4, wy - 4, 8, 9);
+    ctx.fillStyle = PALETTE.woodDark;
+    ctx.fillRect(wx - 1, wy - 4, 2, 9);
+    ctx.fillRect(wx - 4, wy, 8, 2);
+    ctx.fillStyle = PALETTE.compassGold;
+    ctx.fillRect(wx - 1, wy, 2, 2);
+
+    if (isRaid) {
+      const remPct = Math.max(0, cp.raidTimer / HBC_RAID_DURATION);
+      const flashColor = Math.floor(frameTick / 4) % 2 === 0 ? PALETTE.roofRed : PALETTE.compassGold;
+      drawCartGaugeBar(cx - 16, by - 9, 32, 6, remPct, flashColor, false, false);
+    } else {
+      const barColor = isOver
+        ? (Math.floor(frameTick / 6) % 2 === 0 ? PALETTE.roofRed : PALETTE.compassGold)
+        : (wt >= CART_CAPACITY ? PALETTE.compassGold : PALETTE.teal);
+      drawCartGaugeBar(cx - 16, by - 9, 32, 6, wt / CART_BUST_WEIGHT, barColor, false, true);
+    }
+  }
+
+  function drawCartGaugeBar(gx, gy, gw, gh, ratio, fillColor, isBusted, showCapacityTick = false) {
+    ctx.fillStyle = 'rgba(15, 19, 36, 0.92)';
+    ctx.fillRect(gx, gy, gw, gh);
+    ctx.strokeStyle = PALETTE.black;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(gx, gy, gw, gh);
+
+    const innerW = gw - 2;
+    const innerH = gh - 2;
+
+    if (isBusted) {
+      ctx.fillStyle = PALETTE.roofRed;
+      ctx.fillRect(gx + 1, gy + 1, innerW, innerH);
+      return;
+    }
+
+    const clamped = Math.max(0, Math.min(1, ratio));
+    if (clamped > 0) {
+      ctx.fillStyle = fillColor;
+      ctx.fillRect(gx + 1, gy + 1, Math.max(2, Math.round(innerW * clamped)), innerH);
+    }
+
+    if (showCapacityTick) {
+      const tickX = gx + 1 + Math.round(innerW * (CART_CAPACITY / CART_BUST_WEIGHT));
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(tickX, gy, 1, gh);
+    }
+  }
+
+  function drawDepthSortedActors() {
+    const actors = [
+      { type: 'player', x: player.x, y: player.y, dir: player.dir }
+    ];
+
+    sceneNPCs.forEach(npc => {
+      actors.push({
+        type: npc.role,
+        x: npc.x,
+        y: npc.y,
+        dir: npc.dir
+      });
+    });
+
+    actors.sort((a, b) => a.y - b.y);
+
+    actors.forEach(act => {
+      const bob = Math.floor(frameTick / 10) % 2 === 0 ? 0 : -1;
+      const flip = act.dir === 'left';
+
+      ctx.fillStyle = 'rgba(15, 19, 36, 0.45)';
+      ctx.fillRect(Math.round(act.x - 6), Math.round(act.y - 1), 12, 3);
+
+      if (act.type === 'player') {
+        drawMatrix(sprFreetrader, act.x - 7, act.y - 16 + bob, {
+          1: PALETTE.black,
+          2: '#E0AC69',
+          3: PALETTE.roofBlue,
+          4: PALETTE.roofRed,
+          5: '#2E2925',
+          6: PALETTE.compassGold
+        }, 1, flip);
+      } else if (act.type === 'buffalo') {
+        drawMatrix(sprBuffaloHunter, act.x - 8, act.y - 16 + bob, {
+          1: PALETTE.black,
+          2: '#D89E62',
+          3: '#5C3A21',
+          4: '#362011',
+          5: '#8C949C',
+          6: PALETTE.roofRed
+        }, 1, flip);
+      } else if (act.type === 'cree') {
+        drawMatrix(sprCreeHunter, act.x - 8, act.y - 16 + bob, {
+          1: PALETTE.black,
+          2: '#D89E62',
+          3: '#D4A359',
+          4: '#8C6239',
+          5: '#633C22',
+          6: PALETTE.teal
+        }, 1, flip);
+      } else if (act.type === 'voyageur') {
+        drawMatrix(sprVoyageur, act.x - 8, act.y - 16 + bob, {
+          1: PALETTE.black,
+          2: '#E0AC69',
+          3: PALETTE.wallWhite,
+          4: PALETTE.roofRed,
+          5: PALETTE.woodlandBase,
+          6: PALETTE.roofRed,
+          7: PALETTE.waterBank
+        }, 1, flip);
+      } else if (act.type === 'saulteaux') {
+        drawMatrix(sprSaulteauxHunter, act.x - 8, act.y - 16 + bob, {
+          1: PALETTE.black,
+          2: '#D89E62',
+          3: '#29366f',
+          4: PALETTE.roofRed,
+          5: PALETTE.compassGold,
+          6: PALETTE.woodLight
+        }, 1, flip);
+      } else if (act.type === 'kilt') {
+        drawMatrix(sprKiltHunter, act.x - 8, act.y - 16 + bob, {
+          1: PALETTE.black,
+          2: '#F2C699',
+          3: '#5C4433',
+          4: PALETTE.roofRed,
+          5: PALETTE.woodlandBase,
+          6: PALETTE.wallWhite,
+          7: PALETTE.stoneMid
+        }, 1, flip);
+      } else if (act.type === 'hbc') {
+        drawMatrix(sprHbcOfficer, act.x - 7, act.y - 17 + bob, {
+          1: PALETTE.black,
+          2: '#F2C699',
+          3: PALETTE.roofRed,
+          4: PALETTE.compassGold,
+          5: PALETTE.wallWhite
+        }, 1, flip);
+      } else if (act.type === 'warden') {
+        drawMatrix(sprWardenPlains, act.x - 7, act.y - 18 + bob, {
+          1: PALETTE.black,
+          2: '#F2C699',
+          3: PALETTE.roofRed,
+          4: PALETTE.compassGold,
+          5: PALETTE.wallWhite,
+          6: '#ffffff'
+        }, 1, flip);
+      }
+    });
+  }
+
+  // =========================================================================
+  // MAIN RENDER LOOP
+  // =========================================================================
+  function renderLoop(now) {
+    updateSimulation(now);
+
+    if (gameState === 'TITLE') {
+      drawTitleScreen();
+    } else if (gameState === 'MAP') {
+      renderMapCanvas();
+    } else if (gameState === 'WEIR') {
+      drawWeirScene();
+    }
+
+    requestAnimationFrame(renderLoop);
+  }
+
+  // =========================================================================
+  // CONTROLS & INPUT BRIDGE (Cabinet postMessage + Keyboard)
+  // =========================================================================
+  function enterSelectedCheckpoint() {
+    const cp = CHECKPOINTS[activeCheckpointIndex];
+    if (cp.flow === 'WE') {
+      player = { x: 120, y: 42, dir: 'down', moving: false };
+    } else if (cp.entrySide === 'EAST') {
+      player = { x: 214, y: 120, dir: 'left', moving: false };
+    } else {
+      player = { x: 26, y: 120, dir: 'right', moving: false };
+    }
+    sceneNPCs = [];
+    riverFish = [];
+    floatingPopups = [];
+
+    if (cp.hbcActiveTimer > 0) {
+      spawnCheckpointNPC(cp, 'hbc');
+      cp.hbcActiveTimer = 0;
+      cp.hbcTriggeredPass = false;
+    }
+
+    if (cp.id === 'st_francois_xavier') {
+      if (cp.wardenActiveTimer > 0) {
+        spawnCheckpointNPC(cp, 'warden');
+        cp.wardenActiveTimer = 0;
+        cp.wardenTriggeredPass = false;
+      }
+      // Trigger the rare Spirited White Horse once per gameplay when visiting St. Francois-Xavier
+      maybeSpawnSpiritedWhiteHorse(cp);
+    }
+
+    sfxStep();
+    setViewMode('WEIR');
+  }
+
+  function handleActionA() {
+    initAudio();
+
+    if (gameState === 'TITLE') {
+      setBriefingSide(1);
+      briefingScreen.style.display = 'flex';
+      setViewMode('BRIEFING');
+      sfxCursor();
+      return;
+    }
+
+    if (gameState === 'BRIEFING') {
+      briefingScreen.style.display = 'none';
+      startFreetradeSession();
+      return;
+    }
+
+    if (gameState === 'MAP') {
+      enterSelectedCheckpoint();
+      return;
+    }
+
+    if (gameState === 'WEIR') {
+      const cp = CHECKPOINTS[activeCheckpointIndex];
+
+      if (cp.status === 'UNSET') {
+        if (!isOnDirtRoad(cp, player.x, player.y)) {
+          return;
+        }
+        cp.cartX = player.x;
+        cp.cartY = player.y;
+        cp.status = 'SETTING';
+        cp.setProgress = 0;
+        cp.isWorking = true;
+        sfxWorkTick();
+        updateCheckpointBoxesUI();
+        return;
+      }
+
+      if (!isPlayerNearCart(cp)) return;
+
+      if (cp.status === 'SETTING') {
+        if (!cp.isWorking) {
+          cp.isWorking = true;
+          sfxWorkTick();
+        }
+      } else if (cp.status === 'ACTIVE' || cp.status === 'HBC_RAID') {
+        const furCount = cp.furs;
+        const robeCount = cp.robes;
+        const wasRaid = cp.status === 'HBC_RAID';
+
+        totalFurs += furCount;
+        totalRobes += robeCount;
+
+        cp.furs = 0;
+        cp.robes = 0;
+        cp.raidTimer = 0;
+        cp.status = 'UNSET';
+        cp.setProgress = 0;
+        cp.isWorking = false;
+
+        if (furCount > 0 || robeCount > 0 || wasRaid) {
+          sfxHarvest();
+          const label = (furCount > 0 || robeCount > 0) ? 'HAULED!' : 'SAVED!';
+          addPopup(label, cp.cartX - 16, cp.cartY - 18, PALETTE.compassGold);
+        } else {
+          sfxStep();
+        }
+        updateCheckpointBoxesUI();
+        updateHUD();
+      } else if (cp.status === 'BUSTED') {
+        cp.status = 'UNSET';
+        cp.furs = 0;
+        cp.robes = 0;
+        sfxStep();
+        updateCheckpointBoxesUI();
+      }
+      return;
+    }
+
+    if (gameState === 'GAMEOVER') {
+      gameoverScreen.style.display = 'none';
+      timeLeft = 300;
+      bakeStaticMap();
+      setViewMode('TITLE');
+    }
+  }
+
+  function handleActionB() {
+    initAudio();
+
+    if (gameState === 'BRIEFING') {
+      toggleBriefingSide();
+      return;
+    }
+
+    if (gameState === 'WEIR') {
+      const cp = CHECKPOINTS[activeCheckpointIndex];
+      cp.isWorking = false;
+      sfxStep();
+      setViewMode('MAP');
+    }
+  }
+
+  function canPlayerStandAt(cp, nx, ny) {
+    if (cp.id === 'upper_fort_garry') {
+      // Red River occupies x >= 178 on right-hand side of Upper Fort Garry
+      if (nx >= 12 && nx <= 172 && ny >= 52 && ny <= 78) return true;
+      if (nx >= 110 && nx <= 130 && ny >= 14 && ny <= 54) return true;
+      if (nx >= 112 && nx <= 128 && ny >= 78 && ny <= 162) return true;
+      if (nx >= 12 && nx <= 172 && ny >= 162 && ny <= 226) return true;
+      return false;
+    }
+
+    if (cp.flow === 'NS') {
+      if (cp.id === 'st_boniface') {
+        // West bank has Assiniboine River entering at y: 136..184
+        if (nx >= 8 && nx <= 72 && ((ny >= 18 && ny <= 132) || (ny >= 186 && ny <= 228))) return true;
+        // East bank including the West-East road north of the Cathedral (y: 4..16)
+        if (nx >= 168 && nx <= 232 && ny >= 4 && ny <= 16) return true;
+        if (nx >= 168 && nx <= 232 && ny >= 58 && ny <= 228) return true;
+        if (nx >= 72 && nx <= 168 && ny >= 112 && ny <= 128) return true;
+        return false;
+      }
+      const minWestY = cp.id === 'st_vital' ? 54 : 18;
+      if (nx >= 8 && nx <= 72 && ny >= minWestY && ny <= 228) return true;
+      const minEastY = cp.id === 'kildonan' ? 56 : 18;
+      if (nx >= 168 && nx <= 232 && ny >= minEastY && ny <= 228) return true;
+      if (nx >= 72 && nx <= 168 && ny >= 112 && ny <= 128) return true;
+      return false;
+    } else {
+      if (nx >= 12 && nx <= 228 && ny >= 52 && ny <= 78) return true;
+      if (nx >= 110 && nx <= 130 && ny >= 14 && ny <= 54) return true;
+      if (nx >= 112 && nx <= 128 && ny >= 78 && ny <= 162) return true;
+      if (nx >= 12 && nx <= 228 && ny >= 162 && ny <= 226) return true;
+      return false;
+    }
+  }
+
+  function handleDpad(dir) {
+    if (gameState === 'MAP') {
+      if (dir === 'RIGHT' || dir === 'DOWN') cycleCheckpoint(1);
+      else if (dir === 'LEFT' || dir === 'UP') cycleCheckpoint(-1);
+      return;
+    }
+
+    if (gameState === 'WEIR') {
+      const cp = CHECKPOINTS[activeCheckpointIndex];
+      const step = 10;
+      let nx = player.x;
+      let ny = player.y;
+
+      if (dir === 'UP') { ny -= step; player.dir = 'up'; }
+      else if (dir === 'DOWN') { ny += step; player.dir = 'down'; }
+      else if (dir === 'LEFT') { nx -= step; player.dir = 'left'; }
+      else if (dir === 'RIGHT') { nx += step; player.dir = 'right'; }
+
+      if (cp.flow === 'WE' && dir === 'UP' && ny <= 22 && nx >= 108 && nx <= 132) {
+        handleActionB();
+        return;
+      }
+      if (cp.flow === 'NS' && cp.entrySide === 'EAST' && dir === 'RIGHT' && nx >= 230 && ny >= 108 && ny <= 132) {
+        handleActionB();
+        return;
+      }
+      if (cp.flow === 'NS' && cp.entrySide === 'WEST' && dir === 'LEFT' && nx <= 10 && ny >= 108 && ny <= 132) {
+        handleActionB();
+        return;
+      }
+
+      if (canPlayerStandAt(cp, nx, ny)) {
+        player.x = nx;
+        player.y = ny;
+        sfxStep();
+      }
+    }
+  }
+
+  function startFreetradeSession() {
+    resetAllCheckpoints();
+    totalFurs = 0;
+    totalRobes = 0;
+    hbcBrokenCount = 0;
+    timeLeft = 300;
+    lastSecondTimestamp = Math.floor(performance.now() / 1000);
+    bakeStaticMap();
+    setCheckpoint(0);
+    setViewMode('MAP');
+    startBGM();
+  }
+
+  function triggerGameOver(byHbcMonopoly = false) {
+    stopBGM();
+    const rankInfo = getTraderRankInfo();
+
+    gameoverSub.innerText = byHbcMonopoly ? 'HBC SEIZED YOUR TRADE!' : 'WINTER HAS ARRIVED';
+    gameoverRank.innerText = rankInfo.title;
+    gameoverRank.style.color = rankInfo.color;
+
+    document.getElementById('final-stats').innerHTML =
+      `BUFFALO ROBES: ${totalRobes}<br>` +
+      `SMALL GAME PELTS: ${totalFurs}<br>` +
+      `HBC BROKEN CARTS: ${hbcBrokenCount}/3`;
+
+    gameoverScreen.style.display = 'flex';
+    setViewMode('GAMEOVER');
+  }
+
+  // Arcade Cabinet postMessage Listener
   window.addEventListener('message', function(event) {
     const cmd = event.data;
-    if (cmd === 'BUTTON_A') {
-      if (state === 'START') startGame();
-      else doAction();
-    } else if (cmd === 'HOME') {
-      stopChiptuneTrack();
-    }
-    if (cmd === 'DPAD_UP' || cmd === 'DPAD_DOWN' || cmd === 'DPAD_LEFT' || cmd === 'DPAD_RIGHT') {
-      moveTile(cmd);
-    } else if (cmd === 'RELEASE' || cmd === 'STOP') {
-      stopTileMovement();
+    if (cmd === 'BUTTON_A') handleActionA();
+    else if (cmd === 'BUTTON_B') handleActionB();
+    else if (cmd === 'DPAD_UP') handleDpad('UP');
+    else if (cmd === 'DPAD_DOWN') handleDpad('DOWN');
+    else if (cmd === 'DPAD_LEFT') handleDpad('LEFT');
+    else if (cmd === 'DPAD_RIGHT') handleDpad('RIGHT');
+  });
+
+  // Keyboard Fallbacks
+  window.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowUp') { handleDpad('UP'); e.preventDefault(); }
+    else if (e.key === 'ArrowDown') { handleDpad('DOWN'); e.preventDefault(); }
+    else if (e.key === 'ArrowLeft') { handleDpad('LEFT'); e.preventDefault(); }
+    else if (e.key === 'ArrowRight') { handleDpad('RIGHT'); e.preventDefault(); }
+    else if (e.key === 'a' || e.key === 'A' || e.key === 'Enter' || e.key === ' ' || e.key === 'z') {
+      handleActionA();
+      e.preventDefault();
+    } else if (e.key === 'b' || e.key === 'B' || e.key === 'Shift' || e.key === 'x') {
+      handleActionB();
+      e.preventDefault();
+    } else if (gameState === 'MAP' && ['1', '2', '3', '4', '5', '6'].includes(e.key)) {
+      setCheckpoint(parseInt(e.key, 10) - 1);
     }
   });
 
-  window.addEventListener('keydown', (e) => {
-    if(e.key === 'ArrowUp') moveTile('up');
-    if(e.key === 'ArrowDown') moveTile('down');
-    if(e.key === 'ArrowLeft') moveTile('left');
-    if(e.key === 'ArrowRight') moveTile('right');
-    if(e.key === 'a' || e.key === 'Enter') {
-      if (state === 'START') startGame();
-      else doAction();
-    }
-  });
-
-  window.addEventListener('keyup', (e) => {
-    if(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-      stopTileMovement();
-    }
-  });
-
-  document.addEventListener('touchstart', () => { initChiptuneAudio(); }, { once: true });
-  document.addEventListener('click', () => { initChiptuneAudio(); }, { once: true });
-
-  loop();
+  // Boot Initialization
+  bakeStaticMap();
+  buildCheckpointBoxes();
+  setCheckpoint(0);
+  updateHUD();
+  requestAnimationFrame(renderLoop);
 </script>
 </body>
 </html>
