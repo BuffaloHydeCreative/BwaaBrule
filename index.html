@@ -104,14 +104,21 @@
       color: #12AEA2;
       padding: 20px;
       flex-direction: column;
+      overflow-y: auto;
+      scrollbar-width: none;
       z-index: 10;
+    }
+
+    #dos-menu::-webkit-scrollbar {
+      display: none;
     }
 
     .dos-header {
       font-weight: bold;
-      margin-bottom: 15px;
+      margin-bottom: 12px;
       border-bottom: 2px dashed #12AEA2;
       padding-bottom: 5px;
+      flex: 0 0 auto;
     }
 
     .dos-list {
@@ -120,7 +127,7 @@
       margin: 0;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
     }
 
     .dos-list li {
@@ -401,9 +408,11 @@
             <li>li rassad di fleur.html</li>
             <li>Sîsîp.html</li>
             <li>Land Thunder!.html</li>
-            <li>Le Roi des Traiteurs.html</li>
+            <li>Bonami!.html</li>
             <li>Le Grand Portage.html</li>
             <li>Scotch Pâkahatowân.html</li>
+            <li>Aen Zhwaal.html</li>
+            <li>Portage La Loche.html</li>
           </ul>
         </div>
 
@@ -455,7 +464,8 @@
     let pauseIndex = 0;
     const games = [
       'game1.html', 'game2.html', 'game3.html', 
-      'game4.html', 'game5.html', 'game6.html', 'game7.html', 'game8.html'
+      'game4.html', 'game5.html', 'game6.html', 
+      'game7.html', 'game8.html', 'game9.html', 'game10.html'
     ];
     let isPlaying = false;
 
@@ -567,6 +577,7 @@
       if (currentIndex < 0) currentIndex = games.length - 1;
       if (currentIndex >= games.length) currentIndex = 0;
       listItems[currentIndex].classList.add('active');
+      listItems[currentIndex].scrollIntoView({ block: 'nearest' });
     }
 
     function movePauseMenu(direction) {
