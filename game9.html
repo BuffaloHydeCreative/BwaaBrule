@@ -1,0 +1,1973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Aen Zhwaal</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  body {
+    margin: 0; padding: 0;
+    background: transparent;
+    display: flex; justify-content: center; align-items: center;
+    height: 100vh; width: 100vw;
+    font-family: 'Press Start 2P', monospace;
+    user-select: none; touch-action: manipulation; overflow: hidden;
+  }
+  #game-container {
+    width: 100%; height: 100%; max-width: 600px;
+    display: flex; flex-direction: column; justify-content: center;
+    box-sizing: border-box; padding: 10px;
+  }
+  #screen-container {
+    flex: 0 0 auto; width: 100%;
+    aspect-ratio: 4 / 3; 
+    border: 4px solid #D4D0C5; 
+    position: relative; background: #0E2A1E; 
+    overflow: hidden; box-sizing: border-box;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+  }
+  canvas {
+    width: 100%; height: 100%;
+    display: block; image-rendering: pixelated;
+  }
+</style>
+</head>
+<body>
+<div id="game-container">
+  <div id="screen-container">
+    <canvas id="gameCanvas" width="320" height="240"></canvas>
+  </div>
+</div>
+
+<script>
+  const cvs = document.getElementById('gameCanvas');
+  const ctx = cvs.getContext('2d');
+
+  // --- AUDIO SYNTHESIZER ---
+  let audioCtx = null;
+  function initAudio() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  }
+  function playTone(freq, type, dur, vol = 0.1) {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + dur);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + dur);
+  }
+  function playGunshot() {
+    if (!audioCtx) return;
+    const bufferSize = audioCtx.sampleRate * 0.45;
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = buffer;
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(1100, audioCtx.currentTime);
+    filter.frequency.exponentialRampToValueAtTime(90, audioCtx.currentTime + 0.45);
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.65, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.45);
+    noise.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+    noise.start();
+  }
+
+  // --- 16-BIT SNES MASTER PALETTE ---
+  const PAL = {
+    DARK_GREEN: '#0E2A1E', MUTED_GREEN: '#3D5948', LUSH_GREEN: '#A8D038', BRIGHT_GREEN: '#88A326',
+    GOLD: '#F7C844', ORANGE: '#FB6604', RED: '#AD1C21', BORDEAUX: '#540E11',
+    OCEAN: '#0F6F9E', SEA_GREEN: '#12AEA2', ICE_LIGHT: '#E0F7FA', ICE_MID: '#80DEEA', ICE_DARK: '#00838F',
+    HIDE: '#D4D0C5', WHITE: '#FFFFFF', BLACK: '#111111', GRAY_DARK: '#2C2C2C', GRAY_LIGHT: '#8E99A2',
+    SKIN: '#E0A97B',
+    LIMESTONE_LIGHT: '#EAE6DC', LIMESTONE_MID: '#D4D0C5', LIMESTONE_DARK: '#9C9688',
+    SPRUCE_DARK: '#0D261C', SPRUCE_MID: '#1B4332', SPRUCE_LIGHT: '#2D6A4F',
+    PRAIRIE_GOLD: '#D4A338', PRAIRIE_TAN: '#E5BE67', PRAIRIE_BROWN: '#8C6229',
+    BUFFALO_DARK: '#24140B', BUFFALO_MID: '#4A2815', BUFFALO_LIGHT: '#6E3E22',
+    SHIELD_DARK: '#4A4E54', SHIELD_MID: '#6E747D', SHIELD_LIGHT: '#9BA2AD',
+    MARSH_MUD: '#4D3723', MARSH_WET: '#382617', MARSH_REED: '#6B7A2C',
+    COATS: {
+      BAY:      { b: '#7B3F1D', h: '#A3582B', s: '#4A220D', m: '#1A110B', sp: null },
+      BUCKSKIN: { b: '#C68E45', h: '#E2AC63', s: '#8C5F27', m: '#1A110B', sp: null },
+      BLACK:    { b: '#222428', h: '#3E424B', s: '#111214', m: '#09090A', sp: null },
+      CHESTNUT: { b: '#94351A', h: '#BD4B2A', s: '#5E1E0C', m: '#63200D', sp: null },
+      DAPPLE:   { b: '#8A9399', h: '#B8C2C9', s: '#575F66', m: '#383E42', sp: '#D4DCE0' },
+      APPALOOSA:{ b: '#DCE0E3', h: '#FFFFFF', s: '#9AA3AB', m: '#2B2E33', sp: '#3E2723' }
+    }
+  };
+
+  // --- RED RIVER SETTLEMENT RIDER SKINS ---
+  const RIDER_SKINS = [
+    { tunic: '#1A4B84', accent: '#AD1C21', hat: '#1A4B84', trim: '#F7C844' },
+    { tunic: '#C68E45', accent: '#AD1C21', hat: '#FFFFFF', trim: '#F7C844' },
+    { tunic: '#1B263B', accent: '#12AEA2', hat: '#AD1C21', trim: '#F7C844' },
+    { tunic: '#AD1C21', accent: '#F7C844', hat: '#111111', trim: '#FFFFFF' },
+    { tunic: '#2C3E50', accent: '#AD1C21', hat: '#1B4F72', trim: '#A8D038' },
+    { tunic: '#1F3A60', accent: '#F7C844', hat: '#1F3A60', trim: '#F7C844' },
+    { tunic: '#4A220D', accent: '#7B3F1D', hat: '#2C1407', trim: '#D4D0C5' }
+  ];
+
+  // --- 16-BIT DETAILED PIXEL MATRICES (24x15) ---
+  const HORSE_FRAMES = [
+    [
+      "000000000000TTT000000000",
+      "000000000001HHH100000000",
+      "000000000001881000110000",
+      "000000000016666101531000",
+      "000000000016776115229100",
+      "000111000166661522322100",
+      "001555111111115222211000",
+      "015542222222222222100000",
+      "155233322222922222100000",
+      "152233222292222224100000",
+      "012222222222222244100000",
+      "014222444444444241000000",
+      "142411000000001424100000",
+      "141000000000000142410000",
+      "010000000000000011100000"
+    ],
+    [
+      "000000000000000000000000",
+      "000000000000TTT000000000",
+      "000000000001HHH100000000",
+      "000000000001881000110000",
+      "000000000016666101531000",
+      "000000000016776115229100",
+      "000011100166661522322100",
+      "000155511111115222211000",
+      "001542222222222222100000",
+      "015233322222922222100000",
+      "012233222292222224100000",
+      "001222222222222244100000",
+      "001422444444444241000000",
+      "000142410000001421000000",
+      "000011100000000110000000"
+    ],
+    [
+      "000000000000TTT000000000",
+      "000000000001HHH100000000",
+      "000000000001881000110000",
+      "000000000016666101531000",
+      "000000000016776115229100",
+      "000111000166661522322100",
+      "001555111111115222211000",
+      "015542222222222222100000",
+      "155233322222922222100000",
+      "152233222292222224100000",
+      "012222222222222244100000",
+      "014222444444444241000000",
+      "001424100000001424100000",
+      "000142410000014241000000",
+      "000011100000011100000000"
+    ]
+  ];
+
+  // --- ROSTER (Added 'might' attribute for Stocky & Strong breeds in deep Spring-Melt Mud) ---
+  const HORSE_ROSTER = [
+    { name: 'Buffalo Runner', breed: 'Spanish Mustang', coat: 'BUCKSKIN', captainNote: '"Quick burst, never spooks!"',     spd: 4.2, burst: 8.5, end: 3.5, agi: 9.5, snow: 4.5, might: 4.0, fearless: true },
+    { name: 'Indian Pony',    breed: 'Native Stocky',   coat: 'BAY',      captainNote: '"Sure-footed in snow & mud!"',   spd: 3.6, burst: 5.5, end: 6.5, agi: 6.5, snow: 10.0, might: 9.5, fearless: false },
+    { name: 'Can. Bush Pony', breed: 'Mustang/Trotter', coat: 'BLACK',    captainNote: '"Moose agility, fastest on ice!"', spd: 3.4, burst: 4.5, end: 5.5, agi: 8.5, snow: 12.0, might: 6.5, fearless: false },
+    { name: 'Cart & Draft',   breed: 'Clydesdale/Shire',coat: 'DAPPLE',   captainNote: '"Heavy muscle, powers through mud!"', spd: 3.2, burst: 3.0, end: 9.5, agi: 2.5, snow: 5.5, might: 12.0, fearless: true },
+    { name: 'Officers Mount', breed: 'Thoroughbred Mix',coat: 'CHESTNUT', captainNote: '"Built for long distance!"',      spd: 4.8, burst: 5.0, end: 10.0, agi: 7.5, snow: 3.0, might: 5.5, fearless: false },
+    { name: 'Appaloosa',      breed: 'Plateau Spotted', coat: 'APPALOOSA',captainNote: '"Balanced on every trail!"',     spd: 4.1, burst: 5.5, end: 6.5, agi: 6.5, snow: 5.5, might: 6.5, fearless: false }
+  ];
+
+  // --- 4 HISTORICAL COURSES (3 randomly drawn per listing board) ---
+  const COURSES = [
+    { name: 'Frozen Assiniboine', short: 'ASSINIBOINE', mod: 'SNOW',  obs: 'ICE SLICK' },
+    { name: 'Open Prairie',       short: 'PRAIRIE',     mod: 'FLAT',  obs: 'GOPHER HOLE' },
+    { name: 'Upper Fort Garry',   short: 'UPPER FORT',  mod: 'BUMPS', obs: 'MUD VALLEY' },
+    { name: 'Lower Fort Garry',   short: 'LOWER FORT',  mod: 'MUD',   obs: 'MELT BOG' }
+  ];
+
+  // --- FIREBAG ITEM DEFINITIONS & SCORING ---
+  const ITEMS = [
+    { key: 'moccasins', name: 'Moccasins',    short: 'MOCS', val: 1, color: '#E2AC63' },
+    { key: 'capote',    name: 'Capote',       short: 'CAPT', val: 2, color: '#0F6F9E' },
+    { key: 'sash',      name: 'Sash',   short: 'SASH', val: 3, color: '#AD1C21' },
+    { key: 'robe',      name: 'Buffalo Robe', short: 'ROBE', val: 4, color: '#7B3F1D' }
+  ];
+
+  const OPPONENTS = [
+    { group: 'English',    names: ['Factor MacTavish', 'Lt. Kensington', 'Clerk Pritchard'], wMin: 1, wMax: 1, style: 'Conservative', seeking: [0, 1], quote: "A modest stake. Keeps the ledger tidy." },
+    { group: 'Cree',       names: ['Maskwa', 'Maskepetoon'],                 wMin: 1, wMax: 2, style: 'Conservative', seeking: [0, 1], quote: "Steady eyes, measured trade." },
+    { group: 'Saulteaux',  names: ['Ochek', 'Mishtadim'],                     wMin: 2, wMax: 3, style: 'Resourceful',  seeking: [1, 2], quote: "We read the earth and the hooves well." },
+    { group: 'Assiniboine',names: ['Mato', 'Tatanka'],                           wMin: 2, wMax: 3, style: 'Resourceful',  seeking: [2, 3], quote: "Good robes and sashes earn the match." },
+    { group: 'French',     names: ['Ti-Jean Morin', 'Baptiste Roy', 'Amble Parisien'],        wMin: 1, wMax: 4, style: 'Erratic',      seeking: [1, 2], quote: "Sacre bleu! All in, or just a trifle!" },
+    { group: 'Scottish',   names: ['Angus McKay', 'Hamish Sutherland', 'Douglas Ross'],        wMin: 1, wMax: 4, style: 'Erratic',      seeking: [0, 2], quote: "Aye, fortune favors the bold... maybe!" },
+    { group: 'Irish',      names: ['Seamus Murphy', 'Liam Doyle'],          wMin: 1, wMax: 4, style: 'Erratic',      seeking: [1, 3], quote: "Luck of the turf! Let's toss the lot!" },
+    { group: 'American',   names: ['Pembina Pete', 'Yankee Bill'],             wMin: 3, wMax: 4, style: 'High Roller',  seeking: [2, 3], quote: "Came north for big stakes and fine furs!" }
+  ];
+
+  // --- PLAYER FIREBAG WALLET & STAGING ---
+  let firebag = { moccasins: 1, capote: 1, sash: 0, robe: 0 };
+  let stagedBet = { moccasins: 0, capote: 0, sash: 0, robe: 0 };
+  let activeBagSlot = 0;
+  let breedBrowseIdx = 0;
+
+  function getBagScore(bag) {
+    return (bag.moccasins * 1) + (bag.capote * 2) + (bag.sash * 3) + (bag.robe * 4);
+  }
+
+  function resetFirebag() {
+    firebag = { moccasins: 1, capote: 1, sash: 0, robe: 0 };
+    stagedBet = { moccasins: 0, capote: 0, sash: 0, robe: 0 };
+  }
+
+  function initDefaultBet() {
+    stagedBet = { moccasins: 0, capote: 0, sash: 0, robe: 0 };
+    activeBagSlot = 0;
+    for (let i = 0; i < ITEMS.length; i++) {
+      let k = ITEMS[i].key;
+      if (firebag[k] > 0) {
+        stagedBet[k] = 1;
+        activeBagSlot = i;
+        break;
+      }
+    }
+  }
+
+  // --- GAME STATE ---
+  let state = 'TITLE';
+  let frame = 0;
+
+  // Pre-Race Listing Data
+  let raceListings = [];
+  let selListingIdx = 0;
+  let selPrefHorse = 0;
+  let cardSide = 0;
+  let setupRow = 0;
+  let curOpponent = null;
+
+  // Resolved Match Assignment
+  let match = {
+    courseIdx: 0,
+    playerHorseIdx: 0,
+    npcHorseIdx: 1,
+    playerRiderIdx: 0,
+    npcRiderIdx: 1,
+    playerWonPick: false,
+    playerBetTotal: 1,
+    npcBetTotal: 1,
+    npcWagerItems: [],
+    effectivePot: 2
+  };
+  let captainText = "";
+
+  // Race Simulation Data
+  let race = {
+    dist: 6500,
+    pDist: 0, rDist: 0,
+    pSpd: 0, rSpd: 0,
+    pStam: 100, rStam: 100,
+    pLane: 0, rLane: 1,
+    pStumble: 0, rStumble: 0,
+    obstacles: [],
+    countdownVal: 3,
+    countdownTimer: 0,
+    bangFlash: 0,
+    photoTimer: 0,
+    runoutTimer: 0,
+    winner: '',
+    logText: ''
+  };
+
+  // --- GENERATE 3 RANDOM MATCHUPS FROM THE 4-COURSE POOL ---
+  function generatePreRaceBoard() {
+    const playerTotal = getBagScore(firebag);
+    const arch = OPPONENTS[Math.floor(Math.random() * OPPONENTS.length)];
+
+    let maxCoverable = Math.min(arch.wMax, playerTotal);
+    let minCoverable = Math.min(arch.wMin, maxCoverable);
+    if (maxCoverable < 1) maxCoverable = 1;
+    if (minCoverable < 1) minCoverable = 1;
+
+    let npcWager = Math.floor(Math.random() * (maxCoverable - minCoverable + 1)) + minCoverable;
+
+    let validSeek = arch.seeking.filter(idx => ITEMS[idx].val <= playerTotal);
+    if (validSeek.length === 0) validSeek = [0];
+    let seekingIdx = validSeek[Math.floor(Math.random() * validSeek.length)];
+
+    let rem = npcWager;
+    let npcItems = [];
+    if (ITEMS[seekingIdx].val <= rem && ITEMS[seekingIdx].val <= playerTotal) {
+      npcItems.push(ITEMS[seekingIdx]);
+      rem -= ITEMS[seekingIdx].val;
+    }
+    for (let i = ITEMS.length - 1; i >= 0; i--) {
+      while (rem >= ITEMS[i].val && ITEMS[i].val <= playerTotal) {
+        npcItems.push(ITEMS[i]);
+        rem -= ITEMS[i].val;
+      }
+    }
+
+    curOpponent = {
+      name: arch.names[Math.floor(Math.random() * arch.names.length)],
+      group: arch.group,
+      style: arch.style,
+      seekingName: ITEMS[seekingIdx].name,
+      wager: npcWager,
+      wagerItems: npcItems,
+      quote: arch.quote
+    };
+
+    // Draw 3 random courses from the 4-course pool
+    let coursePool = [0, 1, 2, 3].sort(() => Math.random() - 0.5).slice(0, 3);
+
+    raceListings = [];
+    for (let i = 0; i < 3; i++) {
+      let cIdx = coursePool[i];
+      let hA = Math.floor(Math.random() * HORSE_ROSTER.length);
+      let hB = (hA + 1 + Math.floor(Math.random() * (HORSE_ROSTER.length - 1))) % HORSE_ROSTER.length;
+      let rA = Math.floor(Math.random() * RIDER_SKINS.length);
+      let rB = (rA + 1 + Math.floor(Math.random() * (RIDER_SKINS.length - 1))) % RIDER_SKINS.length;
+      raceListings.push({
+        courseIdx: cIdx,
+        horseA: hA,
+        horseB: hB,
+        riderA: rA,
+        riderB: rB
+      });
+    }
+
+    selListingIdx = 0;
+    selPrefHorse = 0;
+    cardSide = 0;
+    setupRow = 0;
+    breedBrowseIdx = raceListings[0].horseA;
+    initDefaultBet();
+  }
+
+  // --- RESOLVE WAGER PRIORITY & CAPTAIN BREAKDOWN ---
+  function resolveWagerAndDraft() {
+    const chosen = raceListings[selListingIdx];
+    const preferredH = selPrefHorse === 0 ? chosen.horseA : chosen.horseB;
+    const otherH     = selPrefHorse === 0 ? chosen.horseB : chosen.horseA;
+    const preferredR = selPrefHorse === 0 ? chosen.riderA : chosen.riderB;
+    const otherR     = selPrefHorse === 0 ? chosen.riderB : chosen.riderA;
+
+    let pBet = getBagScore(stagedBet);
+    if (pBet < 1) {
+      initDefaultBet();
+      pBet = getBagScore(stagedBet);
+    }
+
+    match.playerBetTotal = pBet;
+    match.npcBetTotal = curOpponent.wager;
+    match.npcWagerItems = curOpponent.wagerItems;
+    match.effectivePot = pBet + curOpponent.wager;
+
+    if (pBet > curOpponent.wager) {
+      match.playerWonPick = true;
+      match.playerHorseIdx = preferredH;
+      match.playerRiderIdx = preferredR;
+      match.npcHorseIdx = otherH;
+      match.npcRiderIdx = otherR;
+    } else {
+      match.playerWonPick = false;
+      match.npcHorseIdx = preferredH;
+      match.npcRiderIdx = preferredR;
+      match.playerHorseIdx = otherH;
+      match.playerRiderIdx = otherR;
+    }
+    match.courseIdx = chosen.courseIdx;
+
+    generateCaptainCommentary();
+  }
+
+  function formatBetSummary(bag) {
+    let parts = [];
+    ITEMS.forEach(it => {
+      if (bag[it.key] > 0) parts.push(`${bag[it.key]} ${it.name}`);
+    });
+    return parts.join(', ');
+  }
+
+  function generateCaptainCommentary() {
+    const c = COURSES[match.courseIdx];
+    const pH = HORSE_ROSTER[match.playerHorseIdx];
+    const nH = HORSE_ROSTER[match.npcHorseIdx];
+    const betStr = formatBetSummary(stagedBet);
+
+    let draftCall = "";
+    if (match.playerWonPick) {
+      draftCall = `Your stake (${betStr}) tops ${curOpponent.name}! You claim de ${pH.name}, leaving ${curOpponent.name} wid de ${nH.name}! `;
+    } else if (match.playerBetTotal === match.npcBetTotal) {
+      draftCall = `Even wagers on de barrel! Tie goes to ${curOpponent.name}, who claims de ${nH.name}! Your ${betStr} rides wid de ${pH.name}! `;
+    } else {
+      draftCall = `${curOpponent.name} outbids your stake and snatches de ${nH.name}! Dat puts your ${betStr} on de ${pH.name}! `;
+    }
+
+    let trackCall = "";
+    if (c.mod === 'SNOW') {
+      trackCall = "De Assiniboine river is froze hard—watch dem slick ice patches to de winter camp! ";
+    } else if (c.mod === 'FLAT') {
+      trackCall = "Flat prairie grass past de buffalo—pure speed to de cart circle! ";
+    } else if (c.mod === 'BUMPS') {
+      trackCall = "Summer bumps past de river-lot houses down into de Forks valley and up to Upper Fort Garry! ";
+    } else {
+      trackCall = "Spring ice melt at Lower Fort Garry! Heavy, dense mud along de rocky shore to St. Andrews stone church—stocky muscle rules today! ";
+    }
+
+    captainText = draftCall + trackCall + "Step back from de line, mes amis!";
+  }
+
+  // --- SETTLE FIREBAG ITEMS AT RACE END ---
+  function settleFirebagOutcome(playerWon) {
+    if (playerWon) {
+      match.npcWagerItems.forEach(it => {
+        firebag[it.key]++;
+      });
+    } else {
+      ITEMS.forEach(it => {
+        firebag[it.key] = Math.max(0, firebag[it.key] - stagedBet[it.key]);
+      });
+    }
+    stagedBet = { moccasins: 0, capote: 0, sash: 0, robe: 0 };
+  }
+
+  function setupRace() {
+    const pH = HORSE_ROSTER[match.playerHorseIdx];
+    const rH = HORSE_ROSTER[match.npcHorseIdx];
+    race = {
+      dist: 6500,
+      pDist: 0, rDist: 0,
+      pSpd: pH.spd, rSpd: rH.spd,
+      pStam: 100, rStam: 100,
+      pLane: 0, rLane: 1,
+      pStumble: 0, rStumble: 0,
+      obstacles: [],
+      countdownVal: 3,
+      countdownTimer: 0,
+      bangFlash: 0,
+      photoTimer: 0,
+      runoutTimer: 0,
+      winner: '',
+      logText: 'AWAITING STARTER...'
+    };
+    for (let x = 500; x < 6200; x += 380 + Math.random() * 250) {
+      race.obstacles.push({
+        dist: x,
+        lane: Math.random() > 0.5 ? 0 : 1,
+        passedP: false,
+        passedR: false
+      });
+    }
+  }
+
+  // --- AUTONOMOUS AI RACE SIMULATION ---
+  function simulateHorse(isPlayerSide) {
+    const h = isPlayerSide ? HORSE_ROSTER[match.playerHorseIdx] : HORSE_ROSTER[match.npcHorseIdx];
+    const course = COURSES[match.courseIdx];
+    let dist = isPlayerSide ? race.pDist : race.rDist;
+    let stam = isPlayerSide ? race.pStam : race.rStam;
+    let stumble = isPlayerSide ? race.pStumble : race.rStumble;
+    let lane = isPlayerSide ? race.pLane : race.rLane;
+
+    let targetSpd = h.spd;
+    if (course.mod === 'SNOW') {
+      targetSpd += (h.snow - 6) * 0.22;
+    } else if (course.mod === 'FLAT') {
+      targetSpd += 0.6;
+    } else if (course.mod === 'BUMPS') {
+      targetSpd += (h.agi - 6) * 0.20;
+    } else if (course.mod === 'MUD') {
+      // Lower Fort Garry Spring-Melt Mud: strongly rewards stocky & strong breeds (Draft Horse & Indian Pony)
+      targetSpd += (h.might - 6.5) * 0.28;
+    }
+
+    let progress = dist / race.dist;
+    if (progress < 0.25 && h.burst > 6 && stam > 30) {
+      targetSpd += (h.burst * 0.18);
+      stam -= 0.25;
+    } else if (progress > 0.70 && stam > 20) {
+      targetSpd += (h.end * 0.14);
+      stam -= 0.20;
+    } else {
+      if (stam < 100) stam += (h.end * 0.04);
+    }
+
+    for (let obs of race.obstacles) {
+      let passed = isPlayerSide ? obs.passedP : obs.passedR;
+      if (!passed && Math.abs(obs.dist - dist) < 35 && obs.lane === lane) {
+        if (isPlayerSide) obs.passedP = true; else obs.passedR = true;
+        let clearChance = (h.agi / 12);
+        if (course.mod === 'SNOW') clearChance += (h.snow / 25);
+        if (course.mod === 'MUD')  clearChance = (h.might / 13) + (h.agi / 24);
+
+        if (Math.random() < clearChance) {
+          if (isPlayerSide) race.logText = `${h.name.toUpperCase()} CLEARS ${course.obs}!`;
+        } else {
+          stumble = (h.fearless || (course.mod === 'MUD' && h.might >= 9)) ? 18 : 40;
+          if (isPlayerSide) race.logText = `${h.name.toUpperCase()} BOGGED IN ${course.obs}!`;
+        }
+      }
+    }
+
+    if (stumble > 0) {
+      targetSpd *= (course.mod === 'MUD' && h.might >= 9) ? 0.72 : 0.55;
+      stumble--;
+    }
+    targetSpd += (Math.sin(frame * 0.1 + (isPlayerSide ? 0 : 2)) * 0.25);
+    targetSpd = Math.max(1.5, targetSpd);
+
+    dist += targetSpd;
+
+    if (isPlayerSide) {
+      race.pDist = dist; race.pSpd = targetSpd; race.pStam = stam; race.pStumble = stumble;
+    } else {
+      race.rDist = dist; race.rSpd = targetSpd; race.rStam = stam; race.rStumble = stumble;
+    }
+  }
+
+  // --- INPUT HANDLING ---
+  function handleInput(cmd) {
+    initAudio();
+    if (state === 'TITLE') {
+      if (cmd === 'BUTTON_A') {
+        playTone(440, 'square', 0.1);
+        generatePreRaceBoard();
+        state = 'LISTING';
+      }
+    }
+    else if (state === 'LISTING') {
+      if (cmd === 'BUTTON_B') {
+        cardSide = (cardSide + 1) % 2;
+        setupRow = 0;
+        if (cardSide === 1) {
+          const activeList = raceListings[selListingIdx];
+          breedBrowseIdx = selPrefHorse === 0 ? activeList.horseA : activeList.horseB;
+        }
+        playTone(460, 'triangle', 0.08);
+        return;
+      }
+
+      if (cardSide === 0) {
+        if (cmd === 'DPAD_UP') { setupRow = (setupRow + 2) % 3; playTone(300, 'triangle', 0.05); }
+        if (cmd === 'DPAD_DOWN') { setupRow = (setupRow + 1) % 3; playTone(300, 'triangle', 0.05); }
+        
+        if (cmd === 'DPAD_LEFT') {
+          playTone(350, 'triangle', 0.05);
+          if (setupRow === 0) selListingIdx = (selListingIdx + 2) % 3;
+          if (setupRow === 1) selPrefHorse = (selPrefHorse + 1) % 2;
+        }
+        if (cmd === 'DPAD_RIGHT') {
+          playTone(350, 'triangle', 0.05);
+          if (setupRow === 0) selListingIdx = (selListingIdx + 1) % 3;
+          if (setupRow === 1) selPrefHorse = (selPrefHorse + 1) % 2;
+        }
+        if (cmd === 'BUTTON_A') {
+          if (setupRow === 0) {
+            setupRow = 1;
+            playTone(380, 'triangle', 0.05);
+          } else if (setupRow === 1) {
+            setupRow = 2;
+            playTone(380, 'triangle', 0.05);
+          } else {
+            playTone(523, 'square', 0.12);
+            resolveWagerAndDraft();
+            state = 'CAPTAIN';
+          }
+        }
+      } else {
+        if (cmd === 'DPAD_UP' || cmd === 'DPAD_DOWN') {
+          setupRow = (setupRow + 1) % 2;
+          playTone(300, 'triangle', 0.05);
+        }
+        if (cmd === 'DPAD_LEFT') {
+          playTone(350, 'triangle', 0.05);
+          if (setupRow === 0) {
+            activeBagSlot = (activeBagSlot + 3) % 4;
+          } else {
+            breedBrowseIdx = (breedBrowseIdx + HORSE_ROSTER.length - 1) % HORSE_ROSTER.length;
+          }
+        }
+        if (cmd === 'DPAD_RIGHT') {
+          playTone(350, 'triangle', 0.05);
+          if (setupRow === 0) {
+            activeBagSlot = (activeBagSlot + 1) % 4;
+          } else {
+            breedBrowseIdx = (breedBrowseIdx + 1) % HORSE_ROSTER.length;
+          }
+        }
+        if (cmd === 'BUTTON_A') {
+          if (setupRow === 0) {
+            let k = ITEMS[activeBagSlot].key;
+            let owned = firebag[k];
+            if (owned > 0) {
+              let nextQty = (stagedBet[k] + 1) % (owned + 1);
+              let otherStaged = getBagScore(stagedBet) - (stagedBet[k] * ITEMS[activeBagSlot].val);
+              if (nextQty === 0 && otherStaged === 0) {
+                nextQty = 1;
+                playTone(220, 'sawtooth', 0.06);
+              } else {
+                stagedBet[k] = nextQty;
+                playTone(420, 'triangle', 0.06);
+              }
+            } else {
+              playTone(180, 'sawtooth', 0.06);
+            }
+          } else {
+            breedBrowseIdx = (breedBrowseIdx + 1) % HORSE_ROSTER.length;
+            playTone(380, 'triangle', 0.05);
+          }
+        }
+      }
+    }
+    else if (state === 'CAPTAIN') {
+      if (cmd === 'BUTTON_A') {
+        playTone(523, 'square', 0.12);
+        setupRace();
+        state = 'READY';
+      }
+    }
+    else if (state === 'READY') {
+      if (cmd === 'BUTTON_A') {
+        state = 'COUNTDOWN';
+        race.countdownVal = 3;
+        race.countdownTimer = 50;
+        playTone(440, 'square', 0.15);
+      }
+    }
+    else if (state === 'RESULT') {
+      if (cmd === 'BUTTON_A') {
+        playTone(440, 'square', 0.1);
+        if (getBagScore(firebag) <= 0) {
+          resetFirebag();
+          state = 'TITLE';
+        } else {
+          generatePreRaceBoard();
+          state = 'LISTING';
+        }
+      }
+    }
+  }
+
+  // --- UPDATE LOOP ---
+  function update() {
+    frame++;
+    if (state === 'COUNTDOWN') {
+      race.countdownTimer--;
+      if (race.countdownTimer <= 0) {
+        race.countdownVal--;
+        if (race.countdownVal > 0) {
+          race.countdownTimer = 50;
+          playTone(440, 'square', 0.15);
+        } else {
+          playGunshot();
+          race.bangFlash = 12;
+          race.logText = "BANG! THEY'RE OFF!";
+          state = 'RACING';
+        }
+      }
+    }
+    else if (state === 'RACING') {
+      if (race.bangFlash > 0) race.bangFlash--;
+      simulateHorse(true);
+      simulateHorse(false);
+
+      const HORSE_NOSE_OFFSET = 46;
+      if ((race.pDist + HORSE_NOSE_OFFSET) >= race.dist || (race.rDist + HORSE_NOSE_OFFSET) >= race.dist) {
+        if (race.pDist >= race.rDist) {
+          race.winner = 'PLAYER';
+          settleFirebagOutcome(true);
+        } else {
+          race.winner = 'RIVAL';
+          settleFirebagOutcome(false);
+        }
+        race.photoTimer = 75;
+        race.logText = "PHOTO FINISH AT THE LINE!";
+        playTone(880, 'square', 0.08, 0.15);
+        state = 'PHOTO_FINISH';
+      }
+    }
+    else if (state === 'PHOTO_FINISH') {
+      race.photoTimer--;
+      if (race.photoTimer <= 0) {
+        race.runoutTimer = 55;
+        race.logText = race.winner === 'PLAYER' ? "TOP LANE TAKES THE RIBBON!" : "BOTTOM LANE TAKES THE RIBBON!";
+        if (race.winner === 'PLAYER') playTone(587, 'square', 0.3);
+        else playTone(196, 'sawtooth', 0.3);
+        state = 'RUNOUT';
+      }
+    }
+    else if (state === 'RUNOUT') {
+      race.pDist += race.pSpd * 0.85;
+      race.rDist += race.rSpd * 0.85;
+      race.runoutTimer--;
+      if (race.runoutTimer <= 0) {
+        state = 'RESULT';
+      }
+    }
+  }
+
+  // --- SNES GRAPHICS & SHADING RENDERERS ---
+  function drawPixelText(txt, x, y, size, color, align = 'left', shadow = true) {
+    ctx.font = `${size}px "Press Start 2P", monospace`;
+    ctx.textAlign = align;
+    if (shadow) {
+      ctx.fillStyle = PAL.BLACK;
+      ctx.fillText(txt, x + 1, y + 1);
+    }
+    ctx.fillStyle = color;
+    ctx.fillText(txt, x, y);
+  }
+
+  function drawFirebagItemIcon(x, y, itemIdx, isDimmed = false) {
+    ctx.save();
+    if (isDimmed) ctx.globalAlpha = 0.32;
+
+    if (itemIdx === 0) {
+      ctx.fillStyle = '#C68E45';
+      ctx.fillRect(x + 1, y + 4, 8, 4);
+      ctx.fillRect(x + 2, y + 2, 5, 2);
+      ctx.fillStyle = '#7B3F1D';
+      ctx.fillRect(x + 1, y + 7, 8, 2);
+      ctx.fillStyle = PAL.RED;
+      ctx.fillRect(x + 3, y + 4, 2, 2);
+      ctx.fillStyle = PAL.SEA_GREEN;
+      ctx.fillRect(x + 6, y + 5, 2, 1);
+    } else if (itemIdx === 1) {
+      ctx.fillStyle = PAL.OCEAN;
+      ctx.fillRect(x + 2, y + 1, 6, 8);
+      ctx.fillRect(x + 1, y + 3, 8, 4);
+      ctx.fillStyle = PAL.WHITE;
+      ctx.fillRect(x + 2, y + 7, 6, 1);
+      ctx.fillStyle = PAL.RED;
+      ctx.fillRect(x + 2, y + 5, 6, 1);
+    } else if (itemIdx === 2) {
+      ctx.fillStyle = PAL.RED;
+      ctx.fillRect(x + 2, y + 1, 6, 8);
+      ctx.fillStyle = PAL.GOLD;
+      ctx.fillRect(x + 3, y + 2, 4, 2);
+      ctx.fillRect(x + 3, y + 5, 4, 2);
+      ctx.fillStyle = PAL.OCEAN;
+      ctx.fillRect(x + 4, y + 3, 2, 2);
+      ctx.fillStyle = PAL.WHITE;
+      ctx.fillRect(x + 2, y + 9, 1, 1);
+      ctx.fillRect(x + 5, y + 9, 1, 1);
+      ctx.fillRect(x + 7, y + 9, 1, 1);
+    } else {
+      ctx.fillStyle = PAL.BUFFALO_MID;
+      ctx.fillRect(x + 1, y + 2, 8, 6);
+      ctx.fillStyle = PAL.BUFFALO_DARK;
+      ctx.fillRect(x + 2, y + 1, 6, 3);
+      ctx.fillStyle = PAL.BUFFALO_LIGHT;
+      ctx.fillRect(x + 3, y + 4, 4, 3);
+      ctx.fillStyle = PAL.HIDE;
+      ctx.fillRect(x + 1, y + 2, 1, 6);
+      ctx.fillRect(x + 8, y + 2, 1, 6);
+    }
+    ctx.restore();
+  }
+
+  function drawDetailedHorse(x, y, horseIdx, riderIdx, animIdx, isStumbling = false, scale = 2) {
+    const h = HORSE_ROSTER[horseIdx];
+    const rSkin = RIDER_SKINS[riderIdx];
+    const coat = PAL.COATS[h.coat];
+    const matrix = HORSE_FRAMES[animIdx % 3];
+
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(x + 3 * scale, y + 13.5 * scale, 17 * scale, 2 * scale);
+
+    const pMap = {
+      '1': PAL.BLACK,
+      '2': coat.b,
+      '3': coat.h,
+      '4': coat.s,
+      '5': coat.m,
+      '6': rSkin.tunic,
+      '7': rSkin.accent,
+      '8': PAL.SKIN,
+      '9': coat.sp ? coat.sp : coat.b,
+      'H': rSkin.hat,
+      'T': rSkin.trim
+    };
+
+    let yOffset = (isStumbling && state === 'RACING') ? (frame % 4 < 2 ? -2 : 2) : 0;
+
+    for (let r = 0; r < matrix.length; r++) {
+      for (let c = 0; c < matrix[r].length; c++) {
+        const ch = matrix[r][c];
+        if (ch !== '0') {
+          ctx.fillStyle = pMap[ch];
+          ctx.fillRect(x + c * scale, y + yOffset + r * scale, scale, scale);
+        }
+      }
+    }
+  }
+
+  // --- SCENERY SPRITES ---
+
+  function drawSnowSpruce(x, y, hScale = 1) {
+    const w = Math.floor(14 * hScale);
+    const trunkH = Math.floor(5 * hScale);
+    ctx.fillStyle = '#3E2723';
+    ctx.fillRect(x + Math.floor(w / 2) - 1, y + Math.floor(20 * hScale), 3, trunkH);
+
+    const tiers = [
+      { ty: 0,  tw: 4,  th: 5 },
+      { ty: 4,  tw: 8,  th: 5 },
+      { ty: 9,  tw: 11, th: 6 },
+      { ty: 14, tw: 14, th: 6 }
+    ];
+    tiers.forEach(t => {
+      let bx = x + Math.floor((w - t.tw * hScale) / 2);
+      let by = y + Math.floor(t.ty * hScale);
+      let bw = Math.floor(t.tw * hScale);
+      let bh = Math.floor(t.th * hScale);
+
+      ctx.fillStyle = PAL.SPRUCE_DARK;
+      ctx.fillRect(bx, by, bw, bh);
+      ctx.fillStyle = PAL.SPRUCE_MID;
+      ctx.fillRect(bx + 1, by, Math.max(1, bw - 3), bh - 1);
+      ctx.fillStyle = PAL.WHITE;
+      ctx.fillRect(bx, by, bw, Math.max(1, Math.floor(2 * hScale)));
+      ctx.fillStyle = PAL.ICE_MID;
+      ctx.fillRect(bx + 1, by + Math.max(1, Math.floor(2 * hScale)), Math.max(1, bw - 2), 1);
+    });
+  }
+
+  function drawWinterGrassClump(x, y) {
+    ctx.fillStyle = PAL.PRAIRIE_BROWN;
+    ctx.fillRect(x, y + 2, 1, 5);
+    ctx.fillRect(x + 3, y, 1, 7);
+    ctx.fillRect(x + 6, y + 3, 1, 4);
+    ctx.fillStyle = PAL.PRAIRIE_TAN;
+    ctx.fillRect(x + 2, y + 1, 1, 6);
+    ctx.fillRect(x + 5, y + 2, 1, 5);
+    ctx.fillStyle = PAL.WHITE;
+    ctx.fillRect(x, y + 1, 2, 1);
+    ctx.fillRect(x + 3, y - 1, 2, 1);
+    ctx.fillRect(x + 5, y + 1, 2, 1);
+  }
+
+  function drawPrairieGrassTuft(x, y, isLush = false) {
+    const c1 = isLush ? PAL.DARK_GREEN : PAL.PRAIRIE_BROWN;
+    const c2 = isLush ? PAL.BRIGHT_GREEN : PAL.PRAIRIE_GOLD;
+    const c3 = isLush ? PAL.LUSH_GREEN : PAL.PRAIRIE_TAN;
+
+    ctx.fillStyle = c1;
+    ctx.fillRect(x + 1, y + 3, 1, 6);
+    ctx.fillRect(x + 4, y + 1, 1, 8);
+    ctx.fillRect(x + 7, y + 4, 1, 5);
+    ctx.fillStyle = c2;
+    ctx.fillRect(x + 2, y + 2, 1, 7);
+    ctx.fillRect(x + 5, y, 1, 9);
+    ctx.fillRect(x + 8, y + 2, 1, 7);
+    ctx.fillStyle = c3;
+    ctx.fillRect(x + 5, y, 1, 3);
+    ctx.fillRect(x + 2, y + 2, 1, 2);
+  }
+
+  function drawTipi(x, y) {
+    ctx.fillStyle = PAL.HIDE;
+    ctx.fillRect(x + 10, y, 4, 4);
+    ctx.fillRect(x + 8, y + 4, 8, 6);
+    ctx.fillRect(x + 6, y + 10, 12, 6);
+    ctx.fillRect(x + 4, y + 16, 16, 6);
+    ctx.fillRect(x + 2, y + 22, 20, 4);
+    ctx.fillStyle = '#A89F91';
+    ctx.fillRect(x + 12, y + 4, 4, 6);
+    ctx.fillRect(x + 12, y + 10, 6, 6);
+    ctx.fillRect(x + 12, y + 16, 8, 6);
+    ctx.fillRect(x + 12, y + 22, 10, 4);
+    ctx.fillStyle = PAL.BORDEAUX;
+    ctx.fillRect(x + 9, y - 4, 2, 5);
+    ctx.fillRect(x + 13, y - 4, 2, 5);
+    ctx.fillRect(x + 6, y + 12, 12, 2);
+  }
+
+  function drawWinterTipi(x, y, smokeSeed = 0) {
+    ctx.fillStyle = PAL.WHITE;
+    ctx.fillRect(x + 10, y, 4, 4);
+    ctx.fillRect(x + 8, y + 4, 8, 6);
+    ctx.fillRect(x + 6, y + 10, 12, 6);
+    ctx.fillStyle = PAL.HIDE;
+    ctx.fillRect(x + 4, y + 16, 16, 6);
+    ctx.fillRect(x + 2, y + 22, 20, 4);
+    ctx.fillStyle = '#B8DFEE';
+    ctx.fillRect(x + 12, y + 4, 4, 6);
+    ctx.fillRect(x + 12, y + 10, 6, 6);
+    ctx.fillStyle = '#9E9789';
+    ctx.fillRect(x + 12, y + 16, 8, 6);
+    ctx.fillRect(x + 12, y + 22, 10, 4);
+    ctx.fillStyle = '#3E2723';
+    ctx.fillRect(x + 9, y - 5, 2, 6);
+    ctx.fillRect(x + 13, y - 5, 2, 6);
+    ctx.fillStyle = PAL.RED;
+    ctx.fillRect(x + 6, y + 12, 12, 2);
+    ctx.fillStyle = PAL.ORANGE;
+    ctx.fillRect(x + 10, y + 21, 3, 5);
+
+    const animTick = (state === 'PHOTO_FINISH') ? 0 : frame;
+    for (let s = 0; s < 4; s++) {
+      let cycle = ((animTick * 0.35) + smokeSeed + s * 6) % 24;
+      let sy = y - 6 - Math.floor(cycle);
+      let sx = x + 11 + Math.round(Math.sin((cycle + smokeSeed) * 0.25) * 3);
+      let sz = cycle < 12 ? 3 : 2;
+      ctx.fillStyle = cycle < 14 ? 'rgba(255,255,255,0.85)' : 'rgba(224,247,250,0.45)';
+      ctx.fillRect(sx, sy, sz, sz);
+    }
+  }
+
+  // Birchbark Domed Wigwam (For Lower Fort Garry rocky riverbank)
+  function drawWigwam(x, y) {
+    // Domed Birchbark Frame
+    ctx.fillStyle = PAL.HIDE;
+    ctx.fillRect(x + 6, y + 2, 12, 3);
+    ctx.fillRect(x + 3, y + 5, 18, 5);
+    ctx.fillRect(x + 1, y + 10, 22, 8);
+    // Shaded Right Half & Bark Banding
+    ctx.fillStyle = '#B8B0A0';
+    ctx.fillRect(x + 12, y + 2, 6, 3);
+    ctx.fillRect(x + 12, y + 5, 9, 5);
+    ctx.fillRect(x + 12, y + 10, 11, 8);
+    // Horizontal Ash Lashings & Birch Bark Seams
+    ctx.fillStyle = '#5C3A21';
+    ctx.fillRect(x + 3, y + 7, 18, 1);
+    ctx.fillRect(x + 1, y + 12, 22, 1);
+    // Arched Doorway
+    ctx.fillStyle = PAL.BLACK;
+    ctx.fillRect(x + 9, y + 11, 5, 7);
+    ctx.fillStyle = PAL.BORDEAUX;
+    ctx.fillRect(x + 8, y + 10, 7, 1);
+  }
+
+  // Pre-Canadian Shield Granite Boulder Outcrop (For Lower Fort Garry)
+  function drawShieldBoulder(x, y, size = 1) {
+    const w = Math.floor(16 * size);
+    const h = Math.floor(9 * size);
+    ctx.fillStyle = PAL.SHIELD_DARK;
+    ctx.fillRect(x, y + 2, w, h - 2);
+    ctx.fillRect(x + 2, y, w - 4, 2);
+    ctx.fillStyle = PAL.SHIELD_MID;
+    ctx.fillRect(x + 1, y + 1, w - 4, h - 3);
+    ctx.fillStyle = PAL.SHIELD_LIGHT;
+    ctx.fillRect(x + 2, y + 1, Math.max(2, w - 8), 2);
+  }
+
+  function drawPrairieBuffalo(x, y, facingLeft = true) {
+    ctx.save();
+    if (!facingLeft) {
+      ctx.translate(x + 24, y);
+      ctx.scale(-1, 1);
+      x = 0; y = 0;
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    ctx.fillRect(x + 3, y + 13, 18, 2);
+
+    ctx.fillStyle = PAL.BUFFALO_MID;
+    ctx.fillRect(x + 10, y + 4, 11, 7);
+    ctx.fillStyle = PAL.BUFFALO_LIGHT;
+    ctx.fillRect(x + 11, y + 4, 8, 2);
+
+    ctx.fillStyle = PAL.BUFFALO_DARK;
+    ctx.fillRect(x + 3, y + 1, 10, 10);
+    ctx.fillStyle = PAL.BUFFALO_MID;
+    ctx.fillRect(x + 5, y + 2, 6, 6);
+
+    ctx.fillStyle = PAL.BUFFALO_DARK;
+    ctx.fillRect(x, y + 4, 5, 7);
+    ctx.fillRect(x + 1, y + 11, 3, 2);
+    ctx.fillStyle = PAL.HIDE;
+    ctx.fillRect(x + 2, y + 2, 2, 2);
+
+    ctx.fillStyle = PAL.BUFFALO_DARK;
+    ctx.fillRect(x + 4, y + 11, 2, 3);
+    ctx.fillRect(x + 8, y + 11, 2, 3);
+    ctx.fillRect(x + 15, y + 11, 2, 3);
+    ctx.fillRect(x + 19, y + 11, 2, 3);
+    ctx.fillRect(x + 21, y + 5, 1, 4);
+    ctx.restore();
+  }
+
+  function drawRedRiverCart(x, y, flipX = false) {
+    ctx.save();
+    if (flipX) {
+      ctx.translate(x + 36, y);
+      ctx.scale(-1, 1);
+      x = 0; y = 0;
+    }
+    ctx.fillStyle = '#7B3F1D';
+    ctx.fillRect(x + 4, y + 4, 22, 10);
+    ctx.fillStyle = '#4A220D';
+    ctx.fillRect(x + 4, y + 11, 22, 3);
+    ctx.fillRect(x + 26, y + 12, 10, 2);
+    ctx.fillStyle = PAL.GOLD;
+    ctx.fillRect(x + 10, y + 8, 12, 12);
+    ctx.fillStyle = '#4A220D';
+    ctx.fillRect(x + 12, y + 10, 8, 8);
+    ctx.fillStyle = PAL.GOLD;
+    ctx.fillRect(x + 15, y + 8, 2, 12);
+    ctx.fillRect(x + 10, y + 13, 12, 2);
+    ctx.restore();
+  }
+
+  function drawRedRiverCartCircle(x, y) {
+    drawRedRiverCart(x - 24, y - 6, false);
+    drawRedRiverCart(x + 62, y - 6, true);
+    drawRedRiverCart(x, y, true);
+    drawRedRiverCart(x + 32, y, false);
+  }
+
+  function drawRedRiverHouse(x, y, redRoof = true) {
+    ctx.fillStyle = PAL.LIMESTONE_LIGHT;
+    ctx.fillRect(x + 2, y + 8, 22, 11);
+    ctx.fillStyle = PAL.LIMESTONE_DARK;
+    ctx.fillRect(x + 2, y + 16, 22, 3);
+    ctx.fillStyle = redRoof ? PAL.BORDEAUX : '#4A220D';
+    ctx.fillRect(x, y + 4, 26, 4);
+    ctx.fillStyle = redRoof ? PAL.RED : '#7B3F1D';
+    ctx.fillRect(x + 2, y + 2, 22, 3);
+    ctx.fillStyle = PAL.LIMESTONE_MID;
+    ctx.fillRect(x + 18, y - 2, 3, 5);
+    ctx.fillStyle = '#3E2723';
+    ctx.fillRect(x + 11, y + 12, 4, 7);
+    ctx.fillStyle = PAL.OCEAN;
+    ctx.fillRect(x + 5, y + 11, 3, 3);
+    ctx.fillRect(x + 18, y + 11, 3, 3);
+  }
+
+  function drawParishSchoolhouseChurch(x, y) {
+    ctx.fillStyle = PAL.LIMESTONE_LIGHT;
+    ctx.fillRect(x + 14, y + 14, 30, 14);
+    ctx.fillStyle = PAL.LIMESTONE_MID;
+    ctx.fillRect(x + 14, y + 24, 30, 4);
+    ctx.fillStyle = PAL.BORDEAUX;
+    ctx.fillRect(x + 12, y + 10, 34, 4);
+    ctx.fillStyle = PAL.RED;
+    ctx.fillRect(x + 14, y + 7, 30, 4);
+    ctx.fillStyle = PAL.OCEAN;
+    ctx.fillRect(x + 20, y + 17, 3, 5);
+    ctx.fillRect(x + 28, y + 17, 3, 5);
+    ctx.fillRect(x + 36, y + 17, 3, 5);
+    ctx.fillStyle = PAL.GOLD;
+    ctx.fillRect(x + 21, y + 16, 1, 1);
+    ctx.fillRect(x + 29, y + 16, 1, 1);
+    ctx.fillRect(x + 37, y + 16, 1, 1);
+
+    ctx.fillStyle = PAL.LIMESTONE_LIGHT;
+    ctx.fillRect(x + 4, y + 8, 12, 20);
+    ctx.fillStyle = PAL.LIMESTONE_DARK;
+    ctx.fillRect(x + 4, y + 8, 2, 20);
+    ctx.fillStyle = PAL.BLACK;
+    ctx.fillRect(x + 7, y + 10, 6, 5);
+    ctx.fillStyle = PAL.GOLD;
+    ctx.fillRect(x + 9, y + 11, 2, 3);
+    ctx.fillStyle = '#3E2723';
+    ctx.fillRect(x + 7, y + 20, 6, 8);
+    ctx.fillStyle = PAL.BORDEAUX;
+    ctx.fillRect(x + 2, y + 5, 16, 3);
+    ctx.fillStyle = PAL.RED;
+    ctx.fillRect(x + 5, y + 1, 10, 4);
+    ctx.fillRect(x + 7, y - 3, 6, 4);
+    ctx.fillStyle = PAL.GOLD;
+    ctx.fillRect(x + 9, y - 8, 2, 5);
+    ctx.fillRect(x + 7, y - 6, 6, 1);
+  }
+
+  // Historic St. Andrews on the Red Anglican Stone Church (1849 Limestone Church & Square Tower at Finish Line)
+  function drawStAndrewsStoneChurch(x, y) {
+    // 1. Main Tyndall Limestone Sanctuary Nave
+    ctx.fillStyle = PAL.LIMESTONE_MID;
+    ctx.fillRect(x + 18, y + 16, 42, 20);
+    ctx.fillStyle = PAL.LIMESTONE_LIGHT;
+    ctx.fillRect(x + 18, y + 16, 38, 16);
+    // Stone Ashlar Masonry Lines
+    ctx.fillStyle = PAL.LIMESTONE_DARK;
+    ctx.fillRect(x + 18, y + 32, 42, 4);
+    for (let r = 0; r < 4; r++) {
+      ctx.fillRect(x + 18, y + 20 + r * 4, 42, 1);
+    }
+    // Steeply Pitched Dark Shingle Roof
+    ctx.fillStyle = PAL.GRAY_DARK;
+    ctx.fillRect(x + 16, y + 11, 46, 5);
+    ctx.fillStyle = PAL.SHIELD_MID;
+    ctx.fillRect(x + 18, y + 8, 42, 4);
+    // Gothic Pointed-Arch Stained Windows along Nave
+    for (let w = 0; w < 3; w++) {
+      let wx = x + 24 + w * 11;
+      ctx.fillStyle = PAL.BLACK;
+      ctx.fillRect(wx, y + 20, 4, 7);
+      ctx.fillStyle = PAL.OCEAN;
+      ctx.fillRect(wx + 1, y + 21, 2, 5);
+      ctx.fillStyle = PAL.GOLD;
+      ctx.fillRect(wx + 1, y + 20, 2, 1);
+    }
+    // East Chancel Apse
+    ctx.fillStyle = PAL.LIMESTONE_MID;
+    ctx.fillRect(x + 60, y + 20, 8, 16);
+    ctx.fillStyle = PAL.GRAY_DARK;
+    ctx.fillRect(x + 60, y + 16, 9, 4);
+
+    // 2. Iconic Square Limestone West Bell Tower & Octagonal Broach Spire
+    ctx.fillStyle = PAL.LIMESTONE_LIGHT;
+    ctx.fillRect(x + 4, y + 8, 15, 28);
+    ctx.fillStyle = PAL.LIMESTONE_DARK;
+    ctx.fillRect(x + 4, y + 8, 2, 28);
+    ctx.fillRect(x + 17, y + 8, 2, 28);
+    // Stone Stringcourses
+    ctx.fillRect(x + 4, y + 17, 15, 1);
+    ctx.fillRect(x + 4, y + 26, 15, 1);
+    // Belfry Louvers & Timber Entrance
+    ctx.fillStyle = PAL.BLACK;
+    ctx.fillRect(x + 8, y + 10, 7, 5);
+    ctx.fillStyle = PAL.GOLD;
+    ctx.fillRect(x + 10, y + 11, 3, 3);
+    ctx.fillStyle = '#3E2723';
+    ctx.fillRect(x + 8, y + 28, 7, 8);
+    // Broach Spire & Cross
+    ctx.fillStyle = PAL.GRAY_DARK;
+    ctx.fillRect(x + 3, y + 5, 17, 3);
+    ctx.fillStyle = PAL.SHIELD_MID;
+    ctx.fillRect(x + 6, y + 0, 11, 5);
+    ctx.fillRect(x + 8, y - 5, 7, 5);
+    ctx.fillRect(x + 10, y - 10, 3, 5);
+    ctx.fillStyle = PAL.GOLD;
+    ctx.fillRect(x + 11, y - 14, 1, 4);
+    ctx.fillRect(x + 9, y - 12, 5, 1);
+  }
+
+  function drawRiverbankTree(x, y, isOak = true) {
+    ctx.fillStyle = '#4A220D';
+    ctx.fillRect(x + 8, y + 14, 4, 10);
+    ctx.fillStyle = '#7B3F1D';
+    ctx.fillRect(x + 8, y + 14, 2, 10);
+
+    if (isOak) {
+      ctx.fillStyle = PAL.DARK_GREEN;
+      ctx.fillRect(x + 2, y + 6, 16, 10);
+      ctx.fillRect(x + 5, y + 2, 10, 4);
+      ctx.fillStyle = PAL.BRIGHT_GREEN;
+      ctx.fillRect(x + 3, y + 5, 12, 7);
+      ctx.fillRect(x + 6, y + 2, 6, 3);
+      ctx.fillStyle = PAL.LUSH_GREEN;
+      ctx.fillRect(x + 4, y + 4, 6, 4);
+    } else {
+      ctx.fillStyle = PAL.DARK_GREEN;
+      ctx.fillRect(x + 5, y + 4, 10, 12);
+      ctx.fillRect(x + 7, y, 6, 4);
+      ctx.fillStyle = PAL.MUTED_GREEN;
+      ctx.fillRect(x + 6, y + 3, 7, 10);
+      ctx.fillStyle = PAL.LUSH_GREEN;
+      ctx.fillRect(x + 6, y + 2, 4, 5);
+    }
+  }
+
+  // Historic Stone Fort (Shared between Upper Fort Garry finish and Lower Fort Garry start line)
+  function drawStoneFort(x, y, scale = 0.80) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+
+    ctx.fillStyle = PAL.LIMESTONE_MID;
+    ctx.fillRect(14, 22, 112, 22);
+    ctx.fillStyle = PAL.LIMESTONE_DARK;
+    ctx.fillRect(14, 38, 112, 6);
+    for (let row = 0; row < 4; row++) {
+      ctx.fillRect(14, 25 + row * 4, 112, 1);
+    }
+    ctx.fillStyle = PAL.LIMESTONE_LIGHT;
+    ctx.fillRect(14, 21, 112, 2);
+
+    // Governor Simpson's Residence / Big House
+    ctx.fillStyle = PAL.LIMESTONE_LIGHT;
+    ctx.fillRect(32, 10, 34, 12);
+    ctx.fillStyle = PAL.BORDEAUX;
+    ctx.fillRect(30, 4, 38, 7);
+    ctx.fillStyle = PAL.RED;
+    ctx.fillRect(32, 5, 34, 4);
+    ctx.fillStyle = PAL.LIMESTONE_DARK;
+    ctx.fillRect(36, 0, 3, 5);
+    ctx.fillRect(59, 0, 3, 5);
+    ctx.fillStyle = PAL.BLACK;
+    ctx.fillRect(37, 13, 3, 4);
+    ctx.fillRect(47, 13, 3, 4);
+    ctx.fillRect(57, 13, 3, 4);
+
+    // Stone Warehouse & HBC Flagstaff
+    ctx.fillStyle = PAL.LIMESTONE_MID;
+    ctx.fillRect(76, 12, 28, 10);
+    ctx.fillStyle = '#4A220D';
+    ctx.fillRect(74, 8, 32, 4);
+    ctx.fillStyle = PAL.WHITE;
+    ctx.fillRect(69, -8, 2, 30);
+    ctx.fillStyle = PAL.RED;
+    ctx.fillRect(71, -8, 14, 8);
+    ctx.fillStyle = PAL.OCEAN;
+    ctx.fillRect(71, -8, 6, 4);
+    ctx.fillStyle = PAL.WHITE;
+    ctx.fillRect(78, -5, 5, 2);
+
+    // Main Stone Gatehouse
+    ctx.fillStyle = PAL.LIMESTONE_LIGHT;
+    ctx.fillRect(58, 16, 24, 28);
+    ctx.fillStyle = PAL.LIMESTONE_DARK;
+    ctx.fillRect(58, 16, 2, 28);
+    ctx.fillRect(80, 16, 2, 28);
+    ctx.fillStyle = PAL.BORDEAUX;
+    ctx.fillRect(56, 12, 28, 4);
+    ctx.fillStyle = PAL.GOLD;
+    ctx.fillRect(66, 18, 8, 3);
+    ctx.fillStyle = '#2C1407';
+    ctx.fillRect(64, 27, 12, 17);
+    ctx.fillStyle = '#4A220D';
+    ctx.fillRect(65, 28, 10, 16);
+    ctx.fillStyle = PAL.BLACK;
+    ctx.fillRect(69, 27, 2, 17);
+
+    // Cylindrical Limestone Corner Bastions
+    const bastions = [4, 116];
+    bastions.forEach(bx => {
+      ctx.fillStyle = PAL.LIMESTONE_MID;
+      ctx.fillRect(bx, 16, 20, 28);
+      ctx.fillStyle = PAL.LIMESTONE_LIGHT;
+      ctx.fillRect(bx + 2, 16, 6, 28);
+      ctx.fillStyle = PAL.LIMESTONE_DARK;
+      ctx.fillRect(bx + 14, 16, 6, 28);
+      ctx.fillStyle = PAL.BLACK;
+      ctx.fillRect(bx + 6, 22, 2, 5);
+      ctx.fillRect(bx + 12, 22, 2, 5);
+      ctx.fillStyle = PAL.BORDEAUX;
+      ctx.fillRect(bx - 2, 13, 24, 3);
+      ctx.fillStyle = PAL.RED;
+      ctx.fillRect(bx + 1, 10, 18, 3);
+      ctx.fillRect(bx + 4, 7, 12, 3);
+      ctx.fillStyle = PAL.BORDEAUX;
+      ctx.fillRect(bx + 7, 4, 6, 3);
+      ctx.fillStyle = PAL.GOLD;
+      ctx.fillRect(bx + 9, 2, 2, 2);
+    });
+
+    ctx.restore();
+  }
+
+  function drawMiniScenePreview(x, y, w, h, listing) {
+    const c = COURSES[listing.courseIdx];
+    ctx.fillStyle = c.mod === 'SNOW' ? '#7EB5D6' : (c.mod === 'FLAT' ? '#5BA4DC' : (c.mod === 'BUMPS' ? '#4A9ED1' : '#588BAE'));
+    ctx.fillRect(x, y, w, Math.floor(h * 0.42));
+
+    if (c.mod === 'SNOW') {
+      ctx.fillStyle = PAL.ICE_LIGHT;
+      ctx.fillRect(x, y + 18, w, 8);
+      drawSnowSpruce(x + 8, y + 6, 0.65);
+      drawSnowSpruce(x + 68, y + 5, 0.7);
+      drawWinterGrassClump(x + 36, y + 18);
+      ctx.fillStyle = PAL.ICE_MID;
+      ctx.fillRect(x, y + Math.floor(h * 0.42), w, Math.ceil(h * 0.58));
+      ctx.fillStyle = PAL.WHITE;
+      ctx.fillRect(x + 8, y + 36, 20, 2);
+      ctx.fillRect(x + 54, y + 52, 24, 2);
+    } else if (c.mod === 'FLAT') {
+      ctx.fillStyle = PAL.BRIGHT_GREEN;
+      ctx.fillRect(x, y + 18, w, 8);
+      ctx.fillStyle = PAL.HIDE;
+      ctx.fillRect(x + 12, y + 11, 10, 10);
+      drawPrairieBuffalo(x + 38, y + 10, true);
+      drawPrairieGrassTuft(x + 70, y + 16, false);
+      ctx.fillStyle = '#C68E45';
+      ctx.fillRect(x, y + Math.floor(h * 0.42), w, Math.ceil(h * 0.58));
+    } else if (c.mod === 'BUMPS') {
+      ctx.fillStyle = PAL.BRIGHT_GREEN;
+      ctx.fillRect(x, y + 16, w, 6);
+      ctx.fillStyle = PAL.DARK_GREEN;
+      ctx.fillRect(x + 10, y + 9, 8, 9);
+      ctx.fillStyle = PAL.LIMESTONE_LIGHT;
+      ctx.fillRect(x + 56, y + 13, 12, 6);
+      ctx.fillStyle = PAL.RED;
+      ctx.fillRect(x + 55, y + 11, 14, 3);
+      ctx.fillStyle = PAL.OCEAN;
+      ctx.fillRect(x, y + 21, w, 5);
+      ctx.fillStyle = PAL.MUTED_GREEN;
+      ctx.fillRect(x, y + Math.floor(h * 0.42), w, Math.ceil(h * 0.58));
+    } else {
+      // Lower Fort Garry Preview: Pre-Canadian Shield boulders, wigwam, marsh & spring-melt mud track
+      ctx.fillStyle = PAL.MARSH_REED;
+      ctx.fillRect(x, y + 15, w, 6);
+      drawShieldBoulder(x + 8, y + 13, 0.7);
+      drawWigwam(x + 32, y + 6);
+      drawSnowSpruce(x + 68, y + 4, 0.65);
+      ctx.fillStyle = PAL.OCEAN;
+      ctx.fillRect(x, y + 21, w, 4);
+      // Heavy Spring-Melt Mud Track
+      ctx.fillStyle = PAL.MARSH_MUD;
+      ctx.fillRect(x, y + Math.floor(h * 0.42), w, Math.ceil(h * 0.58));
+      ctx.fillStyle = PAL.MARSH_WET;
+      ctx.fillRect(x + 10, y + 36, 22, 3);
+      ctx.fillRect(x + 50, y + 48, 26, 3);
+    }
+
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.fillRect(x, y + Math.floor(h * 0.70), w, 1);
+
+    let anim = Math.floor(frame / 6);
+    drawDetailedHorse(x + 6,  y + 20, listing.horseA, listing.riderA, anim, false, 1.35);
+    drawDetailedHorse(x + 48, y + 34, listing.horseB, listing.riderB, anim + 1, false, 1.35);
+  }
+
+  function drawCourseBackdrop(courseIdx, scrollPx) {
+    const c = COURSES[courseIdx];
+    const isRaceView = (state === 'RACING' || state === 'PHOTO_FINISH' || state === 'RUNOUT' || state === 'RESULT' || state === 'READY' || state === 'COUNTDOWN');
+
+    if (c.mod === 'SNOW') {
+      ctx.fillStyle = '#4A89AC'; ctx.fillRect(0, 0, 320, 42);
+      ctx.fillStyle = '#7EB5D6'; ctx.fillRect(0, 42, 320, 30);
+      ctx.fillStyle = '#B8DFEE'; ctx.fillRect(0, 72, 320, 18);
+
+      ctx.fillStyle = PAL.ICE_LIGHT; ctx.fillRect(0, 84, 320, 14);
+      ctx.fillStyle = '#B0C4DE';     ctx.fillRect(0, 98, 320, 6);
+
+      let bgOff = (scrollPx * 0.28) % 240;
+      for (let i = -240; i < 560; i += 240) {
+        drawSnowSpruce(i - bgOff + 18, 64, 1.15);
+        drawSnowSpruce(i - bgOff + 38, 69, 0.95);
+        drawWinterGrassClump(i - bgOff + 64, 86);
+        drawWinterGrassClump(i - bgOff + 92, 89);
+        drawSnowSpruce(i - bgOff + 132, 66, 1.05);
+        drawWinterGrassClump(i - bgOff + 162, 87);
+        drawWinterGrassClump(i - bgOff + 195, 90);
+        drawWinterGrassClump(i - bgOff + 218, 86);
+      }
+
+      if (isRaceView) {
+        let finishX = 48 + (race.dist - scrollPx);
+        if (finishX > -120 && finishX < 380) {
+          drawWinterTipi(finishX - 28, 68, 0);
+          drawWinterTipi(finishX + 4,  70, 9);
+          drawWinterTipi(finishX + 34, 67, 17);
+        }
+      }
+
+      ctx.fillStyle = PAL.ICE_DARK; ctx.fillRect(0, 104, 320, 8);
+      ctx.fillStyle = PAL.ICE_MID;  ctx.fillRect(0, 112, 320, 63);
+      ctx.fillStyle = PAL.ICE_LIGHT;ctx.fillRect(0, 175, 320, 65);
+
+      let fgOff = scrollPx % 160;
+      for (let i = -160; i < 480; i += 80) {
+        ctx.fillStyle = PAL.WHITE;
+        ctx.fillRect(i - fgOff + 10, 125, 24, 2);
+        ctx.fillRect(i - fgOff + 45, 190, 30, 2);
+        ctx.fillStyle = PAL.ICE_DARK;
+        ctx.fillRect(i - fgOff + 28, 152, 14, 1);
+        ctx.fillRect(i - fgOff + 62, 214, 18, 1);
+      }
+    } 
+    else if (c.mod === 'FLAT') {
+      ctx.fillStyle = '#2B7BB9'; ctx.fillRect(0, 0, 320, 45);
+      ctx.fillStyle = '#5BA4DC'; ctx.fillRect(0, 45, 320, 35);
+      ctx.fillStyle = '#9AD0F5'; ctx.fillRect(0, 80, 320, 20);
+
+      ctx.fillStyle = PAL.BRIGHT_GREEN; ctx.fillRect(0, 90, 320, 14);
+      ctx.fillStyle = PAL.PRAIRIE_GOLD; ctx.fillRect(0, 102, 320, 12);
+
+      let bgOff = (scrollPx * 0.3) % 480;
+      for (let i = -480; i < 960; i += 480) {
+        drawPrairieGrassTuft(i - bgOff + 14,  94, false);
+        drawPrairieGrassTuft(i - bgOff + 32,  98, true);
+        drawTipi(i - bgOff + 62, 74);
+        drawTipi(i - bgOff + 92, 78);
+        drawPrairieGrassTuft(i - bgOff + 128, 95, false);
+        drawPrairieGrassTuft(i - bgOff + 154, 100, false);
+        drawPrairieBuffalo(i - bgOff + 188, 82, true);
+        drawPrairieBuffalo(i - bgOff + 222, 85, true);
+        drawPrairieGrassTuft(i - bgOff + 260, 96, false);
+        drawPrairieBuffalo(i - bgOff + 296, 81, false);
+        drawPrairieGrassTuft(i - bgOff + 340, 95, false);
+        drawPrairieGrassTuft(i - bgOff + 372, 101, true);
+        drawPrairieGrassTuft(i - bgOff + 410, 94, false);
+        drawPrairieGrassTuft(i - bgOff + 445, 99, false);
+      }
+
+      if (isRaceView) {
+        let finishX = 48 + (race.dist - scrollPx);
+        if (finishX > -120 && finishX < 380) {
+          drawRedRiverCartCircle(finishX - 24, 84);
+        }
+      }
+
+      ctx.fillStyle = '#8C5F27'; ctx.fillRect(0, 114, 320, 6);
+      ctx.fillStyle = '#C68E45'; ctx.fillRect(0, 120, 320, 60);
+      ctx.fillStyle = '#D9A45B'; ctx.fillRect(0, 180, 320, 60);
+
+      let fgOff = scrollPx % 160;
+      ctx.fillStyle = '#8C5F27';
+      for (let i = -160; i < 480; i += 40) {
+        ctx.fillRect(i - fgOff + 12, 130, 6, 2);
+        ctx.fillRect(i - fgOff + 28, 205, 8, 2);
+      }
+    } 
+    else if (c.mod === 'BUMPS') {
+      // 3. Upper Fort Garry (Summer Forks)
+      ctx.fillStyle = '#1E6B9C'; ctx.fillRect(0, 0, 320, 42);
+      ctx.fillStyle = '#4A9ED1'; ctx.fillRect(0, 42, 320, 28);
+      ctx.fillStyle = '#8BC8EC'; ctx.fillRect(0, 70, 320, 12);
+
+      ctx.fillStyle = PAL.LUSH_GREEN;   ctx.fillRect(0, 76, 320, 8);
+      ctx.fillStyle = PAL.BRIGHT_GREEN; ctx.fillRect(0, 84, 320, 12);
+
+      let finishX = isRaceView ? (48 + (race.dist - scrollPx)) : 99999;
+      let fortX = finishX - 28;
+      let valleyX = fortX - 96;
+      let schoolhouseX = valleyX - 58;
+
+      let hardstopScreenX = isRaceView ? (schoolhouseX - 4) : 320;
+      if (hardstopScreenX > 0) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, Math.min(320, hardstopScreenX), 96);
+        ctx.clip();
+
+        let bgOff = (scrollPx * 0.35) % 640;
+        for (let i = -640; i < 1280; i += 640) {
+          drawRiverbankTree(i - bgOff + 28,  58, true);
+          drawRiverbankTree(i - bgOff + 44,  60, false);
+          drawRedRiverHouse(i - bgOff + 125, 65, true);
+          drawRiverbankTree(i - bgOff + 245, 59, false);
+          drawRiverbankTree(i - bgOff + 310, 57, true);
+          drawRedRiverHouse(i - bgOff + 425, 66, false);
+          drawRiverbankTree(i - bgOff + 540, 58, true);
+        }
+        ctx.restore();
+      }
+
+      if (isRaceView) {
+        if (schoolhouseX > -70 && schoolhouseX < 350) {
+          drawParishSchoolhouseChurch(schoolhouseX, 56);
+        }
+
+        if (valleyX > -160 && valleyX < 380) {
+          ctx.fillStyle = '#8BC8EC';
+          ctx.fillRect(valleyX,      74, 88, 6);
+          ctx.fillRect(valleyX + 8,  80, 72, 6);
+          ctx.fillRect(valleyX + 16, 86, 56, 6);
+
+          ctx.fillStyle = PAL.MUTED_GREEN;
+          ctx.fillRect(valleyX - 4,  76, 6, 8);
+          ctx.fillRect(valleyX + 4,  82, 8, 8);
+          ctx.fillRect(valleyX + 76, 82, 8, 8);
+          ctx.fillRect(valleyX + 84, 76, 6, 8);
+
+          ctx.fillStyle = PAL.OCEAN;
+          ctx.fillRect(valleyX + 18, 86, 52, 12);
+          ctx.fillStyle = PAL.SEA_GREEN;
+          let flowTick = (state === 'PHOTO_FINISH') ? 0 : frame;
+          let flowShift = Math.floor((flowTick * 0.4) % 10);
+          ctx.fillRect(valleyX + 24, 88 + (flowShift % 4), 16, 2);
+          ctx.fillRect(valleyX + 46, 91 + ((flowShift + 2) % 4), 18, 2);
+        }
+
+        if (fortX > -160 && fortX < 360) {
+          drawStoneFort(fortX, 42, 0.80);
+        }
+      }
+
+      let bgOff = (scrollPx * 0.35) % 640;
+      for (let i = -320; i < 640; i += 320) {
+        const tufts = [
+          { dx: 18, lush: true },
+          { dx: 88, lush: false },
+          { dx: 142, lush: true },
+          { dx: 215, lush: false },
+          { dx: 288, lush: true }
+        ];
+        tufts.forEach(t => {
+          let tx = i - (bgOff % 320) + t.dx;
+          if (tx < valleyX + 10 || tx > valleyX + 76) {
+            drawPrairieGrassTuft(tx, 86, t.lush);
+          }
+        });
+      }
+
+      ctx.fillStyle = PAL.DARK_GREEN;
+      for (let sx = -160; sx < 480; sx += 24) {
+        let bx = sx - (bgOff % 24);
+        if (bx < valleyX + 12 || bx > valleyX + 74) {
+          ctx.fillRect(bx + 2, 93, 10, 3);
+          ctx.fillStyle = PAL.MUTED_GREEN;
+          ctx.fillRect(bx + 4, 92, 6, 2);
+          ctx.fillStyle = PAL.DARK_GREEN;
+        }
+      }
+
+      ctx.fillStyle = PAL.OCEAN; ctx.fillRect(0, 96, 320, 12);
+      ctx.fillStyle = PAL.SEA_GREEN;
+      let waterTick = (state === 'PHOTO_FINISH') ? 0 : frame;
+      let waterOff = (scrollPx * 0.5 + waterTick * 0.6) % 80;
+      for (let wx = -80; wx < 400; wx += 80) {
+        ctx.fillRect(wx - waterOff + 10, 99, 18, 1);
+        ctx.fillRect(wx - waterOff + 42, 104, 22, 1);
+      }
+
+      ctx.fillStyle = PAL.DARK_GREEN;  ctx.fillRect(0, 108, 320, 8);
+      ctx.fillStyle = PAL.MUTED_GREEN; ctx.fillRect(0, 116, 320, 62);
+      ctx.fillStyle = PAL.LUSH_GREEN;  ctx.fillRect(0, 178, 320, 62);
+
+      let fgOff = scrollPx % 160;
+      for (let i = -160; i < 480; i += 80) {
+        drawPrairieGrassTuft(i - fgOff + 14, 106, true);
+        drawPrairieGrassTuft(i - fgOff + 52, 107, false);
+        ctx.fillStyle = PAL.DARK_GREEN;
+        ctx.fillRect(i - fgOff + 10, 145, 36, 4);
+        ctx.fillStyle = PAL.MUTED_GREEN;
+        ctx.fillRect(i - fgOff + 30, 200, 42, 4);
+      }
+    }
+    else {
+      // 4. Lower Fort Garry (Spring Melt Marsh & Pre-Canadian Shield toward Lake Winnipeg)
+      // Starts at Gov. Simpson's Stone Fort -> Rocky Shield Shore with Wigwams & Village Houses -> St. Andrews Stone Church at Finish!
+      ctx.fillStyle = '#33658A'; ctx.fillRect(0, 0, 320, 42);
+      ctx.fillStyle = '#588BAE'; ctx.fillRect(0, 42, 320, 28);
+      ctx.fillStyle = '#9BC1BC'; ctx.fillRect(0, 70, 320, 12);
+
+      // Marshy Pre-Canadian Shield Far Bank (Olive/Moss Marsh Grass & Granite Ledges, y: 76 to 96)
+      ctx.fillStyle = PAL.MARSH_REED;  ctx.fillRect(0, 76, 320, 9);
+      ctx.fillStyle = PAL.MUTED_GREEN; ctx.fillRect(0, 85, 320, 11);
+
+      let startFortX = isRaceView ? (18 - scrollPx) : 99999;
+      let finishX    = isRaceView ? (48 + (race.dist - scrollPx)) : 99999;
+      let churchX    = finishX - 18;
+
+      // Repeating Backdrop: Boreal Spruce/Oak, Wigwams, Village Houses & Pre-Canadian Shield Granite Boulders
+      // Clipped cleanly between the Starting Stone Fort and the Finishing Stone Church
+      let leftClip  = isRaceView ? Math.max(0, startFortX + 118) : 0;
+      let rightClip = isRaceView ? Math.min(320, churchX - 8) : 320;
+
+      if (rightClip > leftClip) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(leftClip, 0, rightClip - leftClip, 96);
+        ctx.clip();
+
+        let bgOff = (scrollPx * 0.35) % 640;
+        for (let i = -640; i < 1280; i += 640) {
+          drawSnowSpruce(i - bgOff + 24,   58, 1.0);
+          drawWigwam(i - bgOff + 68,       67);
+          drawShieldBoulder(i - bgOff + 112, 83, 1.1);
+          drawRedRiverHouse(i - bgOff + 165, 65, false);
+          drawRiverbankTree(i - bgOff + 235, 59, true);
+          drawWigwam(i - bgOff + 295,      68);
+          drawShieldBoulder(i - bgOff + 345, 82, 1.25);
+          drawSnowSpruce(i - bgOff + 390,  57, 1.1);
+          drawRedRiverHouse(i - bgOff + 455, 65, true);
+          drawWigwam(i - bgOff + 520,      67);
+          drawShieldBoulder(i - bgOff + 575, 83, 1.0);
+        }
+        ctx.restore();
+      }
+
+      if (isRaceView) {
+        // Starting Landmark: Gov. Simpson's Lower Fort Garry Stone Fort
+        if (startFortX > -160 && startFortX < 340) {
+          drawStoneFort(startFortX, 42, 0.80);
+        }
+
+        // Finishing Landmark: St. Andrews on the Red Anglican Stone Church
+        if (churchX > -90 && churchX < 360) {
+          drawStAndrewsStoneChurch(churchX, 50);
+        }
+      }
+
+      // Rocky & Rough Pre-Canadian Shield Opposite Shoreline (Granite Rocks & Marsh Reeds along water's edge)
+      let bgOff = (scrollPx * 0.35) % 320;
+      for (let i = -320; i < 640; i += 320) {
+        drawShieldBoulder(i - bgOff + 16,  87, 0.85);
+        drawPrairieGrassTuft(i - bgOff + 52, 86, true);
+        drawShieldBoulder(i - bgOff + 108, 88, 1.0);
+        drawPrairieGrassTuft(i - bgOff + 154, 86, false);
+        drawShieldBoulder(i - bgOff + 205, 87, 0.9);
+        drawPrairieGrassTuft(i - bgOff + 258, 86, true);
+      }
+
+      // Swollen Spring-Melt Red River Channel (Cold Deep Lake-Approach Blue + Drifting Melt-Ice Flakes)
+      ctx.fillStyle = '#0B5378'; ctx.fillRect(0, 96, 320, 12);
+      ctx.fillStyle = PAL.ICE_MID;
+      let waterTick = (state === 'PHOTO_FINISH') ? 0 : frame;
+      let waterOff = (scrollPx * 0.5 + waterTick * 0.6) % 120;
+      for (let wx = -120; wx < 440; wx += 120) {
+        // Drifting spring melt ice chunks & ripples
+        ctx.fillStyle = PAL.ICE_LIGHT;
+        ctx.fillRect(wx - waterOff + 14, 99, 8, 2);
+        ctx.fillStyle = PAL.SEA_GREEN;
+        ctx.fillRect(wx - waterOff + 58, 103, 20, 1);
+        ctx.fillStyle = PAL.ICE_MID;
+        ctx.fillRect(wx - waterOff + 92, 100, 6, 2);
+      }
+
+      // Near-Shore Rocky Shield Edge & Heavy Spring-Melt Mud Track (y: 108 to 240)
+      ctx.fillStyle = PAL.SHIELD_DARK; ctx.fillRect(0, 108, 320, 8);
+      ctx.fillStyle = PAL.MARSH_MUD;   ctx.fillRect(0, 116, 320, 62);
+      ctx.fillStyle = '#5E442C';       ctx.fillRect(0, 178, 320, 62);
+
+      // Rocky Shore Boulders, Marsh Reeds & Deep Mud Ruts Parallax
+      let fgOff = scrollPx % 160;
+      for (let i = -160; i < 480; i += 80) {
+        drawShieldBoulder(i - fgOff + 8, 106, 0.95);
+        drawPrairieGrassTuft(i - fgOff + 34, 105, true);
+        drawShieldBoulder(i - fgOff + 56, 107, 0.75);
+        // Heavy wet mud ruts across the lanes
+        ctx.fillStyle = PAL.MARSH_WET;
+        ctx.fillRect(i - fgOff + 12, 144, 38, 5);
+        ctx.fillRect(i - fgOff + 32, 198, 44, 5);
+      }
+    }
+
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.fillRect(0, 174, 320, 2);
+  }
+
+  // --- MAIN RENDER LOOP ---
+  function draw() {
+    ctx.clearRect(0, 0, 320, 240);
+
+    if (state === 'TITLE') {
+      drawCourseBackdrop(1, frame * 1.5);
+      drawDetailedHorse(80, 130, 0, 0, Math.floor(frame / 6), false, 2);
+      drawDetailedHorse(180, 180, 5, 1, Math.floor((frame + 3) / 6), false, 2);
+
+      ctx.fillStyle = 'rgba(14, 42, 30, 0.92)';
+      ctx.fillRect(14, 18, 292, 76);
+      ctx.strokeStyle = PAL.GOLD; ctx.lineWidth = 2;
+      ctx.strokeRect(14, 18, 292, 76);
+
+      drawPixelText("AEN ZHWAAL", 160, 47, 20, PAL.GOLD, 'center');
+      drawPixelText("HORSE RACING AT THE RED RIVER SETTLEMENT", 160, 66, 6, PAL.HIDE, 'center');
+      if (frame % 50 < 30) {
+        drawPixelText("PRESS 'A' TO START", 160, 84, 8, PAL.SEA_GREEN, 'center');
+      }
+    }
+    else if (state === 'LISTING') {
+      ctx.fillStyle = PAL.DARK_GREEN; ctx.fillRect(0, 0, 320, 240);
+      ctx.strokeStyle = PAL.HIDE; ctx.lineWidth = 2; ctx.strokeRect(3, 3, 314, 234);
+
+      const bagTotal = getBagScore(firebag);
+      const currentBetVal = getBagScore(stagedBet);
+
+      drawPixelText(`FIREBAG:${bagTotal}`, 8, 14, 7, PAL.SEA_GREEN);
+    
+      drawPixelText(`VS:${curOpponent.name}`, 312, 14, 7, PAL.GOLD, 'right');
+
+      if (cardSide === 0) {
+        drawPixelText(`${curOpponent.style} | SEEKING:${curOpponent.seekingName.toUpperCase()}`, 312, 23, 5, PAL.HIDE, 'right');
+        drawPixelText(`"${curOpponent.quote}"`, 312, 32, 5, PAL.GRAY_LIGHT, 'right');
+
+        const colW = 98;
+        const startX = 9;
+        for (let i = 0; i < 3; i++) {
+          let cx = startX + i * (colW + 4);
+          let cy = 38;
+          let isCardSel = (selListingIdx === i);
+          let isFocusRow0 = (setupRow === 0 && isCardSel);
+
+          ctx.fillStyle = isCardSel ? '#1E3D2F' : PAL.BLACK;
+          ctx.fillRect(cx, cy, colW, 108);
+          ctx.strokeStyle = isFocusRow0 ? PAL.GOLD : (isCardSel ? PAL.SEA_GREEN : PAL.GRAY_DARK);
+          ctx.lineWidth = isCardSel ? 2 : 1;
+          ctx.strokeRect(cx, cy, colW, 108);
+
+          let cName = COURSES[raceListings[i].courseIdx].short;
+          drawPixelText(cName, cx + colW / 2, cy + 10, 6, isCardSel ? PAL.GOLD : PAL.WHITE, 'center');
+
+          drawMiniScenePreview(cx + 5, cy + 14, 88, 58, raceListings[i]);
+          ctx.strokeStyle = PAL.BLACK; ctx.lineWidth = 1;
+          ctx.strokeRect(cx + 5, cy + 14, 88, 58);
+
+          let hA = HORSE_ROSTER[raceListings[i].horseA].name;
+          let hB = HORSE_ROSTER[raceListings[i].horseB].name;
+          let isPrefA = (isCardSel && selPrefHorse === 0);
+          let isPrefB = (isCardSel && selPrefHorse === 1);
+
+          drawPixelText((isPrefA ? "*" : "") + hA, cx + colW / 2, cy + 84, 5, isPrefA ? PAL.SEA_GREEN : PAL.WHITE, 'center');
+          drawPixelText("VS", cx + colW / 2, cy + 93, 5, PAL.GRAY_LIGHT, 'center');
+          drawPixelText((isPrefB ? "*" : "") + hB, cx + colW / 2, cy + 102, 5, isPrefB ? PAL.SEA_GREEN : PAL.WHITE, 'center');
+        }
+
+        const activeList = raceListings[selListingIdx];
+        const prefHorseObj = HORSE_ROSTER[selPrefHorse === 0 ? activeList.horseA : activeList.horseB];
+
+        ctx.fillStyle = setupRow === 1 ? PAL.BORDEAUX : PAL.BLACK;
+        ctx.fillRect(9, 151, 302, 18);
+        ctx.strokeStyle = setupRow === 1 ? PAL.GOLD : PAL.MUTED_GREEN;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(9, 151, 302, 18);
+        drawPixelText((setupRow === 1 ? ">" : " ") + "PREF MOUNT:", 14, 163, 6, PAL.WHITE);
+        drawPixelText(`< ${prefHorseObj.name} >`, 305, 163, 6, PAL.SEA_GREEN, 'right');
+
+        ctx.fillStyle = PAL.BLACK;
+        ctx.fillRect(9, 173, 302, 18);
+        ctx.strokeStyle = PAL.MUTED_GREEN;
+        ctx.strokeRect(9, 173, 302, 18);
+        drawPixelText(`YOUR WAGER: ${currentBetVal} PTS`, 14, 185, 6, PAL.GOLD);
+        drawPixelText("PRESS B TO EDIT BAG", 305, 185, 5, PAL.SEA_GREEN, 'right');
+
+        let isBtnFocus = (setupRow === 2);
+        ctx.fillStyle = isBtnFocus ? PAL.GOLD : PAL.BORDEAUX;
+        ctx.fillRect(58, 198, 204, 28);
+        ctx.strokeStyle = isBtnFocus ? PAL.WHITE : PAL.GOLD;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(58, 198, 204, 28);
+        drawPixelText("KOMANSE!", 160, 217, 11, isBtnFocus ? PAL.BLACK : PAL.GOLD, 'center', !isBtnFocus);
+      } 
+      else {
+        const isBagRow = (setupRow === 0);
+        const isBreedRow = (setupRow === 1);
+
+        ctx.fillStyle = isBagRow ? '#172E24' : '#0B1D15';
+        ctx.fillRect(9, 22, 302, 114);
+        ctx.strokeStyle = isBagRow ? PAL.GOLD : PAL.MUTED_GREEN;
+        ctx.lineWidth = isBagRow ? 2 : 1;
+        ctx.strokeRect(9, 22, 302, 114);
+
+        drawPixelText((isBagRow ? ">" : " ") + "FIREBAG WAGER", 14, 34, 7, PAL.GOLD);
+        drawPixelText(`STAGED BET: ${currentBetVal} / ${bagTotal} PTS`, 305, 34, 6, PAL.SEA_GREEN, 'right');
+
+        for (let idx = 0; idx < 4; idx++) {
+          const it = ITEMS[idx];
+          const owned = firebag[it.key];
+          const betQty = stagedBet[it.key];
+          const sx = 14 + idx * 74;
+          const sy = 40;
+          const sw = 70;
+          const sh = 78;
+          const isSlotSel = (isBagRow && activeBagSlot === idx);
+
+          ctx.fillStyle = betQty > 0 ? '#1C3F31' : PAL.BLACK;
+          ctx.fillRect(sx, sy, sw, sh);
+          ctx.strokeStyle = isSlotSel ? PAL.GOLD : (betQty > 0 ? PAL.SEA_GREEN : PAL.GRAY_DARK);
+          ctx.lineWidth = isSlotSel ? 2 : 1;
+          ctx.strokeRect(sx, sy, sw, sh);
+
+          drawFirebagItemIcon(sx + 30, sy + 6, idx, owned === 0);
+
+          drawPixelText(it.short, sx + sw / 2, sy + 28, 6, owned > 0 ? PAL.WHITE : PAL.GRAY_DARK, 'center');
+          drawPixelText(`${it.val} PT${it.val > 1 ? 'S' : ''}`, sx + sw / 2, sy + 40, 5, PAL.HIDE, 'center');
+
+          drawPixelText(`OWN:${owned}`, sx + sw / 2, sy + 54, 6, owned > 0 ? PAL.SEA_GREEN : PAL.GRAY_DARK, 'center');
+          drawPixelText(`BET:${betQty}`, sx + sw / 2, sy + 69, 6, betQty > 0 ? PAL.GOLD : PAL.GRAY_LIGHT, 'center');
+        }
+
+        drawPixelText("LEFT/RIGHT: ITEM   A: +1 / TOGGLE", 160, 131, 5, PAL.HIDE, 'center');
+
+        const hInfo = HORSE_ROSTER[breedBrowseIdx];
+        ctx.fillStyle = isBreedRow ? '#172E24' : '#0B1D15';
+        ctx.fillRect(9, 141, 302, 74);
+        ctx.strokeStyle = isBreedRow ? PAL.GOLD : PAL.MUTED_GREEN;
+        ctx.lineWidth = isBreedRow ? 2 : 1;
+        ctx.strokeRect(9, 141, 302, 74);
+
+        drawPixelText((isBreedRow ? ">" : " ") + `BREED GUIDE (${breedBrowseIdx + 1}/6)`, 14, 153, 6, PAL.GOLD);
+        drawPixelText("< LEFT / RIGHT >", 305, 153, 5, PAL.GRAY_LIGHT, 'right');
+
+        ctx.fillStyle = PAL.BLACK;
+        ctx.fillRect(14, 159, 58, 48);
+        ctx.strokeStyle = PAL.GRAY_DARK;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(14, 159, 58, 48);
+        drawDetailedHorse(19, 168, breedBrowseIdx, breedBrowseIdx % RIDER_SKINS.length, Math.floor(frame / 6), false, 2);
+
+        drawPixelText(hInfo.name.toUpperCase(), 80, 170, 7, PAL.WHITE);
+        drawPixelText(hInfo.breed, 80, 182, 5, PAL.HIDE);
+        drawPixelText("CAPTAIN:", 80, 195, 5, PAL.SEA_GREEN);
+        drawPixelText(hInfo.captainNote, 80, 206, 5, PAL.GOLD);
+
+        drawPixelText("PRESS 'B' TO RETURN TO RACE CARD", 160, 229, 6, PAL.GOLD, 'center');
+      }
+    }
+    else if (state === 'CAPTAIN') {
+      drawCourseBackdrop(match.courseIdx, 0);
+      ctx.fillStyle = 'rgba(14, 42, 30, 0.93)';
+      ctx.fillRect(14, 18, 292, 204);
+      ctx.strokeStyle = PAL.GOLD; ctx.lineWidth = 2;
+      ctx.strokeRect(14, 18, 292, 204);
+
+      ctx.fillStyle = PAL.BORDEAUX; ctx.fillRect(24, 30, 34, 34);
+      ctx.fillStyle = PAL.SKIN; ctx.fillRect(33, 38, 16, 15);
+      ctx.fillStyle = PAL.RED; ctx.fillRect(31, 32, 20, 7);
+      ctx.fillStyle = PAL.BLACK; ctx.fillRect(33, 47, 16, 8);
+      ctx.fillStyle = PAL.GOLD; ctx.fillRect(29, 55, 24, 9);
+
+      drawPixelText("BUFFALO HUNT CAPTAIN", 66, 43, 8, PAL.GOLD);
+      drawPixelText(`POT: ${match.effectivePot} PTS | ${COURSES[match.courseIdx].short}`, 66, 57, 6, PAL.SEA_GREEN);
+
+      const words = captainText.split(' ');
+      let lines = [], line = '';
+      words.forEach(w => {
+        if ((line + w).length > 35) { lines.push(line); line = w + ' '; }
+        else line += w + ' ';
+      });
+      lines.push(line);
+
+      lines.forEach((l, idx) => {
+        drawPixelText(l, 24, 80 + idx * 13, 6, PAL.WHITE);
+      });
+
+      if (frame % 50 < 30) {
+        drawPixelText("PRESS 'A' TO WATCH RACE", 160, 210, 7, PAL.GOLD, 'center');
+      }
+    }
+    else if (state === 'READY' || state === 'COUNTDOWN' || state === 'RACING' || state === 'PHOTO_FINISH' || state === 'RUNOUT' || state === 'RESULT') {
+      drawCourseBackdrop(match.courseIdx, race.pDist);
+
+      let startX = 48 - race.pDist;
+      if (startX > -10 && startX < 330) {
+        ctx.fillStyle = PAL.HIDE;
+        ctx.fillRect(startX, 112, 3, 128);
+      }
+
+      let finishX = 48 + (race.dist - race.pDist);
+      if (finishX > -20 && finishX < 340) {
+        ctx.fillStyle = PAL.BORDEAUX;
+        ctx.fillRect(finishX, 112, 4, 128);
+        ctx.fillStyle = PAL.GOLD;
+        ctx.fillRect(finishX + 1, 112, 2, 128);
+      }
+
+      const mod = COURSES[match.courseIdx].mod;
+      race.obstacles.forEach(obs => {
+        let ox = 48 + (obs.dist - race.pDist);
+        if (ox > -30 && ox < 340) {
+          let oy = obs.lane === 0 ? 142 : 202;
+          if (mod === 'SNOW') {
+            ctx.fillStyle = PAL.OCEAN; ctx.fillRect(ox, oy, 22, 8);
+            ctx.fillStyle = PAL.WHITE; ctx.fillRect(ox + 3, oy + 2, 16, 3);
+          } else if (mod === 'FLAT') {
+            ctx.fillStyle = PAL.BLACK; ctx.fillRect(ox, oy + 2, 14, 6);
+            ctx.fillStyle = '#5E1E0C'; ctx.fillRect(ox - 2, oy + 6, 18, 3);
+          } else if (mod === 'BUMPS') {
+            ctx.fillStyle = '#3E2723'; ctx.fillRect(ox, oy, 24, 9);
+            ctx.fillStyle = PAL.DARK_GREEN; ctx.fillRect(ox + 4, oy + 2, 16, 4);
+          } else {
+            // Lower Fort Garry Spring-Melt Mud Bog & Half-Melted Ice Slush
+            ctx.fillStyle = '#26180D'; ctx.fillRect(ox, oy, 26, 10);
+            ctx.fillStyle = PAL.ICE_DARK; ctx.fillRect(ox + 4, oy + 2, 18, 5);
+            ctx.fillStyle = PAL.ICE_LIGHT; ctx.fillRect(ox + 7, oy + 3, 7, 2);
+          }
+        }
+      });
+
+      let isAnimating = (state === 'RACING' || state === 'RUNOUT');
+      let pAnim = (state === 'PHOTO_FINISH') ? 0 : (isAnimating ? Math.floor(frame / 4) : 1);
+      let rAnim = (state === 'PHOTO_FINISH') ? 0 : (isAnimating ? Math.floor((frame + 2) / 4) : 1);
+
+      drawDetailedHorse(48, 120, match.playerHorseIdx, match.playerRiderIdx, pAnim, race.pStumble > 0, 2);
+
+      let rScreenX = 48 + (race.rDist - race.pDist);
+      if (rScreenX > -60 && rScreenX < 340) {
+        drawDetailedHorse(rScreenX, 180, match.npcHorseIdx, match.npcRiderIdx, rAnim, race.rStumble > 0, 2);
+      }
+
+      if (state === 'PHOTO_FINISH' && race.photoTimer > 67) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+        ctx.fillRect(0, 0, 320, 240);
+      }
+
+      if (race.bangFlash > 0) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+        ctx.fillRect(0, 0, 320, 240);
+      }
+
+      ctx.fillStyle = PAL.BLACK; ctx.fillRect(0, 0, 320, 28);
+      ctx.fillStyle = PAL.GOLD;  ctx.fillRect(0, 28, 320, 2);
+
+      ctx.fillStyle = PAL.GRAY_DARK; ctx.fillRect(10, 8, 180, 12);
+      let pPct = Math.min(1, race.pDist / race.dist);
+      let rPct = Math.min(1, race.rDist / race.dist);
+      ctx.fillStyle = PAL.RED;       ctx.fillRect(10 + rPct * 174, 14, 6, 6);
+      ctx.fillStyle = PAL.SEA_GREEN; ctx.fillRect(10 + pPct * 174, 8, 6, 6);
+
+      drawPixelText(`POT:${match.effectivePot}`, 310, 17, 7, PAL.GOLD, 'right');
+
+      ctx.fillStyle = 'rgba(0,0,0,0.75)';
+      ctx.fillRect(0, 224, 320, 16);
+      drawPixelText(race.logText, 160, 235, 6, PAL.WHITE, 'center');
+
+      if (state === 'READY') {
+        ctx.fillStyle = 'rgba(0,0,0,0.78)';
+        ctx.fillRect(30, 85, 260, 54);
+        ctx.strokeStyle = PAL.GOLD; ctx.strokeRect(30, 85, 260, 54);
+        drawPixelText("RIDERS AT THE LINE", 160, 106, 9, PAL.WHITE, 'center');
+        if (frame % 40 < 25) {
+          drawPixelText("PRESS 'A' FOR COUNTDOWN", 160, 126, 8, PAL.GOLD, 'center');
+        }
+      }
+      else if (state === 'COUNTDOWN') {
+        let frenchWords = { 3: "TROIS...", 2: "DEUX...", 1: "UN!" };
+        let txt = frenchWords[race.countdownVal] || "";
+        ctx.fillStyle = 'rgba(0,0,0,0.75)';
+        ctx.fillRect(70, 85, 180, 50);
+        ctx.strokeStyle = PAL.ORANGE; ctx.strokeRect(70, 85, 180, 50);
+        drawPixelText(txt, 160, 118, 16, PAL.GOLD, 'center');
+      }
+      else if (state === 'RESULT') {
+        ctx.fillStyle = 'rgba(14, 42, 30, 0.95)';
+        ctx.fillRect(18, 36, 284, 174);
+        ctx.strokeStyle = PAL.GOLD; ctx.lineWidth = 2;
+        ctx.strokeRect(18, 36, 284, 174);
+
+        const wonNames = match.npcWagerItems.map(it => it.name).join(' + ');
+        if (race.winner === 'PLAYER') {
+          drawPixelText("YOUR HORSE WINS!", 160, 62, 10, PAL.SEA_GREEN, 'center');
+          drawPixelText(`WON: ${wonNames}`, 160, 82, 6, PAL.GOLD, 'center');
+        } else {
+          drawPixelText("OPPONENT WINS!", 160, 62, 10, PAL.RED, 'center');
+          drawPixelText(`LOST -${match.playerBetTotal} PTS OF GOODS`, 160, 82, 7, PAL.HIDE, 'center');
+        }
+
+        drawPixelText(`FIREBAG SCORE: ${getBagScore(firebag)}`, 160, 105, 8, PAL.WHITE, 'center');
+
+        for (let idx = 0; idx < 4; idx++) {
+          const it = ITEMS[idx];
+          const bx = 30 + idx * 66;
+          const by = 116;
+          ctx.fillStyle = PAL.BLACK;
+          ctx.fillRect(bx, by, 60, 32);
+          ctx.strokeStyle = firebag[it.key] > 0 ? PAL.SEA_GREEN : PAL.GRAY_DARK;
+          ctx.lineWidth = 1;
+          ctx.strokeRect(bx, by, 60, 32);
+          drawFirebagItemIcon(bx + 4, by + 6, idx, firebag[it.key] === 0);
+          drawPixelText(`${it.short}:${it.val}`, bx + 18, by + 14, 5, PAL.HIDE, 'left', false);
+          drawPixelText(`x${firebag[it.key]}`, bx + 18, by + 26, 7, firebag[it.key] > 0 ? PAL.GOLD : PAL.GRAY_DARK, 'left', false);
+        }
+
+        if (getBagScore(firebag) <= 0) {
+          drawPixelText("FIREBAG EMPTY! STARTING ANEW.", 160, 168, 6, PAL.ORANGE, 'center');
+        }
+        if (frame % 50 < 30) {
+          drawPixelText("PRESS 'A' TO CONTINUE", 160, 194, 8, PAL.GOLD, 'center');
+        }
+      }
+    }
+  }
+
+  function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // --- POSTMESSAGE ARCADE BRIDGE ---
+  window.addEventListener('message', function(event) {
+    handleInput(event.data);
+  });
+
+  // Keyboard fallback for standalone browser testing
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowUp') handleInput('DPAD_UP');
+    if (e.key === 'ArrowDown') handleInput('DPAD_DOWN');
+    if (e.key === 'ArrowLeft') handleInput('DPAD_LEFT');
+    if (e.key === 'ArrowRight') handleInput('DPAD_RIGHT');
+    if (e.key === 'a' || e.key === 'A' || e.key === 'z' || e.key === 'Z' || e.key === 'Enter' || e.key === ' ') handleInput('BUTTON_A');
+    if (e.key === 'b' || e.key === 'B' || e.key === 'x' || e.key === 'X' || e.key === 'Shift') handleInput('BUTTON_B');
+  });
+
+  loop();
+</script>
+</body>
+</html>
