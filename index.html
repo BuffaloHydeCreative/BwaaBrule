@@ -2,67 +2,55 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Bwaa Brule</title>
   <style>
-    /* Global Reset & Base */
-    body { 
-      margin: 0; padding: 0; 
+    /* Global Reset & Edge-to-Edge Viewport */
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body { 
+      margin: 0; 
+      padding: 0; 
       background: #000; 
       color: #fff; 
       font-family: 'Courier New', Courier, monospace; 
-      display: flex; justify-content: center; align-items: center;
-      height: 100vh; width: 100vw;
+      height: 100%; 
+      width: 100%;
       overflow: hidden;
       touch-action: none; 
     }
 
-    /* Main Mobile Arcade Cabinet */
-    .arcade-machine {
-      width: 100%;
-      max-width: 450px;
-      height: 100%;
-      max-height: 100vh;
-      background: #0d0d0d;
-      border-radius: 20px;
-      border: 4px solid #333;
-      display: flex;
-      flex-direction: column;
-      box-shadow: 0 20px 50px rgba(0,0,0,0.8), inset 0 0 20px rgba(255,255,255,0.05);
-      position: relative;
+    /* Full-Screen Viewport Container */
+    .viewport-shell {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+      background: #000;
       overflow: hidden;
-      box-sizing: border-box;
     }
 
-    /* --- SECTION 1: CRT MONITOR --- */
-    .monitor-bezel {
-      flex: 1;
-      min-height: 250px; 
-      background: linear-gradient(to bottom, #000 0%, #151515 100%);
-      padding: 15px 15px 5px 15px;
-      box-sizing: border-box;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      position: relative;
-      box-shadow: inset 0 25px 35px rgba(0,0,0,0.9), inset 0 -5px 10px rgba(255,255,255,0.05);
-    }
-
+    /* Full-Bleed CRT Screen */
     .crt-screen {
+      position: absolute;
+      inset: 0;
       width: 100%;
       height: 100%;
       background: #000;
-      border-radius: 12px;
-      position: relative;
       overflow: hidden;
-      border: 6px solid #1a1a1a;
-      box-shadow: inset 0 0 30px rgba(0,0,0,0.9);
     }
 
     .screen-layer {
       position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
-      box-sizing: border-box;
+      inset: 0;
+      width: 100%;
+      height: 100%;
       display: none; 
     }
 
@@ -99,10 +87,11 @@
       z-index: 2;
     }
 
+    /* Full-Viewport DOS Game Selection Menu */
     #dos-menu {
       background: #000;
       color: #12AEA2;
-      padding: 20px;
+      padding: calc(18px + env(safe-area-inset-top)) 20px calc(165px + env(safe-area-inset-bottom)) 20px;
       flex-direction: column;
       overflow-y: auto;
       scrollbar-width: none;
@@ -115,9 +104,10 @@
 
     .dos-header {
       font-weight: bold;
+      font-size: 16px;
       margin-bottom: 12px;
       border-bottom: 2px dashed #12AEA2;
-      padding-bottom: 5px;
+      padding-bottom: 6px;
       flex: 0 0 auto;
     }
 
@@ -127,13 +117,14 @@
       margin: 0;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 7px;
     }
 
     .dos-list li {
-      font-size: 14px;
+      font-size: 15px;
       text-transform: uppercase;
-      opacity: 0.5;
+      opacity: 0.6;
+      padding: 3px 4px;
     }
 
     .dos-list li.active {
@@ -154,28 +145,28 @@
 
     /* --- PAUSE HUD OVERLAY --- */
     #pause-overlay {
-      background: rgba(0, 0, 0, 0.85);
+      background: rgba(0, 0, 0, 0.84);
       color: #12AEA2;
       padding: 20px;
+      padding-bottom: calc(130px + env(safe-area-inset-bottom));
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      z-index: 12;
+      z-index: 16;
     }
 
     .pause-box {
-      width: 85%;
-      max-width: 280px;
+      width: 88%;
+      max-width: 310px;
       background: #050505;
       border: 2px solid #12AEA2;
-      box-shadow: 0 0 20px rgba(18, 174, 162, 0.25), inset 0 0 12px rgba(0, 0, 0, 0.9);
-      padding: 16px;
-      box-sizing: border-box;
+      box-shadow: 0 0 24px rgba(18, 174, 162, 0.3), inset 0 0 12px rgba(0, 0, 0, 0.9);
+      padding: 18px;
     }
 
     .pause-header {
       font-weight: bold;
-      font-size: 16px;
+      font-size: 17px;
       text-align: center;
       color: #F7C844;
       margin-bottom: 14px;
@@ -194,11 +185,11 @@
     }
 
     .pause-list li {
-      font-size: 14px;
+      font-size: 15px;
       text-transform: uppercase;
       color: #12AEA2;
-      opacity: 0.65;
-      padding: 4px 6px;
+      opacity: 0.7;
+      padding: 5px 6px;
       cursor: pointer;
     }
 
@@ -222,56 +213,97 @@
       margin-top: 14px;
       padding-top: 8px;
       border-top: 1px dashed #333;
-      font-size: 10px;
-      color: #888;
+      font-size: 11px;
+      color: #999;
       text-align: center;
     }
 
+    /* Full-Edge In-Game iFrame */
     #arcade-frame {
+      position: absolute;
+      inset: 0;
       width: 100%;
       height: 100%;
       border: none;
       z-index: 5;
-      pointer-events: none; /* Keeps keyboard focus locked on cabinet OS */
+      pointer-events: none; /* Keeps keyboard focus locked on OS controls */
     }
 
+    /* Retro CRT Scanline & Vignette Overlay */
     .crt-screen::after {
       content: " ";
       display: block;
       position: absolute;
-      top: 0; left: 0; bottom: 0; right: 0;
-      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-      z-index: 20;
+      inset: 0;
+      background: 
+        linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.22) 50%), 
+        linear-gradient(90deg, rgba(255, 0, 0, 0.05), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.05));
+      z-index: 25;
       background-size: 100% 3px, 3px 100%;
       pointer-events: none;
-      box-shadow: inset 0 0 40px rgba(0,0,0,0.8);
+      box-shadow: inset 0 0 32px rgba(0, 0, 0, 0.65);
     }
 
-    /* --- SECTION 2: CONTROL DECK --- */
-    .control-deck {
-      flex: 0 0 160px;
-      background: linear-gradient(to bottom, #2b2b2b 0%, #1a1a1a 15%, #111 100%);
-      border-top: 3px solid #666; 
-      border-bottom: 8px solid #000; 
-      box-shadow: 0 15px 25px rgba(0,0,0,0.9); 
-      position: relative;
-      padding: 0 25px;
+    /* --- FLOATING OVERLAY CONTROLS --- */
+    /* Top-Right Compact Home / Pause Pill */
+    .home-hud {
+      position: absolute;
+      top: calc(10px + env(safe-area-inset-top));
+      right: calc(12px + env(safe-area-inset-right));
+      z-index: 30;
       display: flex;
       align-items: center;
+    }
+
+    .home-btn {
+      padding: 6px 12px;
+      background: rgba(15, 15, 15, 0.55);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      border: 1.5px solid rgba(18, 174, 162, 0.55);
+      border-radius: 14px;
+      color: rgba(255, 255, 255, 0.85);
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+      touch-action: none;
+    }
+
+    .home-btn:active, .home-btn.active-press {
+      transform: scale(0.94);
+      background: rgba(18, 174, 162, 0.35);
+      border-color: #12AEA2;
+    }
+
+    /* Bottom Floating Touch Deck */
+    .floating-controls {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 0 calc(18px + env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) calc(18px + env(safe-area-inset-left));
+      display: flex;
+      align-items: flex-end;
       justify-content: space-between;
-      z-index: 5;
-      box-sizing: border-box;
+      pointer-events: none; /* Allows clicks/taps in center gap to pass through if needed */
+      z-index: 30;
     }
 
     .joystick-base {
-      width: 120px;
-      height: 120px;
-      background: radial-gradient(circle, #1a1a1a 30%, #2a2a2a 100%);
+      width: 116px;
+      height: 116px;
+      background: radial-gradient(circle, rgba(20, 20, 20, 0.42) 30%, rgba(45, 45, 45, 0.52) 100%);
+      backdrop-filter: blur(3px);
+      -webkit-backdrop-filter: blur(3px);
       border-radius: 50%;
-      border: 4px solid #050505;
-      box-shadow: inset 0 5px 15px rgba(0,0,0,0.9), 0 2px 5px rgba(255,255,255,0.1);
+      border: 2px solid rgba(255, 255, 255, 0.22);
+      box-shadow: inset 0 4px 12px rgba(0, 0, 0, 0.65), 0 4px 12px rgba(0, 0, 0, 0.45);
       position: relative;
       touch-action: none; 
+      pointer-events: auto;
       cursor: grab;
     }
 
@@ -280,13 +312,15 @@
     }
 
     .joystick-stick {
-      width: 65px; 
-      height: 65px;
-      background: radial-gradient(circle at 35% 35%, #888, #222);
+      width: 58px; 
+      height: 58px;
+      background: radial-gradient(circle at 35% 35%, rgba(190, 190, 190, 0.78), rgba(50, 50, 50, 0.85));
+      border: 1.5px solid rgba(255, 255, 255, 0.35);
       border-radius: 50%;
       position: absolute;
-      top: 27.5px; left: 27.5px; 
-      box-shadow: 8px 12px 15px rgba(0,0,0,0.6), inset -5px -5px 15px rgba(0,0,0,0.7);
+      top: 27px; 
+      left: 27px; 
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.65);
       pointer-events: none; 
       transition: transform 0.15s ease-out; 
       z-index: 1;
@@ -298,163 +332,119 @@
 
     .action-container {
       display: flex;
-      gap: 15px;
-      transform: rotate(-15deg); 
+      gap: 14px;
+      transform: rotate(-14deg);
+      margin-bottom: 6px;
+      pointer-events: auto;
     }
 
     .action-btn-wrapper {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 12px;
+      gap: 5px;
     }
 
     .action-btn {
-      width: 55px;
-      height: 55px;
+      width: 56px;
+      height: 56px;
       border-radius: 50%;
-      border: 3px solid #111;
+      border: 2px solid rgba(255, 255, 255, 0.28);
       cursor: pointer;
       position: relative;
-      box-shadow: inset 0 6px 12px rgba(255,255,255,0.15), inset 0 -8px 15px rgba(0,0,0,0.7), 0 6px 0 #050505, 0 10px 15px rgba(0,0,0,0.6);
+      backdrop-filter: blur(3px);
+      -webkit-backdrop-filter: blur(3px);
+      box-shadow: inset 0 4px 10px rgba(255, 255, 255, 0.22), 0 5px 12px rgba(0, 0, 0, 0.6);
       touch-action: none;
-    }
-    
-    .action-btn::after {
-      content: '';
-      position: absolute;
-      top: 4px; left: 10px; right: 10px; height: 18px;
-      background: linear-gradient(rgba(255,255,255,0.25), transparent);
-      border-radius: 20px 20px 0 0;
-      pointer-events: none;
     }
 
     .action-btn:active, .action-btn.active-press {
-      transform: translateY(6px);
-      box-shadow: inset 0 6px 12px rgba(255,255,255,0.15), inset 0 -8px 15px rgba(0,0,0,0.7), 0 0 0 #050505, 0 4px 6px rgba(0,0,0,0.6);
+      transform: translateY(4px) scale(0.95);
+      box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.5), 0 1px 4px rgba(0, 0, 0, 0.6);
     }
 
-    .btn-b { background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0.4) 0%, transparent 80%), #AD1C21; margin-top: 25px; }
-    .btn-a { background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0.4) 0%, transparent 80%), #12AEA2; }
+    .btn-b { 
+      background: rgba(173, 28, 33, 0.68); 
+      margin-top: 22px; 
+    }
+    .btn-a { 
+      background: rgba(18, 174, 162, 0.68); 
+    }
 
     .btn-label {
-      font-size: 12px;
+      font-size: 11px;
       font-weight: bold;
-      color: #777;
-    }
-
-    /* --- SECTION 3: FRONT PANEL --- */
-    .front-panel {
-      flex: 0 0 90px;
-      background: linear-gradient(to bottom, #050505 0%, #111 100%);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      position: relative;
-      z-index: 4; 
-    }
-
-    .home-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .home-btn {
-      width: 45px;
-      height: 20px;
-      background: #333;
-      border-radius: 10px;
-      border: 2px solid #111;
-      cursor: pointer;
-      box-shadow: inset 0 2px 4px rgba(255,255,255,0.05), 0 4px 0 #000;
-      touch-action: none;
-    }
-
-    .home-btn:active {
-      transform: translateY(4px);
-      box-shadow: inset 0 2px 4px rgba(255,255,255,0.05), 0 0 0 #000;
-    }
-
-    .home-label {
-      font-size: 10px;
-      font-weight: bold;
-      color: #666;
-      letter-spacing: 1px;
-      font-family: Arial, sans-serif;
+      color: rgba(255, 255, 255, 0.75);
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
     }
   </style>
 </head>
 <body>
 
-  <div class="arcade-machine">
-    <div class="monitor-bezel">
-      <div class="crt-screen">
-        
-        <div id="boot-splash" class="screen-layer">
-          <canvas id="introCanvas" width="600" height="450"></canvas>
-        </div>
+  <div class="viewport-shell">
+    <div class="crt-screen">
+      
+      <div id="boot-splash" class="screen-layer">
+        <canvas id="introCanvas" width="600" height="450"></canvas>
+      </div>
 
-        <div id="static-splash" class="screen-layer">
-          <canvas id="bwaaCanvas" width="600" height="450"></canvas>
-        </div>
+      <div id="static-splash" class="screen-layer">
+        <canvas id="bwaaCanvas" width="600" height="450"></canvas>
+      </div>
 
-        <div id="dos-menu" class="screen-layer">
-          <div class="dos-header">Bwaa_Brule.EXE<br>RAM OK...</div>
-          <ul class="dos-list" id="game-list">
-            <li class="active">Red River Run.html</li>
-            <li>La Grande Gigue.html</li>
-            <li>li rassad di fleur.html</li>
-            <li>Sîsîp.html</li>
-            <li>Land Thunder!.html</li>
-            <li>Bonami!.html</li>
-            <li>Le Grand Portage.html</li>
-            <li>Scotch Pâkahatowân.html</li>
-            <li>Aen Zhwaal.html</li>
-            <li>Portage La Loche.html</li>
+      <div id="dos-menu" class="screen-layer">
+        <div class="dos-header">Bwaa_Brule.EXE<br>RAM OK...</div>
+        <ul class="dos-list" id="game-list">
+          <li class="active">Red River Run.html</li>
+          <li>La Grande Gigue.html</li>
+          <li>li rassad di fleur.html</li>
+          <li>Sîsîp.html</li>
+          <li>Land Thunder!.html</li>
+          <li>le Roi des traiteurs.html</li>
+          <li>Le Grand Portage.html</li>
+          <li>Scotch Pâkahatowân.html</li>
+          <li>Aen Zhwaal.html</li>
+          <li>Portage La Loche.html</li>
+        </ul>
+      </div>
+
+      <!-- PAUSE HUD OVERLAY -->
+      <div id="pause-overlay" class="screen-layer">
+        <div class="pause-box">
+          <div class="pause-header">SYSTEM PAUSED</div>
+          <ul class="pause-list" id="pause-list">
+            <li class="active" data-action="RESUME">Return to Game</li>
+            <li data-action="RESTART">Restart Game</li>
+            <li data-action="MENU">Return to Game Selection</li>
           </ul>
+          <div class="pause-hint">D-PAD: SELECT &nbsp;|&nbsp; A (Z): OK</div>
         </div>
+      </div>
 
-        <!-- PAUSE HUD OVERLAY -->
-        <div id="pause-overlay" class="screen-layer">
-          <div class="pause-box">
-            <div class="pause-header">SYSTEM PAUSED</div>
-            <ul class="pause-list" id="pause-list">
-              <li class="active" data-action="RESUME">Resume</li>
-              <li data-action="RESTART">Game Restart</li>
-              <li data-action="MENU">Return to Game Menu</li>
-            </ul>
-            <div class="pause-hint">D-PAD: SELECT &nbsp;|&nbsp; A (Z): OK</div>
+      <iframe id="arcade-frame" class="screen-layer" title="Game Screen"></iframe>
+
+      <!-- Top-Right Home / Pause Button -->
+      <div class="home-hud">
+        <div class="home-btn" id="btn-home" onmousedown="handleSystemMenuTrigger()" ontouchstart="preventGhostClick(event, 'HOME')">HOME</div>
+      </div>
+
+      <!-- Bottom Floating Translucent Controls -->
+      <div class="floating-controls">
+        <div class="joystick-base" id="joystick-base">
+          <div class="joystick-stick" id="joystick-stick"></div>
+        </div>
+        <div class="action-container">
+          <div class="action-btn-wrapper">
+            <div class="action-btn btn-b" id="btn-b" onmousedown="btnAction('BUTTON_B')" ontouchstart="preventGhostClick(event, 'BUTTON_B')"></div>
+            <span class="btn-label">B</span>
+          </div>
+          <div class="action-btn-wrapper">
+            <div class="action-btn btn-a" id="btn-a" onmousedown="btnAction('BUTTON_A')" ontouchstart="preventGhostClick(event, 'BUTTON_A')"></div>
+            <span class="btn-label">A</span>
           </div>
         </div>
-
-        <iframe id="arcade-frame" class="screen-layer" title="Game Screen"></iframe>
-
       </div>
-    </div>
 
-    <div class="control-deck">
-      <div class="joystick-base" id="joystick-base">
-        <div class="joystick-stick" id="joystick-stick"></div>
-      </div>
-      <div class="action-container">
-        <div class="action-btn-wrapper">
-          <div class="action-btn btn-b" id="btn-b" onmousedown="btnAction('BUTTON_B')" ontouchstart="preventGhostClick(event, 'BUTTON_B')"></div>
-          <span class="btn-label">B</span>
-        </div>
-        <div class="action-btn-wrapper">
-          <div class="action-btn btn-a" id="btn-a" onmousedown="btnAction('BUTTON_A')" ontouchstart="preventGhostClick(event, 'BUTTON_A')"></div>
-          <span class="btn-label">A</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="front-panel">
-      <div class="home-container">
-        <div class="home-btn" onmousedown="btnHome()" ontouchstart="preventGhostClick(event, 'HOME')"></div>
-        <span class="home-label">HOME</span>
-      </div>
     </div>
   </div>
 
@@ -478,6 +468,7 @@
     const pauseItems = document.querySelectorAll('#pause-list li');
     const btnAEl = document.getElementById('btn-a');
     const btnBEl = document.getElementById('btn-b');
+    const btnHomeEl = document.getElementById('btn-home');
 
     let staticStartTime = 0;
 
@@ -550,12 +541,15 @@
 
     function preventGhostClick(e, actionType) {
       e.preventDefault(); 
+      e.stopPropagation();
       if (actionType === 'BUTTON_A' || actionType === 'BUTTON_B') {
         btnAction(actionType);
         e.target.classList.add('active-press');
         setTimeout(() => e.target.classList.remove('active-press'), 150);
       } else if (actionType === 'HOME') {
-        btnHome();
+        e.target.classList.add('active-press');
+        setTimeout(() => e.target.classList.remove('active-press'), 150);
+        handleSystemMenuTrigger();
       }
     }
 
@@ -637,14 +631,27 @@
       else if (action === 'MENU') returnToGameMenu();
     }
 
-    // Allow direct tap/click on Pause HUD options as well
+    // Allow direct tap/click on Pause HUD options
     pauseItems.forEach((item, idx) => {
-      item.addEventListener('click', () => {
+      item.addEventListener('click', (e) => {
+        e.stopPropagation();
         if (machineState !== 'PAUSED') return;
         pauseItems[pauseIndex].classList.remove('active');
         pauseIndex = idx;
         pauseItems[pauseIndex].classList.add('active');
         executePauseSelection();
+      });
+    });
+
+    // Allow direct tap/click on DOS Game List items
+    listItems.forEach((item, idx) => {
+      item.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (machineState !== 'MENU') return;
+        listItems[currentIndex].classList.remove('active');
+        currentIndex = idx;
+        listItems[currentIndex].classList.add('active');
+        btnAction('BUTTON_A');
       });
     });
 
@@ -667,30 +674,29 @@
       }
     }
 
-    function btnHome() {
-      if (machineState === 'PLAYING' || machineState === 'PAUSED' || machineState === 'MENU') {
-        stopSendingDirection();
-        isFramePaused = false;
-        pausedRAFCallbacks = [];
-        pauseOverlay.style.display = 'none';
-        gameFrame.src = ""; 
-        gameFrame.style.display = 'none';
-        dosMenu.style.display = 'none';
-        machineState = 'STATIC';
-        staticSplash.style.display = 'flex';
-        isPlaying = false;
-        staticStartTime = performance.now();
-        requestAnimationFrame(staticLoop);
-      }
+    function returnToSplash() {
+      stopSendingDirection();
+      isFramePaused = false;
+      pausedRAFCallbacks = [];
+      pauseOverlay.style.display = 'none';
+      gameFrame.src = ""; 
+      gameFrame.style.display = 'none';
+      dosMenu.style.display = 'none';
+      machineState = 'STATIC';
+      staticSplash.style.display = 'flex';
+      isPlaying = false;
+      staticStartTime = performance.now();
+      requestAnimationFrame(staticLoop);
     }
 
-    function handleEscapeKey() {
+    // Shared handler for both the HOME button and the ESC key
+    function handleSystemMenuTrigger() {
       if (machineState === 'PLAYING') {
         openPauseMenu();
       } else if (machineState === 'PAUSED') {
         resumeGame();
       } else if (machineState === 'MENU') {
-        btnHome();
+        returnToSplash();
       }
     }
 
@@ -699,8 +705,8 @@
     const joyStick = document.getElementById('joystick-stick');
     let isDragging = false;
     let currentDir = null;
-    const maxRadius = 35; 
-    const deadzone = 15;  
+    const maxRadius = 33; 
+    const deadzone = 14;  
 
     let holdTimer = null;
     let repeatInterval = null;
@@ -722,6 +728,7 @@
 
     function startDrag(e) {
       e.preventDefault();
+      e.stopPropagation();
       isDragging = true;
       joyStick.classList.add('dragging');
       moveDrag(e);
@@ -775,8 +782,8 @@
     }
 
     function endDrag(e) {
-      if (e) e.preventDefault();
       if (!isDragging) return;
+      if (e) e.preventDefault();
       isDragging = false;
       currentDir = null;
       stopSendingDirection(); 
@@ -863,7 +870,8 @@
       if (key === 'Escape' || key === 'Esc') {
         e.preventDefault();
         if (e.repeat) return;
-        handleEscapeKey();
+        btnHomeEl.classList.add('active-press');
+        handleSystemMenuTrigger();
         return;
       }
     });
@@ -890,6 +898,12 @@
         btnBEl.classList.remove('active-press');
         return;
       }
+
+      if (key === 'Escape' || key === 'Esc') {
+        e.preventDefault();
+        btnHomeEl.classList.remove('active-press');
+        return;
+      }
     });
 
     window.addEventListener('blur', () => {
@@ -897,6 +911,7 @@
       syncKeyboardJoystick();
       btnAEl.classList.remove('active-press');
       btnBEl.classList.remove('active-press');
+      btnHomeEl.classList.remove('active-press');
     });
 
     function drawMatrix(context, matrix, palette, startX, startY, pixelSize, alpha = 1.0) {
@@ -920,7 +935,6 @@
         '2': '#ffffff'  // Solid White Stencil Fill
     };
 
-    // Center stacked 2D array matrix matching the thick arcade spelling specs
     const BWAA_SPRITE = [
         "000001111110000110000110000011110000001111000000",
         "000012222221001221001221000122221000012222100000",
@@ -956,18 +970,16 @@
         const zoomDuration = 4.0; 
         let currentScale;
 
-        // Cinematic zoom into resting place
         if (elapsed < zoomDuration) {
             const t = elapsed / zoomDuration;
             const easeOut = 1 - Math.pow(1 - t, 3);
-            currentScale = 0.5 + (1.2 - 0.5) * easeOut; // Scales up gently to max size
+            currentScale = 0.5 + (1.2 - 0.5) * easeOut;
         } else {
             currentScale = 1.2; 
         }
 
         sCtx.save();
-        // Central positioning with slight vertical offset above the prompt
-        sCtx.translate(sCanvas.width / 2, sCanvas.height / 2 - 30);
+        sCtx.translate(sCanvas.width / 2, sCanvas.height / 2 - 45);
         sCtx.scale(currentScale, currentScale);
 
         const pSize = 5; 
@@ -977,14 +989,13 @@
         drawMatrix(sCtx, BWAA_SPRITE, BWAA_PALETTE, -spriteW/2, -spriteH/2, pSize);
         sCtx.restore();
 
-        // Lock text appearance exclusively until AFTER animation finishes computing frames
         if (elapsed >= zoomDuration) {
             const blink = Math.floor(timestamp / 500) % 2 === 0;
             if (blink) {
                 sCtx.fillStyle = '#12AEA2'; 
                 sCtx.font = 'bold 24px "Courier New"';
                 sCtx.textAlign = 'center';
-                sCtx.fillText("PRESS A TO START", sCanvas.width / 2, sCanvas.height - 30);
+                sCtx.fillText("PRESS A TO START", sCanvas.width / 2, sCanvas.height - 95);
             }
         }
 
@@ -1085,15 +1096,15 @@
                 ctx.fillStyle = '#12AEA2';
                 ctx.font = 'bold 24px "Courier New"';
                 ctx.textAlign = 'center';
-                ctx.fillText("POWER ON", canvas.width / 2, canvas.height / 2 - 10);
+                ctx.fillText("POWER ON", canvas.width / 2, canvas.height / 2 - 20);
                 ctx.font = '16px "Courier New"';
-                ctx.fillText("(TAP OR PRESS Z TO START)", canvas.width / 2, canvas.height / 2 + 25);
+                ctx.fillText("(TAP OR PRESS Z TO START)", canvas.width / 2, canvas.height / 2 + 15);
             }
         } 
         else if (splashState === 'PLAYING') {
             const elapsed = (timestamp - animStartTime) / 1000; 
             const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2 - 40; 
+            const centerY = canvas.height / 2 - 45; 
             
             let currentScale = 0;
             let currentRotation = 0;
