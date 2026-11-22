@@ -15,20 +15,17 @@
     width: 100%;
     height: 100%;
     background: #091a24;
-    display: flex;
-    justify-content: center;
-    align-items: center;
     font-family: 'Press Start 2P', monospace;
     user-select: none;
-    touch-action: manipulation;
+    touch-action: none;
     overflow: hidden;
   }
   #game-container {
     width: 100vw;
     height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
     background: #091a24;
   }
   canvas {
@@ -49,19 +46,17 @@
   const cvs = document.getElementById('gameCanvas');
   const ctx = cvs.getContext('2d');
 
-  // Dynamic Fullscreen Resolution Engine (maintains crisp 320px logical width, adapts height to fill full screen without letterboxing)
+  // --- FULL-SCREEN DYNAMIC VIEWPORT SCALING ---
   let VIEW_W = 320;
   let VIEW_H = 240;
 
   function resizeViewport() {
-    const container = document.getElementById('game-container');
-    const rect = container.getBoundingClientRect();
-    const w = Math.max(1, rect.width);
-    const h = Math.max(1, rect.height);
+    const w = Math.max(1, window.innerWidth);
+    const h = Math.max(1, window.innerHeight);
     const aspect = h / w;
 
     VIEW_W = 320;
-    VIEW_H = Math.max(220, Math.min(540, Math.round(VIEW_W * aspect)));
+    VIEW_H = Math.max(220, Math.min(600, Math.round(VIEW_W * aspect)));
     cvs.width = VIEW_W;
     cvs.height = VIEW_H;
     ctx.imageSmoothingEnabled = false;
@@ -122,32 +117,32 @@
     PRAIRIE_GOLD: '#D4A338', PRAIRIE_TAN: '#E5BE67', PRAIRIE_BROWN: '#8C6229'
   };
 
-  // --- MULTI-LAYERED PARALLAX SNOWFALL & RED RIVER VALLEY DATA ---
+  // --- 3-LAYER PARALLAX FALLING SNOW + CLOUDS ---
   const SNOW_LAYERS = [
-    // Far fine snow (slow drift, small 1x1 flakes)
-    Array.from({ length: 38 }, (_, i) => ({
+    // Layer 0: Distant fine snow
+    Array.from({ length: 42 }, (_, i) => ({
       x: (i * 89) % 320,
-      y: (i * 53) % 540,
+      y: (i * 53) % 600,
       spdY: 0.25 + (i % 3) * 0.08,
       drift: (i % 2 === 0 ? 1 : -1) * 0.15,
       phase: i * 0.7,
       size: 1,
       color: 'rgba(224, 247, 250, 0.55)'
     })),
-    // Mid blizzard flakes (medium speed, 2x1 / 2x2 flakes)
-    Array.from({ length: 28 }, (_, i) => ({
+    // Layer 1: Mid-ground flakes
+    Array.from({ length: 30 }, (_, i) => ({
       x: (i * 113 + 17) % 320,
-      y: (i * 71 + 29) % 540,
+      y: (i * 71 + 29) % 600,
       spdY: 0.55 + (i % 4) * 0.12,
       drift: (i % 3 === 0 ? 1 : -1) * 0.35,
       phase: i * 1.1,
       size: 2,
-      color: 'rgba(255, 255, 255, 0.80)'
+      color: 'rgba(255, 255, 255, 0.82)'
     })),
-    // Near foreground heavy snow gusts (fast fall, crisp 2x2 / 3x2 flakes)
-    Array.from({ length: 16 }, (_, i) => ({
+    // Layer 2: Foreground heavy snow gusts
+    Array.from({ length: 18 }, (_, i) => ({
       x: (i * 137 + 41) % 320,
-      y: (i * 97 + 13) % 540,
+      y: (i * 97 + 13) % 600,
       spdY: 1.05 + (i % 3) * 0.22,
       drift: 0.65,
       phase: i * 1.9,
@@ -167,21 +162,18 @@
     {
       name: 'THE FORKS',
       sub: 'UPPER FORT GARRY & ASSINIBOINE',
-      desc: 'CONJUNCTION OF RED & ASSINIBOINE RIVERS',
       status: 'OPEN',
       ends: 3
     },
     {
       name: 'LOWER FORT GARRY',
       sub: 'STONE FORT & SHIELD SHORE',
-      desc: 'COMING SOON',
       status: 'LOCKED',
       ends: 3
     },
     {
       name: 'ST. BONIFACE BEND',
       sub: 'CATHEDRAL & POINT DOUGLAS',
-      desc: 'COMING SOON',
       status: 'LOCKED',
       ends: 3
     }
@@ -195,7 +187,7 @@
 
   let currentEnd = 1;
   const totalEnds = 3;
-  let stonesPerTeam = 4;
+  const stonesPerTeam = 4;
   let playerStonesThrown = 0;
   let aiStonesThrown = 0;
   let isPlayerTurn = true;
@@ -219,8 +211,6 @@
   const BANK_LEFT_X = 53;
   const BANK_RIGHT_X = 267;
   const SLOPE_ZONE = 24;
-
-  // Focused Down-Rink Scout Camera (frames Far Hog Line & full House without overshooting into sky)
   const SCOUT_CAM_Y = 132;
 
   // --- REALISTIC CURLING KINEMATICS ---
@@ -232,9 +222,9 @@
   const MARKER_BACK_PCT   = 75;
 
   const DIST_ZERO  = 690;
-  const DIST_HOG   = HACK_Y - FAR_HOG_Y;               // 810px
-  const DIST_HOUSE = HACK_Y - (HOUSE_Y + HOUSE_R);     // 884px
-  const DIST_BACK  = HACK_Y - BACK_Y;                  // 987px
+  const DIST_HOG   = HACK_Y - FAR_HOG_Y;
+  const DIST_HOUSE = HACK_Y - (HOUSE_Y + HOUSE_R);
+  const DIST_BACK  = HACK_Y - BACK_Y;
   const DIST_MAX   = 1750;
 
   function getTargetDistanceFromPower(rawPct) {
@@ -284,8 +274,8 @@
   let settleDelay = 0;
   let statusBanner = '';
 
-  // --- POSTMESSAGE JOYSTICK & BUTTON INPUT ENGINE (PULSE + HOLD DECAY & DEBOUNCE) ---
-  // Matches the parent index.html drag-joystick (initial pulse + 100ms repeat) and prevents double-firing
+  // --- POSTMESSAGE JOYSTICK & BUTTON ENGINE ---
+  // Works seamlessly with index.html's drag-joystick (initial pulse + 100ms repeat) and button signals
   const dpadExpiry = { UP: 0, DOWN: 0, LEFT: 0, RIGHT: 0 };
   const DPAD_HOLD_WINDOW_MS = 145;
   let lastBtnATime = 0;
@@ -444,7 +434,6 @@
         let isSwept = (s === activeStone && sweepPulse > 0.05);
         let sweepFactor = isSwept ? sweepPulse : 0;
 
-        // 1. Controlled realistic late-break curl
         let speedRatio = Math.min(1.0, spd / 6.2);
         let crawlDamp = Math.min(1.0, spd / 0.75);
         let lateBreakWeight = Math.pow(1.0 - speedRatio, 1.35) * crawlDamp;
@@ -454,7 +443,6 @@
         s.vx += curlAccel;
         s.angle += s.angularVel * Math.min(1.0, spd / 2.2);
 
-        // 2. Natural inward-sloping riverbank ice shelves
         const leftSlopeEdge = BANK_LEFT_X + SLOPE_ZONE;
         const rightSlopeEdge = BANK_RIGHT_X - SLOPE_ZONE;
         let bankDrag = 0;
@@ -472,7 +460,6 @@
         s.x += s.vx;
         s.y += s.vy;
 
-        // 3. Standard Curling Boundary Rules (Side boards OR End board = instant elimination)
         if (s.x - STONE_R <= BANK_LEFT_X || s.x + STONE_R >= BANK_RIGHT_X) {
           s.outOfBounds = true;
           if (s === activeStone) statusBanner = "OUT OF PLAY — HIT SIDE BANK!";
@@ -487,7 +474,6 @@
           continue;
         }
 
-        // 4. True Kinetic Ice Friction
         let currentDecel = ICE_DECEL * (1.0 - 0.28 * sweepFactor) + bankDrag;
         if (spd < 0.45) currentDecel += (0.45 - spd) * 0.024;
 
@@ -511,7 +497,6 @@
       }
     }
 
-    // 5. Elastic Granite Stone-to-Stone Collisions
     for (let i = 0; i < stones.length; i++) {
       for (let j = i + 1; j < stones.length; j++) {
         let a = stones[i];
@@ -606,7 +591,7 @@
     state = 'END_SUMMARY';
   }
 
-  // --- INPUT HANDLING (DEBOUNCED BUTTONS + JOYSTICK CARDINAL PULSES) ---
+  // --- INPUT HANDLERS ---
   function handleA() {
     const now = performance.now();
     if (now - lastBtnATime < BTN_DEBOUNCE_MS) return;
@@ -689,7 +674,6 @@
         playTone(320, 'triangle', 0.05);
       }
     } else if (state === 'AIM' && !wasAlreadyHeld) {
-      // Immediate crisp single-step nudge on initial joystick flick; holding continues smoothly in update()
       if (dir === 'LEFT')  aimAngle = Math.max(-Math.PI * 0.68, aimAngle - 0.014);
       if (dir === 'RIGHT') aimAngle = Math.min(-Math.PI * 0.32, aimAngle + 0.014);
     }
@@ -700,7 +684,7 @@
     if (isPaused) return;
     frame++;
 
-    // Update multi-layer falling snow particles
+    // Update 3-layer falling snow particles
     for (let l = 0; l < SNOW_LAYERS.length; l++) {
       const layer = SNOW_LAYERS[l];
       for (let f of layer) {
@@ -715,7 +699,7 @@
       }
     }
 
-    // Drift background clouds
+    // Drift sky clouds
     for (let c of SKY_CLOUDS) {
       c.x += c.spd;
       if (c.x > VIEW_W + 20) c.x = -c.w - 10;
@@ -768,7 +752,6 @@
     ctx.fillText(txt, x, y);
   }
 
-  // Render a specific depth layer of falling snow
   function drawSnowLayer(layerIdx, maxY = VIEW_H) {
     const layer = SNOW_LAYERS[layerIdx];
     for (let f of layer) {
@@ -908,7 +891,7 @@
     ctx.restore();
   }
 
-  // --- MULTI-LAYER PARALLAX RED RIVER VALLEY BACKDROP + LAYERED SNOWFALL ---
+  // --- 5-LAYER PARALLAX RED RIVER VALLEY BACKDROP + LAYERED SNOWFALL ---
   function drawRedRiverValleyBackdrop(offsetY, parallaxShift = 0) {
     // Layer 0: Deep Winter Sub-Arctic Sky Banding
     ctx.fillStyle = '#18364F';
@@ -918,7 +901,7 @@
     ctx.fillStyle = '#6EA5C9';
     ctx.fillRect(0, offsetY + 56, VIEW_W, 22);
 
-    // Layer 1: Slow Drifting Winter Sky Clouds (Parallax Factor 0.15)
+    // Layer 1: Drifting Winter Sky Clouds (Parallax 0.15x)
     for (let c of SKY_CLOUDS) {
       let cx = Math.round((c.x + parallaxShift * 0.15) % (VIEW_W + 60));
       if (cx < -60) cx += VIEW_W + 60;
@@ -931,7 +914,7 @@
     // Far fine snow layer falling behind distant treeline
     drawSnowLayer(0, offsetY + 118);
 
-    // Layer 2: Distant Red River Valley Horizon Treeline Silhouette (Parallax Factor 0.25)
+    // Layer 2: Distant Red River Valley Horizon Treeline Silhouette (Parallax 0.25x)
     ctx.fillStyle = '#26495C';
     for (let hx = -40; hx < VIEW_W + 60; hx += 36) {
       let tx = Math.round(hx + ((parallaxShift * 0.25) % 36));
@@ -940,7 +923,7 @@
       ctx.fillRect(tx + 9, offsetY + 57, 6, 4);
     }
 
-    // Layer 3: Snow-Covered North Bank & Point Douglas / Forks Terraces
+    // Layer 3: Snow-Covered North Bank & Forks Terraces
     ctx.fillStyle = PAL.ICE_LIGHT;
     ctx.fillRect(0, offsetY + 72, VIEW_W, 42);
     ctx.fillStyle = '#C5DCE8';
@@ -949,7 +932,7 @@
     // Mid-layer snowfall drifting across the snowbanks
     drawSnowLayer(1, offsetY + 118);
 
-    // Layer 4: Midground Spruce Groves, Assiniboine Conjunction & Upper Fort Garry (Parallax Factor 0.55)
+    // Layer 4: Midground Spruce Groves, Assiniboine Conjunction & Upper Fort Garry (Parallax 0.55x)
     const midShift = Math.round(parallaxShift * 0.55);
 
     drawSnowSpruce(14 + midShift, offsetY + 52, 1.1);
@@ -976,7 +959,7 @@
     drawWinterGrassClump(242 + midShift, offsetY + 78);
     drawWinterGrassClump(296 + midShift, offsetY + 80);
 
-    // Layer 5: Foreground Riverbank Snow Ledge & Reeds (Parallax Factor 1.0)
+    // Layer 5: Foreground Riverbank Snow Ledge & Reeds (Parallax 1.0x)
     ctx.fillStyle = PAL.ICE_DARK;
     ctx.fillRect(0, offsetY + 112, VIEW_W, 6);
     drawWinterGrassClump(18, offsetY + 106);
@@ -1047,7 +1030,6 @@
     ctx.save();
     ctx.translate(0, -Math.round(camY));
 
-    // Parallax horizontal pan subtly linked to aimAngle during AIM so the valley feels alive
     const aimPan = (state === 'AIM' || state === 'POWER') ? Math.round((aimAngle + Math.PI / 2) * 16) : 0;
     drawRedRiverValleyBackdrop(0, aimPan);
 
@@ -1159,7 +1141,7 @@
 
     ctx.restore();
 
-    // Foreground Heavy Snow Gusts falling across the active rink viewport
+    // Foreground Heavy Snow Gusts falling across the full-screen rink
     drawSnowLayer(2, VIEW_H - 44);
   }
 
@@ -1168,37 +1150,30 @@
     ctx.clearRect(0, 0, VIEW_W, VIEW_H);
 
     if (state === 'TITLE') {
-      // Full-height Red River Valley Winter Parallax Scene with 3-Layer Falling Snow
       const valleyY = Math.max(76, Math.floor(VIEW_H * 0.34));
       const gentleSway = Math.sin(frame * 0.008) * 14;
 
-      // Upper Winter Sky Fill for taller viewports
       ctx.fillStyle = '#0e2336';
       ctx.fillRect(0, 0, VIEW_W, valleyY + 10);
 
       drawRedRiverValleyBackdrop(valleyY, gentleSway);
 
-      // Frozen River Ice Foreground stretching cleanly to the bottom of the fullscreen viewport
       const iceTop = valleyY + 116;
       ctx.fillStyle = PAL.ICE_MID;
       ctx.fillRect(0, iceTop, VIEW_W, VIEW_H - iceTop);
       ctx.fillStyle = '#A8ECF4';
       ctx.fillRect(36, iceTop, VIEW_W - 72, VIEW_H - iceTop);
 
-      // Ice cracks & sheen
       ctx.fillStyle = PAL.WHITE;
       ctx.fillRect(54, iceTop + 14, 28, 2);
       ctx.fillRect(218, iceTop + 26, 32, 2);
 
-      // Foreground Snow Layer across the full scene
       drawSnowLayer(2, VIEW_H);
 
-      // Decorative Curling Stones on the Ice
       const stoneY = Math.min(VIEW_H - 22, iceTop + 22);
       drawCurlingStone(122, stoneY, 'PLAYER', frame * 0.02, false);
       drawCurlingStone(198, stoneY, 'AI', -frame * 0.02, false);
 
-      // SNES Title Banner
       const bannerY = Math.max(12, Math.floor(valleyY * 0.16));
       ctx.fillStyle = 'rgba(14, 42, 30, 0.92)';
       ctx.fillRect(16, bannerY, 288, 66);
@@ -1212,7 +1187,6 @@
       }
     }
     else if (state === 'RINK_SELECT') {
-      // Live Red River Valley Winter Parallax & Snowfall behind the Rink Select Menu
       const valleyY = Math.max(40, Math.floor(VIEW_H * 0.25));
       ctx.fillStyle = '#0e2336';
       ctx.fillRect(0, 0, VIEW_W, VIEW_H);
@@ -1429,7 +1403,7 @@
     requestAnimationFrame(loop);
   }
 
-  // --- EXCLUSIVE POSTMESSAGE JOYSTICK & BUTTON BRIDGE (NO DUPLICATE LOCAL LISTENERS) ---
+  // --- POSTMESSAGE JOYSTICK & BUTTON BRIDGE ---
   window.addEventListener('message', function(event) {
     const cmd = event.data;
     if (cmd === 'PAUSE') {
@@ -1443,7 +1417,7 @@
       return;
     }
 
-    if (cmd === 'DPAD_UP' || cmd === 'DPAD_UP_PRESS')       handleDpadPulse('UP');
+    if (cmd === 'DPAD_UP' || cmd === 'DPAD_UP_PRESS')          handleDpadPulse('UP');
     else if (cmd === 'DPAD_DOWN' || cmd === 'DPAD_DOWN_PRESS')  handleDpadPulse('DOWN');
     else if (cmd === 'DPAD_LEFT' || cmd === 'DPAD_LEFT_PRESS')  handleDpadPulse('LEFT');
     else if (cmd === 'DPAD_RIGHT' || cmd === 'DPAD_RIGHT_PRESS') handleDpadPulse('RIGHT');
