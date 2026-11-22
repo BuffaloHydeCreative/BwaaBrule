@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Bwaa Brule</title>
   <style>
-    /* Global Reset & Edge-to-Edge Viewport */
+    /* Global Reset & Full-Page Embed Base */
     * {
       box-sizing: border-box;
       -webkit-tap-highlight-color: transparent;
@@ -16,7 +16,7 @@
     html, body { 
       margin: 0; 
       padding: 0; 
-      background: #000; 
+      background: #050505; 
       color: #fff; 
       font-family: 'Courier New', Courier, monospace; 
       height: 100%; 
@@ -25,25 +25,28 @@
       touch-action: none; 
     }
 
-    /* Full-Screen Viewport Container */
-    .viewport-shell {
+    /* Full-Page Responsive Embed Shell */
+    .embed-shell {
       position: fixed;
       inset: 0;
       width: 100vw;
       height: 100vh;
       height: 100dvh;
-      background: #000;
+      background: #080808;
+      display: flex;
+      flex-direction: column;
       overflow: hidden;
     }
 
-    /* Full-Bleed CRT Screen */
+    /* --- SECTION 1: EXPANDED CRT VIEWPORT --- */
     .crt-screen {
-      position: absolute;
-      inset: 0;
+      flex: 1 1 auto;
+      min-height: 0;
       width: 100%;
-      height: 100%;
       background: #000;
+      position: relative;
       overflow: hidden;
+      border-bottom: 2px solid #222;
     }
 
     .screen-layer {
@@ -87,11 +90,11 @@
       z-index: 2;
     }
 
-    /* Full-Viewport DOS Game Selection Menu */
+    /* Full-Width DOS Game Selection Menu */
     #dos-menu {
       background: #000;
       color: #12AEA2;
-      padding: calc(18px + env(safe-area-inset-top)) 20px calc(165px + env(safe-area-inset-bottom)) 20px;
+      padding: calc(16px + env(safe-area-inset-top)) 20px 18px 20px;
       flex-direction: column;
       overflow-y: auto;
       scrollbar-width: none;
@@ -117,14 +120,15 @@
       margin: 0;
       display: flex;
       flex-direction: column;
-      gap: 7px;
+      gap: 6px;
     }
 
     .dos-list li {
       font-size: 15px;
       text-transform: uppercase;
-      opacity: 0.6;
-      padding: 3px 4px;
+      opacity: 0.62;
+      padding: 4px 6px;
+      cursor: pointer;
     }
 
     .dos-list li.active {
@@ -145,10 +149,9 @@
 
     /* --- PAUSE HUD OVERLAY --- */
     #pause-overlay {
-      background: rgba(0, 0, 0, 0.84);
+      background: rgba(0, 0, 0, 0.86);
       color: #12AEA2;
       padding: 20px;
-      padding-bottom: calc(130px + env(safe-area-inset-bottom));
       flex-direction: column;
       justify-content: center;
       align-items: center;
@@ -156,8 +159,8 @@
     }
 
     .pause-box {
-      width: 88%;
-      max-width: 310px;
+      width: 90%;
+      max-width: 320px;
       background: #050505;
       border: 2px solid #12AEA2;
       box-shadow: 0 0 24px rgba(18, 174, 162, 0.3), inset 0 0 12px rgba(0, 0, 0, 0.9);
@@ -188,7 +191,7 @@
       font-size: 15px;
       text-transform: uppercase;
       color: #12AEA2;
-      opacity: 0.7;
+      opacity: 0.72;
       padding: 5px 6px;
       cursor: pointer;
     }
@@ -218,7 +221,7 @@
       text-align: center;
     }
 
-    /* Full-Edge In-Game iFrame */
+    /* Full-Bleed In-Game iFrame */
     #arcade-frame {
       position: absolute;
       inset: 0;
@@ -244,66 +247,39 @@
       box-shadow: inset 0 0 32px rgba(0, 0, 0, 0.65);
     }
 
-    /* --- FLOATING OVERLAY CONTROLS --- */
-    /* Top-Right Compact Home / Pause Pill */
-    .home-hud {
-      position: absolute;
-      top: calc(10px + env(safe-area-inset-top));
-      right: calc(12px + env(safe-area-inset-right));
-      z-index: 30;
+    /* --- SECTION 2: COMPACT DOCKED CONTROL DECK --- */
+    .control-deck {
+      flex: 0 0 auto;
+      height: calc(136px + env(safe-area-inset-bottom));
+      width: 100%;
+      background: linear-gradient(to bottom, #161616 0%, #0b0b0b 100%);
+      border-top: 1px solid #2c2c2c;
+      padding: 10px calc(18px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(18px + env(safe-area-inset-left));
       display: flex;
       align-items: center;
-    }
-
-    .home-btn {
-      padding: 6px 12px;
-      background: rgba(15, 15, 15, 0.55);
-      backdrop-filter: blur(4px);
-      -webkit-backdrop-filter: blur(4px);
-      border: 1.5px solid rgba(18, 174, 162, 0.55);
-      border-radius: 14px;
-      color: rgba(255, 255, 255, 0.85);
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 11px;
-      font-weight: bold;
-      letter-spacing: 1px;
-      cursor: pointer;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-      touch-action: none;
-    }
-
-    .home-btn:active, .home-btn.active-press {
-      transform: scale(0.94);
-      background: rgba(18, 174, 162, 0.35);
-      border-color: #12AEA2;
-    }
-
-    /* Bottom Floating Touch Deck */
-    .floating-controls {
-      position: absolute;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      padding: 0 calc(18px + env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) calc(18px + env(safe-area-inset-left));
-      display: flex;
-      align-items: flex-end;
       justify-content: space-between;
-      pointer-events: none; /* Allows clicks/taps in center gap to pass through if needed */
       z-index: 30;
     }
 
+    .deck-inner {
+      width: 100%;
+      max-width: 560px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Left Thumb: Drag Joystick */
     .joystick-base {
-      width: 116px;
-      height: 116px;
-      background: radial-gradient(circle, rgba(20, 20, 20, 0.42) 30%, rgba(45, 45, 45, 0.52) 100%);
-      backdrop-filter: blur(3px);
-      -webkit-backdrop-filter: blur(3px);
+      width: 108px;
+      height: 108px;
+      background: radial-gradient(circle, #141414 32%, #242424 100%);
       border-radius: 50%;
-      border: 2px solid rgba(255, 255, 255, 0.22);
-      box-shadow: inset 0 4px 12px rgba(0, 0, 0, 0.65), 0 4px 12px rgba(0, 0, 0, 0.45);
+      border: 3px solid #050505;
+      box-shadow: inset 0 4px 12px rgba(0, 0, 0, 0.9), 0 1px 4px rgba(255, 255, 255, 0.08);
       position: relative;
       touch-action: none; 
-      pointer-events: auto;
       cursor: grab;
     }
 
@@ -312,17 +288,17 @@
     }
 
     .joystick-stick {
-      width: 58px; 
-      height: 58px;
-      background: radial-gradient(circle at 35% 35%, rgba(190, 190, 190, 0.78), rgba(50, 50, 50, 0.85));
-      border: 1.5px solid rgba(255, 255, 255, 0.35);
+      width: 54px; 
+      height: 54px;
+      background: radial-gradient(circle at 35% 35%, #8f8f8f, #222);
+      border: 1.5px solid rgba(255, 255, 255, 0.22);
       border-radius: 50%;
       position: absolute;
-      top: 27px; 
-      left: 27px; 
-      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.65);
+      top: 24px; 
+      left: 24px; 
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.75);
       pointer-events: none; 
-      transition: transform 0.15s ease-out; 
+      transition: transform 0.14s ease-out; 
       z-index: 1;
     }
 
@@ -330,12 +306,52 @@
       transition: none; 
     }
 
+    /* Center: System Home / Pause Button */
+    .center-hud {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      align-self: flex-end;
+      margin-bottom: 4px;
+    }
+
+    .home-btn {
+      padding: 7px 14px;
+      background: #1b1b1b;
+      border: 1.5px solid rgba(18, 174, 162, 0.55);
+      border-radius: 14px;
+      color: #d8d8d8;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      cursor: pointer;
+      box-shadow: 0 3px 0 #000, 0 4px 10px rgba(0, 0, 0, 0.6);
+      touch-action: none;
+    }
+
+    .home-btn:active, .home-btn.active-press {
+      transform: translateY(3px);
+      box-shadow: 0 0 0 #000;
+      background: rgba(18, 174, 162, 0.28);
+      border-color: #12AEA2;
+      color: #fff;
+    }
+
+    .key-hint {
+      font-size: 9px;
+      color: #666;
+      letter-spacing: 0.5px;
+    }
+
+    /* Right Thumb: Angled B & A Action Buttons */
     .action-container {
       display: flex;
       gap: 14px;
       transform: rotate(-14deg);
-      margin-bottom: 6px;
-      pointer-events: auto;
+      margin-right: 4px;
     }
 
     .action-btn-wrapper {
@@ -346,42 +362,74 @@
     }
 
     .action-btn {
-      width: 56px;
-      height: 56px;
+      width: 54px;
+      height: 54px;
       border-radius: 50%;
-      border: 2px solid rgba(255, 255, 255, 0.28);
+      border: 2.5px solid #090909;
       cursor: pointer;
       position: relative;
-      backdrop-filter: blur(3px);
-      -webkit-backdrop-filter: blur(3px);
-      box-shadow: inset 0 4px 10px rgba(255, 255, 255, 0.22), 0 5px 12px rgba(0, 0, 0, 0.6);
+      box-shadow: inset 0 4px 10px rgba(255, 255, 255, 0.2), inset 0 -6px 12px rgba(0, 0, 0, 0.65), 0 5px 0 #000, 0 8px 14px rgba(0, 0, 0, 0.65);
       touch-action: none;
     }
 
+    .action-btn::after {
+      content: '';
+      position: absolute;
+      top: 4px; left: 10px; right: 10px; height: 15px;
+      background: linear-gradient(rgba(255, 255, 255, 0.22), transparent);
+      border-radius: 20px 20px 0 0;
+      pointer-events: none;
+    }
+
     .action-btn:active, .action-btn.active-press {
-      transform: translateY(4px) scale(0.95);
-      box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.5), 0 1px 4px rgba(0, 0, 0, 0.6);
+      transform: translateY(5px);
+      box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.55), 0 0 0 #000, 0 2px 5px rgba(0, 0, 0, 0.6);
     }
 
     .btn-b { 
-      background: rgba(173, 28, 33, 0.68); 
-      margin-top: 22px; 
+      background: #AD1C21; 
+      margin-top: 20px; 
     }
     .btn-a { 
-      background: rgba(18, 174, 162, 0.68); 
+      background: #12AEA2; 
     }
 
     .btn-label {
       font-size: 11px;
       font-weight: bold;
-      color: rgba(255, 255, 255, 0.75);
-      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+      color: #888;
+    }
+
+    /* Desktop / Wide Embed Enhancement */
+    @media (min-width: 768px) {
+      .control-deck {
+        height: 144px;
+        padding: 12px 32px;
+      }
+      .deck-inner {
+        max-width: 680px;
+      }
+      .joystick-base {
+        width: 114px;
+        height: 114px;
+      }
+      .joystick-stick {
+        width: 56px;
+        height: 56px;
+        top: 26px;
+        left: 26px;
+      }
+      .action-btn {
+        width: 58px;
+        height: 58px;
+      }
     }
   </style>
 </head>
 <body>
 
-  <div class="viewport-shell">
+  <div class="embed-shell" id="embed-shell" tabindex="0">
+    <!-- 1. EXPANDED CRT VIEWPORT -->
     <div class="crt-screen">
       
       <div id="boot-splash" class="screen-layer">
@@ -404,7 +452,7 @@
           <li>Le Grand Portage.html</li>
           <li>Scotch Pâkahatowân.html</li>
           <li>Aen Zhwaal.html</li>
-          <li>Portage La Loche.html</li>
+          <li>La Glace Rouge.html</li>
         </ul>
       </div>
 
@@ -423,28 +471,31 @@
 
       <iframe id="arcade-frame" class="screen-layer" title="Game Screen"></iframe>
 
-      <!-- Top-Right Home / Pause Button -->
-      <div class="home-hud">
-        <div class="home-btn" id="btn-home" onmousedown="handleSystemMenuTrigger()" ontouchstart="preventGhostClick(event, 'HOME')">HOME</div>
-      </div>
+    </div>
 
-      <!-- Bottom Floating Translucent Controls -->
-      <div class="floating-controls">
+    <!-- 2. COMPACT DOCKED CONTROL DECK -->
+    <div class="control-deck">
+      <div class="deck-inner">
         <div class="joystick-base" id="joystick-base">
           <div class="joystick-stick" id="joystick-stick"></div>
         </div>
+
+        <div class="center-hud">
+          <div class="home-btn" id="btn-home" onmousedown="handleSystemMenuTrigger()" ontouchstart="preventGhostClick(event, 'HOME')">HOME</div>
+          <span class="key-hint">ESC: PAUSE</span>
+        </div>
+
         <div class="action-container">
           <div class="action-btn-wrapper">
             <div class="action-btn btn-b" id="btn-b" onmousedown="btnAction('BUTTON_B')" ontouchstart="preventGhostClick(event, 'BUTTON_B')"></div>
-            <span class="btn-label">B</span>
+            <span class="btn-label">B (X)</span>
           </div>
           <div class="action-btn-wrapper">
             <div class="action-btn btn-a" id="btn-a" onmousedown="btnAction('BUTTON_A')" ontouchstart="preventGhostClick(event, 'BUTTON_A')"></div>
-            <span class="btn-label">A</span>
+            <span class="btn-label">A (Z)</span>
           </div>
         </div>
       </div>
-
     </div>
   </div>
 
@@ -459,6 +510,7 @@
     ];
     let isPlaying = false;
 
+    const embedShell = document.getElementById('embed-shell');
     const bootSplash = document.getElementById('boot-splash');
     const staticSplash = document.getElementById('static-splash');
     const dosMenu = document.getElementById('dos-menu');
@@ -471,6 +523,17 @@
     const btnHomeEl = document.getElementById('btn-home');
 
     let staticStartTime = 0;
+
+    // Ensure full-page embedded window grabs keyboard focus on load & interaction
+    window.addEventListener('load', () => {
+      window.focus();
+      embedShell.focus({ preventScroll: true });
+    });
+
+    embedShell.addEventListener('pointerdown', () => {
+      window.focus();
+      embedShell.focus({ preventScroll: true });
+    });
 
     /* --- IFRAME PAUSE / FREEZE CONTROLLER --- */
     let isFramePaused = false;
@@ -509,6 +572,7 @@
       pausedRAFCallbacks = [];
       attachFramePauseHook();
       window.focus();
+      embedShell.focus({ preventScroll: true });
     });
 
     function setFramePaused(paused) {
@@ -705,8 +769,8 @@
     const joyStick = document.getElementById('joystick-stick');
     let isDragging = false;
     let currentDir = null;
-    const maxRadius = 33; 
-    const deadzone = 14;  
+    const maxRadius = 30; 
+    const deadzone = 13;  
 
     let holdTimer = null;
     let repeatInterval = null;
@@ -799,12 +863,16 @@
     window.addEventListener('touchend', endDrag);
 
     /* --- KEYBOARD INPUT HANDLERS --- */
-    const activeArrowKeys = new Set();
-    const ARROW_TO_DIR = {
+    const activeDirectionKeys = new Set();
+    const KEY_TO_DIR = {
       ArrowUp: 'DPAD_UP',
       ArrowDown: 'DPAD_DOWN',
       ArrowLeft: 'DPAD_LEFT',
-      ArrowRight: 'DPAD_RIGHT'
+      ArrowRight: 'DPAD_RIGHT',
+      w: 'DPAD_UP',
+      s: 'DPAD_DOWN',
+      a: 'DPAD_LEFT',
+      d: 'DPAD_RIGHT'
     };
     const DIR_TO_OFFSET = {
       DPAD_UP: [0, -maxRadius],
@@ -813,9 +881,16 @@
       DPAD_RIGHT: [maxRadius, 0]
     };
 
+    function normalizeDirKey(key) {
+      if (KEY_TO_DIR[key]) return key;
+      const lower = key.toLowerCase();
+      if (KEY_TO_DIR[lower]) return lower;
+      return null;
+    }
+
     function syncKeyboardJoystick() {
       if (isDragging) return;
-      const keysArray = Array.from(activeArrowKeys);
+      const keysArray = Array.from(activeDirectionKeys);
       if (keysArray.length === 0) {
         currentDir = null;
         stopSendingDirection();
@@ -824,7 +899,7 @@
         return;
       }
       const latestKey = keysArray[keysArray.length - 1];
-      const newDir = ARROW_TO_DIR[latestKey];
+      const newDir = KEY_TO_DIR[latestKey];
       const [ox, oy] = DIR_TO_OFFSET[newDir];
       joyStick.classList.add('dragging');
       joyStick.style.transform = `translate(${ox}px, ${oy}px)`;
@@ -838,16 +913,17 @@
     window.addEventListener('keydown', (e) => {
       const key = e.key;
       const lower = key.toLowerCase();
+      const dirKey = normalizeDirKey(key);
 
-      if (ARROW_TO_DIR[key]) {
+      if (dirKey) {
         e.preventDefault();
         if (e.repeat) return;
-        activeArrowKeys.add(key);
+        activeDirectionKeys.add(dirKey);
         syncKeyboardJoystick();
         return;
       }
 
-      if (lower === 'z') {
+      if (lower === 'z' || key === 'Enter') {
         e.preventDefault();
         if (e.repeat) return;
         btnAEl.classList.add('active-press');
@@ -879,15 +955,16 @@
     window.addEventListener('keyup', (e) => {
       const key = e.key;
       const lower = key.toLowerCase();
+      const dirKey = normalizeDirKey(key);
 
-      if (ARROW_TO_DIR[key]) {
+      if (dirKey) {
         e.preventDefault();
-        activeArrowKeys.delete(key);
+        activeDirectionKeys.delete(dirKey);
         syncKeyboardJoystick();
         return;
       }
 
-      if (lower === 'z') {
+      if (lower === 'z' || key === 'Enter') {
         e.preventDefault();
         btnAEl.classList.remove('active-press');
         return;
@@ -907,7 +984,7 @@
     });
 
     window.addEventListener('blur', () => {
-      activeArrowKeys.clear();
+      activeDirectionKeys.clear();
       syncKeyboardJoystick();
       btnAEl.classList.remove('active-press');
       btnBEl.classList.remove('active-press');
@@ -973,13 +1050,13 @@
         if (elapsed < zoomDuration) {
             const t = elapsed / zoomDuration;
             const easeOut = 1 - Math.pow(1 - t, 3);
-            currentScale = 0.5 + (1.2 - 0.5) * easeOut;
+            currentScale = 0.5 + (1.25 - 0.5) * easeOut;
         } else {
-            currentScale = 1.2; 
+            currentScale = 1.25; 
         }
 
         sCtx.save();
-        sCtx.translate(sCanvas.width / 2, sCanvas.height / 2 - 45);
+        sCtx.translate(sCanvas.width / 2, sCanvas.height / 2 - 25);
         sCtx.scale(currentScale, currentScale);
 
         const pSize = 5; 
@@ -995,7 +1072,7 @@
                 sCtx.fillStyle = '#12AEA2'; 
                 sCtx.font = 'bold 24px "Courier New"';
                 sCtx.textAlign = 'center';
-                sCtx.fillText("PRESS A TO START", sCanvas.width / 2, sCanvas.height - 95);
+                sCtx.fillText("PRESS A TO START", sCanvas.width / 2, sCanvas.height - 32);
             }
         }
 
@@ -1104,7 +1181,7 @@
         else if (splashState === 'PLAYING') {
             const elapsed = (timestamp - animStartTime) / 1000; 
             const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2 - 45; 
+            const centerY = canvas.height / 2 - 35; 
             
             let currentScale = 0;
             let currentRotation = 0;
