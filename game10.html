@@ -5,76 +5,69 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>La Glace Rouge — Red River Curling</title>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.fog.min.js"></script>
 <style>
-  body {
-    margin: 0; padding: 0;
-    background: #06131c;
-    display: flex; justify-content: center; align-items: center;
-    height: 100vh; width: 100vw;
-    font-family: 'Press Start 2P', monospace;
-    user-select: none; touch-action: manipulation; overflow: hidden;
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
   }
-  #vanta-bg {
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
-    z-index: 0;
+  html, body {
+    width: 100%;
+    height: 100%;
+    background: #091a24;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: 'Press Start 2P', monospace;
+    user-select: none;
+    touch-action: manipulation;
+    overflow: hidden;
   }
   #game-container {
-    position: relative;
-    z-index: 2;
-    width: 100%; height: 100%; max-width: 600px;
-    display: flex; flex-direction: column; justify-content: center;
-    box-sizing: border-box; padding: 10px;
-  }
-  #screen-container {
-    flex: 0 0 auto; width: 100%;
-    aspect-ratio: 4 / 3; 
-    border: 4px solid #D4D0C5; 
-    position: relative; background: transparent; 
-    overflow: hidden; box-sizing: border-box;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.85);
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #091a24;
   }
   canvas {
-    width: 100%; height: 100%;
-    display: block; image-rendering: pixelated;
+    width: 100%;
+    height: 100%;
+    display: block;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
   }
 </style>
 </head>
 <body>
-<div id="vanta-bg"></div>
 <div id="game-container">
-  <div id="screen-container">
-    <canvas id="gameCanvas" width="320" height="240"></canvas>
-  </div>
+  <canvas id="gameCanvas"></canvas>
 </div>
 
 <script>
-  // --- VANTA.JS SUB-GLACIAL WINTER RIVER MIST & AURORA BACKDROP ---
-  try {
-    if (window.VANTA) {
-      VANTA.FOG({
-        el: "#vanta-bg",
-        mouseControls: false,
-        touchControls: false,
-        gyroControls: false,
-        minHeight: 200.00,
-        minWidth: 200.00,
-        highlightColor: 0x12aea2,
-        midtoneColor: 0x0f6f9e,
-        lowlightColor: 0x0e2a1e,
-        baseColor: 0x091a24,
-        blurFactor: 0.65,
-        speed: 1.10,
-        zoom: 1.25
-      });
-    }
-  } catch (e) {}
-
   const cvs = document.getElementById('gameCanvas');
   const ctx = cvs.getContext('2d');
-  ctx.imageSmoothingEnabled = false;
+
+  // Dynamic Fullscreen Resolution Engine (maintains crisp 320px logical width, adapts height to fill full screen without letterboxing)
+  let VIEW_W = 320;
+  let VIEW_H = 240;
+
+  function resizeViewport() {
+    const container = document.getElementById('game-container');
+    const rect = container.getBoundingClientRect();
+    const w = Math.max(1, rect.width);
+    const h = Math.max(1, rect.height);
+    const aspect = h / w;
+
+    VIEW_W = 320;
+    VIEW_H = Math.max(220, Math.min(540, Math.round(VIEW_W * aspect)));
+    cvs.width = VIEW_W;
+    cvs.height = VIEW_H;
+    ctx.imageSmoothingEnabled = false;
+  }
+  window.addEventListener('resize', resizeViewport);
+  resizeViewport();
 
   // --- AUDIO SYNTHESIZER ---
   let audioCtx = null;
@@ -129,6 +122,46 @@
     PRAIRIE_GOLD: '#D4A338', PRAIRIE_TAN: '#E5BE67', PRAIRIE_BROWN: '#8C6229'
   };
 
+  // --- MULTI-LAYERED PARALLAX SNOWFALL & RED RIVER VALLEY DATA ---
+  const SNOW_LAYERS = [
+    // Far fine snow (slow drift, small 1x1 flakes)
+    Array.from({ length: 38 }, (_, i) => ({
+      x: (i * 89) % 320,
+      y: (i * 53) % 540,
+      spdY: 0.25 + (i % 3) * 0.08,
+      drift: (i % 2 === 0 ? 1 : -1) * 0.15,
+      phase: i * 0.7,
+      size: 1,
+      color: 'rgba(224, 247, 250, 0.55)'
+    })),
+    // Mid blizzard flakes (medium speed, 2x1 / 2x2 flakes)
+    Array.from({ length: 28 }, (_, i) => ({
+      x: (i * 113 + 17) % 320,
+      y: (i * 71 + 29) % 540,
+      spdY: 0.55 + (i % 4) * 0.12,
+      drift: (i % 3 === 0 ? 1 : -1) * 0.35,
+      phase: i * 1.1,
+      size: 2,
+      color: 'rgba(255, 255, 255, 0.80)'
+    })),
+    // Near foreground heavy snow gusts (fast fall, crisp 2x2 / 3x2 flakes)
+    Array.from({ length: 16 }, (_, i) => ({
+      x: (i * 137 + 41) % 320,
+      y: (i * 97 + 13) % 540,
+      spdY: 1.05 + (i % 3) * 0.22,
+      drift: 0.65,
+      phase: i * 1.9,
+      size: 2,
+      color: '#FFFFFF'
+    }))
+  ];
+
+  const SKY_CLOUDS = [
+    { x: 20,  y: 16, w: 46, spd: 0.06 },
+    { x: 145, y: 26, w: 58, spd: 0.04 },
+    { x: 255, y: 12, w: 40, spd: 0.07 }
+  ];
+
   // --- RINKS CONFIGURATION ---
   const RINKS = [
     {
@@ -158,10 +191,11 @@
   let state = 'TITLE';
   let frame = 0;
   let selectedRinkIdx = 0;
+  let isPaused = false;
 
   let currentEnd = 1;
   const totalEnds = 3;
-  let stonesPerTeam = 4; // 4 rocks per team (half a regular 8-rock curling end)
+  let stonesPerTeam = 4;
   let playerStonesThrown = 0;
   let aiStonesThrown = 0;
   let isPlayerTurn = true;
@@ -186,19 +220,12 @@
   const BANK_RIGHT_X = 267;
   const SLOPE_ZONE = 24;
 
-  // Focused Down-Rink Scout Camera (frames Far Hog Line at bottom of visible ice & full House in center, without overshooting into sky)
+  // Focused Down-Rink Scout Camera (frames Far Hog Line & full House without overshooting into sky)
   const SCOUT_CAM_Y = 132;
 
   // --- REALISTIC CURLING KINEMATICS ---
   const ICE_DECEL = 0.0155;
 
-  // Piecewise Down-Rink Weight Bar Landmarks (Dedicates 75% of the bar to playable shot precision!):
-  // 0%   -> Short / Near-Hog approach (dist = 690px)
-  // 25%  -> Far Hog Line (HACK_Y - FAR_HOG_Y = 810px)
-  // 50%  -> Top of House (HACK_Y - (HOUSE_Y + HOUSE_R) = 884px)
-  // 62.5%-> Button Center (HACK_Y - HOUSE_Y = 930px)
-  // 75%  -> Back of House / End Board (HACK_Y - BACK_Y = 987px)
-  // 100% -> Takeout / Overshot Surge (dist = 1750px -> v0 = 7.36)
   const MARKER_HOG_PCT    = 25;
   const MARKER_HOUSE_PCT  = 50;
   const MARKER_BUTTON_PCT = 62.5;
@@ -208,7 +235,7 @@
   const DIST_HOG   = HACK_Y - FAR_HOG_Y;               // 810px
   const DIST_HOUSE = HACK_Y - (HOUSE_Y + HOUSE_R);     // 884px
   const DIST_BACK  = HACK_Y - BACK_Y;                  // 987px
-  const DIST_MAX   = 1750;                             // High takeout weight
+  const DIST_MAX   = 1750;
 
   function getTargetDistanceFromPower(rawPct) {
     const p = Math.max(0, Math.min(100, rawPct));
@@ -222,7 +249,6 @@
       const t = (p - MARKER_HOUSE_PCT) / (MARKER_BACK_PCT - MARKER_HOUSE_PCT);
       return DIST_HOUSE + t * (DIST_BACK - DIST_HOUSE);
     } else {
-      // Final 25% of bar ramps rapidly into heavy takeout weight
       const t = (p - MARKER_BACK_PCT) / (100 - MARKER_BACK_PCT);
       return DIST_BACK + Math.pow(t, 1.35) * (DIST_MAX - DIST_BACK);
     }
@@ -237,12 +263,16 @@
     return (v0 * v0) / (2 * ICE_DECEL);
   }
 
-  let camY = WORLD_H - 240;
-  let targetCamY = WORLD_H - 240;
+  function getHackCamY() {
+    return Math.max(0, WORLD_H - VIEW_H);
+  }
+
+  let camY = getHackCamY();
+  let targetCamY = getHackCamY();
 
   let aimAngle = -Math.PI / 2;
   let powerVal = 0;
-  let powerDir = 0.625; // Half base speed with exponential acceleration curve
+  let powerDir = 0.625;
   let spinDir = -1;
 
   let stones = [];
@@ -254,7 +284,24 @@
   let settleDelay = 0;
   let statusBanner = '';
 
-  let dpad = { up: false, down: false, left: false, right: false };
+  // --- POSTMESSAGE JOYSTICK & BUTTON INPUT ENGINE (PULSE + HOLD DECAY & DEBOUNCE) ---
+  // Matches the parent index.html drag-joystick (initial pulse + 100ms repeat) and prevents double-firing
+  const dpadExpiry = { UP: 0, DOWN: 0, LEFT: 0, RIGHT: 0 };
+  const DPAD_HOLD_WINDOW_MS = 145;
+  let lastBtnATime = 0;
+  let lastBtnBTime = 0;
+  const BTN_DEBOUNCE_MS = 110;
+
+  function isDpadHeld(dir) {
+    return performance.now() < dpadExpiry[dir];
+  }
+
+  function clearAllInputs() {
+    dpadExpiry.UP = 0;
+    dpadExpiry.DOWN = 0;
+    dpadExpiry.LEFT = 0;
+    dpadExpiry.RIGHT = 0;
+  }
 
   function startMatch() {
     currentEnd = 1;
@@ -300,12 +347,12 @@
       powerDir = 0.625;
       state = 'AIM';
       statusBanner = `END ${currentEnd}/${totalEnds} • STONE ${playerStonesThrown + 1}/${stonesPerTeam}`;
-      targetCamY = WORLD_H - 240;
+      targetCamY = getHackCamY();
     } else {
       state = 'AI_PREP';
       aiThinkTimer = 50;
       statusBanner = `END ${currentEnd}/${totalEnds} • HBC STONE ${aiStonesThrown + 1}/${stonesPerTeam}`;
-      targetCamY = WORLD_H - 240;
+      targetCamY = getHackCamY();
     }
   }
 
@@ -508,7 +555,7 @@
     stones = stones.filter(s => !s.outOfBounds);
 
     if (activeStone && !activeStone.outOfBounds) {
-      targetCamY = Math.max(SCOUT_CAM_Y, Math.min(WORLD_H - 240, activeStone.y - 115));
+      targetCamY = Math.max(SCOUT_CAM_Y, Math.min(getHackCamY(), activeStone.y - Math.floor(VIEW_H * 0.48)));
     } else {
       targetCamY = SCOUT_CAM_Y;
     }
@@ -559,8 +606,13 @@
     state = 'END_SUMMARY';
   }
 
-  // --- INPUT HANDLING ---
+  // --- INPUT HANDLING (DEBOUNCED BUTTONS + JOYSTICK CARDINAL PULSES) ---
   function handleA() {
+    const now = performance.now();
+    if (now - lastBtnATime < BTN_DEBOUNCE_MS) return;
+    lastBtnATime = now;
+    if (isPaused) return;
+
     initAudio();
     if (state === 'TITLE') {
       playTone(440, 'square', 0.1);
@@ -604,6 +656,11 @@
   }
 
   function handleB() {
+    const now = performance.now();
+    if (now - lastBtnBTime < BTN_DEBOUNCE_MS) return;
+    lastBtnBTime = now;
+    if (isPaused) return;
+
     initAudio();
     if (state === 'AIM') {
       spinDir *= -1;
@@ -616,7 +673,12 @@
     }
   }
 
-  function handleDpad(dir) {
+  function handleDpadPulse(dir) {
+    if (isPaused) return;
+    const now = performance.now();
+    const wasAlreadyHeld = now < dpadExpiry[dir];
+    dpadExpiry[dir] = now + DPAD_HOLD_WINDOW_MS;
+
     if (state === 'RINK_SELECT') {
       if (dir === 'UP') {
         selectedRinkIdx = (selectedRinkIdx + RINKS.length - 1) % RINKS.length;
@@ -626,24 +688,48 @@
         selectedRinkIdx = (selectedRinkIdx + 1) % RINKS.length;
         playTone(320, 'triangle', 0.05);
       }
+    } else if (state === 'AIM' && !wasAlreadyHeld) {
+      // Immediate crisp single-step nudge on initial joystick flick; holding continues smoothly in update()
+      if (dir === 'LEFT')  aimAngle = Math.max(-Math.PI * 0.68, aimAngle - 0.014);
+      if (dir === 'RIGHT') aimAngle = Math.min(-Math.PI * 0.32, aimAngle + 0.014);
     }
   }
 
   // --- UPDATE LOOP ---
   function update() {
+    if (isPaused) return;
     frame++;
 
-    if (state === 'AIM') {
-      if (dpad.left)  aimAngle = Math.max(-Math.PI * 0.68, aimAngle - 0.011);
-      if (dpad.right) aimAngle = Math.min(-Math.PI * 0.32, aimAngle + 0.011);
+    // Update multi-layer falling snow particles
+    for (let l = 0; l < SNOW_LAYERS.length; l++) {
+      const layer = SNOW_LAYERS[l];
+      for (let f of layer) {
+        f.y += f.spdY;
+        f.x += f.drift + Math.sin(frame * 0.03 + f.phase) * (0.18 + l * 0.12);
+        if (f.y > VIEW_H) {
+          f.y = -4;
+          f.x = (f.x + 73) % VIEW_W;
+        }
+        if (f.x < 0) f.x += VIEW_W;
+        if (f.x >= VIEW_W) f.x -= VIEW_W;
+      }
+    }
 
-      // Hold UP to scout the Far Hog Line & House directly (frames y: 132..372 without overshooting into sky)
-      if (dpad.up) targetCamY = SCOUT_CAM_Y;
-      else targetCamY = WORLD_H - 240;
+    // Drift background clouds
+    for (let c of SKY_CLOUDS) {
+      c.x += c.spd;
+      if (c.x > VIEW_W + 20) c.x = -c.w - 10;
+    }
+
+    if (state === 'AIM') {
+      if (isDpadHeld('LEFT'))  aimAngle = Math.max(-Math.PI * 0.68, aimAngle - 0.010);
+      if (isDpadHeld('RIGHT')) aimAngle = Math.min(-Math.PI * 0.32, aimAngle + 0.010);
+
+      if (isDpadHeld('UP')) targetCamY = SCOUT_CAM_Y;
+      else targetCamY = getHackCamY();
     }
     else if (state === 'POWER') {
-      targetCamY = WORLD_H - 240;
-      // Exponential bar speed-up at half overall sweep rate
+      targetCamY = getHackCamY();
       const norm = powerVal / 100;
       const accelMultiplier = 0.42 + Math.pow(norm, 1.55) * 2.35;
       powerVal += powerDir * accelMultiplier;
@@ -680,6 +766,17 @@
     }
     ctx.fillStyle = color;
     ctx.fillText(txt, x, y);
+  }
+
+  // Render a specific depth layer of falling snow
+  function drawSnowLayer(layerIdx, maxY = VIEW_H) {
+    const layer = SNOW_LAYERS[layerIdx];
+    for (let f of layer) {
+      if (f.y <= maxY) {
+        ctx.fillStyle = f.color;
+        ctx.fillRect(Math.round(f.x), Math.round(f.y), f.size, f.size);
+      }
+    }
   }
 
   function drawSnowSpruce(x, y, hScale = 1) {
@@ -811,43 +908,77 @@
     ctx.restore();
   }
 
-  function drawForksConjunctionBackdrop(offsetY) {
-    ctx.fillStyle = 'rgba(20, 48, 72, 0.72)';
-    ctx.fillRect(0, offsetY, 320, 40);
-    ctx.fillStyle = '#4A89AC';
-    ctx.fillRect(0, offsetY + 34, 320, 24);
-    ctx.fillStyle = '#7EB5D6';
-    ctx.fillRect(0, offsetY + 58, 320, 18);
+  // --- MULTI-LAYER PARALLAX RED RIVER VALLEY BACKDROP + LAYERED SNOWFALL ---
+  function drawRedRiverValleyBackdrop(offsetY, parallaxShift = 0) {
+    // Layer 0: Deep Winter Sub-Arctic Sky Banding
+    ctx.fillStyle = '#18364F';
+    ctx.fillRect(0, offsetY, VIEW_W, 38);
+    ctx.fillStyle = '#386A8C';
+    ctx.fillRect(0, offsetY + 32, VIEW_W, 26);
+    ctx.fillStyle = '#6EA5C9';
+    ctx.fillRect(0, offsetY + 56, VIEW_W, 22);
 
+    // Layer 1: Slow Drifting Winter Sky Clouds (Parallax Factor 0.15)
+    for (let c of SKY_CLOUDS) {
+      let cx = Math.round((c.x + parallaxShift * 0.15) % (VIEW_W + 60));
+      if (cx < -60) cx += VIEW_W + 60;
+      let cy = offsetY + c.y;
+      ctx.fillStyle = 'rgba(224, 247, 250, 0.28)';
+      ctx.fillRect(cx + 4, cy, c.w - 8, 5);
+      ctx.fillRect(cx, cy + 3, c.w, 4);
+    }
+
+    // Far fine snow layer falling behind distant treeline
+    drawSnowLayer(0, offsetY + 118);
+
+    // Layer 2: Distant Red River Valley Horizon Treeline Silhouette (Parallax Factor 0.25)
+    ctx.fillStyle = '#26495C';
+    for (let hx = -40; hx < VIEW_W + 60; hx += 36) {
+      let tx = Math.round(hx + ((parallaxShift * 0.25) % 36));
+      ctx.fillRect(tx, offsetY + 66, 24, 12);
+      ctx.fillRect(tx + 5, offsetY + 61, 14, 5);
+      ctx.fillRect(tx + 9, offsetY + 57, 6, 4);
+    }
+
+    // Layer 3: Snow-Covered North Bank & Point Douglas / Forks Terraces
     ctx.fillStyle = PAL.ICE_LIGHT;
-    ctx.fillRect(0, offsetY + 72, 320, 42);
+    ctx.fillRect(0, offsetY + 72, VIEW_W, 42);
     ctx.fillStyle = '#C5DCE8';
-    ctx.fillRect(0, offsetY + 96, 320, 18);
+    ctx.fillRect(0, offsetY + 96, VIEW_W, 18);
 
-    drawSnowSpruce(14, offsetY + 52, 1.1);
-    drawSnowSpruce(32, offsetY + 58, 0.9);
-    drawWinterGrassClump(56, offsetY + 75);
-    drawWinterGrassClump(76, offsetY + 78);
+    // Mid-layer snowfall drifting across the snowbanks
+    drawSnowLayer(1, offsetY + 118);
 
+    // Layer 4: Midground Spruce Groves, Assiniboine Conjunction & Upper Fort Garry (Parallax Factor 0.55)
+    const midShift = Math.round(parallaxShift * 0.55);
+
+    drawSnowSpruce(14 + midShift, offsetY + 52, 1.1);
+    drawSnowSpruce(32 + midShift, offsetY + 58, 0.9);
+    drawWinterGrassClump(56 + midShift, offsetY + 75);
+    drawWinterGrassClump(76 + midShift, offsetY + 78);
+
+    // Incoming Frozen Assiniboine Conjunction Notch
     ctx.fillStyle = '#9BB8C9';
-    ctx.fillRect(58, offsetY + 86, 62, 12);
+    ctx.fillRect(58 + midShift, offsetY + 86, 62, 12);
     ctx.fillStyle = PAL.ICE_DARK;
-    ctx.fillRect(62, offsetY + 90, 56, 22);
+    ctx.fillRect(62 + midShift, offsetY + 90, 56, 22);
     ctx.fillStyle = PAL.ICE_MID;
-    ctx.fillRect(66, offsetY + 94, 52, 20);
+    ctx.fillRect(66 + midShift, offsetY + 94, 52, 20);
     ctx.fillStyle = PAL.WHITE;
-    ctx.fillRect(72, offsetY + 99, 18, 2);
-    ctx.fillRect(88, offsetY + 106, 22, 2);
+    ctx.fillRect(72 + midShift, offsetY + 99, 18, 2);
+    ctx.fillRect(88 + midShift, offsetY + 106, 22, 2);
 
-    drawWinterUpperFortGarry(124, offsetY + 38, 0.88);
+    // Upper Fort Garry
+    drawWinterUpperFortGarry(124 + midShift, offsetY + 38, 0.88);
 
-    drawSnowSpruce(256, offsetY + 55, 1.05);
-    drawSnowSpruce(278, offsetY + 60, 0.9);
-    drawWinterGrassClump(242, offsetY + 78);
-    drawWinterGrassClump(296, offsetY + 80);
+    drawSnowSpruce(256 + midShift, offsetY + 55, 1.05);
+    drawSnowSpruce(278 + midShift, offsetY + 60, 0.9);
+    drawWinterGrassClump(242 + midShift, offsetY + 78);
+    drawWinterGrassClump(296 + midShift, offsetY + 80);
 
+    // Layer 5: Foreground Riverbank Snow Ledge & Reeds (Parallax Factor 1.0)
     ctx.fillStyle = PAL.ICE_DARK;
-    ctx.fillRect(0, offsetY + 112, 320, 6);
+    ctx.fillRect(0, offsetY + 112, VIEW_W, 6);
     drawWinterGrassClump(18, offsetY + 106);
     drawWinterGrassClump(44, offsetY + 107);
     drawWinterGrassClump(134, offsetY + 106);
@@ -916,7 +1047,9 @@
     ctx.save();
     ctx.translate(0, -Math.round(camY));
 
-    drawForksConjunctionBackdrop(0);
+    // Parallax horizontal pan subtly linked to aimAngle during AIM so the valley feels alive
+    const aimPan = (state === 'AIM' || state === 'POWER') ? Math.round((aimAngle + Math.PI / 2) * 16) : 0;
+    drawRedRiverValleyBackdrop(0, aimPan);
 
     ctx.fillStyle = PAL.ICE_LIGHT;
     ctx.fillRect(0, 118, 52, WORLD_H - 118);
@@ -1025,47 +1158,85 @@
     }
 
     ctx.restore();
+
+    // Foreground Heavy Snow Gusts falling across the active rink viewport
+    drawSnowLayer(2, VIEW_H - 44);
   }
 
   // --- MAIN RENDER LOOP ---
   function draw() {
-    ctx.clearRect(0, 0, 320, 240);
+    ctx.clearRect(0, 0, VIEW_W, VIEW_H);
 
     if (state === 'TITLE') {
-      drawForksConjunctionBackdrop(76);
+      // Full-height Red River Valley Winter Parallax Scene with 3-Layer Falling Snow
+      const valleyY = Math.max(76, Math.floor(VIEW_H * 0.34));
+      const gentleSway = Math.sin(frame * 0.008) * 14;
+
+      // Upper Winter Sky Fill for taller viewports
+      ctx.fillStyle = '#0e2336';
+      ctx.fillRect(0, 0, VIEW_W, valleyY + 10);
+
+      drawRedRiverValleyBackdrop(valleyY, gentleSway);
+
+      // Frozen River Ice Foreground stretching cleanly to the bottom of the fullscreen viewport
+      const iceTop = valleyY + 116;
       ctx.fillStyle = PAL.ICE_MID;
-      ctx.fillRect(0, 192, 320, 48);
+      ctx.fillRect(0, iceTop, VIEW_W, VIEW_H - iceTop);
+      ctx.fillStyle = '#A8ECF4';
+      ctx.fillRect(36, iceTop, VIEW_W - 72, VIEW_H - iceTop);
 
-      drawCurlingStone(122, 214, 'PLAYER', 0.4, false);
-      drawCurlingStone(198, 214, 'AI', -0.4, false);
+      // Ice cracks & sheen
+      ctx.fillStyle = PAL.WHITE;
+      ctx.fillRect(54, iceTop + 14, 28, 2);
+      ctx.fillRect(218, iceTop + 26, 32, 2);
 
-      ctx.fillStyle = 'rgba(14, 42, 30, 0.90)';
-      ctx.fillRect(16, 12, 288, 66);
+      // Foreground Snow Layer across the full scene
+      drawSnowLayer(2, VIEW_H);
+
+      // Decorative Curling Stones on the Ice
+      const stoneY = Math.min(VIEW_H - 22, iceTop + 22);
+      drawCurlingStone(122, stoneY, 'PLAYER', frame * 0.02, false);
+      drawCurlingStone(198, stoneY, 'AI', -frame * 0.02, false);
+
+      // SNES Title Banner
+      const bannerY = Math.max(12, Math.floor(valleyY * 0.16));
+      ctx.fillStyle = 'rgba(14, 42, 30, 0.92)';
+      ctx.fillRect(16, bannerY, 288, 66);
       ctx.strokeStyle = PAL.GOLD; ctx.lineWidth = 2;
-      ctx.strokeRect(16, 12, 288, 66);
+      ctx.strokeRect(16, bannerY, 288, 66);
 
-      drawPixelText("LA GLACE ROUGE", 160, 38, 16, PAL.GOLD, 'center');
-      drawPixelText("RED RIVER CURLING AT THE FORKS", 160, 54, 6, PAL.HIDE, 'center');
+      drawPixelText("LA GLACE ROUGE", 160, bannerY + 26, 16, PAL.GOLD, 'center');
+      drawPixelText("RED RIVER CURLING AT THE FORKS", 160, bannerY + 42, 6, PAL.HIDE, 'center');
       if (frame % 50 < 30) {
-        drawPixelText("PRESS 'A' TO STEP ONTO THE ICE", 160, 70, 7, PAL.SEA_GREEN, 'center');
+        drawPixelText("PRESS 'A' TO STEP ONTO THE ICE", 160, bannerY + 58, 7, PAL.SEA_GREEN, 'center');
       }
     }
     else if (state === 'RINK_SELECT') {
-      ctx.fillStyle = 'rgba(14, 42, 30, 0.88)';
-      ctx.fillRect(0, 0, 320, 240);
-      ctx.strokeStyle = PAL.HIDE; ctx.lineWidth = 2;
-      ctx.strokeRect(4, 4, 312, 232);
+      // Live Red River Valley Winter Parallax & Snowfall behind the Rink Select Menu
+      const valleyY = Math.max(40, Math.floor(VIEW_H * 0.25));
+      ctx.fillStyle = '#0e2336';
+      ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+      drawRedRiverValleyBackdrop(valleyY, Math.sin(frame * 0.008) * 10);
+      ctx.fillStyle = PAL.ICE_MID;
+      ctx.fillRect(0, valleyY + 116, VIEW_W, VIEW_H - (valleyY + 116));
+      drawSnowLayer(2, VIEW_H);
 
-      drawPixelText("SELECT FROZEN RINK", 160, 24, 11, PAL.GOLD, 'center');
-      drawPixelText("WINTER 1850 • RED RIVER VALLEY", 160, 37, 6, PAL.SEA_GREEN, 'center');
+      ctx.fillStyle = 'rgba(14, 42, 30, 0.86)';
+      ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+      ctx.strokeStyle = PAL.HIDE; ctx.lineWidth = 2;
+      ctx.strokeRect(4, 4, VIEW_W - 8, VIEW_H - 8);
+
+      const topY = Math.max(24, Math.floor((VIEW_H - 210) * 0.4));
+      drawPixelText("SELECT FROZEN RINK", 160, topY, 11, PAL.GOLD, 'center');
+      drawPixelText("WINTER 1850 • RED RIVER VALLEY", 160, topY + 13, 6, PAL.SEA_GREEN, 'center');
 
       for (let i = 0; i < RINKS.length; i++) {
         const r = RINKS[i];
-        const y = 48 + i * 54;
+        const y = topY + 24 + i * 54;
         const isSel = (i === selectedRinkIdx);
         const isOpen = (r.status === 'OPEN');
 
-        ctx.fillStyle = isSel ? 'rgba(84, 14, 17, 0.92)' : 'rgba(17, 17, 17, 0.78)';
+        ctx.fillStyle = isSel ? 'rgba(84, 14, 17, 0.92)' : 'rgba(17, 17, 17, 0.82)';
         ctx.fillRect(16, y, 288, 46);
         ctx.strokeStyle = isSel ? PAL.GOLD : (isOpen ? PAL.SEA_GREEN : PAL.GRAY_DARK);
         ctx.lineWidth = isSel ? 2 : 1;
@@ -1086,16 +1257,16 @@
         }
       }
 
-      drawPixelText("UP/DOWN: RINK   A: START MATCH", 160, 226, 6, PAL.WHITE, 'center');
+      drawPixelText("UP/DOWN: RINK   A: START MATCH", 160, VIEW_H - 14, 6, PAL.WHITE, 'center');
     }
     else {
       drawFrozenRink();
 
-      // --- TOP SCOREBOARD HUD (4 Stones per Team) ---
+      // --- TOP SCOREBOARD HUD ---
       ctx.fillStyle = 'rgba(17, 17, 17, 0.92)';
-      ctx.fillRect(0, 0, 320, 24);
+      ctx.fillRect(0, 0, VIEW_W, 24);
       ctx.fillStyle = PAL.GOLD;
-      ctx.fillRect(0, 24, 320, 2);
+      ctx.fillRect(0, 24, VIEW_W, 2);
 
       drawPixelText(`YOU:${playerTotalScore}`, 8, 15, 7, PAL.GOLD);
       for (let i = 0; i < stonesPerTeam; i++) {
@@ -1111,25 +1282,25 @@
       }
       drawPixelText(`HBC:${aiTotalScore}`, 312, 15, 7, PAL.SEA_GREEN, 'right');
 
-      // --- FULL-WIDTH BOTTOM-SET HUD & DOWN-RINK WEIGHT BAR (25% / 50% / 75% Landmarks) ---
+      // --- FULL-WIDTH BOTTOM-SET HUD & DOWN-RINK WEIGHT BAR ---
+      const hudTop = VIEW_H - 44;
       ctx.fillStyle = 'rgba(14, 42, 30, 0.94)';
-      ctx.fillRect(0, 196, 320, 44);
+      ctx.fillRect(0, hudTop, VIEW_W, 44);
       ctx.fillStyle = PAL.GOLD;
-      ctx.fillRect(0, 195, 320, 2);
+      ctx.fillRect(0, hudTop - 1, VIEW_W, 2);
 
       if (state === 'AIM' || state === 'POWER') {
         let curlTxt = spinDir < 0 ? "CURL: <- LEFT (B)" : "CURL: RIGHT -> (B)";
-        drawPixelText(curlTxt, 8, 207, 5, state === 'AIM' ? PAL.GOLD : PAL.SEA_GREEN);
+        drawPixelText(curlTxt, 8, hudTop + 11, 5, state === 'AIM' ? PAL.GOLD : PAL.SEA_GREEN);
 
         let phaseHint = state === 'AIM' ? "UP:SCOUT  A:POWER" : "A:RELEASE STONE!";
-        drawPixelText(phaseHint, 312, 207, 5, state === 'POWER' ? PAL.ORANGE : PAL.WHITE, 'right');
+        drawPixelText(phaseHint, 312, hudTop + 11, 5, state === 'POWER' ? PAL.ORANGE : PAL.WHITE, 'right');
 
         const barX = 6;
-        const barY = 212;
+        const barY = hudTop + 16;
         const barW = 308;
         const barH = 14;
 
-        // Exact 1/4 (25%), 1/2 (50%), 5/8 (62.5%), and 3/4 (75%) Positions
         const hogX    = barX + Math.round(barW * 0.25);
         const houseX  = barX + Math.round(barW * 0.50);
         const buttonX = barX + Math.round(barW * 0.625);
@@ -1138,67 +1309,54 @@
         ctx.fillStyle = PAL.BLACK;
         ctx.fillRect(barX, barY, barW, barH);
 
-        // 1. Short / Pre-Hog Segment (0 .. 1/4)
         ctx.fillStyle = 'rgba(60, 60, 60, 0.45)';
         ctx.fillRect(barX + 1, barY + 1, hogX - barX - 1, barH - 2);
 
-        // 2. Guard Zone Segment (1/4 Far Hog Line .. 1/2 Top of House)
         ctx.fillStyle = 'rgba(15, 111, 158, 0.55)';
         ctx.fillRect(hogX, barY + 1, houseX - hogX, barH - 2);
 
-        // 3. House Scoring Segment (1/2 Top of House .. 3/4 Back of House)
         ctx.fillStyle = 'rgba(18, 174, 162, 0.72)';
         ctx.fillRect(houseX, barY + 1, backX - houseX, barH - 2);
 
-        // 4. Takeout / Overshot Segment (3/4 Back of House .. 100%)
         ctx.fillStyle = 'rgba(173, 28, 33, 0.60)';
         ctx.fillRect(backX, barY + 1, (barX + barW - 1) - backX, barH - 2);
 
-        // Active Power Fill Bar
         if (state === 'POWER') {
           let fillW = Math.round((powerVal / 100) * (barW - 2));
           ctx.fillStyle = powerVal > MARKER_BACK_PCT ? PAL.RED : (powerVal >= MARKER_HOUSE_PCT ? PAL.LUSH_GREEN : PAL.GOLD);
           ctx.fillRect(barX + 1, barY + 2, fillW, barH - 4);
         }
 
-        // Crisp End-of-Sheet Landmark Tick Lines
-        // Far Hog Line Tick (1/4)
         ctx.fillStyle = PAL.RED;
         ctx.fillRect(hogX, barY, 2, barH);
-        // Top of House Tick (1/2)
         ctx.fillStyle = PAL.ICE_LIGHT;
         ctx.fillRect(houseX, barY, 2, barH);
-        // Button Center Pin Tick (5/8)
         ctx.fillStyle = PAL.GOLD;
         ctx.fillRect(buttonX - 1, barY - 1, 2, barH + 2);
-        // Back of House / End Board Tick (3/4)
         ctx.fillStyle = PAL.ORANGE;
         ctx.fillRect(backX, barY, 2, barH);
 
-        // Outer Bar Frame
         ctx.strokeStyle = state === 'POWER' ? PAL.GOLD : PAL.HIDE;
         ctx.lineWidth = 1;
         ctx.strokeRect(barX, barY, barW, barH);
 
-        // Active Cursor Needle
         if (state === 'POWER') {
           let fillW = Math.round((powerVal / 100) * (barW - 2));
           ctx.fillStyle = PAL.WHITE;
           ctx.fillRect(barX + fillW, barY - 2, 2, barH + 4);
         }
 
-        // Accurate End-of-Sheet Landmark Labels Directly Below Their Exact Ticks
-        drawPixelText("HOG", hogX, 236, 5, PAL.RED, 'center', false);
-        drawPixelText("HOUSE", houseX, 236, 5, PAL.ICE_LIGHT, 'center', false);
-        drawPixelText("BTN", buttonX, 236, 5, PAL.GOLD, 'center', false);
-        drawPixelText("BACK", backX, 236, 5, PAL.ORANGE, 'center', false);
-        drawPixelText("OUT", barX + Math.round(barW * 0.90), 236, 5, PAL.RED, 'center', false);
+        drawPixelText("HOG", hogX, hudTop + 40, 5, PAL.RED, 'center', false);
+        drawPixelText("HOUSE", houseX, hudTop + 40, 5, PAL.ICE_LIGHT, 'center', false);
+        drawPixelText("BTN", buttonX, hudTop + 40, 5, PAL.GOLD, 'center', false);
+        drawPixelText("BACK", backX, hudTop + 40, 5, PAL.ORANGE, 'center', false);
+        drawPixelText("OUT", barX + Math.round(barW * 0.90), hudTop + 40, 5, PAL.RED, 'center', false);
       } 
       else if (state === 'SLIDE' && activeStone && activeStone.team === 'PLAYER') {
-        drawPixelText(statusBanner, 160, 207, 6, PAL.GOLD, 'center');
+        drawPixelText(statusBanner, 160, hudTop + 11, 6, PAL.GOLD, 'center');
 
         const barX = 6;
-        const barY = 213;
+        const barY = hudTop + 17;
         const barW = 308;
         const barH = 12;
 
@@ -1210,54 +1368,56 @@
 
         ctx.fillStyle = PAL.ICE_MID;
         ctx.fillRect(barX + 1, barY + 2, Math.round((sweepHeat / 100) * (barW - 2)), barH - 4);
-        drawPixelText("SWEEP REDUCES ICE FRICTION & STRAIGHTENS CURL", 160, 236, 5, PAL.HIDE, 'center', false);
+        drawPixelText("SWEEP REDUCES ICE FRICTION & STRAIGHTENS CURL", 160, hudTop + 40, 5, PAL.HIDE, 'center', false);
       } 
       else {
-        drawPixelText(statusBanner, 160, 222, 6, PAL.WHITE, 'center');
+        drawPixelText(statusBanner, 160, hudTop + 26, 6, PAL.WHITE, 'center');
       }
 
       if (state === 'END_SUMMARY') {
+        const modalY = Math.floor((VIEW_H - 114) / 2);
         ctx.fillStyle = 'rgba(14, 42, 30, 0.94)';
-        ctx.fillRect(28, 60, 264, 114);
+        ctx.fillRect(28, modalY, 264, 114);
         ctx.strokeStyle = PAL.GOLD; ctx.lineWidth = 2;
-        ctx.strokeRect(28, 60, 264, 114);
+        ctx.strokeRect(28, modalY, 264, 114);
 
-        drawPixelText(`END ${currentEnd} COMPLETE`, 160, 82, 9, PAL.GOLD, 'center');
+        drawPixelText(`END ${currentEnd} COMPLETE`, 160, modalY + 22, 9, PAL.GOLD, 'center');
 
         if (lastEndWinner === 'PLAYER') {
-          drawPixelText(`YOU SCORE +${lastEndPoints} PT${lastEndPoints > 1 ? 'S' : ''}!`, 160, 106, 8, PAL.LUSH_GREEN, 'center');
+          drawPixelText(`YOU SCORE +${lastEndPoints} PT${lastEndPoints > 1 ? 'S' : ''}!`, 160, modalY + 46, 8, PAL.LUSH_GREEN, 'center');
         } else if (lastEndWinner === 'AI') {
-          drawPixelText(`OFFICER SCORES +${lastEndPoints}!`, 160, 106, 8, PAL.RED, 'center');
+          drawPixelText(`OFFICER SCORES +${lastEndPoints}!`, 160, modalY + 46, 8, PAL.RED, 'center');
         } else {
-          drawPixelText("BLANK END (0 PTS)", 160, 106, 8, PAL.HIDE, 'center');
+          drawPixelText("BLANK END (0 PTS)", 160, modalY + 46, 8, PAL.HIDE, 'center');
         }
 
-        drawPixelText(`YOU ${playerTotalScore}  -  ${aiTotalScore} HBC`, 160, 130, 8, PAL.WHITE, 'center');
+        drawPixelText(`YOU ${playerTotalScore}  -  ${aiTotalScore} HBC`, 160, modalY + 70, 8, PAL.WHITE, 'center');
 
         if (frame % 50 < 30) {
-          drawPixelText("PRESS 'A' TO CONTINUE", 160, 158, 7, PAL.GOLD, 'center');
+          drawPixelText("PRESS 'A' TO CONTINUE", 160, modalY + 98, 7, PAL.GOLD, 'center');
         }
       }
 
       if (state === 'MATCH_OVER') {
+        const modalY = Math.floor((VIEW_H - 134) / 2);
         ctx.fillStyle = 'rgba(14, 42, 30, 0.96)';
-        ctx.fillRect(22, 48, 276, 134);
+        ctx.fillRect(22, modalY, 276, 134);
         ctx.strokeStyle = PAL.GOLD; ctx.lineWidth = 2;
-        ctx.strokeRect(22, 48, 276, 134);
+        ctx.strokeRect(22, modalY, 276, 134);
 
-        drawPixelText("MATCH AT THE FORKS", 160, 72, 8, PAL.HIDE, 'center');
+        drawPixelText("MATCH AT THE FORKS", 160, modalY + 24, 8, PAL.HIDE, 'center');
         if (playerTotalScore > aiTotalScore) {
-          drawPixelText("VICTORY ON THE ICE!", 160, 96, 10, PAL.SEA_GREEN, 'center');
+          drawPixelText("VICTORY ON THE ICE!", 160, modalY + 48, 10, PAL.SEA_GREEN, 'center');
         } else if (aiTotalScore > playerTotalScore) {
-          drawPixelText("OFFICERS TAKE THE MATCH", 160, 96, 8, PAL.RED, 'center');
+          drawPixelText("OFFICERS TAKE THE MATCH", 160, modalY + 48, 8, PAL.RED, 'center');
         } else {
-          drawPixelText("HONOURABLE DRAW!", 160, 96, 10, PAL.GOLD, 'center');
+          drawPixelText("HONOURABLE DRAW!", 160, modalY + 48, 10, PAL.GOLD, 'center');
         }
 
-        drawPixelText(`FINAL: YOU ${playerTotalScore} - ${aiTotalScore} HBC`, 160, 124, 8, PAL.WHITE, 'center');
+        drawPixelText(`FINAL: YOU ${playerTotalScore} - ${aiTotalScore} HBC`, 160, modalY + 76, 8, PAL.WHITE, 'center');
 
         if (frame % 50 < 30) {
-          drawPixelText("PRESS 'A' FOR RINK SELECT", 160, 160, 7, PAL.GOLD, 'center');
+          drawPixelText("PRESS 'A' FOR RINK SELECT", 160, modalY + 112, 7, PAL.GOLD, 'center');
         }
       }
     }
@@ -1269,35 +1429,30 @@
     requestAnimationFrame(loop);
   }
 
-  // --- ARCADE CABINET POSTMESSAGE BRIDGE ---
+  // --- EXCLUSIVE POSTMESSAGE JOYSTICK & BUTTON BRIDGE (NO DUPLICATE LOCAL LISTENERS) ---
   window.addEventListener('message', function(event) {
     const cmd = event.data;
-    if (cmd === 'DPAD_UP_PRESS' || cmd === 'DPAD_UP') { dpad.up = true; handleDpad('UP'); }
-    if (cmd === 'DPAD_UP_RELEASE') dpad.up = false;
-    if (cmd === 'DPAD_DOWN_PRESS' || cmd === 'DPAD_DOWN') { dpad.down = true; handleDpad('DOWN'); }
-    if (cmd === 'DPAD_DOWN_RELEASE') dpad.down = false;
-    if (cmd === 'DPAD_LEFT_PRESS' || cmd === 'DPAD_LEFT') { dpad.left = true; handleDpad('LEFT'); }
-    if (cmd === 'DPAD_LEFT_RELEASE') dpad.left = false;
-    if (cmd === 'DPAD_RIGHT_PRESS' || cmd === 'DPAD_RIGHT') { dpad.right = true; handleDpad('RIGHT'); }
-    if (cmd === 'DPAD_RIGHT_RELEASE') dpad.right = false;
-    if (cmd === 'BUTTON_A') handleA();
-    if (cmd === 'BUTTON_B') handleB();
-  });
+    if (cmd === 'PAUSE') {
+      isPaused = true;
+      clearAllInputs();
+      return;
+    }
+    if (cmd === 'RESUME') {
+      isPaused = false;
+      clearAllInputs();
+      return;
+    }
 
-  // Keyboard fallback for standalone testing
-  window.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowUp')    { dpad.up = true; handleDpad('UP'); }
-    if (e.key === 'ArrowDown')  { dpad.down = true; handleDpad('DOWN'); }
-    if (e.key === 'ArrowLeft')  { dpad.left = true; handleDpad('LEFT'); }
-    if (e.key === 'ArrowRight') { dpad.right = true; handleDpad('RIGHT'); }
-    if (e.key === 'a' || e.key === 'A' || e.key === 'z' || e.key === 'Z' || e.key === 'Enter' || e.key === ' ') handleA();
-    if (e.key === 'b' || e.key === 'B' || e.key === 'x' || e.key === 'X' || e.key === 'Shift') handleB();
-  });
-  window.addEventListener('keyup', (e) => {
-    if (e.key === 'ArrowUp')    dpad.up = false;
-    if (e.key === 'ArrowDown')  dpad.down = false;
-    if (e.key === 'ArrowLeft')  dpad.left = false;
-    if (e.key === 'ArrowRight') dpad.right = false;
+    if (cmd === 'DPAD_UP' || cmd === 'DPAD_UP_PRESS')       handleDpadPulse('UP');
+    else if (cmd === 'DPAD_DOWN' || cmd === 'DPAD_DOWN_PRESS')  handleDpadPulse('DOWN');
+    else if (cmd === 'DPAD_LEFT' || cmd === 'DPAD_LEFT_PRESS')  handleDpadPulse('LEFT');
+    else if (cmd === 'DPAD_RIGHT' || cmd === 'DPAD_RIGHT_PRESS') handleDpadPulse('RIGHT');
+    else if (cmd === 'DPAD_UP_RELEASE')    dpadExpiry.UP = 0;
+    else if (cmd === 'DPAD_DOWN_RELEASE')  dpadExpiry.DOWN = 0;
+    else if (cmd === 'DPAD_LEFT_RELEASE')  dpadExpiry.LEFT = 0;
+    else if (cmd === 'DPAD_RIGHT_RELEASE') dpadExpiry.RIGHT = 0;
+    else if (cmd === 'BUTTON_A') handleA();
+    else if (cmd === 'BUTTON_B') handleB();
   });
 
   loop();
