@@ -6,43 +6,53 @@
 <title>Aen Zhwaal</title>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
-  body {
-    margin: 0; padding: 0;
-    background: transparent;
-    display: flex; justify-content: center; align-items: center;
-    height: 100vh; width: 100vw;
-    font-family: 'Press Start 2P', monospace;
-    user-select: none; touch-action: manipulation; overflow: hidden;
-  }
-  #game-container {
-    width: 100%; height: 100%; max-width: 600px;
-    display: flex; flex-direction: column; justify-content: center;
-    box-sizing: border-box; padding: 10px;
-  }
-  #screen-container {
-    flex: 0 0 auto; width: 100%;
-    aspect-ratio: 4 / 3; 
-    border: 4px solid #D4D0C5; 
-    position: relative; background: #0E2A1E; 
-    overflow: hidden; box-sizing: border-box;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+  html, body, #game-container {
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: #0E2A1E;
+    user-select: none;
+    touch-action: none;
+    image-rendering: pixelated;
   }
   canvas {
-    width: 100%; height: 100%;
-    display: block; image-rendering: pixelated;
+    width: 100%;
+    height: 100%;
+    display: block;
+    image-rendering: pixelated;
   }
 </style>
 </head>
 <body>
 <div id="game-container">
-  <div id="screen-container">
-    <canvas id="gameCanvas" width="320" height="240"></canvas>
-  </div>
+  <canvas id="gameCanvas" width="320" height="240"></canvas>
 </div>
 
 <script>
   const cvs = document.getElementById('gameCanvas');
   const ctx = cvs.getContext('2d');
+
+  // --- DYNAMIC FULL-BLEED VIEWPORT SCALING ---
+  const BASE_H = 240;
+  let VIEW_W = 320;
+  let VIEW_H = 240;
+  let OX = 0;
+
+  function resizeViewport() {
+    const ww = window.innerWidth || 320;
+    const wh = window.innerHeight || 240;
+    const aspect = ww / Math.max(1, wh);
+    VIEW_H = BASE_H;
+    VIEW_W = Math.max(320, Math.round(BASE_H * aspect));
+    cvs.width = VIEW_W;
+    cvs.height = VIEW_H;
+    OX = Math.floor((VIEW_W - 320) / 2);
+    ctx.imageSmoothingEnabled = false;
+  }
+  window.addEventListener('resize', resizeViewport);
+  resizeViewport();
 
   // --- AUDIO SYNTHESIZER ---
   let audioCtx = null;
@@ -51,7 +61,7 @@
     if (audioCtx.state === 'suspended') audioCtx.resume();
   }
   function playTone(freq, type, dur, vol = 0.1) {
-    if (!audioCtx) return;
+    if (!audioCtx || isPaused) return;
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.type = type;
@@ -62,7 +72,7 @@
     osc.start(); osc.stop(audioCtx.currentTime + dur);
   }
   function playGunshot() {
-    if (!audioCtx) return;
+    if (!audioCtx || isPaused) return;
     const bufferSize = audioCtx.sampleRate * 0.45;
     const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
     const data = buffer.getChannelData(0);
@@ -114,7 +124,7 @@
     { tunic: '#4A220D', accent: '#7B3F1D', hat: '#2C1407', trim: '#D4D0C5' }
   ];
 
-  // --- 16-BIT DETAILED PIXEL MATRICES (24x15) ---
+  // --- 16-BIT DETAILED GALLOP MATRICES (24x15) ---
   const HORSE_FRAMES = [
     [
       "000000000000TTT000000000",
@@ -169,17 +179,103 @@
     ]
   ];
 
-  // --- ROSTER (Added 'might' attribute for Stocky & Strong breeds in deep Spring-Melt Mud) ---
-  const HORSE_ROSTER = [
-    { name: 'Buffalo Runner', breed: 'Spanish Mustang', coat: 'BUCKSKIN', captainNote: '"Quick burst, never spooks!"',     spd: 4.2, burst: 8.5, end: 3.5, agi: 9.5, snow: 4.5, might: 4.0, fearless: true },
-    { name: 'Indian Pony',    breed: 'Native Stocky',   coat: 'BAY',      captainNote: '"Sure-footed in snow & mud!"',   spd: 3.6, burst: 5.5, end: 6.5, agi: 6.5, snow: 10.0, might: 9.5, fearless: false },
-    { name: 'Can. Bush Pony', breed: 'Mustang/Trotter', coat: 'BLACK',    captainNote: '"Moose agility, fastest on ice!"', spd: 3.4, burst: 4.5, end: 5.5, agi: 8.5, snow: 12.0, might: 6.5, fearless: false },
-    { name: 'Cart & Draft',   breed: 'Clydesdale/Shire',coat: 'DAPPLE',   captainNote: '"Heavy muscle, powers through mud!"', spd: 3.2, burst: 3.0, end: 9.5, agi: 2.5, snow: 5.5, might: 12.0, fearless: true },
-    { name: 'Officers Mount', breed: 'Thoroughbred Mix',coat: 'CHESTNUT', captainNote: '"Built for long distance!"',      spd: 4.8, burst: 5.0, end: 10.0, agi: 7.5, snow: 3.0, might: 5.5, fearless: false },
-    { name: 'Appaloosa',      breed: 'Plateau Spotted', coat: 'APPALOOSA',captainNote: '"Balanced on every trail!"',     spd: 4.1, burst: 5.5, end: 6.5, agi: 6.5, snow: 5.5, might: 6.5, fearless: false }
+  // --- RELAXED / RESTING HORSE MATRICES FOR LA GRANGE (24x16, No Rider) ---
+  const IDLE_HORSE_FRAMES = [
+    // Frame 0: Standing Calmly, Ears Forward, Tail Resting
+    [
+      "000000000000000000101000",
+      "000000000000000001535100",
+      "000000000000000015222910",
+      "000000000000000152232221",
+      "000000111111111522222110",
+      "000015222222222222221000",
+      "000152333222292222210000",
+      "001522332222922222410000",
+      "001522222222222224410000",
+      "001542224444444424100000",
+      "001514241000000142100000",
+      "001014241000000142100000",
+      "000014241000000142100000",
+      "000001110000000011000000"
+    ],
+    // Frame 1: Head Dipping / Grazing / Tail Swish
+    [
+      "000000000000000000000000",
+      "000000000000000000000000",
+      "000000000000000000101000",
+      "000000111111111001535100",
+      "000015222222222115222910",
+      "001522333222292522232221",
+      "015522332222922222222110",
+      "015222222222222222241000",
+      "001542224444444424410000",
+      "000014241000000142100000",
+      "000014241000000142100000",
+      "000014241000000142100000",
+      "000001110000000011000000",
+      "000000000000000000000000"
+    ]
   ];
 
-  // --- 4 HISTORICAL COURSES (3 randomly drawn per listing board) ---
+  // --- ROSTER WITH DWELLINGS & COLOURFUL HUNT CAPTAIN DESCRIPTIONS ---
+  const HORSE_ROSTER = [
+    {
+      name: 'Buffalo Runner',
+      breed: 'Spanish Mustang',
+      coat: 'BUCKSKIN',
+      dwelling: 'POST',
+      dwellingTitle: 'RED RIVER WOOD HOUSE',
+      captainDesc: "Tied outside de oak log house! Dis Spanish Mustang explodes off de mark like thunder—pure short-burst lightning dat never spooks in a crowd, though he fades if de trail drags too long!",
+      spd: 4.2, burst: 8.5, end: 3.5, agi: 9.5, snow: 4.5, might: 4.0, fearless: true
+    },
+    {
+      name: 'Indian Pony',
+      breed: 'Native Stocky',
+      coat: 'BAY',
+      dwelling: 'CAMP',
+      dwellingTitle: 'WINTER RIVERBANK CAMP',
+      captainDesc: "Raised right beside de lodge fires! Thick-coated, stocky, and sure-footed as a mountain goat. Snow drifts and spring melt mud barely slow dis tough little scrapper down!",
+      spd: 3.6, burst: 5.5, end: 6.5, agi: 6.5, snow: 10.0, might: 9.5, fearless: false
+    },
+    {
+      name: 'Can. Bush Pony',
+      breed: 'Mustang/Trotter',
+      coat: 'BLACK',
+      dwelling: 'BUSH',
+      dwellingTitle: 'WILD SPRUCE & WILLOW BUSH',
+      captainDesc: "Born in de tangled spruce bush! Small-bodied wid moose-like agility. Medium speed on dry grass, but put him on glare river ice and nobody catches his tail!",
+      spd: 3.4, burst: 4.5, end: 5.5, agi: 8.5, snow: 12.0, might: 6.5, fearless: false
+    },
+    {
+      name: 'Cart & Draft',
+      breed: 'Clydesdale/Shire',
+      coat: 'DAPPLE',
+      dwelling: 'BARN',
+      dwellingTitle: 'TIMBER CART SHED',
+      captainDesc: "Fresh out of de Red River cart traces! Heavy, broad-chested muscle. He turns slow like a barge, but when spring mud gets knee-deep, he powers right through!",
+      spd: 3.2, burst: 3.0, end: 9.5, agi: 2.5, snow: 5.5, might: 12.0, fearless: true
+    },
+    {
+      name: 'Officers Mount',
+      breed: 'Thoroughbred Mix',
+      coat: 'CHESTNUT',
+      dwelling: 'LEANTO',
+      dwellingTitle: 'GARRISON LEAN-TO SHELTER',
+      captainDesc: "Kept under de garrison lean-to by de stone walls! Half-bred English Thoroughbred with long legs and iron lungs—built for high cruising speed and late-race endurance!",
+      spd: 4.8, burst: 5.0, end: 10.0, agi: 7.5, snow: 3.0, might: 5.5, fearless: false
+    },
+    {
+      name: 'Appaloosa',
+      breed: 'Plateau Spotted',
+      coat: 'APPALOOSA',
+      dwelling: 'CORRAL',
+      dwellingTitle: 'OPEN PRAIRIE CORRAL',
+      captainDesc: "Traded from de western nations into our prairie corral! Spotted coat, balanced stride, and steady nerves—no glaring weakness on ice, mud, or open grass!",
+      spd: 4.1, burst: 5.5, end: 6.5, agi: 6.5, snow: 5.5, might: 6.5, fearless: false
+    }
+  ];
+
+  // --- 4 HISTORICAL COURSES ---
   const COURSES = [
     { name: 'Frozen Assiniboine', short: 'ASSINIBOINE', mod: 'SNOW',  obs: 'ICE SLICK' },
     { name: 'Open Prairie',       short: 'PRAIRIE',     mod: 'FLAT',  obs: 'GOPHER HOLE' },
@@ -189,28 +285,27 @@
 
   // --- FIREBAG ITEM DEFINITIONS & SCORING ---
   const ITEMS = [
-    { key: 'moccasins', name: 'Moccasins',    short: 'MOCS', val: 1, color: '#E2AC63' },
-    { key: 'capote',    name: 'Capote',       short: 'CAPT', val: 2, color: '#0F6F9E' },
-    { key: 'sash',      name: 'Sash',   short: 'SASH', val: 3, color: '#AD1C21' },
-    { key: 'robe',      name: 'Buffalo Robe', short: 'ROBE', val: 4, color: '#7B3F1D' }
+    { key: 'moccasins', name: 'Moccasins',    short: 'MOC', val: 1, color: '#E2AC63' },
+    { key: 'capote',    name: 'Capote',       short: 'CAP', val: 2, color: '#0F6F9E' },
+    { key: 'sash',      name: 'Woven Sash',   short: 'SSH', val: 3, color: '#AD1C21' },
+    { key: 'robe',      name: 'Buffalo Robe', short: 'RBE', val: 4, color: '#7B3F1D' }
   ];
 
   const OPPONENTS = [
     { group: 'English',    names: ['Factor MacTavish', 'Lt. Kensington', 'Clerk Pritchard'], wMin: 1, wMax: 1, style: 'Conservative', seeking: [0, 1], quote: "A modest stake. Keeps the ledger tidy." },
-    { group: 'Cree',       names: ['Maskwa', 'Maskepetoon'],                 wMin: 1, wMax: 2, style: 'Conservative', seeking: [0, 1], quote: "Steady eyes, measured trade." },
-    { group: 'Saulteaux',  names: ['Ochek', 'Mishtadim'],                     wMin: 2, wMax: 3, style: 'Resourceful',  seeking: [1, 2], quote: "We read the earth and the hooves well." },
-    { group: 'Assiniboine',names: ['Mato', 'Tatanka'],                           wMin: 2, wMax: 3, style: 'Resourceful',  seeking: [2, 3], quote: "Good robes and sashes earn the match." },
-    { group: 'French',     names: ['Ti-Jean Morin', 'Baptiste Roy', 'Amble Parisien'],        wMin: 1, wMax: 4, style: 'Erratic',      seeking: [1, 2], quote: "Sacre bleu! All in, or just a trifle!" },
-    { group: 'Scottish',   names: ['Angus McKay', 'Hamish Sutherland', 'Douglas Ross'],        wMin: 1, wMax: 4, style: 'Erratic',      seeking: [0, 2], quote: "Aye, fortune favors the bold... maybe!" },
-    { group: 'Irish',      names: ['Seamus Murphy', 'Liam Doyle'],          wMin: 1, wMax: 4, style: 'Erratic',      seeking: [1, 3], quote: "Luck of the turf! Let's toss the lot!" },
-    { group: 'American',   names: ['Pembina Pete', 'Yankee Bill'],             wMin: 3, wMax: 4, style: 'High Roller',  seeking: [2, 3], quote: "Came north for big stakes and fine furs!" }
+    { group: 'Cree',       names: ['Mistahimaskwa', 'Piapot', 'Maskepetoon'],                 wMin: 1, wMax: 2, style: 'Conservative', seeking: [0, 1], quote: "Steady eyes, measured trade." },
+    { group: 'Saulteaux',  names: ['Peguis', 'Ochek', 'Thunderbird Sky'],                     wMin: 2, wMax: 3, style: 'Resourceful',  seeking: [1, 2], quote: "We read the earth and the hooves well." },
+    { group: 'Assiniboine',names: ['Mahpiya', 'Tatanka', 'Wambdi'],                           wMin: 2, wMax: 3, style: 'Resourceful',  quote: "Good robes and sashes earn the match." },
+    { group: 'French',     names: ['Ti-Jean Morin', 'Baptiste Roy', 'Louis Riel Sr.'],        wMin: 1, wMax: 4, style: 'Erratic',      seeking: [1, 2], quote: "Sacre bleu! All in, or just a trifle!" },
+    { group: 'Scottish',   names: ['Angus McKay', 'Hamish Sutherland', 'Dougal Ross'],        wMin: 1, wMax: 4, style: 'Erratic',      seeking: [0, 2], quote: "Aye, fortune favors the bold... maybe!" },
+    { group: 'Irish',      names: ['Paddy O’Connor', 'Seamus Murphy', 'Liam Doyle'],          wMin: 1, wMax: 4, style: 'Erratic',      seeking: [1, 3], quote: "Luck of the turf! Let's toss the lot!" },
+    { group: 'American',   names: ['Pembina Pete', 'Dakota Jack', 'Yankee Bill'],             wMin: 3, wMax: 4, style: 'High Roller',  seeking: [2, 3], quote: "Came north for big stakes and fine furs!" }
   ];
 
   // --- PLAYER FIREBAG WALLET & STAGING ---
   let firebag = { moccasins: 1, capote: 1, sash: 0, robe: 0 };
   let stagedBet = { moccasins: 0, capote: 0, sash: 0, robe: 0 };
   let activeBagSlot = 0;
-  let breedBrowseIdx = 0;
 
   function getBagScore(bag) {
     return (bag.moccasins * 1) + (bag.capote * 2) + (bag.sash * 3) + (bag.robe * 4);
@@ -235,14 +330,22 @@
   }
 
   // --- GAME STATE ---
+  // TITLE -> HUB -> (GRANGE or LISTING) -> CAPTAIN -> READY -> COUNTDOWN -> RACING -> PHOTO_FINISH -> RUNOUT -> RESULT
   let state = 'TITLE';
   let frame = 0;
+  let isPaused = false;
+
+  // Title Hub Choice (0 = "To Race Listing", 1 = "La Grange")
+  let hubChoice = 0;
+
+  // La Grange Interactive Carousel Index (0..5)
+  let grangeIdx = 0;
 
   // Pre-Race Listing Data
   let raceListings = [];
   let selListingIdx = 0;
   let selPrefHorse = 0;
-  let cardSide = 0;
+  let cardSide = 0; // 0 = Race & Bet Card, 1 = Full Firebag Wager Card (B button)
   let setupRow = 0;
   let curOpponent = null;
 
@@ -261,7 +364,7 @@
   };
   let captainText = "";
 
-  // Race Simulation Data
+  // Race Simulation Data (with per-race randomized horse form & variance)
   let race = {
     dist: 6500,
     pDist: 0, rDist: 0,
@@ -269,6 +372,7 @@
     pStam: 100, rStam: 100,
     pLane: 0, rLane: 1,
     pStumble: 0, rStumble: 0,
+    pForm: null, rForm: null,
     obstacles: [],
     countdownVal: 3,
     countdownTimer: 0,
@@ -318,7 +422,6 @@
       quote: arch.quote
     };
 
-    // Draw 3 random courses from the 4-course pool
     let coursePool = [0, 1, 2, 3].sort(() => Math.random() - 0.5).slice(0, 3);
 
     raceListings = [];
@@ -341,7 +444,6 @@
     selPrefHorse = 0;
     cardSide = 0;
     setupRow = 0;
-    breedBrowseIdx = raceListings[0].horseA;
     initDefaultBet();
   }
 
@@ -416,7 +518,7 @@
       trackCall = "Spring ice melt at Lower Fort Garry! Heavy, dense mud along de rocky shore to St. Andrews stone church—stocky muscle rules today! ";
     }
 
-    captainText = draftCall + trackCall + "Step back from de line, mes amis!";
+    captainText = draftCall + trackCall + "Any horse can steal de day if de wind blows right—step back from de line!";
   }
 
   // --- SETTLE FIREBAG ITEMS AT RACE END ---
@@ -433,16 +535,34 @@
     stagedBet = { moccasins: 0, capote: 0, sash: 0, robe: 0 };
   }
 
+  // Generate race-day randomized stat jitter so breed/course logic guides odds without guaranteeing a win
+  function rollRaceDayForm(horseIdx) {
+    const base = HORSE_ROSTER[horseIdx];
+    const jitter = (range) => (Math.random() * 2 - 1) * range;
+    return {
+      spd:   Math.max(2.6, base.spd   + jitter(0.68)),
+      burst: Math.max(2.0, base.burst + jitter(2.2)),
+      end:   Math.max(2.0, base.end   + jitter(2.4)),
+      agi:   Math.max(1.5, base.agi   + jitter(2.3)),
+      snow:  Math.max(2.0, base.snow  + jitter(2.6)),
+      might: Math.max(2.5, base.might + jitter(2.6)),
+      surgePhase: Math.random() * Math.PI * 2,
+      surgeFreq: 0.055 + Math.random() * 0.05,
+      lateKick: (Math.random() < 0.38) ? (0.35 + Math.random() * 0.55) : 0
+    };
+  }
+
   function setupRace() {
-    const pH = HORSE_ROSTER[match.playerHorseIdx];
-    const rH = HORSE_ROSTER[match.npcHorseIdx];
+    const pForm = rollRaceDayForm(match.playerHorseIdx);
+    const rForm = rollRaceDayForm(match.npcHorseIdx);
     race = {
       dist: 6500,
       pDist: 0, rDist: 0,
-      pSpd: pH.spd, rSpd: rH.spd,
+      pSpd: pForm.spd, rSpd: rForm.spd,
       pStam: 100, rStam: 100,
       pLane: 0, rLane: 1,
       pStumble: 0, rStumble: 0,
+      pForm: pForm, rForm: rForm,
       obstacles: [],
       countdownVal: 3,
       countdownTimer: 0,
@@ -462,61 +582,73 @@
     }
   }
 
-  // --- AUTONOMOUS AI RACE SIMULATION ---
+  // --- AUTONOMOUS AI RACE SIMULATION (With Increased Organic Chance) ---
   function simulateHorse(isPlayerSide) {
-    const h = isPlayerSide ? HORSE_ROSTER[match.playerHorseIdx] : HORSE_ROSTER[match.npcHorseIdx];
+    const baseH = isPlayerSide ? HORSE_ROSTER[match.playerHorseIdx] : HORSE_ROSTER[match.npcHorseIdx];
+    const form  = isPlayerSide ? race.pForm : race.rForm;
     const course = COURSES[match.courseIdx];
     let dist = isPlayerSide ? race.pDist : race.rDist;
     let stam = isPlayerSide ? race.pStam : race.rStam;
     let stumble = isPlayerSide ? race.pStumble : race.rStumble;
     let lane = isPlayerSide ? race.pLane : race.rLane;
 
-    let targetSpd = h.spd;
+    let targetSpd = form.spd;
+    // Softened surface modifier coefficients so strategy helps, but upsets remain very possible
     if (course.mod === 'SNOW') {
-      targetSpd += (h.snow - 6) * 0.22;
+      targetSpd += (form.snow - 6) * 0.14;
     } else if (course.mod === 'FLAT') {
-      targetSpd += 0.6;
+      targetSpd += 0.45;
     } else if (course.mod === 'BUMPS') {
-      targetSpd += (h.agi - 6) * 0.20;
+      targetSpd += (form.agi - 6) * 0.13;
     } else if (course.mod === 'MUD') {
-      // Lower Fort Garry Spring-Melt Mud: strongly rewards stocky & strong breeds (Draft Horse & Indian Pony)
-      targetSpd += (h.might - 6.5) * 0.28;
+      targetSpd += (form.might - 6.5) * 0.17;
     }
 
     let progress = dist / race.dist;
-    if (progress < 0.25 && h.burst > 6 && stam > 30) {
-      targetSpd += (h.burst * 0.18);
+    if (progress < 0.25 && form.burst > 6 && stam > 30) {
+      targetSpd += (form.burst * 0.15);
       stam -= 0.25;
-    } else if (progress > 0.70 && stam > 20) {
-      targetSpd += (h.end * 0.14);
-      stam -= 0.20;
+    } else if (progress > 0.68 && stam > 15) {
+      targetSpd += (form.end * 0.12) + form.lateKick;
+      stam -= 0.18;
     } else {
-      if (stam < 100) stam += (h.end * 0.04);
+      if (stam < 100) stam += (form.end * 0.04);
+    }
+
+    // Occasional spontaneous mid-race surge ("catching a second wind")
+    if (Math.random() < 0.008 && stam > 25) {
+      targetSpd += 0.75;
+      stam -= 6;
+      if (isPlayerSide) race.logText = `${baseH.name.toUpperCase()} FINDS A SECOND WIND!`;
     }
 
     for (let obs of race.obstacles) {
       let passed = isPlayerSide ? obs.passedP : obs.passedR;
       if (!passed && Math.abs(obs.dist - dist) < 35 && obs.lane === lane) {
         if (isPlayerSide) obs.passedP = true; else obs.passedR = true;
-        let clearChance = (h.agi / 12);
-        if (course.mod === 'SNOW') clearChance += (h.snow / 25);
-        if (course.mod === 'MUD')  clearChance = (h.might / 13) + (h.agi / 24);
+        // Balanced obstacle clear chance with extra luck factor
+        let clearChance = 0.22 + (form.agi / 16);
+        if (course.mod === 'SNOW') clearChance += (form.snow / 32);
+        if (course.mod === 'MUD')  clearChance = 0.20 + (form.might / 18) + (form.agi / 30);
 
         if (Math.random() < clearChance) {
-          if (isPlayerSide) race.logText = `${h.name.toUpperCase()} CLEARS ${course.obs}!`;
+          if (isPlayerSide) race.logText = `${baseH.name.toUpperCase()} CLEARS ${course.obs}!`;
         } else {
-          stumble = (h.fearless || (course.mod === 'MUD' && h.might >= 9)) ? 18 : 40;
-          if (isPlayerSide) race.logText = `${h.name.toUpperCase()} BOGGED IN ${course.obs}!`;
+          stumble = (baseH.fearless || (course.mod === 'MUD' && form.might >= 9)) ? 16 : 32;
+          if (isPlayerSide) race.logText = `${baseH.name.toUpperCase()} BOGGED IN ${course.obs}!`;
         }
       }
     }
 
     if (stumble > 0) {
-      targetSpd *= (course.mod === 'MUD' && h.might >= 9) ? 0.72 : 0.55;
+      targetSpd *= (course.mod === 'MUD' && form.might >= 9) ? 0.76 : 0.62;
       stumble--;
     }
-    targetSpd += (Math.sin(frame * 0.1 + (isPlayerSide ? 0 : 2)) * 0.25);
-    targetSpd = Math.max(1.5, targetSpd);
+
+    // Dynamic stride rhythm + organic momentum wave
+    targetSpd += Math.sin(frame * form.surgeFreq + form.surgePhase) * 0.42;
+    targetSpd += (Math.random() - 0.5) * 0.22;
+    targetSpd = Math.max(1.6, targetSpd);
 
     dist += targetSpd;
 
@@ -527,12 +659,48 @@
     }
   }
 
-  // --- INPUT HANDLING ---
-  function handleInput(cmd) {
+  // --- INPUT ACTION DISPATCHER ---
+  function triggerMenuCommand(cmd) {
     initAudio();
     if (state === 'TITLE') {
       if (cmd === 'BUTTON_A') {
         playTone(440, 'square', 0.1);
+        hubChoice = 0;
+        state = 'HUB';
+      }
+    }
+    else if (state === 'HUB') {
+      if (cmd === 'DPAD_UP' || cmd === 'DPAD_DOWN' || cmd === 'DPAD_LEFT' || cmd === 'DPAD_RIGHT') {
+        hubChoice = (hubChoice + 1) % 2;
+        playTone(340, 'triangle', 0.06);
+      }
+      if (cmd === 'BUTTON_A') {
+        playTone(523, 'square', 0.12);
+        if (hubChoice === 0) {
+          generatePreRaceBoard();
+          state = 'LISTING';
+        } else {
+          grangeIdx = 0;
+          state = 'GRANGE';
+        }
+      }
+    }
+    else if (state === 'GRANGE') {
+      if (cmd === 'DPAD_LEFT') {
+        grangeIdx = (grangeIdx + HORSE_ROSTER.length - 1) % HORSE_ROSTER.length;
+        playTone(350, 'triangle', 0.06);
+      }
+      if (cmd === 'DPAD_RIGHT') {
+        grangeIdx = (grangeIdx + 1) % HORSE_ROSTER.length;
+        playTone(350, 'triangle', 0.06);
+      }
+      if (cmd === 'BUTTON_B') {
+        playTone(420, 'triangle', 0.08);
+        state = 'HUB';
+      }
+      if (cmd === 'BUTTON_A') {
+        // Proceed directly to Race Listing from La Grange
+        playTone(523, 'square', 0.12);
         generatePreRaceBoard();
         state = 'LISTING';
       }
@@ -541,10 +709,6 @@
       if (cmd === 'BUTTON_B') {
         cardSide = (cardSide + 1) % 2;
         setupRow = 0;
-        if (cardSide === 1) {
-          const activeList = raceListings[selListingIdx];
-          breedBrowseIdx = selPrefHorse === 0 ? activeList.horseA : activeList.horseB;
-        }
         playTone(460, 'triangle', 0.08);
         return;
       }
@@ -577,46 +741,30 @@
           }
         }
       } else {
-        if (cmd === 'DPAD_UP' || cmd === 'DPAD_DOWN') {
-          setupRow = (setupRow + 1) % 2;
-          playTone(300, 'triangle', 0.05);
-        }
+        // Secondary Card: Dedicated Full Firebag Wager Stager
         if (cmd === 'DPAD_LEFT') {
+          activeBagSlot = (activeBagSlot + 3) % 4;
           playTone(350, 'triangle', 0.05);
-          if (setupRow === 0) {
-            activeBagSlot = (activeBagSlot + 3) % 4;
-          } else {
-            breedBrowseIdx = (breedBrowseIdx + HORSE_ROSTER.length - 1) % HORSE_ROSTER.length;
-          }
         }
         if (cmd === 'DPAD_RIGHT') {
+          activeBagSlot = (activeBagSlot + 1) % 4;
           playTone(350, 'triangle', 0.05);
-          if (setupRow === 0) {
-            activeBagSlot = (activeBagSlot + 1) % 4;
-          } else {
-            breedBrowseIdx = (breedBrowseIdx + 1) % HORSE_ROSTER.length;
-          }
         }
         if (cmd === 'BUTTON_A') {
-          if (setupRow === 0) {
-            let k = ITEMS[activeBagSlot].key;
-            let owned = firebag[k];
-            if (owned > 0) {
-              let nextQty = (stagedBet[k] + 1) % (owned + 1);
-              let otherStaged = getBagScore(stagedBet) - (stagedBet[k] * ITEMS[activeBagSlot].val);
-              if (nextQty === 0 && otherStaged === 0) {
-                nextQty = 1;
-                playTone(220, 'sawtooth', 0.06);
-              } else {
-                stagedBet[k] = nextQty;
-                playTone(420, 'triangle', 0.06);
-              }
+          let k = ITEMS[activeBagSlot].key;
+          let owned = firebag[k];
+          if (owned > 0) {
+            let nextQty = (stagedBet[k] + 1) % (owned + 1);
+            let otherStaged = getBagScore(stagedBet) - (stagedBet[k] * ITEMS[activeBagSlot].val);
+            if (nextQty === 0 && otherStaged === 0) {
+              nextQty = 1;
+              playTone(220, 'sawtooth', 0.06);
             } else {
-              playTone(180, 'sawtooth', 0.06);
+              stagedBet[k] = nextQty;
+              playTone(420, 'triangle', 0.06);
             }
           } else {
-            breedBrowseIdx = (breedBrowseIdx + 1) % HORSE_ROSTER.length;
-            playTone(380, 'triangle', 0.05);
+            playTone(180, 'sawtooth', 0.06);
           }
         }
       }
@@ -643,16 +791,108 @@
           resetFirebag();
           state = 'TITLE';
         } else {
-          generatePreRaceBoard();
-          state = 'LISTING';
+          hubChoice = 0;
+          state = 'HUB';
         }
       }
     }
   }
 
+  // --- ARCADE CABINET POSTMESSAGE BRIDGE (Single Source of Truth) ---
+  const dpadHold = {
+    UP:    { active: false, holdUntil: 0, nextRepeat: 0 },
+    DOWN:  { active: false, holdUntil: 0, nextRepeat: 0 },
+    LEFT:  { active: false, holdUntil: 0, nextRepeat: 0 },
+    RIGHT: { active: false, holdUntil: 0, nextRepeat: 0 }
+  };
+  const btnDebounce = { BUTTON_A: 0, BUTTON_B: 0 };
+  const HOLD_WINDOW_MS = 145;
+  const REPEAT_DELAY_MS = 185;
+  const DEBOUNCE_MS = 110;
+
+  function clearInputStates() {
+    for (const dir in dpadHold) {
+      dpadHold[dir].active = false;
+      dpadHold[dir].holdUntil = 0;
+      dpadHold[dir].nextRepeat = 0;
+    }
+  }
+
+  function processHeldInputs(now) {
+    for (const dir in dpadHold) {
+      const slot = dpadHold[dir];
+      if (!slot.active) continue;
+      if (now > slot.holdUntil) {
+        slot.active = false;
+        continue;
+      }
+      if (now >= slot.nextRepeat) {
+        triggerMenuCommand('DPAD_' + dir);
+        slot.nextRepeat = now + REPEAT_DELAY_MS;
+      }
+    }
+  }
+
+  window.addEventListener('message', function(event) {
+    const raw = event.data;
+    const msg = (typeof raw === 'string') ? raw : (raw && (raw.type || raw.action || raw.cmd));
+    if (!msg || typeof msg !== 'string') return;
+
+    if (msg === 'PAUSE') {
+      isPaused = true;
+      clearInputStates();
+      return;
+    }
+    if (msg === 'RESUME') {
+      isPaused = false;
+      clearInputStates();
+      return;
+    }
+    if (isPaused) return;
+
+    const now = performance.now();
+
+    const cardinals = ['UP', 'DOWN', 'LEFT', 'RIGHT'];
+    for (const dir of cardinals) {
+      if (msg === `DPAD_${dir}` || msg === `DPAD_${dir}_PRESS`) {
+        const slot = dpadHold[dir];
+        if (!slot.active) {
+          triggerMenuCommand(`DPAD_${dir}`);
+          slot.nextRepeat = now + REPEAT_DELAY_MS;
+        }
+        slot.active = true;
+        slot.holdUntil = now + HOLD_WINDOW_MS;
+        return;
+      }
+      if (msg === `DPAD_${dir}_RELEASE`) {
+        dpadHold[dir].active = false;
+        dpadHold[dir].holdUntil = 0;
+        return;
+      }
+    }
+
+    if (msg === 'BUTTON_A' || msg === 'BUTTON_A_PRESS') {
+      if (now - btnDebounce.BUTTON_A >= DEBOUNCE_MS) {
+        btnDebounce.BUTTON_A = now;
+        triggerMenuCommand('BUTTON_A');
+      }
+      return;
+    }
+    if (msg === 'BUTTON_B' || msg === 'BUTTON_B_PRESS') {
+      if (now - btnDebounce.BUTTON_B >= DEBOUNCE_MS) {
+        btnDebounce.BUTTON_B = now;
+        triggerMenuCommand('BUTTON_B');
+      }
+      return;
+    }
+  });
+
   // --- UPDATE LOOP ---
   function update() {
+    if (isPaused) return;
+    processHeldInputs(performance.now());
     frame++;
+
     if (state === 'COUNTDOWN') {
       race.countdownTimer--;
       if (race.countdownTimer <= 0) {
@@ -804,6 +1044,183 @@
     }
   }
 
+  // Relaxed / Resting Horse Renderer for La Grange Dwellings (No rider)
+  function drawIdleHorse(x, y, horseIdx, scale = 3) {
+    const h = HORSE_ROSTER[horseIdx];
+    const coat = PAL.COATS[h.coat];
+    // Slow, laid-back breathing/grazing cycle (~1.8s per pose)
+    const poseIdx = Math.floor(frame / 55) % 2;
+    const matrix = IDLE_HORSE_FRAMES[poseIdx];
+
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(x + 4 * scale, y + 13 * scale, 15 * scale, 2 * scale);
+
+    const pMap = {
+      '1': PAL.BLACK,
+      '2': coat.b,
+      '3': coat.h,
+      '4': coat.s,
+      '5': coat.m,
+      '9': coat.sp ? coat.sp : coat.b
+    };
+
+    for (let r = 0; r < matrix.length; r++) {
+      for (let c = 0; c < matrix[r].length; c++) {
+        const ch = matrix[r][c];
+        if (ch !== '0') {
+          ctx.fillStyle = pMap[ch];
+          ctx.fillRect(x + c * scale, y + r * scale, scale, scale);
+        }
+      }
+    }
+  }
+
+  // --- FULL-SCREEN LA GRANGE DWELLING SCENES ---
+  function drawGrangeDwelling(horseIdx) {
+    const h = HORSE_ROSTER[horseIdx];
+    const cx = Math.floor(VIEW_W / 2);
+
+    if (h.dwelling === 'POST') {
+      // 1. Buffalo Runner: Tied to a wooden hitching post outside a Red River wood log house
+      ctx.fillStyle = '#2B7BB9'; ctx.fillRect(0, 0, VIEW_W, 55);
+      ctx.fillStyle = '#5BA4DC'; ctx.fillRect(0, 55, VIEW_W, 45);
+      ctx.fillStyle = '#9AD0F5'; ctx.fillRect(0, 100, VIEW_W, 25);
+
+      // Prairie ground & yard
+      ctx.fillStyle = PAL.BRIGHT_GREEN; ctx.fillRect(0, 118, VIEW_W, 30);
+      ctx.fillStyle = '#8C5F27';       ctx.fillRect(0, 144, VIEW_W, VIEW_H - 144);
+
+      // Red River Squared-Log & Whitewashed House on the Left
+      const hx = cx - 145;
+      const hy = 52;
+      // Timber/Lime walls
+      ctx.fillStyle = PAL.LIMESTONE_LIGHT; ctx.fillRect(hx, hy + 28, 118, 66);
+      ctx.fillStyle = '#7B3F1D';
+      for (let logY = 0; logY < 66; logY += 11) {
+        ctx.fillRect(hx, hy + 28 + logY, 118, 2);
+      }
+      // Pitched Red Shingle Roof & Stone Chimney
+      ctx.fillStyle = PAL.LIMESTONE_MID; ctx.fillRect(hx + 88, hy - 4, 14, 24);
+      ctx.fillStyle = PAL.BORDEAUX;      ctx.fillRect(hx - 6, hy + 18, 130, 12);
+      ctx.fillStyle = PAL.RED;           ctx.fillRect(hx + 4, hy + 8, 110, 12);
+      ctx.fillStyle = PAL.BORDEAUX;      ctx.fillRect(hx + 16, hy + 2, 86, 8);
+      // Timber Door & Window
+      ctx.fillStyle = '#3E2723'; ctx.fillRect(hx + 22, hy + 52, 22, 42);
+      ctx.fillStyle = PAL.OCEAN; ctx.fillRect(hx + 66, hy + 48, 24, 22);
+      ctx.fillStyle = PAL.WHITE; ctx.fillRect(hx + 77, hy + 48, 2, 22); ctx.fillRect(hx + 66, hy + 58, 24, 2);
+
+      // Wooden Hitching Post & Rope Lead
+      const postX = cx + 68;
+      const postY = 108;
+      ctx.fillStyle = '#4A220D'; ctx.fillRect(postX, postY, 8, 44);
+      ctx.fillStyle = '#7B3F1D'; ctx.fillRect(postX + 2, postY, 3, 44);
+      ctx.fillStyle = PAL.GOLD;  ctx.fillRect(postX - 2, postY + 8, 12, 3);
+
+      // Laid-back Buffalo Runner tied to the post
+      const hxPos = cx - 16;
+      const hyPos = 104;
+      drawIdleHorse(hxPos, hyPos, horseIdx, 3);
+
+      // Slack Hitching Rope connecting muzzle to post
+      const headDip = (Math.floor(frame / 55) % 2) * 6;
+      ctx.fillStyle = PAL.PRAIRIE_TAN;
+      ctx.fillRect(hxPos + 64, hyPos + 14 + headDip, 10, 2);
+      ctx.fillRect(hxPos + 72, hyPos + 16 + headDip, 12, 2);
+    }
+    else if (h.dwelling === 'CAMP') {
+      // 2. Indian Pony: Standing calmly by a snowy winter riverbank camp & smoke-rising tipi
+      ctx.fillStyle = '#4A89AC'; ctx.fillRect(0, 0, VIEW_W, 55);
+      ctx.fillStyle = '#7EB5D6'; ctx.fillRect(0, 55, VIEW_W, 45);
+      ctx.fillStyle = PAL.ICE_LIGHT; ctx.fillRect(0, 100, VIEW_W, 48);
+      ctx.fillStyle = PAL.ICE_MID;   ctx.fillRect(0, 148, VIEW_W, VIEW_H - 148);
+
+      drawSnowSpruce(cx - 148, 62, 1.7);
+      drawSnowSpruce(cx + 115, 66, 1.5);
+      drawWinterTipi(cx - 105, 86, 0);
+      drawWinterGrassClump(cx + 85, 134);
+
+      drawIdleHorse(cx - 24, 102, horseIdx, 3);
+    }
+    else if (h.dwelling === 'BUSH') {
+      // 3. Canadian Bush Pony: Surrounded by wild boreal spruce, willows & mossy bush
+      ctx.fillStyle = '#2B6E5C'; ctx.fillRect(0, 0, VIEW_W, 55);
+      ctx.fillStyle = '#4A9E86'; ctx.fillRect(0, 55, VIEW_W, 45);
+      ctx.fillStyle = PAL.DARK_GREEN;  ctx.fillRect(0, 96, VIEW_W, 44);
+      ctx.fillStyle = PAL.MUTED_GREEN; ctx.fillRect(0, 140, VIEW_W, VIEW_H - 140);
+
+      // Dense wild spruce & willow thicket framing the pony
+      drawSnowSpruce(cx - 145, 58, 1.8);
+      drawRiverbankTree(cx - 110, 74, true);
+      drawRiverbankTree(cx + 82, 70, false);
+      drawSnowSpruce(cx + 112, 60, 1.7);
+      drawPrairieGrassTuft(cx - 75, 134, true);
+      drawPrairieGrassTuft(cx + 68, 136, true);
+
+      drawIdleHorse(cx - 32, 102, horseIdx, 3);
+    }
+    else if (h.dwelling === 'BARN') {
+      // 4. Cart & Draft Horse: Resting beside a timber cart shed & Red River cart wheels
+      ctx.fillStyle = '#2B7BB9'; ctx.fillRect(0, 0, VIEW_W, 55);
+      ctx.fillStyle = '#5BA4DC'; ctx.fillRect(0, 55, VIEW_W, 45);
+      ctx.fillStyle = PAL.BRIGHT_GREEN; ctx.fillRect(0, 100, VIEW_W, 42);
+      ctx.fillStyle = '#7B3F1D';       ctx.fillRect(0, 142, VIEW_W, VIEW_H - 142);
+
+      // Timber Cart Barn on Left
+      const bx = cx - 145;
+      ctx.fillStyle = '#4A220D'; ctx.fillRect(bx, 62, 105, 80);
+      ctx.fillStyle = '#7B3F1D'; ctx.fillRect(bx + 4, 66, 97, 74);
+      ctx.fillStyle = PAL.BORDEAUX; ctx.fillRect(bx - 6, 50, 117, 14);
+      ctx.fillStyle = PAL.BLACK;    ctx.fillRect(bx + 36, 92, 36, 50);
+
+      drawRedRiverCart(cx + 68, 122, true);
+      drawIdleHorse(cx - 26, 102, horseIdx, 3);
+    }
+    else if (h.dwelling === 'LEANTO') {
+      // 5. Officers Mount: Standing in a wooden lean-to shelter against Upper Fort Garry stone wall
+      ctx.fillStyle = '#1E6B9C'; ctx.fillRect(0, 0, VIEW_W, 55);
+      ctx.fillStyle = '#4A9ED1'; ctx.fillRect(0, 55, VIEW_W, 45);
+      ctx.fillStyle = PAL.LUSH_GREEN; ctx.fillRect(0, 100, VIEW_W, 44);
+      ctx.fillStyle = '#8C5F27';      ctx.fillRect(0, 144, VIEW_W, VIEW_H - 144);
+
+      // Limestone Fort Backdrop Wall
+      ctx.fillStyle = PAL.LIMESTONE_MID;
+      ctx.fillRect(cx - 145, 58, 290, 86);
+      ctx.fillStyle = PAL.LIMESTONE_DARK;
+      for (let r = 0; r < 86; r += 12) ctx.fillRect(cx - 145, 58 + r, 290, 2);
+
+      // Sloped Timber Lean-To Shelter Roof & Posts over the Officer's Mount
+      ctx.fillStyle = '#3E2723';
+      ctx.fillRect(cx - 65, 74, 130, 8);
+      ctx.fillRect(cx - 58, 82, 8, 64);
+      ctx.fillRect(cx + 50, 82, 8, 64);
+      ctx.fillStyle = '#7B3F1D';
+      ctx.fillRect(cx - 68, 68, 136, 7);
+
+      drawIdleHorse(cx - 34, 102, horseIdx, 3);
+    }
+    else {
+      // 6. Appaloosa: Grazing in an open split-rail prairie corral
+      ctx.fillStyle = '#2B7BB9'; ctx.fillRect(0, 0, VIEW_W, 55);
+      ctx.fillStyle = '#5BA4DC'; ctx.fillRect(0, 55, VIEW_W, 45);
+      ctx.fillStyle = PAL.BRIGHT_GREEN; ctx.fillRect(0, 100, VIEW_W, 44);
+      ctx.fillStyle = PAL.PRAIRIE_GOLD; ctx.fillRect(0, 144, VIEW_W, VIEW_H - 144);
+
+      // Split-rail corral fence across midground
+      ctx.fillStyle = '#4A220D';
+      for (let fx = cx - 140; fx <= cx + 140; fx += 70) {
+        ctx.fillRect(fx, 114, 6, 32);
+      }
+      ctx.fillStyle = '#7B3F1D';
+      ctx.fillRect(cx - 145, 120, 290, 4);
+      ctx.fillRect(cx - 145, 132, 290, 4);
+
+      drawPrairieGrassTuft(cx - 95, 136, false);
+      drawPrairieGrassTuft(cx + 80, 138, true);
+
+      drawIdleHorse(cx - 34, 102, horseIdx, 3);
+    }
+  }
+
   // --- SCENERY SPRITES ---
 
   function drawSnowSpruce(x, y, hScale = 1) {
@@ -918,30 +1335,24 @@
     }
   }
 
-  // Birchbark Domed Wigwam (For Lower Fort Garry rocky riverbank)
   function drawWigwam(x, y) {
-    // Domed Birchbark Frame
     ctx.fillStyle = PAL.HIDE;
     ctx.fillRect(x + 6, y + 2, 12, 3);
     ctx.fillRect(x + 3, y + 5, 18, 5);
     ctx.fillRect(x + 1, y + 10, 22, 8);
-    // Shaded Right Half & Bark Banding
     ctx.fillStyle = '#B8B0A0';
     ctx.fillRect(x + 12, y + 2, 6, 3);
     ctx.fillRect(x + 12, y + 5, 9, 5);
     ctx.fillRect(x + 12, y + 10, 11, 8);
-    // Horizontal Ash Lashings & Birch Bark Seams
     ctx.fillStyle = '#5C3A21';
     ctx.fillRect(x + 3, y + 7, 18, 1);
     ctx.fillRect(x + 1, y + 12, 22, 1);
-    // Arched Doorway
     ctx.fillStyle = PAL.BLACK;
     ctx.fillRect(x + 9, y + 11, 5, 7);
     ctx.fillStyle = PAL.BORDEAUX;
     ctx.fillRect(x + 8, y + 10, 7, 1);
   }
 
-  // Pre-Canadian Shield Granite Boulder Outcrop (For Lower Fort Garry)
   function drawShieldBoulder(x, y, size = 1) {
     const w = Math.floor(16 * size);
     const h = Math.floor(9 * size);
@@ -1074,25 +1485,20 @@
     ctx.fillRect(x + 7, y - 6, 6, 1);
   }
 
-  // Historic St. Andrews on the Red Anglican Stone Church (1849 Limestone Church & Square Tower at Finish Line)
   function drawStAndrewsStoneChurch(x, y) {
-    // 1. Main Tyndall Limestone Sanctuary Nave
     ctx.fillStyle = PAL.LIMESTONE_MID;
     ctx.fillRect(x + 18, y + 16, 42, 20);
     ctx.fillStyle = PAL.LIMESTONE_LIGHT;
     ctx.fillRect(x + 18, y + 16, 38, 16);
-    // Stone Ashlar Masonry Lines
     ctx.fillStyle = PAL.LIMESTONE_DARK;
     ctx.fillRect(x + 18, y + 32, 42, 4);
     for (let r = 0; r < 4; r++) {
       ctx.fillRect(x + 18, y + 20 + r * 4, 42, 1);
     }
-    // Steeply Pitched Dark Shingle Roof
     ctx.fillStyle = PAL.GRAY_DARK;
     ctx.fillRect(x + 16, y + 11, 46, 5);
     ctx.fillStyle = PAL.SHIELD_MID;
     ctx.fillRect(x + 18, y + 8, 42, 4);
-    // Gothic Pointed-Arch Stained Windows along Nave
     for (let w = 0; w < 3; w++) {
       let wx = x + 24 + w * 11;
       ctx.fillStyle = PAL.BLACK;
@@ -1102,29 +1508,24 @@
       ctx.fillStyle = PAL.GOLD;
       ctx.fillRect(wx + 1, y + 20, 2, 1);
     }
-    // East Chancel Apse
     ctx.fillStyle = PAL.LIMESTONE_MID;
     ctx.fillRect(x + 60, y + 20, 8, 16);
     ctx.fillStyle = PAL.GRAY_DARK;
     ctx.fillRect(x + 60, y + 16, 9, 4);
 
-    // 2. Iconic Square Limestone West Bell Tower & Octagonal Broach Spire
     ctx.fillStyle = PAL.LIMESTONE_LIGHT;
     ctx.fillRect(x + 4, y + 8, 15, 28);
     ctx.fillStyle = PAL.LIMESTONE_DARK;
     ctx.fillRect(x + 4, y + 8, 2, 28);
     ctx.fillRect(x + 17, y + 8, 2, 28);
-    // Stone Stringcourses
     ctx.fillRect(x + 4, y + 17, 15, 1);
     ctx.fillRect(x + 4, y + 26, 15, 1);
-    // Belfry Louvers & Timber Entrance
     ctx.fillStyle = PAL.BLACK;
     ctx.fillRect(x + 8, y + 10, 7, 5);
     ctx.fillStyle = PAL.GOLD;
     ctx.fillRect(x + 10, y + 11, 3, 3);
     ctx.fillStyle = '#3E2723';
     ctx.fillRect(x + 8, y + 28, 7, 8);
-    // Broach Spire & Cross
     ctx.fillStyle = PAL.GRAY_DARK;
     ctx.fillRect(x + 3, y + 5, 17, 3);
     ctx.fillStyle = PAL.SHIELD_MID;
@@ -1162,7 +1563,6 @@
     }
   }
 
-  // Historic Stone Fort (Shared between Upper Fort Garry finish and Lower Fort Garry start line)
   function drawStoneFort(x, y, scale = 0.80) {
     ctx.save();
     ctx.translate(x, y);
@@ -1178,7 +1578,6 @@
     ctx.fillStyle = PAL.LIMESTONE_LIGHT;
     ctx.fillRect(14, 21, 112, 2);
 
-    // Governor Simpson's Residence / Big House
     ctx.fillStyle = PAL.LIMESTONE_LIGHT;
     ctx.fillRect(32, 10, 34, 12);
     ctx.fillStyle = PAL.BORDEAUX;
@@ -1193,7 +1592,6 @@
     ctx.fillRect(47, 13, 3, 4);
     ctx.fillRect(57, 13, 3, 4);
 
-    // Stone Warehouse & HBC Flagstaff
     ctx.fillStyle = PAL.LIMESTONE_MID;
     ctx.fillRect(76, 12, 28, 10);
     ctx.fillStyle = '#4A220D';
@@ -1207,7 +1605,6 @@
     ctx.fillStyle = PAL.WHITE;
     ctx.fillRect(78, -5, 5, 2);
 
-    // Main Stone Gatehouse
     ctx.fillStyle = PAL.LIMESTONE_LIGHT;
     ctx.fillRect(58, 16, 24, 28);
     ctx.fillStyle = PAL.LIMESTONE_DARK;
@@ -1224,7 +1621,6 @@
     ctx.fillStyle = PAL.BLACK;
     ctx.fillRect(69, 27, 2, 17);
 
-    // Cylindrical Limestone Corner Bastions
     const bastions = [4, 116];
     bastions.forEach(bx => {
       ctx.fillStyle = PAL.LIMESTONE_MID;
@@ -1289,7 +1685,6 @@
       ctx.fillStyle = PAL.MUTED_GREEN;
       ctx.fillRect(x, y + Math.floor(h * 0.42), w, Math.ceil(h * 0.58));
     } else {
-      // Lower Fort Garry Preview: Pre-Canadian Shield boulders, wigwam, marsh & spring-melt mud track
       ctx.fillStyle = PAL.MARSH_REED;
       ctx.fillRect(x, y + 15, w, 6);
       drawShieldBoulder(x + 8, y + 13, 0.7);
@@ -1297,7 +1692,6 @@
       drawSnowSpruce(x + 68, y + 4, 0.65);
       ctx.fillStyle = PAL.OCEAN;
       ctx.fillRect(x, y + 21, w, 4);
-      // Heavy Spring-Melt Mud Track
       ctx.fillStyle = PAL.MARSH_MUD;
       ctx.fillRect(x, y + Math.floor(h * 0.42), w, Math.ceil(h * 0.58));
       ctx.fillStyle = PAL.MARSH_WET;
@@ -1313,20 +1707,22 @@
     drawDetailedHorse(x + 48, y + 34, listing.horseB, listing.riderB, anim + 1, false, 1.35);
   }
 
+  // --- FULL-BLEED DYNAMIC WIDTH COURSE BACKDROPS ---
   function drawCourseBackdrop(courseIdx, scrollPx) {
     const c = COURSES[courseIdx];
     const isRaceView = (state === 'RACING' || state === 'PHOTO_FINISH' || state === 'RUNOUT' || state === 'RESULT' || state === 'READY' || state === 'COUNTDOWN');
+    const bgSpan = VIEW_W + 480;
 
     if (c.mod === 'SNOW') {
-      ctx.fillStyle = '#4A89AC'; ctx.fillRect(0, 0, 320, 42);
-      ctx.fillStyle = '#7EB5D6'; ctx.fillRect(0, 42, 320, 30);
-      ctx.fillStyle = '#B8DFEE'; ctx.fillRect(0, 72, 320, 18);
+      ctx.fillStyle = '#4A89AC'; ctx.fillRect(0, 0, VIEW_W, 42);
+      ctx.fillStyle = '#7EB5D6'; ctx.fillRect(0, 42, VIEW_W, 30);
+      ctx.fillStyle = '#B8DFEE'; ctx.fillRect(0, 72, VIEW_W, 18);
 
-      ctx.fillStyle = PAL.ICE_LIGHT; ctx.fillRect(0, 84, 320, 14);
-      ctx.fillStyle = '#B0C4DE';     ctx.fillRect(0, 98, 320, 6);
+      ctx.fillStyle = PAL.ICE_LIGHT; ctx.fillRect(0, 84, VIEW_W, 14);
+      ctx.fillStyle = '#B0C4DE';     ctx.fillRect(0, 98, VIEW_W, 6);
 
       let bgOff = (scrollPx * 0.28) % 240;
-      for (let i = -240; i < 560; i += 240) {
+      for (let i = -240; i < bgSpan; i += 240) {
         drawSnowSpruce(i - bgOff + 18, 64, 1.15);
         drawSnowSpruce(i - bgOff + 38, 69, 0.95);
         drawWinterGrassClump(i - bgOff + 64, 86);
@@ -1339,19 +1735,19 @@
 
       if (isRaceView) {
         let finishX = 48 + (race.dist - scrollPx);
-        if (finishX > -120 && finishX < 380) {
+        if (finishX > -120 && finishX < VIEW_W + 120) {
           drawWinterTipi(finishX - 28, 68, 0);
           drawWinterTipi(finishX + 4,  70, 9);
           drawWinterTipi(finishX + 34, 67, 17);
         }
       }
 
-      ctx.fillStyle = PAL.ICE_DARK; ctx.fillRect(0, 104, 320, 8);
-      ctx.fillStyle = PAL.ICE_MID;  ctx.fillRect(0, 112, 320, 63);
-      ctx.fillStyle = PAL.ICE_LIGHT;ctx.fillRect(0, 175, 320, 65);
+      ctx.fillStyle = PAL.ICE_DARK; ctx.fillRect(0, 104, VIEW_W, 8);
+      ctx.fillStyle = PAL.ICE_MID;  ctx.fillRect(0, 112, VIEW_W, 63);
+      ctx.fillStyle = PAL.ICE_LIGHT;ctx.fillRect(0, 175, VIEW_W, VIEW_H - 175);
 
       let fgOff = scrollPx % 160;
-      for (let i = -160; i < 480; i += 80) {
+      for (let i = -160; i < bgSpan; i += 80) {
         ctx.fillStyle = PAL.WHITE;
         ctx.fillRect(i - fgOff + 10, 125, 24, 2);
         ctx.fillRect(i - fgOff + 45, 190, 30, 2);
@@ -1361,15 +1757,15 @@
       }
     } 
     else if (c.mod === 'FLAT') {
-      ctx.fillStyle = '#2B7BB9'; ctx.fillRect(0, 0, 320, 45);
-      ctx.fillStyle = '#5BA4DC'; ctx.fillRect(0, 45, 320, 35);
-      ctx.fillStyle = '#9AD0F5'; ctx.fillRect(0, 80, 320, 20);
+      ctx.fillStyle = '#2B7BB9'; ctx.fillRect(0, 0, VIEW_W, 45);
+      ctx.fillStyle = '#5BA4DC'; ctx.fillRect(0, 45, VIEW_W, 35);
+      ctx.fillStyle = '#9AD0F5'; ctx.fillRect(0, 80, VIEW_W, 20);
 
-      ctx.fillStyle = PAL.BRIGHT_GREEN; ctx.fillRect(0, 90, 320, 14);
-      ctx.fillStyle = PAL.PRAIRIE_GOLD; ctx.fillRect(0, 102, 320, 12);
+      ctx.fillStyle = PAL.BRIGHT_GREEN; ctx.fillRect(0, 90, VIEW_W, 14);
+      ctx.fillStyle = PAL.PRAIRIE_GOLD; ctx.fillRect(0, 102, VIEW_W, 12);
 
       let bgOff = (scrollPx * 0.3) % 480;
-      for (let i = -480; i < 960; i += 480) {
+      for (let i = -480; i < VIEW_W + 960; i += 480) {
         drawPrairieGrassTuft(i - bgOff + 14,  94, false);
         drawPrairieGrassTuft(i - bgOff + 32,  98, true);
         drawTipi(i - bgOff + 62, 74);
@@ -1388,45 +1784,44 @@
 
       if (isRaceView) {
         let finishX = 48 + (race.dist - scrollPx);
-        if (finishX > -120 && finishX < 380) {
+        if (finishX > -120 && finishX < VIEW_W + 120) {
           drawRedRiverCartCircle(finishX - 24, 84);
         }
       }
 
-      ctx.fillStyle = '#8C5F27'; ctx.fillRect(0, 114, 320, 6);
-      ctx.fillStyle = '#C68E45'; ctx.fillRect(0, 120, 320, 60);
-      ctx.fillStyle = '#D9A45B'; ctx.fillRect(0, 180, 320, 60);
+      ctx.fillStyle = '#8C5F27'; ctx.fillRect(0, 114, VIEW_W, 6);
+      ctx.fillStyle = '#C68E45'; ctx.fillRect(0, 120, VIEW_W, 60);
+      ctx.fillStyle = '#D9A45B'; ctx.fillRect(0, 180, VIEW_W, VIEW_H - 180);
 
       let fgOff = scrollPx % 160;
       ctx.fillStyle = '#8C5F27';
-      for (let i = -160; i < 480; i += 40) {
+      for (let i = -160; i < bgSpan; i += 40) {
         ctx.fillRect(i - fgOff + 12, 130, 6, 2);
         ctx.fillRect(i - fgOff + 28, 205, 8, 2);
       }
     } 
     else if (c.mod === 'BUMPS') {
-      // 3. Upper Fort Garry (Summer Forks)
-      ctx.fillStyle = '#1E6B9C'; ctx.fillRect(0, 0, 320, 42);
-      ctx.fillStyle = '#4A9ED1'; ctx.fillRect(0, 42, 320, 28);
-      ctx.fillStyle = '#8BC8EC'; ctx.fillRect(0, 70, 320, 12);
+      ctx.fillStyle = '#1E6B9C'; ctx.fillRect(0, 0, VIEW_W, 42);
+      ctx.fillStyle = '#4A9ED1'; ctx.fillRect(0, 42, VIEW_W, 28);
+      ctx.fillStyle = '#8BC8EC'; ctx.fillRect(0, 70, VIEW_W, 12);
 
-      ctx.fillStyle = PAL.LUSH_GREEN;   ctx.fillRect(0, 76, 320, 8);
-      ctx.fillStyle = PAL.BRIGHT_GREEN; ctx.fillRect(0, 84, 320, 12);
+      ctx.fillStyle = PAL.LUSH_GREEN;   ctx.fillRect(0, 76, VIEW_W, 8);
+      ctx.fillStyle = PAL.BRIGHT_GREEN; ctx.fillRect(0, 84, VIEW_W, 12);
 
       let finishX = isRaceView ? (48 + (race.dist - scrollPx)) : 99999;
       let fortX = finishX - 28;
       let valleyX = fortX - 96;
       let schoolhouseX = valleyX - 58;
 
-      let hardstopScreenX = isRaceView ? (schoolhouseX - 4) : 320;
+      let hardstopScreenX = isRaceView ? (schoolhouseX - 4) : VIEW_W;
       if (hardstopScreenX > 0) {
         ctx.save();
         ctx.beginPath();
-        ctx.rect(0, 0, Math.min(320, hardstopScreenX), 96);
+        ctx.rect(0, 0, Math.min(VIEW_W, hardstopScreenX), 96);
         ctx.clip();
 
         let bgOff = (scrollPx * 0.35) % 640;
-        for (let i = -640; i < 1280; i += 640) {
+        for (let i = -640; i < VIEW_W + 1280; i += 640) {
           drawRiverbankTree(i - bgOff + 28,  58, true);
           drawRiverbankTree(i - bgOff + 44,  60, false);
           drawRedRiverHouse(i - bgOff + 125, 65, true);
@@ -1439,11 +1834,11 @@
       }
 
       if (isRaceView) {
-        if (schoolhouseX > -70 && schoolhouseX < 350) {
+        if (schoolhouseX > -70 && schoolhouseX < VIEW_W + 70) {
           drawParishSchoolhouseChurch(schoolhouseX, 56);
         }
 
-        if (valleyX > -160 && valleyX < 380) {
+        if (valleyX > -160 && valleyX < VIEW_W + 160) {
           ctx.fillStyle = '#8BC8EC';
           ctx.fillRect(valleyX,      74, 88, 6);
           ctx.fillRect(valleyX + 8,  80, 72, 6);
@@ -1464,13 +1859,13 @@
           ctx.fillRect(valleyX + 46, 91 + ((flowShift + 2) % 4), 18, 2);
         }
 
-        if (fortX > -160 && fortX < 360) {
+        if (fortX > -160 && fortX < VIEW_W + 160) {
           drawStoneFort(fortX, 42, 0.80);
         }
       }
 
       let bgOff = (scrollPx * 0.35) % 640;
-      for (let i = -320; i < 640; i += 320) {
+      for (let i = -320; i < VIEW_W + 640; i += 320) {
         const tufts = [
           { dx: 18, lush: true },
           { dx: 88, lush: false },
@@ -1487,7 +1882,7 @@
       }
 
       ctx.fillStyle = PAL.DARK_GREEN;
-      for (let sx = -160; sx < 480; sx += 24) {
+      for (let sx = -160; sx < bgSpan; sx += 24) {
         let bx = sx - (bgOff % 24);
         if (bx < valleyX + 12 || bx > valleyX + 74) {
           ctx.fillRect(bx + 2, 93, 10, 3);
@@ -1497,21 +1892,21 @@
         }
       }
 
-      ctx.fillStyle = PAL.OCEAN; ctx.fillRect(0, 96, 320, 12);
+      ctx.fillStyle = PAL.OCEAN; ctx.fillRect(0, 96, VIEW_W, 12);
       ctx.fillStyle = PAL.SEA_GREEN;
       let waterTick = (state === 'PHOTO_FINISH') ? 0 : frame;
       let waterOff = (scrollPx * 0.5 + waterTick * 0.6) % 80;
-      for (let wx = -80; wx < 400; wx += 80) {
+      for (let wx = -80; wx < VIEW_W + 160; wx += 80) {
         ctx.fillRect(wx - waterOff + 10, 99, 18, 1);
         ctx.fillRect(wx - waterOff + 42, 104, 22, 1);
       }
 
-      ctx.fillStyle = PAL.DARK_GREEN;  ctx.fillRect(0, 108, 320, 8);
-      ctx.fillStyle = PAL.MUTED_GREEN; ctx.fillRect(0, 116, 320, 62);
-      ctx.fillStyle = PAL.LUSH_GREEN;  ctx.fillRect(0, 178, 320, 62);
+      ctx.fillStyle = PAL.DARK_GREEN;  ctx.fillRect(0, 108, VIEW_W, 8);
+      ctx.fillStyle = PAL.MUTED_GREEN; ctx.fillRect(0, 116, VIEW_W, 62);
+      ctx.fillStyle = PAL.LUSH_GREEN;  ctx.fillRect(0, 178, VIEW_W, VIEW_H - 178);
 
       let fgOff = scrollPx % 160;
-      for (let i = -160; i < 480; i += 80) {
+      for (let i = -160; i < bgSpan; i += 80) {
         drawPrairieGrassTuft(i - fgOff + 14, 106, true);
         drawPrairieGrassTuft(i - fgOff + 52, 107, false);
         ctx.fillStyle = PAL.DARK_GREEN;
@@ -1521,24 +1916,20 @@
       }
     }
     else {
-      // 4. Lower Fort Garry (Spring Melt Marsh & Pre-Canadian Shield toward Lake Winnipeg)
-      // Starts at Gov. Simpson's Stone Fort -> Rocky Shield Shore with Wigwams & Village Houses -> St. Andrews Stone Church at Finish!
-      ctx.fillStyle = '#33658A'; ctx.fillRect(0, 0, 320, 42);
-      ctx.fillStyle = '#588BAE'; ctx.fillRect(0, 42, 320, 28);
-      ctx.fillStyle = '#9BC1BC'; ctx.fillRect(0, 70, 320, 12);
+      // 4. Lower Fort Garry
+      ctx.fillStyle = '#33658A'; ctx.fillRect(0, 0, VIEW_W, 42);
+      ctx.fillStyle = '#588BAE'; ctx.fillRect(0, 42, VIEW_W, 28);
+      ctx.fillStyle = '#9BC1BC'; ctx.fillRect(0, 70, VIEW_W, 12);
 
-      // Marshy Pre-Canadian Shield Far Bank (Olive/Moss Marsh Grass & Granite Ledges, y: 76 to 96)
-      ctx.fillStyle = PAL.MARSH_REED;  ctx.fillRect(0, 76, 320, 9);
-      ctx.fillStyle = PAL.MUTED_GREEN; ctx.fillRect(0, 85, 320, 11);
+      ctx.fillStyle = PAL.MARSH_REED;  ctx.fillRect(0, 76, VIEW_W, 9);
+      ctx.fillStyle = PAL.MUTED_GREEN; ctx.fillRect(0, 85, VIEW_W, 11);
 
       let startFortX = isRaceView ? (18 - scrollPx) : 99999;
       let finishX    = isRaceView ? (48 + (race.dist - scrollPx)) : 99999;
       let churchX    = finishX - 18;
 
-      // Repeating Backdrop: Boreal Spruce/Oak, Wigwams, Village Houses & Pre-Canadian Shield Granite Boulders
-      // Clipped cleanly between the Starting Stone Fort and the Finishing Stone Church
       let leftClip  = isRaceView ? Math.max(0, startFortX + 118) : 0;
-      let rightClip = isRaceView ? Math.min(320, churchX - 8) : 320;
+      let rightClip = isRaceView ? Math.min(VIEW_W, churchX - 8) : VIEW_W;
 
       if (rightClip > leftClip) {
         ctx.save();
@@ -1547,7 +1938,7 @@
         ctx.clip();
 
         let bgOff = (scrollPx * 0.35) % 640;
-        for (let i = -640; i < 1280; i += 640) {
+        for (let i = -640; i < VIEW_W + 1280; i += 640) {
           drawSnowSpruce(i - bgOff + 24,   58, 1.0);
           drawWigwam(i - bgOff + 68,       67);
           drawShieldBoulder(i - bgOff + 112, 83, 1.1);
@@ -1564,20 +1955,17 @@
       }
 
       if (isRaceView) {
-        // Starting Landmark: Gov. Simpson's Lower Fort Garry Stone Fort
-        if (startFortX > -160 && startFortX < 340) {
+        if (startFortX > -160 && startFortX < VIEW_W + 160) {
           drawStoneFort(startFortX, 42, 0.80);
         }
 
-        // Finishing Landmark: St. Andrews on the Red Anglican Stone Church
-        if (churchX > -90 && churchX < 360) {
+        if (churchX > -90 && churchX < VIEW_W + 90) {
           drawStAndrewsStoneChurch(churchX, 50);
         }
       }
 
-      // Rocky & Rough Pre-Canadian Shield Opposite Shoreline (Granite Rocks & Marsh Reeds along water's edge)
       let bgOff = (scrollPx * 0.35) % 320;
-      for (let i = -320; i < 640; i += 320) {
+      for (let i = -320; i < VIEW_W + 640; i += 320) {
         drawShieldBoulder(i - bgOff + 16,  87, 0.85);
         drawPrairieGrassTuft(i - bgOff + 52, 86, true);
         drawShieldBoulder(i - bgOff + 108, 88, 1.0);
@@ -1586,13 +1974,11 @@
         drawPrairieGrassTuft(i - bgOff + 258, 86, true);
       }
 
-      // Swollen Spring-Melt Red River Channel (Cold Deep Lake-Approach Blue + Drifting Melt-Ice Flakes)
-      ctx.fillStyle = '#0B5378'; ctx.fillRect(0, 96, 320, 12);
+      ctx.fillStyle = '#0B5378'; ctx.fillRect(0, 96, VIEW_W, 12);
       ctx.fillStyle = PAL.ICE_MID;
       let waterTick = (state === 'PHOTO_FINISH') ? 0 : frame;
       let waterOff = (scrollPx * 0.5 + waterTick * 0.6) % 120;
-      for (let wx = -120; wx < 440; wx += 120) {
-        // Drifting spring melt ice chunks & ripples
+      for (let wx = -120; wx < VIEW_W + 240; wx += 120) {
         ctx.fillStyle = PAL.ICE_LIGHT;
         ctx.fillRect(wx - waterOff + 14, 99, 8, 2);
         ctx.fillStyle = PAL.SEA_GREEN;
@@ -1601,18 +1987,15 @@
         ctx.fillRect(wx - waterOff + 92, 100, 6, 2);
       }
 
-      // Near-Shore Rocky Shield Edge & Heavy Spring-Melt Mud Track (y: 108 to 240)
-      ctx.fillStyle = PAL.SHIELD_DARK; ctx.fillRect(0, 108, 320, 8);
-      ctx.fillStyle = PAL.MARSH_MUD;   ctx.fillRect(0, 116, 320, 62);
-      ctx.fillStyle = '#5E442C';       ctx.fillRect(0, 178, 320, 62);
+      ctx.fillStyle = PAL.SHIELD_DARK; ctx.fillRect(0, 108, VIEW_W, 8);
+      ctx.fillStyle = PAL.MARSH_MUD;   ctx.fillRect(0, 116, VIEW_W, 62);
+      ctx.fillStyle = '#5E442C';       ctx.fillRect(0, 178, VIEW_W, VIEW_H - 178);
 
-      // Rocky Shore Boulders, Marsh Reeds & Deep Mud Ruts Parallax
       let fgOff = scrollPx % 160;
-      for (let i = -160; i < 480; i += 80) {
+      for (let i = -160; i < bgSpan; i += 80) {
         drawShieldBoulder(i - fgOff + 8, 106, 0.95);
         drawPrairieGrassTuft(i - fgOff + 34, 105, true);
         drawShieldBoulder(i - fgOff + 56, 107, 0.75);
-        // Heavy wet mud ruts across the lanes
         ctx.fillStyle = PAL.MARSH_WET;
         ctx.fillRect(i - fgOff + 12, 144, 38, 5);
         ctx.fillRect(i - fgOff + 32, 198, 44, 5);
@@ -1620,123 +2003,206 @@
     }
 
     ctx.fillStyle = 'rgba(0,0,0,0.2)';
-    ctx.fillRect(0, 174, 320, 2);
+    ctx.fillRect(0, 174, VIEW_W, 2);
   }
 
   // --- MAIN RENDER LOOP ---
   function draw() {
-    ctx.clearRect(0, 0, 320, 240);
+    ctx.clearRect(0, 0, VIEW_W, VIEW_H);
 
-    if (state === 'TITLE') {
+    if (state === 'TITLE' || state === 'HUB') {
       drawCourseBackdrop(1, frame * 1.5);
-      drawDetailedHorse(80, 130, 0, 0, Math.floor(frame / 6), false, 2);
-      drawDetailedHorse(180, 180, 5, 1, Math.floor((frame + 3) / 6), false, 2);
+      const centerX = Math.floor(VIEW_W / 2);
+      drawDetailedHorse(centerX - 80, 130, 0, 0, Math.floor(frame / 6), false, 2);
+      drawDetailedHorse(centerX + 20, 180, 5, 1, Math.floor((frame + 3) / 6), false, 2);
 
-      ctx.fillStyle = 'rgba(14, 42, 30, 0.92)';
-      ctx.fillRect(14, 18, 292, 76);
-      ctx.strokeStyle = PAL.GOLD; ctx.lineWidth = 2;
-      ctx.strokeRect(14, 18, 292, 76);
+      if (state === 'TITLE') {
+        ctx.fillStyle = 'rgba(14, 42, 30, 0.92)';
+        ctx.fillRect(OX + 14, 18, 292, 76);
+        ctx.strokeStyle = PAL.GOLD; ctx.lineWidth = 2;
+        ctx.strokeRect(OX + 14, 18, 292, 76);
 
-      drawPixelText("AEN ZHWAAL", 160, 47, 20, PAL.GOLD, 'center');
-      drawPixelText("HORSE RACING AT THE RED RIVER SETTLEMENT", 160, 66, 6, PAL.HIDE, 'center');
-      if (frame % 50 < 30) {
-        drawPixelText("PRESS 'A' TO START", 160, 84, 8, PAL.SEA_GREEN, 'center');
+        drawPixelText("AEN ZHWAAL", OX + 160, 47, 20, PAL.GOLD, 'center');
+        drawPixelText("HORSE RACING AT THE RED RIVER SETTLEMENT", OX + 160, 66, 6, PAL.HIDE, 'center');
+        if (frame % 50 < 30) {
+          drawPixelText("PRESS 'A' TO START", OX + 160, 84, 8, PAL.SEA_GREEN, 'center');
+        }
+      } else {
+        // Post-Title Choice Text Box: "To Race Listing" or "La Grange"
+        ctx.fillStyle = 'rgba(14, 42, 30, 0.95)';
+        ctx.fillRect(OX + 28, 22, 264, 82);
+        ctx.strokeStyle = PAL.GOLD; ctx.lineWidth = 2;
+        ctx.strokeRect(OX + 28, 22, 264, 82);
+
+        drawPixelText("RED RIVER GROUNDS", OX + 160, 38, 7, PAL.HIDE, 'center');
+
+        const opts = [
+          { label: "TO RACE LISTING", sub: "WAGER & MATCHUP BOARD" },
+          { label: "LA GRANGE",       sub: "STABLE & BREED GUIDE" }
+        ];
+        for (let i = 0; i < 2; i++) {
+          let by = 48 + i * 24;
+          let isSel = (hubChoice === i);
+          ctx.fillStyle = isSel ? PAL.BORDEAUX : PAL.BLACK;
+          ctx.fillRect(OX + 42, by, 236, 20);
+          ctx.strokeStyle = isSel ? PAL.GOLD : PAL.MUTED_GREEN;
+          ctx.lineWidth = isSel ? 2 : 1;
+          ctx.strokeRect(OX + 42, by, 236, 20);
+
+          drawPixelText((isSel ? "> " : "  ") + opts[i].label, OX + 50, by + 13, 8, isSel ? PAL.GOLD : PAL.WHITE);
+        }
       }
     }
+    else if (state === 'GRANGE') {
+      // Full-Screen Interactive Info-Carousel Reader ("La Grange")
+      const hInfo = HORSE_ROSTER[grangeIdx];
+      drawGrangeDwelling(grangeIdx);
+
+      // Top HUD Bar anchored at y = 0 across full VIEW_W
+      ctx.fillStyle = 'rgba(14, 42, 30, 0.92)';
+      ctx.fillRect(0, 0, VIEW_W, 24);
+      ctx.fillStyle = PAL.GOLD;
+      ctx.fillRect(0, 24, VIEW_W, 2);
+
+      drawPixelText(`LA GRANGE (${grangeIdx + 1}/6)`, 10, 15, 7, PAL.GOLD);
+      drawPixelText(`< ${hInfo.name.toUpperCase()} >`, Math.floor(VIEW_W / 2), 15, 7, PAL.WHITE, 'center');
+      drawPixelText(hInfo.dwellingTitle, VIEW_W - 10, 15, 5, PAL.SEA_GREEN, 'right');
+
+      // Semi-Transparent Text Box with Hunt Captain Portrait & Full Colourful Description
+      const boxH = 74;
+      const boxY = VIEW_H - boxH - 18;
+      ctx.fillStyle = 'rgba(14, 42, 30, 0.86)';
+      ctx.fillRect(OX + 10, boxY, 300, boxH);
+      ctx.strokeStyle = PAL.GOLD; ctx.lineWidth = 2;
+      ctx.strokeRect(OX + 10, boxY, 300, boxH);
+
+      // Hunt Captain Mini Portrait inside left of box
+      ctx.fillStyle = PAL.BORDEAUX; ctx.fillRect(OX + 16, boxY + 8, 28, 28);
+      ctx.fillStyle = PAL.SKIN;     ctx.fillRect(OX + 23, boxY + 14, 14, 13);
+      ctx.fillStyle = PAL.RED;      ctx.fillRect(OX + 21, boxY + 9, 18, 6);
+      ctx.fillStyle = PAL.BLACK;    ctx.fillRect(OX + 23, boxY + 22, 14, 7);
+      ctx.fillStyle = PAL.GOLD;     ctx.fillRect(OX + 20, boxY + 29, 20, 7);
+
+      drawPixelText(`${hInfo.name} (${hInfo.breed})`, OX + 50, boxY + 16, 6, PAL.GOLD);
+
+      // Word-wrap Hunt Captain's full colourful description
+      const words = hInfo.captainDesc.split(' ');
+      let lines = [], line = '';
+      words.forEach(w => {
+        if ((line + w).length > 38) { lines.push(line); line = w + ' '; }
+        else line += w + ' ';
+      });
+      lines.push(line);
+
+      lines.slice(0, 4).forEach((l, idx) => {
+        drawPixelText(l, OX + 50, boxY + 29 + idx * 10, 5, PAL.WHITE);
+      });
+
+      // Bottom Navigation Bar anchored at VIEW_H - 15
+      ctx.fillStyle = PAL.BLACK;
+      ctx.fillRect(0, VIEW_H - 15, VIEW_W, 15);
+      drawPixelText("LEFT/RIGHT: BREED | B: BACK | A: TO RACES", Math.floor(VIEW_W / 2), VIEW_H - 5, 5, PAL.GOLD, 'center');
+    }
     else if (state === 'LISTING') {
-      ctx.fillStyle = PAL.DARK_GREEN; ctx.fillRect(0, 0, 320, 240);
-      ctx.strokeStyle = PAL.HIDE; ctx.lineWidth = 2; ctx.strokeRect(3, 3, 314, 234);
+      ctx.fillStyle = PAL.DARK_GREEN;
+      ctx.fillRect(0, 0, VIEW_W, VIEW_H);
 
       const bagTotal = getBagScore(firebag);
       const currentBetVal = getBagScore(stagedBet);
 
-      drawPixelText(`FIREBAG:${bagTotal}`, 8, 14, 7, PAL.SEA_GREEN);
-    
-      drawPixelText(`VS:${curOpponent.name}`, 312, 14, 7, PAL.GOLD, 'right');
+      // Top HUD Bar anchored at y = 0 across full VIEW_W
+      ctx.fillStyle = PAL.BLACK;
+      ctx.fillRect(0, 0, VIEW_W, 20);
+      ctx.fillStyle = PAL.HIDE;
+      ctx.fillRect(0, 20, VIEW_W, 1);
+
+      drawPixelText(`FIREBAG:${bagTotal}`, 8, 13, 7, PAL.SEA_GREEN);
+      drawPixelText(cardSide === 0 ? "[B:OPEN FIREBAG]" : "[B:RACE CARD]", Math.floor(VIEW_W / 2), 13, 5, PAL.GOLD, 'center');
+      drawPixelText(`VS:${curOpponent.name}`, VIEW_W - 8, 13, 7, PAL.GOLD, 'right');
 
       if (cardSide === 0) {
-        drawPixelText(`${curOpponent.style} | SEEKING:${curOpponent.seekingName.toUpperCase()}`, 312, 23, 5, PAL.HIDE, 'right');
-        drawPixelText(`"${curOpponent.quote}"`, 312, 32, 5, PAL.GRAY_LIGHT, 'right');
+        drawPixelText(`${curOpponent.style} | SEEKING:${curOpponent.seekingName.toUpperCase()}`, VIEW_W - 8, 30, 5, PAL.HIDE, 'right');
+        drawPixelText(`"${curOpponent.quote}"`, VIEW_W - 8, 39, 5, PAL.GRAY_LIGHT, 'right');
 
         const colW = 98;
-        const startX = 9;
+        const startX = OX + 9;
         for (let i = 0; i < 3; i++) {
           let cx = startX + i * (colW + 4);
-          let cy = 38;
+          let cy = 44;
           let isCardSel = (selListingIdx === i);
           let isFocusRow0 = (setupRow === 0 && isCardSel);
 
           ctx.fillStyle = isCardSel ? '#1E3D2F' : PAL.BLACK;
-          ctx.fillRect(cx, cy, colW, 108);
+          ctx.fillRect(cx, cy, colW, 106);
           ctx.strokeStyle = isFocusRow0 ? PAL.GOLD : (isCardSel ? PAL.SEA_GREEN : PAL.GRAY_DARK);
           ctx.lineWidth = isCardSel ? 2 : 1;
-          ctx.strokeRect(cx, cy, colW, 108);
+          ctx.strokeRect(cx, cy, colW, 106);
 
           let cName = COURSES[raceListings[i].courseIdx].short;
           drawPixelText(cName, cx + colW / 2, cy + 10, 6, isCardSel ? PAL.GOLD : PAL.WHITE, 'center');
 
-          drawMiniScenePreview(cx + 5, cy + 14, 88, 58, raceListings[i]);
+          drawMiniScenePreview(cx + 5, cy + 14, 88, 56, raceListings[i]);
           ctx.strokeStyle = PAL.BLACK; ctx.lineWidth = 1;
-          ctx.strokeRect(cx + 5, cy + 14, 88, 58);
+          ctx.strokeRect(cx + 5, cy + 14, 88, 56);
 
           let hA = HORSE_ROSTER[raceListings[i].horseA].name;
           let hB = HORSE_ROSTER[raceListings[i].horseB].name;
           let isPrefA = (isCardSel && selPrefHorse === 0);
           let isPrefB = (isCardSel && selPrefHorse === 1);
 
-          drawPixelText((isPrefA ? "*" : "") + hA, cx + colW / 2, cy + 84, 5, isPrefA ? PAL.SEA_GREEN : PAL.WHITE, 'center');
-          drawPixelText("VS", cx + colW / 2, cy + 93, 5, PAL.GRAY_LIGHT, 'center');
-          drawPixelText((isPrefB ? "*" : "") + hB, cx + colW / 2, cy + 102, 5, isPrefB ? PAL.SEA_GREEN : PAL.WHITE, 'center');
+          drawPixelText((isPrefA ? "*" : "") + hA, cx + colW / 2, cy + 82, 5, isPrefA ? PAL.SEA_GREEN : PAL.WHITE, 'center');
+          drawPixelText("VS", cx + colW / 2, cy + 91, 5, PAL.GRAY_LIGHT, 'center');
+          drawPixelText((isPrefB ? "*" : "") + hB, cx + colW / 2, cy + 100, 5, isPrefB ? PAL.SEA_GREEN : PAL.WHITE, 'center');
         }
 
         const activeList = raceListings[selListingIdx];
         const prefHorseObj = HORSE_ROSTER[selPrefHorse === 0 ? activeList.horseA : activeList.horseB];
 
         ctx.fillStyle = setupRow === 1 ? PAL.BORDEAUX : PAL.BLACK;
-        ctx.fillRect(9, 151, 302, 18);
+        ctx.fillRect(OX + 9, 155, 302, 18);
         ctx.strokeStyle = setupRow === 1 ? PAL.GOLD : PAL.MUTED_GREEN;
         ctx.lineWidth = 1;
-        ctx.strokeRect(9, 151, 302, 18);
-        drawPixelText((setupRow === 1 ? ">" : " ") + "PREF MOUNT:", 14, 163, 6, PAL.WHITE);
-        drawPixelText(`< ${prefHorseObj.name} >`, 305, 163, 6, PAL.SEA_GREEN, 'right');
+        ctx.strokeRect(OX + 9, 155, 302, 18);
+        drawPixelText((setupRow === 1 ? ">" : " ") + "PREF MOUNT:", OX + 14, 167, 6, PAL.WHITE);
+        drawPixelText(`< ${prefHorseObj.name} >`, OX + 305, 167, 6, PAL.SEA_GREEN, 'right');
 
         ctx.fillStyle = PAL.BLACK;
-        ctx.fillRect(9, 173, 302, 18);
+        ctx.fillRect(OX + 9, 177, 302, 18);
         ctx.strokeStyle = PAL.MUTED_GREEN;
-        ctx.strokeRect(9, 173, 302, 18);
-        drawPixelText(`YOUR WAGER: ${currentBetVal} PTS`, 14, 185, 6, PAL.GOLD);
-        drawPixelText("PRESS B TO EDIT BAG", 305, 185, 5, PAL.SEA_GREEN, 'right');
+        ctx.strokeRect(OX + 9, 177, 302, 18);
+        drawPixelText(`YOUR WAGER: ${currentBetVal} PTS`, OX + 14, 189, 6, PAL.GOLD);
+        drawPixelText("PRESS B TO EDIT BAG", OX + 305, 189, 5, PAL.SEA_GREEN, 'right');
 
+        const btnH = 28;
+        const btnY = VIEW_H - btnH - 8;
         let isBtnFocus = (setupRow === 2);
         ctx.fillStyle = isBtnFocus ? PAL.GOLD : PAL.BORDEAUX;
-        ctx.fillRect(58, 198, 204, 28);
+        ctx.fillRect(OX + 58, btnY, 204, btnH);
         ctx.strokeStyle = isBtnFocus ? PAL.WHITE : PAL.GOLD;
         ctx.lineWidth = 2;
-        ctx.strokeRect(58, 198, 204, 28);
-        drawPixelText("KOMANSE!", 160, 217, 11, isBtnFocus ? PAL.BLACK : PAL.GOLD, 'center', !isBtnFocus);
+        ctx.strokeRect(OX + 58, btnY, 204, btnH);
+        drawPixelText("KOMANSE!", OX + 160, btnY + 19, 11, isBtnFocus ? PAL.BLACK : PAL.GOLD, 'center', !isBtnFocus);
       } 
       else {
-        const isBagRow = (setupRow === 0);
-        const isBreedRow = (setupRow === 1);
+        // Dedicated Full Firebag Wager Card (Spacious & Clear, no breed guide here)
+        ctx.fillStyle = '#172E24';
+        ctx.fillRect(OX + 9, 28, 302, 182);
+        ctx.strokeStyle = PAL.GOLD;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(OX + 9, 28, 302, 182);
 
-        ctx.fillStyle = isBagRow ? '#172E24' : '#0B1D15';
-        ctx.fillRect(9, 22, 302, 114);
-        ctx.strokeStyle = isBagRow ? PAL.GOLD : PAL.MUTED_GREEN;
-        ctx.lineWidth = isBagRow ? 2 : 1;
-        ctx.strokeRect(9, 22, 302, 114);
-
-        drawPixelText((isBagRow ? ">" : " ") + "FIREBAG WAGER", 14, 34, 7, PAL.GOLD);
-        drawPixelText(`STAGED BET: ${currentBetVal} / ${bagTotal} PTS`, 305, 34, 6, PAL.SEA_GREEN, 'right');
+        drawPixelText("FIREBAG WAGER", OX + 16, 44, 8, PAL.GOLD);
+        drawPixelText(`BET: ${currentBetVal} / ${bagTotal} PTS`, OX + 304, 44, 7, PAL.SEA_GREEN, 'right');
 
         for (let idx = 0; idx < 4; idx++) {
           const it = ITEMS[idx];
           const owned = firebag[it.key];
           const betQty = stagedBet[it.key];
-          const sx = 14 + idx * 74;
-          const sy = 40;
-          const sw = 70;
-          const sh = 78;
-          const isSlotSel = (isBagRow && activeBagSlot === idx);
+          const sx = OX + 15 + idx * 73;
+          const sy = 56;
+          const sw = 69;
+          const sh = 128;
+          const isSlotSel = (activeBagSlot === idx);
 
           ctx.fillStyle = betQty > 0 ? '#1C3F31' : PAL.BLACK;
           ctx.fillRect(sx, sy, sw, sh);
@@ -1744,57 +2210,43 @@
           ctx.lineWidth = isSlotSel ? 2 : 1;
           ctx.strokeRect(sx, sy, sw, sh);
 
-          drawFirebagItemIcon(sx + 30, sy + 6, idx, owned === 0);
+          // Scaled up 2x Icon
+          ctx.save();
+          ctx.translate(sx + 24, sy + 12);
+          ctx.scale(2, 2);
+          drawFirebagItemIcon(0, 0, idx, owned === 0);
+          ctx.restore();
 
-          drawPixelText(it.short, sx + sw / 2, sy + 28, 6, owned > 0 ? PAL.WHITE : PAL.GRAY_DARK, 'center');
-          drawPixelText(`${it.val} PT${it.val > 1 ? 'S' : ''}`, sx + sw / 2, sy + 40, 5, PAL.HIDE, 'center');
+          drawPixelText(it.short, sx + sw / 2, sy + 48, 7, owned > 0 ? PAL.WHITE : PAL.GRAY_DARK, 'center');
+          drawPixelText(`${it.val} PT${it.val > 1 ? 'S' : ''}`, sx + sw / 2, sy + 64, 6, PAL.HIDE, 'center');
 
-          drawPixelText(`OWN:${owned}`, sx + sw / 2, sy + 54, 6, owned > 0 ? PAL.SEA_GREEN : PAL.GRAY_DARK, 'center');
-          drawPixelText(`BET:${betQty}`, sx + sw / 2, sy + 69, 6, betQty > 0 ? PAL.GOLD : PAL.GRAY_LIGHT, 'center');
+          drawPixelText(`OWN:${owned}`, sx + sw / 2, sy + 88, 6, owned > 0 ? PAL.SEA_GREEN : PAL.GRAY_DARK, 'center');
+          drawPixelText(`BET:${betQty}`, sx + sw / 2, sy + 110, 7, betQty > 0 ? PAL.GOLD : PAL.GRAY_LIGHT, 'center');
         }
 
-        drawPixelText("LEFT/RIGHT: ITEM   A: +1 / TOGGLE", 160, 131, 5, PAL.HIDE, 'center');
+        drawPixelText("LEFT/RIGHT: SELECT   A: +1 / TOGGLE", OX + 160, 200, 5, PAL.HIDE, 'center');
 
-        const hInfo = HORSE_ROSTER[breedBrowseIdx];
-        ctx.fillStyle = isBreedRow ? '#172E24' : '#0B1D15';
-        ctx.fillRect(9, 141, 302, 74);
-        ctx.strokeStyle = isBreedRow ? PAL.GOLD : PAL.MUTED_GREEN;
-        ctx.lineWidth = isBreedRow ? 2 : 1;
-        ctx.strokeRect(9, 141, 302, 74);
-
-        drawPixelText((isBreedRow ? ">" : " ") + `BREED GUIDE (${breedBrowseIdx + 1}/6)`, 14, 153, 6, PAL.GOLD);
-        drawPixelText("< LEFT / RIGHT >", 305, 153, 5, PAL.GRAY_LIGHT, 'right');
-
+        const footerH = 16;
         ctx.fillStyle = PAL.BLACK;
-        ctx.fillRect(14, 159, 58, 48);
-        ctx.strokeStyle = PAL.GRAY_DARK;
-        ctx.lineWidth = 1;
-        ctx.strokeRect(14, 159, 58, 48);
-        drawDetailedHorse(19, 168, breedBrowseIdx, breedBrowseIdx % RIDER_SKINS.length, Math.floor(frame / 6), false, 2);
-
-        drawPixelText(hInfo.name.toUpperCase(), 80, 170, 7, PAL.WHITE);
-        drawPixelText(hInfo.breed, 80, 182, 5, PAL.HIDE);
-        drawPixelText("CAPTAIN:", 80, 195, 5, PAL.SEA_GREEN);
-        drawPixelText(hInfo.captainNote, 80, 206, 5, PAL.GOLD);
-
-        drawPixelText("PRESS 'B' TO RETURN TO RACE CARD", 160, 229, 6, PAL.GOLD, 'center');
+        ctx.fillRect(0, VIEW_H - footerH, VIEW_W, footerH);
+        drawPixelText("PRESS 'B' TO RETURN TO RACE CARD", Math.floor(VIEW_W / 2), VIEW_H - 5, 6, PAL.GOLD, 'center');
       }
     }
     else if (state === 'CAPTAIN') {
       drawCourseBackdrop(match.courseIdx, 0);
       ctx.fillStyle = 'rgba(14, 42, 30, 0.93)';
-      ctx.fillRect(14, 18, 292, 204);
+      ctx.fillRect(OX + 14, 18, 292, 204);
       ctx.strokeStyle = PAL.GOLD; ctx.lineWidth = 2;
-      ctx.strokeRect(14, 18, 292, 204);
+      ctx.strokeRect(OX + 14, 18, 292, 204);
 
-      ctx.fillStyle = PAL.BORDEAUX; ctx.fillRect(24, 30, 34, 34);
-      ctx.fillStyle = PAL.SKIN; ctx.fillRect(33, 38, 16, 15);
-      ctx.fillStyle = PAL.RED; ctx.fillRect(31, 32, 20, 7);
-      ctx.fillStyle = PAL.BLACK; ctx.fillRect(33, 47, 16, 8);
-      ctx.fillStyle = PAL.GOLD; ctx.fillRect(29, 55, 24, 9);
+      ctx.fillStyle = PAL.BORDEAUX; ctx.fillRect(OX + 24, 30, 34, 34);
+      ctx.fillStyle = PAL.SKIN; ctx.fillRect(OX + 33, 38, 16, 15);
+      ctx.fillStyle = PAL.RED; ctx.fillRect(OX + 31, 32, 20, 7);
+      ctx.fillStyle = PAL.BLACK; ctx.fillRect(OX + 33, 47, 16, 8);
+      ctx.fillStyle = PAL.GOLD; ctx.fillRect(OX + 29, 55, 24, 9);
 
-      drawPixelText("BUFFALO HUNT CAPTAIN", 66, 43, 8, PAL.GOLD);
-      drawPixelText(`POT: ${match.effectivePot} PTS | ${COURSES[match.courseIdx].short}`, 66, 57, 6, PAL.SEA_GREEN);
+      drawPixelText("BUFFALO HUNT CAPTAIN", OX + 66, 43, 8, PAL.GOLD);
+      drawPixelText(`POT: ${match.effectivePot} PTS | ${COURSES[match.courseIdx].short}`, OX + 66, 57, 6, PAL.SEA_GREEN);
 
       const words = captainText.split(' ');
       let lines = [], line = '';
@@ -1805,34 +2257,34 @@
       lines.push(line);
 
       lines.forEach((l, idx) => {
-        drawPixelText(l, 24, 80 + idx * 13, 6, PAL.WHITE);
+        drawPixelText(l, OX + 24, 80 + idx * 13, 6, PAL.WHITE);
       });
 
       if (frame % 50 < 30) {
-        drawPixelText("PRESS 'A' TO WATCH RACE", 160, 210, 7, PAL.GOLD, 'center');
+        drawPixelText("PRESS 'A' TO WATCH RACE", OX + 160, 210, 7, PAL.GOLD, 'center');
       }
     }
     else if (state === 'READY' || state === 'COUNTDOWN' || state === 'RACING' || state === 'PHOTO_FINISH' || state === 'RUNOUT' || state === 'RESULT') {
       drawCourseBackdrop(match.courseIdx, race.pDist);
 
       let startX = 48 - race.pDist;
-      if (startX > -10 && startX < 330) {
+      if (startX > -10 && startX < VIEW_W + 10) {
         ctx.fillStyle = PAL.HIDE;
-        ctx.fillRect(startX, 112, 3, 128);
+        ctx.fillRect(startX, 112, 3, VIEW_H - 112);
       }
 
       let finishX = 48 + (race.dist - race.pDist);
-      if (finishX > -20 && finishX < 340) {
+      if (finishX > -20 && finishX < VIEW_W + 20) {
         ctx.fillStyle = PAL.BORDEAUX;
-        ctx.fillRect(finishX, 112, 4, 128);
+        ctx.fillRect(finishX, 112, 4, VIEW_H - 112);
         ctx.fillStyle = PAL.GOLD;
-        ctx.fillRect(finishX + 1, 112, 2, 128);
+        ctx.fillRect(finishX + 1, 112, 2, VIEW_H - 112);
       }
 
       const mod = COURSES[match.courseIdx].mod;
       race.obstacles.forEach(obs => {
         let ox = 48 + (obs.dist - race.pDist);
-        if (ox > -30 && ox < 340) {
+        if (ox > -30 && ox < VIEW_W + 30) {
           let oy = obs.lane === 0 ? 142 : 202;
           if (mod === 'SNOW') {
             ctx.fillStyle = PAL.OCEAN; ctx.fillRect(ox, oy, 22, 8);
@@ -1844,7 +2296,6 @@
             ctx.fillStyle = '#3E2723'; ctx.fillRect(ox, oy, 24, 9);
             ctx.fillStyle = PAL.DARK_GREEN; ctx.fillRect(ox + 4, oy + 2, 16, 4);
           } else {
-            // Lower Fort Garry Spring-Melt Mud Bog & Half-Melted Ice Slush
             ctx.fillStyle = '#26180D'; ctx.fillRect(ox, oy, 26, 10);
             ctx.fillStyle = PAL.ICE_DARK; ctx.fillRect(ox + 4, oy + 2, 18, 5);
             ctx.fillStyle = PAL.ICE_LIGHT; ctx.fillRect(ox + 7, oy + 3, 7, 2);
@@ -1859,72 +2310,75 @@
       drawDetailedHorse(48, 120, match.playerHorseIdx, match.playerRiderIdx, pAnim, race.pStumble > 0, 2);
 
       let rScreenX = 48 + (race.rDist - race.pDist);
-      if (rScreenX > -60 && rScreenX < 340) {
+      if (rScreenX > -60 && rScreenX < VIEW_W + 60) {
         drawDetailedHorse(rScreenX, 180, match.npcHorseIdx, match.npcRiderIdx, rAnim, race.rStumble > 0, 2);
       }
 
       if (state === 'PHOTO_FINISH' && race.photoTimer > 67) {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
-        ctx.fillRect(0, 0, 320, 240);
+        ctx.fillRect(0, 0, VIEW_W, VIEW_H);
       }
 
       if (race.bangFlash > 0) {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
-        ctx.fillRect(0, 0, 320, 240);
+        ctx.fillRect(0, 0, VIEW_W, VIEW_H);
       }
 
-      ctx.fillStyle = PAL.BLACK; ctx.fillRect(0, 0, 320, 28);
-      ctx.fillStyle = PAL.GOLD;  ctx.fillRect(0, 28, 320, 2);
+      const topHudH = 28;
+      ctx.fillStyle = PAL.BLACK; ctx.fillRect(0, 0, VIEW_W, topHudH);
+      ctx.fillStyle = PAL.GOLD;  ctx.fillRect(0, topHudH, VIEW_W, 2);
 
-      ctx.fillStyle = PAL.GRAY_DARK; ctx.fillRect(10, 8, 180, 12);
+      const barW = Math.max(180, VIEW_W - 140);
+      ctx.fillStyle = PAL.GRAY_DARK; ctx.fillRect(10, 8, barW, 12);
       let pPct = Math.min(1, race.pDist / race.dist);
       let rPct = Math.min(1, race.rDist / race.dist);
-      ctx.fillStyle = PAL.RED;       ctx.fillRect(10 + rPct * 174, 14, 6, 6);
-      ctx.fillStyle = PAL.SEA_GREEN; ctx.fillRect(10 + pPct * 174, 8, 6, 6);
+      ctx.fillStyle = PAL.RED;       ctx.fillRect(10 + rPct * (barW - 6), 14, 6, 6);
+      ctx.fillStyle = PAL.SEA_GREEN; ctx.fillRect(10 + pPct * (barW - 6), 8, 6, 6);
 
-      drawPixelText(`POT:${match.effectivePot}`, 310, 17, 7, PAL.GOLD, 'right');
+      drawPixelText(`POT:${match.effectivePot}`, VIEW_W - 10, 17, 7, PAL.GOLD, 'right');
 
+      const botHudH = 16;
       ctx.fillStyle = 'rgba(0,0,0,0.75)';
-      ctx.fillRect(0, 224, 320, 16);
-      drawPixelText(race.logText, 160, 235, 6, PAL.WHITE, 'center');
+      ctx.fillRect(0, VIEW_H - botHudH, VIEW_W, botHudH);
+      drawPixelText(race.logText, Math.floor(VIEW_W / 2), VIEW_H - 5, 6, PAL.WHITE, 'center');
 
       if (state === 'READY') {
         ctx.fillStyle = 'rgba(0,0,0,0.78)';
-        ctx.fillRect(30, 85, 260, 54);
-        ctx.strokeStyle = PAL.GOLD; ctx.strokeRect(30, 85, 260, 54);
-        drawPixelText("RIDERS AT THE LINE", 160, 106, 9, PAL.WHITE, 'center');
+        ctx.fillRect(OX + 30, 85, 260, 54);
+        ctx.strokeStyle = PAL.GOLD; ctx.strokeRect(OX + 30, 85, 260, 54);
+        drawPixelText("RIDERS AT THE LINE", OX + 160, 106, 9, PAL.WHITE, 'center');
         if (frame % 40 < 25) {
-          drawPixelText("PRESS 'A' FOR COUNTDOWN", 160, 126, 8, PAL.GOLD, 'center');
+          drawPixelText("PRESS 'A' FOR COUNTDOWN", OX + 160, 126, 8, PAL.GOLD, 'center');
         }
       }
       else if (state === 'COUNTDOWN') {
         let frenchWords = { 3: "TROIS...", 2: "DEUX...", 1: "UN!" };
         let txt = frenchWords[race.countdownVal] || "";
         ctx.fillStyle = 'rgba(0,0,0,0.75)';
-        ctx.fillRect(70, 85, 180, 50);
-        ctx.strokeStyle = PAL.ORANGE; ctx.strokeRect(70, 85, 180, 50);
-        drawPixelText(txt, 160, 118, 16, PAL.GOLD, 'center');
+        ctx.fillRect(OX + 70, 85, 180, 50);
+        ctx.strokeStyle = PAL.ORANGE; ctx.strokeRect(OX + 70, 85, 180, 50);
+        drawPixelText(txt, OX + 160, 118, 16, PAL.GOLD, 'center');
       }
       else if (state === 'RESULT') {
         ctx.fillStyle = 'rgba(14, 42, 30, 0.95)';
-        ctx.fillRect(18, 36, 284, 174);
+        ctx.fillRect(OX + 18, 36, 284, 174);
         ctx.strokeStyle = PAL.GOLD; ctx.lineWidth = 2;
-        ctx.strokeRect(18, 36, 284, 174);
+        ctx.strokeRect(OX + 18, 36, 284, 174);
 
         const wonNames = match.npcWagerItems.map(it => it.name).join(' + ');
         if (race.winner === 'PLAYER') {
-          drawPixelText("YOUR HORSE WINS!", 160, 62, 10, PAL.SEA_GREEN, 'center');
-          drawPixelText(`WON: ${wonNames}`, 160, 82, 6, PAL.GOLD, 'center');
+          drawPixelText("YOUR HORSE WINS!", OX + 160, 62, 10, PAL.SEA_GREEN, 'center');
+          drawPixelText(`WON: ${wonNames}`, OX + 160, 82, 6, PAL.GOLD, 'center');
         } else {
-          drawPixelText("OPPONENT WINS!", 160, 62, 10, PAL.RED, 'center');
-          drawPixelText(`LOST -${match.playerBetTotal} PTS OF GOODS`, 160, 82, 7, PAL.HIDE, 'center');
+          drawPixelText("OPPONENT WINS!", OX + 160, 62, 10, PAL.RED, 'center');
+          drawPixelText(`LOST -${match.playerBetTotal} PTS OF GOODS`, OX + 160, 82, 7, PAL.HIDE, 'center');
         }
 
-        drawPixelText(`FIREBAG SCORE: ${getBagScore(firebag)}`, 160, 105, 8, PAL.WHITE, 'center');
+        drawPixelText(`FIREBAG SCORE: ${getBagScore(firebag)}`, OX + 160, 105, 8, PAL.WHITE, 'center');
 
         for (let idx = 0; idx < 4; idx++) {
           const it = ITEMS[idx];
-          const bx = 30 + idx * 66;
+          const bx = OX + 30 + idx * 66;
           const by = 116;
           ctx.fillStyle = PAL.BLACK;
           ctx.fillRect(bx, by, 60, 32);
@@ -1937,10 +2391,10 @@
         }
 
         if (getBagScore(firebag) <= 0) {
-          drawPixelText("FIREBAG EMPTY! STARTING ANEW.", 160, 168, 6, PAL.ORANGE, 'center');
+          drawPixelText("FIREBAG EMPTY! STARTING ANEW.", OX + 160, 168, 6, PAL.ORANGE, 'center');
         }
         if (frame % 50 < 30) {
-          drawPixelText("PRESS 'A' TO CONTINUE", 160, 194, 8, PAL.GOLD, 'center');
+          drawPixelText("PRESS 'A' TO CONTINUE", OX + 160, 194, 8, PAL.GOLD, 'center');
         }
       }
     }
@@ -1951,21 +2405,6 @@
     draw();
     requestAnimationFrame(loop);
   }
-
-  // --- POSTMESSAGE ARCADE BRIDGE ---
-  window.addEventListener('message', function(event) {
-    handleInput(event.data);
-  });
-
-  // Keyboard fallback for standalone browser testing
-  window.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowUp') handleInput('DPAD_UP');
-    if (e.key === 'ArrowDown') handleInput('DPAD_DOWN');
-    if (e.key === 'ArrowLeft') handleInput('DPAD_LEFT');
-    if (e.key === 'ArrowRight') handleInput('DPAD_RIGHT');
-    if (e.key === 'a' || e.key === 'A' || e.key === 'z' || e.key === 'Z' || e.key === 'Enter' || e.key === ' ') handleInput('BUTTON_A');
-    if (e.key === 'b' || e.key === 'B' || e.key === 'x' || e.key === 'X' || e.key === 'Shift') handleInput('BUTTON_B');
-  });
 
   loop();
 </script>
