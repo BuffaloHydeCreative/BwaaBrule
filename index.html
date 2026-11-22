@@ -8,14 +8,14 @@
     :root {
       /* Top clearance so Google Sites / website builder floating headers never clip the screen */
       --site-header-clearance: max(54px, env(safe-area-inset-top, 0px));
-      /* Bottom clearance so mobile Safari/Chrome search bars never cover the controls */
-      --browser-hud-clearance: max(64px, env(safe-area-inset-bottom, 0px));
+      /* Extra bottom lift so mobile Safari/Chrome search bars + gesture bars never cover controls */
+      --browser-hud-clearance: max(115px, calc(env(safe-area-inset-bottom, 0px) + 72px));
     }
 
     @media (min-width: 768px) {
       :root {
         --site-header-clearance: max(56px, env(safe-area-inset-top, 0px));
-        --browser-hud-clearance: env(safe-area-inset-bottom, 0px);
+        --browser-hud-clearance: max(18px, env(safe-area-inset-bottom, 0px));
       }
     }
 
@@ -88,6 +88,76 @@
       object-fit: contain;
       image-rendering: pixelated; 
       z-index: 2;
+    }
+
+    /* --- SYSTEM SAVE WARNING LOADING SCREEN --- */
+    #loading-warning {
+      background: #000;
+      z-index: 15;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      padding: 20px;
+    }
+
+    .warning-box {
+      width: 92%;
+      max-width: 390px;
+      background: #06090e;
+      border: 2px solid #F7C844;
+      box-shadow: 0 0 24px rgba(247, 200, 68, 0.2), inset 0 0 14px rgba(0, 0, 0, 0.9);
+      padding: 18px 16px;
+      text-align: center;
+    }
+
+    .warning-badge {
+      display: inline-block;
+      background: #AD1C21;
+      color: #fff;
+      font-weight: bold;
+      font-size: 12px;
+      letter-spacing: 1.5px;
+      padding: 3px 10px;
+      margin-bottom: 12px;
+      border: 1px solid #F7C844;
+    }
+
+    .warning-text {
+      color: #F7C844;
+      font-size: 15px;
+      font-weight: bold;
+      line-height: 1.45;
+      letter-spacing: 0.5px;
+      margin-bottom: 16px;
+      text-transform: uppercase;
+    }
+
+    .loading-bar-track {
+      width: 100%;
+      height: 14px;
+      background: #111622;
+      border: 1.5px solid #12AEA2;
+      padding: 2px;
+      margin-bottom: 8px;
+    }
+
+    .loading-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: repeating-linear-gradient(
+        90deg,
+        #12AEA2 0px,
+        #12AEA2 10px,
+        #0c7d74 10px,
+        #0c7d74 13px
+      );
+      transition: width 0.08s linear;
+    }
+
+    .loading-sub {
+      font-size: 11px;
+      color: #12AEA2;
+      letter-spacing: 1px;
     }
 
     #static-splash {
@@ -372,11 +442,11 @@
       box-shadow: inset 0 0 32px rgba(0, 0, 0, 0.65);
     }
 
-    /* --- SECTION 2: CONTROL DECK LIFTED ABOVE BROWSER BOTTOM HUD --- */
+    /* --- SECTION 2: CONTROL DECK LIFTED WELL ABOVE BROWSER BOTTOM HUD --- */
     .control-deck {
       flex: 0 0 auto;
       width: 100%;
-      background: linear-gradient(to bottom, #161616 0%, #090909 75%, #050505 100%);
+      background: linear-gradient(to bottom, #161616 0%, #090909 70%, #050505 100%);
       border-top: 1px solid #2c2c2c;
       padding-top: 10px;
       padding-left: calc(18px + env(safe-area-inset-left));
@@ -399,8 +469,8 @@
 
     /* Left Thumb: Drag Joystick */
     .joystick-base {
-      width: 104px;
-      height: 104px;
+      width: 100px;
+      height: 100px;
       background: radial-gradient(circle, #141414 32%, #242424 100%);
       border-radius: 50%;
       border: 3px solid #050505;
@@ -415,14 +485,14 @@
     }
 
     .joystick-stick {
-      width: 52px; 
-      height: 52px;
+      width: 50px; 
+      height: 50px;
       background: radial-gradient(circle at 35% 35%, #8f8f8f, #222);
       border: 1.5px solid rgba(255, 255, 255, 0.22);
       border-radius: 50%;
       position: absolute;
-      top: 23px; 
-      left: 23px; 
+      top: 22px; 
+      left: 22px; 
       box-shadow: 0 6px 12px rgba(0, 0, 0, 0.75);
       pointer-events: none; 
       transition: transform 0.14s ease-out; 
@@ -489,8 +559,8 @@
     }
 
     .action-btn {
-      width: 52px;
-      height: 52px;
+      width: 50px;
+      height: 50px;
       border-radius: 50%;
       border: 2.5px solid #090909;
       cursor: pointer;
@@ -515,7 +585,7 @@
 
     .btn-b { 
       background: #AD1C21; 
-      margin-top: 18px; 
+      margin-top: 16px; 
     }
     .btn-a { 
       background: #12AEA2; 
@@ -530,24 +600,27 @@
     /* Desktop / Wide Embed Enhancement */
     @media (min-width: 768px) {
       .control-deck {
-        padding: 12px 32px 14px 32px;
+        padding-top: 12px;
+        padding-left: 32px;
+        padding-right: 32px;
+        padding-bottom: calc(14px + var(--browser-hud-clearance));
       }
       .deck-inner {
         max-width: 680px;
       }
       .joystick-base {
-        width: 114px;
-        height: 114px;
+        width: 112px;
+        height: 112px;
       }
       .joystick-stick {
-        width: 56px;
-        height: 56px;
+        width: 54px;
+        height: 54px;
         top: 26px;
         left: 26px;
       }
       .action-btn {
-        width: 58px;
-        height: 58px;
+        width: 56px;
+        height: 56px;
       }
     }
   </style>
@@ -560,6 +633,20 @@
       
       <div id="boot-splash" class="screen-layer">
         <canvas id="introCanvas" width="600" height="450"></canvas>
+      </div>
+
+      <!-- SIMULATED LOADING / SAVE WARNING SCREEN -->
+      <div id="loading-warning" class="screen-layer">
+        <div class="warning-box">
+          <div class="warning-badge">NOTICE</div>
+          <div class="warning-text">
+            Games do not save, do not close browser/turn off screen.
+          </div>
+          <div class="loading-bar-track">
+            <div class="loading-bar-fill" id="loading-bar-fill"></div>
+          </div>
+          <div class="loading-sub" id="loading-sub">LOADING BWAA_BRULE.EXE...</div>
+        </div>
       </div>
 
       <div id="static-splash" class="screen-layer">
@@ -634,7 +721,7 @@
   </div>
 
   <script>
-    let machineState = 'BOOT'; // BOOT, STATIC, MENU, PLAYING, PAUSED
+    let machineState = 'BOOT'; // BOOT, WARNING, STATIC, MENU, PLAYING, PAUSED
     let currentIndex = 0;
     let pauseIndex = 0;
 
@@ -725,6 +812,8 @@
 
     const embedShell = document.getElementById('embed-shell');
     const bootSplash = document.getElementById('boot-splash');
+    const loadingWarning = document.getElementById('loading-warning');
+    const loadingBarFill = document.getElementById('loading-bar-fill');
     const staticSplash = document.getElementById('static-splash');
     const gameCarousel = document.getElementById('game-carousel');
     const pauseOverlay = document.getElementById('pause-overlay');
@@ -742,6 +831,7 @@
     const pipDotsContainer = document.getElementById('pip-dots');
 
     let staticStartTime = 0;
+    let warningStartTime = 0;
 
     /* --- DYNAMIC MOBILE BROWSER VIEWPORT SYNC --- */
     function syncViewportBounds() {
@@ -851,9 +941,37 @@
       }
     }
 
+    /* --- SIMULATED LOADING / SAVE WARNING SCREEN --- */
+    function transitionToWarning() {
+      machineState = 'WARNING';
+      bootSplash.style.display = 'none';
+      staticSplash.style.display = 'none';
+      pauseOverlay.style.display = 'none';
+      gameCarousel.style.display = 'none';
+      loadingBarFill.style.width = '0%';
+      loadingWarning.style.display = 'flex';
+      warningStartTime = performance.now();
+      requestAnimationFrame(warningLoop);
+    }
+
+    function warningLoop(timestamp) {
+      if (machineState !== 'WARNING') return;
+      const elapsed = (timestamp - warningStartTime) / 1000;
+      const duration = 4.2; // Enough time to read the no-save / keep-browser-open notice
+      const pct = Math.min(100, Math.round((elapsed / duration) * 100));
+      loadingBarFill.style.width = `${pct}%`;
+
+      if (elapsed >= duration) {
+        transitionToStatic();
+        return;
+      }
+      requestAnimationFrame(warningLoop);
+    }
+
     function transitionToStatic() {
       machineState = 'STATIC';
       bootSplash.style.display = 'none';
+      loadingWarning.style.display = 'none';
       pauseOverlay.style.display = 'none';
       gameCarousel.style.display = 'none';
       staticSplash.style.display = 'flex';
@@ -864,6 +982,7 @@
     function openCarouselMenu() {
       machineState = 'MENU';
       staticSplash.style.display = 'none';
+      loadingWarning.style.display = 'none';
       pauseOverlay.style.display = 'none';
       gameCarousel.style.display = 'flex';
       updateCarouselUI();
@@ -1015,7 +1134,9 @@
     });
 
     function btnAction(buttonStr) {
-      if (machineState === 'PLAYING') {
+      if (machineState === 'BOOT' && buttonStr === 'BUTTON_A') {
+        triggerBootStart();
+      } else if (machineState === 'PLAYING') {
         sendSignal(buttonStr);
       } else if (machineState === 'PAUSED') {
         if (buttonStr === 'BUTTON_A') executePauseSelection();
@@ -1066,8 +1187,8 @@
     let isDragging = false;
     let currentDir = null;
     let activeBroadcastDir = null;
-    const maxRadius = 28; 
-    const deadzone = 12;  
+    const maxRadius = 26; 
+    const deadzone = 11;  
 
     let holdTimer = null;
     let repeatInterval = null;
@@ -1222,11 +1343,7 @@
         e.preventDefault();
         if (e.repeat) return;
         btnAEl.classList.add('active-press');
-        if (machineState === 'BOOT' && splashState === 'WAITING') {
-          triggerBootStart();
-        } else {
-          btnAction('BUTTON_A');
-        }
+        btnAction('BUTTON_A');
         return;
       }
 
@@ -1597,11 +1714,11 @@
       } else if (game.artType === 'BUFFALO') {
         // 5. LAND THUNDER!: Orange-Terracotta-Golden Prairie, Parallax Western Tipi,
         //    Sashed Mounted Hunter chasing/hunting behind the Rumbling Buffalo Herd
-        ctx.fillStyle = '#5c1f14'; // Deep terracotta dusk
+        ctx.fillStyle = '#5c1f14';
         ctx.fillRect(0, 0, W, 38);
-        ctx.fillStyle = '#a83c18'; // Rich terracotta-orange
+        ctx.fillStyle = '#a83c18';
         ctx.fillRect(0, 38, W, 36);
-        ctx.fillStyle = '#e07a22'; // Warm amber-orange horizon
+        ctx.fillStyle = '#e07a22';
         ctx.fillRect(0, 74, W, 32);
 
         // Large Golden Prairie Sun
@@ -1641,35 +1758,27 @@
         // Sashed Mounted Buffalo Hunter on Horseback (Left-Rear, chasing & hunting the herd!)
         const hx = cx - 108;
         const hy = Math.round(118 + strideB * 0.8);
-        // Horse flowing tail
         ctx.fillStyle = '#2e1a0c';
         ctx.fillRect(hx - 40, hy - 10, 10, 18);
-        // Warm chestnut-bay horse body
         ctx.fillStyle = '#8c3b19';
         ctx.fillRect(hx - 30, hy - 12, 48, 20);
-        // Horse neck & head (facing right toward the fleeing herd)
         ctx.fillRect(hx + 12, hy - 28, 14, 20);
         ctx.fillRect(hx + 22, hy - 24, 15, 10);
-        // Dark mane
         ctx.fillStyle = '#1e1b18';
         ctx.fillRect(hx + 8, hy - 28, 5, 16);
-        // Galloping horse legs
         ctx.fillStyle = '#8c3b19';
         ctx.fillRect(hx - 26 - (wave * 4), hy + 8, 7, 18);
         ctx.fillRect(hx - 14 + (wave * 4), hy + 8, 7, 16);
         ctx.fillRect(hx + 8 - (wave * 4), hy + 8, 7, 16);
         ctx.fillRect(hx + 18 + (wave * 4), hy + 8, 7, 18);
 
-        // Mounted Buffalo Hunter (Teal capote, wide-brim hat, & flowing red/gold sash)
         ctx.fillStyle = '#12AEA2';
         ctx.fillRect(hx - 10, hy - 27, 15, 15);
-        // Sash wrapped across chest/waist + trailing fringed tail
         ctx.fillStyle = '#AD1C21';
         ctx.fillRect(hx - 10, hy - 20, 15, 4);
         ctx.fillRect(hx - 24, hy - 21 + (wave * 2), 14, 5);
         ctx.fillStyle = '#F7C844';
         ctx.fillRect(hx - 28, hy - 20 + (wave * 2), 5, 4);
-        // Hunter head & hat
         ctx.fillStyle = '#dcd7c9';
         ctx.fillRect(hx - 7, hy - 35, 9, 8);
         ctx.fillStyle = '#3b150c';
@@ -1677,13 +1786,10 @@
         ctx.fillRect(hx - 7, hy - 42, 9, 4);
 
         // Rumbling Herd of Buffalo Ahead of the Hunter (Center to Right, charging forward)
-        // Distant back-row buffalo
         drawMatrix(ctx, BUFFALO_SPRITE, PALETTE, cx - 28, 74 + strideA, 4);
         drawMatrix(ctx, BUFFALO_SPRITE, PALETTE, cx + 68, 76 + strideB, 4);
-        // Mid-herd charging bulls
         drawMatrix(ctx, BUFFALO_SPRITE, PALETTE, cx - 44, 94 + strideB, 5);
         drawMatrix(ctx, BUFFALO_SPRITE, PALETTE, cx + 48, 92 + strideA, 5);
-        // Foreground stampeding bulls
         drawMatrix(ctx, BUFFALO_SPRITE, PALETTE, cx - 10, 108 + strideA, 6);
         drawMatrix(ctx, BUFFALO_SPRITE, PALETTE, cx + 86, 104 + strideB, 6);
 
@@ -2267,7 +2373,7 @@
             }
             else {
                 splashState = 'DONE';
-                transitionToStatic();
+                transitionToWarning();
                 return;
             }
 
