@@ -5,6 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Bwaa Brule</title>
   <style>
+    :root {
+      /* Buffer to keep controls lifted above mobile Safari/Chrome bottom search bars */
+      --browser-hud-clearance: max(64px, env(safe-area-inset-bottom, 0px));
+    }
+
+    @media (min-width: 768px) {
+      :root {
+        --browser-hud-clearance: env(safe-area-inset-bottom, 0px);
+      }
+    }
+
     /* Global Reset & Full-Page Embed Base */
     * {
       box-sizing: border-box;
@@ -25,13 +36,13 @@
       touch-action: none; 
     }
 
-    /* Full-Page Responsive Embed Shell */
+    /* Full-Page Responsive Embed Shell (synced to visualViewport via JS) */
     .embed-shell {
       position: fixed;
-      inset: 0;
+      top: 0;
+      left: 0;
       width: 100vw;
-      height: 100vh;
-      height: 100dvh;
+      height: 100svh;
       background: #080808;
       display: flex;
       flex-direction: column;
@@ -94,7 +105,7 @@
     #dos-menu {
       background: #000;
       color: #12AEA2;
-      padding: calc(16px + env(safe-area-inset-top)) 20px 18px 20px;
+      padding: calc(14px + env(safe-area-inset-top)) 20px 14px 20px;
       flex-direction: column;
       overflow-y: auto;
       scrollbar-width: none;
@@ -108,7 +119,7 @@
     .dos-header {
       font-weight: bold;
       font-size: 16px;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
       border-bottom: 2px dashed #12AEA2;
       padding-bottom: 6px;
       flex: 0 0 auto;
@@ -120,7 +131,7 @@
       margin: 0;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 5px;
     }
 
     .dos-list li {
@@ -247,14 +258,17 @@
       box-shadow: inset 0 0 32px rgba(0, 0, 0, 0.65);
     }
 
-    /* --- SECTION 2: COMPACT DOCKED CONTROL DECK --- */
+    /* --- SECTION 2: CONTROL DECK LIFTED ABOVE BROWSER BOTTOM HUD --- */
     .control-deck {
       flex: 0 0 auto;
-      height: calc(136px + env(safe-area-inset-bottom));
       width: 100%;
-      background: linear-gradient(to bottom, #161616 0%, #0b0b0b 100%);
+      background: linear-gradient(to bottom, #161616 0%, #090909 75%, #050505 100%);
       border-top: 1px solid #2c2c2c;
-      padding: 10px calc(18px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(18px + env(safe-area-inset-left));
+      padding-top: 10px;
+      padding-left: calc(18px + env(safe-area-inset-left));
+      padding-right: calc(18px + env(safe-area-inset-right));
+      /* Lifts joystick and buttons cleanly above mobile browser bottom search bar */
+      padding-bottom: calc(12px + var(--browser-hud-clearance));
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -272,8 +286,8 @@
 
     /* Left Thumb: Drag Joystick */
     .joystick-base {
-      width: 108px;
-      height: 108px;
+      width: 104px;
+      height: 104px;
       background: radial-gradient(circle, #141414 32%, #242424 100%);
       border-radius: 50%;
       border: 3px solid #050505;
@@ -288,14 +302,14 @@
     }
 
     .joystick-stick {
-      width: 54px; 
-      height: 54px;
+      width: 52px; 
+      height: 52px;
       background: radial-gradient(circle at 35% 35%, #8f8f8f, #222);
       border: 1.5px solid rgba(255, 255, 255, 0.22);
       border-radius: 50%;
       position: absolute;
-      top: 24px; 
-      left: 24px; 
+      top: 23px; 
+      left: 23px; 
       box-shadow: 0 6px 12px rgba(0, 0, 0, 0.75);
       pointer-events: none; 
       transition: transform 0.14s ease-out; 
@@ -312,7 +326,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 6px;
+      gap: 5px;
       align-self: flex-end;
       margin-bottom: 4px;
     }
@@ -358,12 +372,12 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 5px;
+      gap: 4px;
     }
 
     .action-btn {
-      width: 54px;
-      height: 54px;
+      width: 52px;
+      height: 52px;
       border-radius: 50%;
       border: 2.5px solid #090909;
       cursor: pointer;
@@ -388,7 +402,7 @@
 
     .btn-b { 
       background: #AD1C21; 
-      margin-top: 20px; 
+      margin-top: 18px; 
     }
     .btn-a { 
       background: #12AEA2; 
@@ -403,8 +417,7 @@
     /* Desktop / Wide Embed Enhancement */
     @media (min-width: 768px) {
       .control-deck {
-        height: 144px;
-        padding: 12px 32px;
+        padding: 12px 32px 14px 32px;
       }
       .deck-inner {
         max-width: 680px;
@@ -473,7 +486,7 @@
 
     </div>
 
-    <!-- 2. COMPACT DOCKED CONTROL DECK -->
+    <!-- 2. CONTROL DECK LIFTED ABOVE MOBILE BROWSER BOTTOM HUD -->
     <div class="control-deck">
       <div class="deck-inner">
         <div class="joystick-base" id="joystick-base">
@@ -524,8 +537,32 @@
 
     let staticStartTime = 0;
 
+    /* --- DYNAMIC MOBILE BROWSER VIEWPORT SYNC --- */
+    function syncViewportBounds() {
+      if (window.visualViewport) {
+        embedShell.style.height = `${window.visualViewport.height}px`;
+        embedShell.style.top = `${window.visualViewport.offsetTop}px`;
+      } else {
+        embedShell.style.height = `${window.innerHeight}px`;
+        embedShell.style.top = '0px';
+      }
+      if (isPlaying && gameFrame.contentWindow) {
+        try {
+          gameFrame.contentWindow.dispatchEvent(new Event('resize'));
+        } catch (err) {}
+      }
+    }
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', syncViewportBounds);
+      window.visualViewport.addEventListener('scroll', syncViewportBounds);
+    }
+    window.addEventListener('resize', syncViewportBounds);
+    syncViewportBounds();
+
     // Ensure full-page embedded window grabs keyboard focus on load & interaction
     window.addEventListener('load', () => {
+      syncViewportBounds();
       window.focus();
       embedShell.focus({ preventScroll: true });
     });
@@ -779,8 +816,8 @@
     let isDragging = false;
     let currentDir = null;
     let activeBroadcastDir = null;
-    const maxRadius = 30; 
-    const deadzone = 13;  
+    const maxRadius = 28; 
+    const deadzone = 12;  
 
     let holdTimer = null;
     let repeatInterval = null;
