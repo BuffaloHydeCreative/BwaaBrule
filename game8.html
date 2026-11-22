@@ -351,19 +351,33 @@
             }
         ];
 
-        // COURSE 4: VIZÉ LA LIGN (Driving Range Mode — Drawn from The Forks / Hole 1 Prairie Portage)
+        // COURSE 4: VIZÉ LA LIGN (Kildonan Red River Serpentine — East Bank Driving Range, No Marking Lines)
         const HOLES_RANGE = [
             {
                 par: 0, worldW: 600, worldH: 1080,
-                tee: { x: 300, y: 1000 },
-                pin: { x: 300, y: 70 },
+                tee: { x: 355, y: 1000 },
+                pin: { x: 355, y: 70 },
                 startAngle: -Math.PI / 2,
                 shapes: [
-                    { type: 'WATER',      x: 0,   y: 0,   w: 62,  h: 1080 },
-                    { type: 'WATER',      x: 0,   y: 520, w: 135, h: 42   },
-                    { type: 'WATER',      x: 538, y: 0,   w: 62,  h: 1080 },
-                    { type: 'FAIRWAY',    x: 145, y: 50,  w: 310, h: 985  },
-                    { type: 'RANGE_LINE', x: 298, y: 60,  w: 4,   h: 960  }
+                    // Continuous Serpentine Red River flowing north through Kildonan along the Left/West side
+                    { type: 'WATER', x: 0,  y: 940, w: 115, h: 140 },
+                    { type: 'WATER', x: 18, y: 820, w: 125, h: 135 },
+                    { type: 'WATER', x: 42, y: 700, w: 130, h: 135 },
+                    { type: 'WATER', x: 24, y: 580, w: 130, h: 135 },
+                    { type: 'WATER', x: 0,  y: 460, w: 120, h: 135 },
+                    { type: 'WATER', x: 20, y: 340, w: 130, h: 135 },
+                    { type: 'WATER', x: 48, y: 220, w: 135, h: 135 },
+                    { type: 'WATER', x: 28, y: 100, w: 130, h: 135 },
+                    { type: 'WATER', x: 8,  y: 0,   w: 120, h: 115 },
+
+                    // Wide East-Bank Kildonan Driving Range Fairway (No marking lines)
+                    { type: 'FAIRWAY', x: 195, y: 60, w: 325, h: 975 },
+
+                    // Detailed Tall Grass Rough Patch on the right flank from which the Fox emerges
+                    { type: 'TALL_GRASS_PATCH', x: 455, y: 495, w: 95, h: 115 },
+
+                    // Single Sand Trap nestled beside the tall grass rough patch
+                    { type: 'SAND', x: 415, y: 525, w: 46, h: 68 }
                 ]
             }
         ];
@@ -395,7 +409,9 @@
             maxBalls: 10,
             ballScores: [],
             landedBalls: [],
-            targets: [],
+            fox: null,
+            geese: null,
+            herd: null,
             currentMultiplier: 1,
             hitTargetsThisShot: [],
             popups: [],
@@ -528,45 +544,96 @@
             }
         }
 
-        function spawnRangeTargets() {
+        // Initializes the 3 special range targets once per 10-ball session (destroyed permanently when hit)
+        function initRangeTargets() {
             const hole = HOLES_RANGE[0];
-            const teeY = hole.tee.y;
+            const teeY = hole.tee.y; // 1000
             const windNorthFactor = -Math.sin(sessionConditions.dirAngle) * sessionConditions.speed;
-            const globalMaxDist = Math.max(460, Math.min(910, 660 + windNorthFactor * 5.2));
-            const minZoneY = Math.max(90, teeY - globalMaxDist);
+            const globalMaxDist = Math.max(480, Math.min(900, 660 + windNorthFactor * 5.2));
+            const minZoneY = Math.max(110, teeY - globalMaxDist);
             const maxZoneY = teeY - Math.round(globalMaxDist / 3);
 
-            rangeState.targets = [];
-            const targetDefs = [
-                { kind: 'BUFFALO', mult: 2, label: '2X', radius: 18, vxRange: 0.35, vyRange: 0.15, airborne: false },
-                { kind: 'BUFFALO', mult: 2, label: '2X', radius: 18, vxRange: 0.35, vyRange: 0.15, airborne: false },
-                { kind: 'BUFFALO', mult: 2, label: '2X', radius: 18, vxRange: 0.35, vyRange: 0.15, airborne: false },
-                { kind: 'GEESE',   mult: 3, label: '3X', radius: 22, vxRange: 0.85, vyRange: 0.20, airborne: true  },
-                { kind: 'GEESE',   mult: 3, label: '3X', radius: 22, vxRange: 0.85, vyRange: 0.20, airborne: true  },
-                { kind: 'FOX',     mult: 5, label: '5X', radius: 15, vxRange: 1.15, vyRange: 0.35, airborne: false },
-                { kind: 'FOX',     mult: 5, label: '5X', radius: 15, vxRange: 1.15, vyRange: 0.35, airborne: false }
-            ];
+            // 1. Fox (5x): Emerges from the tall grass rough patch (x: 495, y: 550) and sprints across fairway off-screen
+            rangeState.fox = {
+                kind: 'FOX',
+                mult: 5,
+                hit: false,
+                active: true,
+                x: 495,
+                y: 550,
+                vx: -1.45,
+                anim: 0,
+                delay: 35
+            };
 
-            targetDefs.forEach((def, idx) => {
-                const bandFrac = (idx + 0.5) / targetDefs.length;
-                const ty = maxZoneY - bandFrac * (maxZoneY - minZoneY) + (Math.random() - 0.5) * 26;
-                const tx = 135 + Math.random() * 330;
-                const dir = (Math.random() > 0.5 ? 1 : -1);
-                rangeState.targets.push({
-                    id: idx,
-                    kind: def.kind,
-                    mult: def.mult,
-                    label: def.label,
-                    radius: def.radius,
-                    airborne: def.airborne,
-                    x: tx,
-                    y: Math.max(95, Math.min(maxZoneY, ty)),
-                    vx: dir * (def.vxRange * (0.65 + Math.random() * 0.5)),
-                    vy: (Math.random() - 0.5) * def.vyRange,
-                    anim: Math.random() * 50,
-                    hitFlash: 0
+            // 2. Flock of Geese (3x): Sitting on the fairway pecking grass; scatter & fly off-screen permanently when hit
+            const geeseY = Math.max(minZoneY + 30, Math.min(maxZoneY - 40, teeY - globalMaxDist * 0.58));
+            const geeseX = 255 + Math.random() * 140;
+            rangeState.geese = {
+                kind: 'GEESE',
+                mult: 3,
+                hit: false,
+                scattering: false,
+                gone: false,
+                x: geeseX,
+                y: geeseY,
+                anim: 0,
+                birds: [
+                    { dx: -16, dy: -6, vx: -1.6, vy: -2.4, peckOffset: 0.0 },
+                    { dx: 4,   dy: -12, vx: 0.4,  vy: -2.7, peckOffset: 1.4 },
+                    { dx: 18,  dy: -2, vx: 1.8,  vy: -2.2, peckOffset: 2.7 },
+                    { dx: -8,  dy: 10, vx: -1.1, vy: -2.5, peckOffset: 3.9 },
+                    { dx: 12,  dy: 12, vx: 1.4,  vy: -2.3, peckOffset: 5.1 }
+                ]
+            };
+
+            // 3. Buffalo Herd (2 to 3 buffalos max, 2x): Rumbles horizontally across fairway off-screen to off-screen
+            const herdCount = Math.random() > 0.45 ? 3 : 2;
+            const herdY = Math.max(minZoneY + 20, Math.min(maxZoneY - 20, teeY - globalMaxDist * 0.80));
+            const dir = Math.random() > 0.5 ? 1 : -1;
+            const startX = dir > 0 ? -40 : 640;
+            const members = [];
+            for (let i = 0; i < herdCount; i++) {
+                members.push({
+                    dx: -dir * (i * 34),
+                    dy: (i % 2 === 0 ? -7 : 7)
                 });
-            });
+            }
+            rangeState.herd = {
+                kind: 'BUFFALO',
+                mult: 2,
+                hit: false,
+                active: true,
+                x: startX,
+                y: herdY,
+                dir: dir,
+                vx: dir * 0.85,
+                anim: 0,
+                delay: 15,
+                members: members
+            };
+        }
+
+        // Resets un-hit moving targets (Fox & Buffalo Herd) on every new shot
+        function resetRangeMovingTargetsForShot() {
+            if (rangeState.fox && !rangeState.fox.hit) {
+                rangeState.fox.active = true;
+                rangeState.fox.x = 495;
+                rangeState.fox.y = 540 + (Math.random() - 0.5) * 35;
+                rangeState.fox.vx = -(1.35 + Math.random() * 0.35);
+                rangeState.fox.delay = 25 + Math.floor(Math.random() * 45);
+            }
+            if (rangeState.herd && !rangeState.herd.hit) {
+                const dir = Math.random() > 0.5 ? 1 : -1;
+                rangeState.herd.active = true;
+                rangeState.herd.dir = dir;
+                rangeState.herd.x = dir > 0 ? -40 : 640;
+                rangeState.herd.vx = dir * (0.78 + Math.random() * 0.25);
+                rangeState.herd.delay = 10 + Math.floor(Math.random() * 35);
+                rangeState.herd.members.forEach((m, idx) => {
+                    m.dx = -dir * (idx * 34);
+                });
+            }
         }
 
         function initRangeMode() {
@@ -580,7 +647,7 @@
             rangeState.popups = [];
             rangeState.lastShotSummary = "";
             loadHole(0);
-            spawnRangeTargets();
+            initRangeTargets();
         }
 
         function prepareNextRangeBall() {
@@ -600,6 +667,7 @@
             rangeState.hitTargetsThisShot = [];
             meter.powerMarker = -1;
             meter.accuracyMarker = -1;
+            resetRangeMovingTargetsForShot();
             let projY = Math.max(0, Math.min(hole.worldH, ball.y + Math.sin(aimAngle) * getEffectiveClubDist(clubIdx)));
             targetCamY = getTargetCameraY(hole, projY);
             state = 'AIM';
@@ -648,7 +716,6 @@
                 state = 'HOLE_OUT';
             } else {
                 rangeState.ballNum++;
-                if (rangeState.ballNum % 3 === 1) spawnRangeTargets();
                 setTimeout(() => {
                     if (state === 'HOLE_OUT') prepareNextRangeBall();
                 }, 1200);
@@ -734,18 +801,25 @@
                 }
                 return;
             }
-            if (s.type === 'RANGE_LINE') {
-                targetCtx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-                for (let ry = s.y; ry < s.y + s.h; ry += 16) {
-                    targetCtx.fillRect(s.x, ry, s.w, 8);
-                }
-                targetCtx.fillStyle = 'rgba(247, 200, 68, 0.55)';
-                targetCtx.font = '7px "Press Start 2P"';
-                targetCtx.textAlign = 'left';
-                for (let yd = 100; yd <= 850; yd += 100) {
-                    let my = 1000 - yd;
-                    targetCtx.fillRect(150, my, 300, 1);
-                    targetCtx.fillText(`${yd}Y`, 154, my - 3);
+            if (s.type === 'TALL_GRASS_PATCH') {
+                // Detailed Tall Grass Rough Patch (Fox den cover beside the sand trap)
+                targetCtx.fillStyle = '#63521d';
+                targetCtx.fillRect(s.x, s.y, s.w, s.h);
+                targetCtx.fillStyle = '#756224';
+                targetCtx.fillRect(s.x + 4, s.y + 4, s.w - 8, s.h - 8);
+                for (let gx = s.x + 6; gx < s.x + s.w - 8; gx += 10) {
+                    for (let gy = s.y + 8; gy < s.y + s.h - 6; gy += 12) {
+                        let sway = ((gy / 12) % 2 === 0) ? 0 : 4;
+                        // Deep shadow stalk
+                        targetCtx.fillStyle = '#4d3e14';
+                        targetCtx.fillRect(gx + sway, gy - 4, 2, 10);
+                        // Golden-ochre tall grass blades
+                        targetCtx.fillStyle = '#b39942';
+                        targetCtx.fillRect(gx + sway + 2, gy - 6, 2, 11);
+                        // Sunlit wheat tip
+                        targetCtx.fillStyle = PALETTE.YELLOW;
+                        targetCtx.fillRect(gx + sway + 2, gy - 7, 2, 3);
+                    }
                 }
                 return;
             }
@@ -898,8 +972,7 @@
             for (let i = hole.shapes.length - 1; i >= 0; i--) {
                 const s = hole.shapes[i];
                 if (x >= s.x && x <= s.x + s.w && y >= s.y && y <= s.y + s.h) {
-                    if (s.type === 'RANGE_LINE') return 'FAIRWAY';
-                    if (s.type === 'PEBBLE_ROUGH') return 'ROUGH';
+                    if (s.type === 'TALL_GRASS_PATCH' || s.type === 'PEBBLE_ROUGH') return 'ROUGH';
                     if (s.type === 'WATERFALL') return 'WATER';
                     if (s.type === 'MOUNTAIN' || s.type === 'RIDGE' || s.type === 'HAZARD_ROCK') return 'OB';
                     return s.type; 
@@ -991,7 +1064,6 @@
             state = 'FLY'; let club = CLUBS[clubIdx];
             const player = getActivePlayer();
 
-            // Sweet spot center is 25; parish archetype scales dispersion (St. James tight, St. Vital wide)
             let sweetCenter = 25; 
             let deviation = ((meter.accuracy - sweetCenter) / 100) * player.accuracyMult;
             let finalAngle = aimAngle + (deviation * 0.9);
@@ -1013,7 +1085,6 @@
                 return;
             }
 
-            // Parish lie recovery modifiers (St. Andrews Short-Game specialist excels out of rough & sand)
             let liePenalty = 1.0; let zPenalty = 1.0;
             if (lie === 'ROUGH') {
                 if (clubIdx === 0) { liePenalty = 0.35; zPenalty = 0.35; }
@@ -1271,6 +1342,7 @@
 
             const hole = activeCourseHoles[currentHole];
 
+            // Vizé La Lign Dynamic Wildlife & Target Animations
             if (rangeState.active) {
                 for (let i = rangeState.popups.length - 1; i >= 0; i--) {
                     let p = rangeState.popups[i];
@@ -1279,13 +1351,49 @@
                     if (p.life <= 0) rangeState.popups.splice(i, 1);
                 }
 
-                for (let t of rangeState.targets) {
-                    t.anim += 0.08;
-                    t.x += t.vx;
-                    t.y += t.vy;
-                    if (t.hitFlash > 0) t.hitFlash--;
-                    if (t.x < 105 || t.x > 495) t.vx *= -1;
-                    if (t.y < 85 || t.y > 760) t.vy *= -1;
+                // 1. Fox emerging from tall grass rough patch and running across fairway off-screen
+                const fox = rangeState.fox;
+                if (fox && !fox.hit && fox.active) {
+                    if (fox.delay > 0) {
+                        fox.delay--;
+                    } else {
+                        fox.anim += 0.14;
+                        fox.x += fox.vx;
+                        if (fox.x < -30) {
+                            fox.active = false; // Exited off-screen; will reset on next shot
+                        }
+                    }
+                }
+
+                // 2. Geese sitting on fairway pecking at grass; scatter and fly off-screen permanently when hit
+                const geese = rangeState.geese;
+                if (geese && !geese.gone) {
+                    geese.anim += 0.08;
+                    if (geese.scattering) {
+                        let anyVisible = false;
+                        for (let b of geese.birds) {
+                            b.dx += b.vx;
+                            b.dy += b.vy;
+                            const wy = geese.y + b.dy;
+                            const wx = geese.x + b.dx;
+                            if (wy > -40 && wx > -40 && wx < 640) anyVisible = true;
+                        }
+                        if (!anyVisible) geese.gone = true;
+                    }
+                }
+
+                // 3. Buffalo Herd (2-3 buffalos) rumbling horizontally off-screen to off-screen
+                const herd = rangeState.herd;
+                if (herd && !herd.hit && herd.active) {
+                    if (herd.delay > 0) {
+                        herd.delay--;
+                    } else {
+                        herd.anim += 0.08;
+                        herd.x += herd.vx;
+                        if ((herd.dir > 0 && herd.x > 690) || (herd.dir < 0 && herd.x < -90)) {
+                            herd.active = false; // Exited off-screen; will reset on next shot
+                        }
+                    }
                 }
             }
 
@@ -1324,23 +1432,67 @@
                     targetCamY = getTargetCameraY(hole, ball.y);
                 }
 
+                // Vizé La Lign Target Hit Detection (No regeneration once hit)
                 if (rangeState.active) {
-                    for (let t of rangeState.targets) {
-                        if (rangeState.hitTargetsThisShot.includes(t.id)) continue;
-                        const heightMatch = t.airborne ? (ball.z >= 1 && ball.z <= 28) : (ball.z <= 12);
-                        if (heightMatch && Math.hypot(ball.x - t.x, ball.y - t.y) < t.radius + 4) {
-                            rangeState.hitTargetsThisShot.push(t.id);
-                            rangeState.currentMultiplier *= t.mult;
-                            t.hitFlash = 45;
-                            playBonusHitJingle(t.mult);
+                    // Check Fox (5x)
+                    const fox = rangeState.fox;
+                    if (fox && !fox.hit && fox.active && fox.delay <= 0 && ball.z <= 12) {
+                        if (Math.hypot(ball.x - fox.x, ball.y - fox.y) < 18) {
+                            fox.hit = true;
+                            fox.active = false;
+                            rangeState.currentMultiplier *= fox.mult;
+                            playBonusHitJingle(fox.mult);
                             rangeState.popups.push({
-                                x: t.x,
-                                y: t.y - 12,
-                                text: `${t.label} ${t.kind}!`,
-                                color: t.mult >= 5 ? PALETTE.UI_ORANGE : (t.mult >= 3 ? PALETTE.WATER_BLUE_LIGHT : PALETTE.YELLOW),
-                                life: 65
+                                x: fox.x,
+                                y: fox.y - 10,
+                                text: "5X FOX!",
+                                color: PALETTE.UI_ORANGE,
+                                life: 70
                             });
-                            shotFeedback = `${t.label} ${t.kind}!`;
+                            shotFeedback = "5X FOX!";
+                        }
+                    }
+
+                    // Check Grounded Geese Flock (3x) -> Scatter & fly off-screen permanently
+                    const geese = rangeState.geese;
+                    if (geese && !geese.hit && !geese.scattering && ball.z <= 14) {
+                        if (Math.hypot(ball.x - geese.x, ball.y - geese.y) < 28) {
+                            geese.hit = true;
+                            geese.scattering = true;
+                            rangeState.currentMultiplier *= geese.mult;
+                            playBonusHitJingle(geese.mult);
+                            rangeState.popups.push({
+                                x: geese.x,
+                                y: geese.y - 12,
+                                text: "3X GEESE!",
+                                color: PALETTE.WATER_BLUE_LIGHT,
+                                life: 70
+                            });
+                            shotFeedback = "3X GEESE!";
+                        }
+                    }
+
+                    // Check Buffalo Herd (2x)
+                    const herd = rangeState.herd;
+                    if (herd && !herd.hit && herd.active && herd.delay <= 0 && ball.z <= 14) {
+                        for (let m of herd.members) {
+                            const bx = herd.x + m.dx;
+                            const by = herd.y + m.dy;
+                            if (Math.hypot(ball.x - bx, ball.y - by) < 18) {
+                                herd.hit = true;
+                                herd.active = false;
+                                rangeState.currentMultiplier *= herd.mult;
+                                playBonusHitJingle(herd.mult);
+                                rangeState.popups.push({
+                                    x: bx,
+                                    y: by - 12,
+                                    text: "2X BUFFALO!",
+                                    color: PALETTE.YELLOW,
+                                    life: 70
+                                });
+                                shotFeedback = "2X BUFFALO!";
+                                break;
+                            }
                         }
                     }
                 }
@@ -1809,8 +1961,8 @@
 
             for (let s of hole.shapes) {
                 if (s.type === 'HAZARD_ROCK') continue;
-                if (s.type === 'RANGE_LINE') {
-                    ctx.fillStyle = PALETTE.YELLOW;
+                if (s.type === 'TALL_GRASS_PATCH') {
+                    ctx.fillStyle = '#63521d';
                 } else if (s.type === 'FAIRWAY') {
                     ctx.fillStyle = (courseIdx === 1 || courseIdx === 3) ? PALETTE.FAIRWAY_PRAIRIE : (courseIdx === 2 ? PALETTE.FAIRWAY_NORTH : PALETTE.FAIRWAY_WOOD);
                 } else if (s.type === 'PEBBLE_ROUGH') {
@@ -1833,15 +1985,6 @@
                     Math.max(1, s.w * scaleX),
                     Math.max(2, s.h * scaleY)
                 );
-            }
-
-            if (courseIdx === 3) {
-                ctx.fillStyle = PALETTE.UI_ORANGE;
-                ctx.fillRect(innerX + innerW * 0.35, innerY + innerH * 0.45, 3, 3);
-                ctx.fillStyle = PALETTE.WHITE;
-                ctx.fillRect(innerX + innerW * 0.65, innerY + innerH * 0.30, 3, 3);
-                ctx.fillStyle = PALETTE.YELLOW;
-                ctx.fillRect(innerX + innerW * 0.48, innerY + innerH * 0.20, 3, 3);
             }
 
             ctx.fillStyle = PALETTE.TEE_BLUE_LIGHT;
@@ -1992,7 +2135,6 @@
             ctx.fillText(dispTot, cxTot, scY + headerH + rowH * 2.74);
         }
 
-        // Parish Player Selection Text Picker (Lists Parish + Short Game / Conserv. / Aggressive titles)
         function drawPlayerTypePicker(px, py, pw, ph) {
             const p = getActivePlayer();
             const blink = (Date.now() % 500 < 300) ? PALETTE.UI_ORANGE : PALETTE.YELLOW;
@@ -2003,7 +2145,6 @@
             ctx.lineWidth = 2;
             ctx.strokeRect(px, py, pw, ph);
 
-            // Left / Right Arrows
             ctx.fillStyle = blink;
             ctx.font = '9px "Press Start 2P"';
             ctx.textAlign = 'left';
@@ -2011,7 +2152,6 @@
             ctx.textAlign = 'right';
             ctx.fillText("▶", px + pw - 8, py + 17);
 
-            // Parish + Strategy Title
             ctx.textAlign = 'center';
             ctx.fillStyle = PALETTE.WHITE;
             ctx.font = '8px "Press Start 2P"';
@@ -2026,13 +2166,11 @@
             const activeCourse = COURSES[selectedCourseIdx];
             const cx = VIEW_W / 2;
 
-            // Top Header Bar anchored to y = 0
             ctx.fillStyle = PALETTE.BLACK; ctx.fillRect(0, 0, VIEW_W, 24);
             ctx.fillStyle = PALETTE.UI_ORANGE; ctx.fillRect(0, 24, VIEW_W, 3);
             ctx.fillStyle = PALETTE.WHITE; ctx.font = '11px "Press Start 2P"'; ctx.textAlign = 'center';
             ctx.fillText("SELECT COURSE", cx, 17);
 
-            // 1. TOP PREVIEW: Mini-Map Strip
             const miniY = 30;
             const miniH = 66;
             if (activeCourse.isRange) {
@@ -2043,7 +2181,7 @@
                     miniY,
                     140,
                     miniH,
-                    "THE FORKS RANGE"
+                    "KILDONAN RANGE"
                 );
             } else {
                 const miniW = 74, miniGap = 14;
@@ -2063,7 +2201,6 @@
                 }
             }
 
-            // 2. MIDDLE: 4 Course Selection Cards
             const startY = 100; const cardH = 36; const cardGap = 3;
             const cardW = Math.min(VIEW_W - 20, 480);
             const cardX = cx - cardW / 2;
@@ -2104,10 +2241,8 @@
                 }
             }
 
-            // 3. PLAYER SELECTION TYPE PICKER (Directly above Scorecard)
             drawPlayerTypePicker(cx - 125, 258, 250, 28);
 
-            // 4. BOTTOM PREVIEW: Blank Gridded Scorecard
             if (activeCourse.isRange) {
                 drawRangeMiniScorecard(cx - 125, 291, 250, 74, null);
             } else {
@@ -2562,29 +2697,58 @@
             ctx.fillRect(fx + 3, fy + 3, 2, 3);
         }
 
-        function drawPixelGeeseFlock(gx, gy, anim) {
-            const flap = Math.sin(anim * 7) > 0 ? -3 : 2;
-            const offsets = [
-                { dx: 0,   dy: -8 },
-                { dx: -12, dy: 0  },
-                { dx: 12,  dy: 0  },
-                { dx: -22, dy: 8  },
-                { dx: 22,  dy: 8  }
+        // Draws Grounded Geese Pecking at Grass, or Scattering & Flying Upward Off-Screen when Hit
+        function drawPixelGeeseFlock(gx, gy, anim, geeseObj) {
+            const birds = geeseObj ? geeseObj.birds : [
+                { dx: 0, dy: -8, peckOffset: 0 },
+                { dx: -12, dy: 0, peckOffset: 1.5 },
+                { dx: 12, dy: 0, peckOffset: 3.0 },
+                { dx: -22, dy: 8, peckOffset: 4.5 },
+                { dx: 22, dy: 8, peckOffset: 6.0 }
             ];
-            for (let o of offsets) {
-                const bx = gx + o.dx;
-                const by = gy + o.dy;
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
-                ctx.fillRect(bx - 3, by + 12, 6, 3);
-                ctx.fillStyle = PALETTE.GOOSE_BODY;
-                ctx.fillRect(bx - 2, by - 4, 4, 8);
-                ctx.fillStyle = PALETTE.GOOSE_WING;
-                ctx.fillRect(bx - 7, by - 1 + flap, 5, 3);
-                ctx.fillRect(bx + 2, by - 1 + flap, 5, 3);
-                ctx.fillStyle = PALETTE.GOOSE_NECK;
-                ctx.fillRect(bx - 1, by - 8, 2, 4);
-                ctx.fillStyle = PALETTE.WHITE;
-                ctx.fillRect(bx - 1, by - 6, 2, 1);
+            const scattering = geeseObj ? geeseObj.scattering : false;
+
+            for (let b of birds) {
+                const bx = gx + b.dx;
+                const by = gy + b.dy;
+
+                if (scattering) {
+                    // Flying scatter animation
+                    const flap = Math.sin(anim * 10 + (b.peckOffset || 0)) > 0 ? -4 : 3;
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+                    ctx.fillRect(bx - 3, by + 16, 6, 2);
+                    ctx.fillStyle = PALETTE.GOOSE_BODY;
+                    ctx.fillRect(bx - 2, by - 4, 4, 8);
+                    ctx.fillStyle = PALETTE.GOOSE_WING;
+                    ctx.fillRect(bx - 8, by - 1 + flap, 6, 3);
+                    ctx.fillRect(bx + 2, by - 1 + flap, 6, 3);
+                    ctx.fillStyle = PALETTE.GOOSE_NECK;
+                    ctx.fillRect(bx - 1, by - 8, 2, 4);
+                    ctx.fillStyle = PALETTE.WHITE;
+                    ctx.fillRect(bx - 1, by - 6, 2, 1);
+                } else {
+                    // Sitting on fairway pecking at the grass
+                    const pecking = Math.sin(anim * 2.5 + (b.peckOffset || 0)) > 0.35;
+                    // Body sitting on grass
+                    ctx.fillStyle = PALETTE.GOOSE_BODY;
+                    ctx.fillRect(bx - 4, by - 2, 8, 5);
+                    ctx.fillStyle = PALETTE.GOOSE_WING;
+                    ctx.fillRect(bx - 3, by - 1, 5, 3);
+                    // Tail tip
+                    ctx.fillStyle = PALETTE.WHITE;
+                    ctx.fillRect(bx + 3, by - 2, 2, 2);
+                    // Head & neck (dips down to grass when pecking)
+                    ctx.fillStyle = PALETTE.GOOSE_NECK;
+                    if (pecking) {
+                        ctx.fillRect(bx - 7, by + 1, 4, 3);
+                        ctx.fillStyle = PALETTE.WHITE;
+                        ctx.fillRect(bx - 6, by + 1, 1, 2);
+                    } else {
+                        ctx.fillRect(bx - 5, by - 6, 2, 5);
+                        ctx.fillStyle = PALETTE.WHITE;
+                        ctx.fillRect(bx - 5, by - 5, 2, 1);
+                    }
+                }
             }
         }
 
@@ -2688,25 +2852,34 @@
                 }
             }
 
+            // Vizé La Lign Driving Range: Landed Balls, Wildlife Targets (No Hovering Labels) & Hit Popups
             if (rangeState.active) {
                 for (let lb of rangeState.landedBalls) {
                     ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
                     ctx.fillRect(lb.x - 2, lb.y - 2, 4, 4);
                 }
 
-                for (let t of rangeState.targets) {
-                    if (t.kind === 'BUFFALO') drawPixelBuffalo(t.x, t.y);
-                    else if (t.kind === 'GEESE') drawPixelGeeseFlock(t.x, t.y, t.anim);
-                    else if (t.kind === 'FOX') drawPixelFox(t.x, t.y, t.anim);
-
-                    ctx.font = '7px "Press Start 2P"';
-                    ctx.textAlign = 'center';
-                    ctx.fillStyle = PALETTE.BLACK;
-                    ctx.fillText(t.label, t.x + 1, t.y - 13);
-                    ctx.fillStyle = t.hitFlash > 0 ? PALETTE.GREEN : (t.mult >= 5 ? PALETTE.UI_ORANGE : (t.mult >= 3 ? PALETTE.WATER_BLUE_LIGHT : PALETTE.YELLOW));
-                    ctx.fillText(t.label, t.x, t.y - 14);
+                // 1. Fox (5x) emerging from tall grass rough patch
+                const fox = rangeState.fox;
+                if (fox && !fox.hit && fox.active && fox.delay <= 0) {
+                    drawPixelFox(fox.x, fox.y, fox.anim);
                 }
 
+                // 2. Grounded Geese Flock (3x) pecking at grass (or scattering off-screen when hit)
+                const geese = rangeState.geese;
+                if (geese && !geese.gone) {
+                    drawPixelGeeseFlock(geese.x, geese.y, geese.anim, geese);
+                }
+
+                // 3. Buffalo Herd (2-3 buffalos, 2x) rumbling across fairway
+                const herd = rangeState.herd;
+                if (herd && !herd.hit && herd.active && herd.delay <= 0) {
+                    for (let m of herd.members) {
+                        drawPixelBuffalo(herd.x + m.dx, herd.y + m.dy);
+                    }
+                }
+
+                // Floating Hit Multiplier Popups (Only flash after player hits target)
                 for (let p of rangeState.popups) {
                     ctx.font = '8px "Press Start 2P"';
                     ctx.textAlign = 'center';
@@ -2916,8 +3089,8 @@
             let scaleX = (mapW - 16) / hole.worldW; let scaleY = (mapH - 24) / hole.worldH;
             for (let s of hole.shapes) {
                 if (s.type === 'HAZARD_ROCK') continue;
-                if (s.type === 'RANGE_LINE') {
-                    ctx.fillStyle = PALETTE.YELLOW;
+                if (s.type === 'TALL_GRASS_PATCH') {
+                    ctx.fillStyle = '#63521d';
                 } else if (s.type === 'FAIRWAY') {
                     ctx.fillStyle = (selectedCourseIdx === 1 || selectedCourseIdx === 3) ? PALETTE.FAIRWAY_PRAIRIE : (selectedCourseIdx === 2 ? PALETTE.FAIRWAY_NORTH : PALETTE.FAIRWAY_WOOD);
                 } else if (s.type === 'PEBBLE_ROUGH') {
@@ -2938,9 +3111,21 @@
             }
 
             if (rangeState.active) {
-                for (let t of rangeState.targets) {
-                    ctx.fillStyle = t.mult >= 5 ? PALETTE.UI_ORANGE : (t.mult >= 3 ? PALETTE.WATER_BLUE_LIGHT : PALETTE.YELLOW);
-                    ctx.fillRect(mapX + 8 + (t.x * scaleX) - 1, mapY + 18 + (t.y * scaleY) - 1, 3, 3);
+                // Active wildlife targets on mini-map
+                const fox = rangeState.fox;
+                if (fox && !fox.hit && fox.active && fox.delay <= 0) {
+                    ctx.fillStyle = PALETTE.UI_ORANGE;
+                    ctx.fillRect(mapX + 8 + (fox.x * scaleX) - 1, mapY + 18 + (fox.y * scaleY) - 1, 3, 3);
+                }
+                const geese = rangeState.geese;
+                if (geese && !geese.gone && !geese.scattering) {
+                    ctx.fillStyle = PALETTE.WATER_BLUE_LIGHT;
+                    ctx.fillRect(mapX + 8 + (geese.x * scaleX) - 1, mapY + 18 + (geese.y * scaleY) - 1, 3, 3);
+                }
+                const herd = rangeState.herd;
+                if (herd && !herd.hit && herd.active && herd.delay <= 0) {
+                    ctx.fillStyle = PALETTE.YELLOW;
+                    ctx.fillRect(mapX + 8 + (herd.x * scaleX) - 1, mapY + 18 + (herd.y * scaleY) - 1, 3, 3);
                 }
             } else {
                 ctx.fillStyle = (Date.now() % 400 < 200) ? PALETTE.UI_ORANGE : PALETTE.WHITE; 
@@ -3002,26 +3187,27 @@
             ctx.fillStyle = PALETTE.BLACK; ctx.fillRect(0, botHudY, VIEW_W, botHudH);
             ctx.fillStyle = PALETTE.UI_ORANGE; ctx.fillRect(0, botHudY - 4, VIEW_W, 4);
 
-            ctx.fillStyle = PALETTE.WHITE; ctx.font = '9px "Press Start 2P"'; ctx.textAlign = 'left';
+            ctx.fillStyle = PALETTE.WHITE; ctx.font = '10px "Press Start 2P"'; ctx.textAlign = 'left';
             if (rangeState.active) {
-                ctx.fillText(`VIZÉ LA LIGN B:${rangeState.ballNum}/${rangeState.maxBalls}`, 10, 22);
+                ctx.fillText(`VIZÉ LA LIGN  B:${rangeState.ballNum}/${rangeState.maxBalls}`, 10, 22);
             } else {
-                let modeLabel = puttingState.active ? `H${currentHole + 1} (GREEN)` : `HOLE ${currentHole + 1}`;
-                ctx.fillText(`${modeLabel} PAR ${hole.par}`, 10, 22);
+                let modeLabel = puttingState.active ? `HOLE ${currentHole + 1} (GREEN)` : `HOLE ${currentHole + 1}`;
+                ctx.fillText(`${modeLabel}   PAR ${hole.par}`, 10, 22);
             }
 
             ctx.textAlign = 'center'; ctx.fillStyle = PALETTE.YELLOW;
-            if (!puttingState.active) ctx.fillText(`WIND:${sessionConditions.speed}KM/H ${sessionConditions.dirName}`, VIEW_W / 2, 22);
-            else ctx.fillText(`GREEN:${COURSES[selectedCourseIdx].greens}`, VIEW_W / 2, 22);
+            if (!puttingState.active) ctx.fillText(`WIND: ${sessionConditions.speed}KM/H ${sessionConditions.dirName}`, VIEW_W / 2, 22);
+            else ctx.fillText(`GREEN: ${COURSES[selectedCourseIdx].greens}`, VIEW_W / 2, 22);
 
+            // Clean Top-Right HUD (No player name displayed during actual gameplay)
             ctx.fillStyle = PALETTE.WHITE; ctx.textAlign = 'right';
             if (rangeState.active) {
                 const totPts = rangeState.ballScores.reduce((acc, s) => acc + s.points, 0);
                 ctx.fillStyle = rangeState.currentMultiplier > 1 ? PALETTE.YELLOW : PALETTE.WHITE;
-                ctx.fillText(`${player.shortName} ${rangeState.currentMultiplier}X:${totPts}`, VIEW_W - 10, 22);
+                ctx.fillText(`${rangeState.currentMultiplier}X  PTS:${totPts}`, VIEW_W - 10, 22);
             } else {
-                let curLie = puttingState.active ? "GRN" : lie;
-                ctx.fillText(`${player.shortName} S:${strokes + (strokes === 0 ? 1 : 0)} ${curLie}`, VIEW_W - 10, 22);
+                let curLie = puttingState.active ? "GREEN" : lie;
+                ctx.fillText(`STROKE: ${strokes + (strokes === 0 ? 1 : 0)}  LIE: ${curLie}`, VIEW_W - 10, 22);
             }
 
             let distText = "";
