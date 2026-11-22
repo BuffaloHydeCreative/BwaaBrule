@@ -1,0 +1,1306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>La Glace Rouge — Red River Curling</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.fog.min.js"></script>
+<style>
+  body {
+    margin: 0; padding: 0;
+    background: #06131c;
+    display: flex; justify-content: center; align-items: center;
+    height: 100vh; width: 100vw;
+    font-family: 'Press Start 2P', monospace;
+    user-select: none; touch-action: manipulation; overflow: hidden;
+  }
+  #vanta-bg {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    z-index: 0;
+  }
+  #game-container {
+    position: relative;
+    z-index: 2;
+    width: 100%; height: 100%; max-width: 600px;
+    display: flex; flex-direction: column; justify-content: center;
+    box-sizing: border-box; padding: 10px;
+  }
+  #screen-container {
+    flex: 0 0 auto; width: 100%;
+    aspect-ratio: 4 / 3; 
+    border: 4px solid #D4D0C5; 
+    position: relative; background: transparent; 
+    overflow: hidden; box-sizing: border-box;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.85);
+  }
+  canvas {
+    width: 100%; height: 100%;
+    display: block; image-rendering: pixelated;
+  }
+</style>
+</head>
+<body>
+<div id="vanta-bg"></div>
+<div id="game-container">
+  <div id="screen-container">
+    <canvas id="gameCanvas" width="320" height="240"></canvas>
+  </div>
+</div>
+
+<script>
+  // --- VANTA.JS SUB-GLACIAL WINTER RIVER MIST & AURORA BACKDROP ---
+  try {
+    if (window.VANTA) {
+      VANTA.FOG({
+        el: "#vanta-bg",
+        mouseControls: false,
+        touchControls: false,
+        gyroControls: false,
+        minHeight: 200.00,
+        minWidth: 200.00,
+        highlightColor: 0x12aea2,
+        midtoneColor: 0x0f6f9e,
+        lowlightColor: 0x0e2a1e,
+        baseColor: 0x091a24,
+        blurFactor: 0.65,
+        speed: 1.10,
+        zoom: 1.25
+      });
+    }
+  } catch (e) {}
+
+  const cvs = document.getElementById('gameCanvas');
+  const ctx = cvs.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+
+  // --- AUDIO SYNTHESIZER ---
+  let audioCtx = null;
+  function initAudio() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  }
+  function playTone(freq, type, dur, vol = 0.09) {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + dur);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + dur);
+  }
+  function playSweepNoise() {
+    if (!audioCtx) return;
+    const bufferSize = Math.floor(audioCtx.sampleRate * 0.08);
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = buffer;
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(1400, audioCtx.currentTime);
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.14, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+    noise.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+    noise.start();
+  }
+  function playStoneClack(intensity = 1) {
+    if (!audioCtx) return;
+    const vol = Math.min(0.45, Math.max(0.08, intensity * 0.25));
+    playTone(210, 'triangle', 0.07, vol);
+    playTone(540, 'square', 0.04, vol * 0.7);
+  }
+
+  // --- 16-BIT SNES MASTER PALETTE ---
+  const PAL = {
+    DARK_GREEN: '#0E2A1E', MUTED_GREEN: '#3D5948', LUSH_GREEN: '#A8D038', BRIGHT_GREEN: '#88A326',
+    GOLD: '#F7C844', ORANGE: '#FB6604', RED: '#AD1C21', BORDEAUX: '#540E11',
+    OCEAN: '#0F6F9E', SEA_GREEN: '#12AEA2', ICE_LIGHT: '#E0F7FA', ICE_MID: '#80DEEA', ICE_DARK: '#00838F',
+    HIDE: '#D4D0C5', WHITE: '#FFFFFF', BLACK: '#111111', GRAY_DARK: '#2C2C2C', GRAY_LIGHT: '#8E99A2',
+    SKIN: '#E0A97B',
+    LIMESTONE_LIGHT: '#EAE6DC', LIMESTONE_MID: '#D4D0C5', LIMESTONE_DARK: '#9C9688',
+    SPRUCE_DARK: '#0D261C', SPRUCE_MID: '#1B4332', SPRUCE_LIGHT: '#2D6A4F',
+    PRAIRIE_GOLD: '#D4A338', PRAIRIE_TAN: '#E5BE67', PRAIRIE_BROWN: '#8C6229'
+  };
+
+  // --- RINKS CONFIGURATION ---
+  const RINKS = [
+    {
+      name: 'THE FORKS',
+      sub: 'UPPER FORT GARRY & ASSINIBOINE',
+      desc: 'CONJUNCTION OF RED & ASSINIBOINE RIVERS',
+      status: 'OPEN',
+      ends: 3
+    },
+    {
+      name: 'LOWER FORT GARRY',
+      sub: 'STONE FORT & SHIELD SHORE',
+      desc: 'COMING SOON',
+      status: 'LOCKED',
+      ends: 3
+    },
+    {
+      name: 'ST. BONIFACE BEND',
+      sub: 'CATHEDRAL & POINT DOUGLAS',
+      desc: 'COMING SOON',
+      status: 'LOCKED',
+      ends: 3
+    }
+  ];
+
+  // --- GAME STATE ---
+  let state = 'TITLE';
+  let frame = 0;
+  let selectedRinkIdx = 0;
+
+  let currentEnd = 1;
+  const totalEnds = 3;
+  let stonesPerTeam = 4; // 4 rocks per team (half a regular 8-rock curling end)
+  let playerStonesThrown = 0;
+  let aiStonesThrown = 0;
+  let isPlayerTurn = true;
+  let playerTotalScore = 0;
+  let aiTotalScore = 0;
+  let lastEndWinner = '';
+  let lastEndPoints = 0;
+
+  // --- RINK GEOMETRY ---
+  const WORLD_H = 1200;
+  const HOUSE_X = 160;
+  const HOUSE_Y = 215;
+  const HOUSE_R = 46;
+  const BACK_Y = 158;
+  const FAR_HOG_Y = 335;
+  const NEAR_HOG_Y = 1085;
+  const HACK_X = 160;
+  const HACK_Y = 1145;
+  const STONE_R = 7;
+
+  const BANK_LEFT_X = 53;
+  const BANK_RIGHT_X = 267;
+  const SLOPE_ZONE = 24;
+
+  // Focused Down-Rink Scout Camera (frames Far Hog Line at bottom of visible ice & full House in center, without overshooting into sky)
+  const SCOUT_CAM_Y = 132;
+
+  // --- REALISTIC CURLING KINEMATICS ---
+  const ICE_DECEL = 0.0155;
+
+  // Piecewise Down-Rink Weight Bar Landmarks (Dedicates 75% of the bar to playable shot precision!):
+  // 0%   -> Short / Near-Hog approach (dist = 690px)
+  // 25%  -> Far Hog Line (HACK_Y - FAR_HOG_Y = 810px)
+  // 50%  -> Top of House (HACK_Y - (HOUSE_Y + HOUSE_R) = 884px)
+  // 62.5%-> Button Center (HACK_Y - HOUSE_Y = 930px)
+  // 75%  -> Back of House / End Board (HACK_Y - BACK_Y = 987px)
+  // 100% -> Takeout / Overshot Surge (dist = 1750px -> v0 = 7.36)
+  const MARKER_HOG_PCT    = 25;
+  const MARKER_HOUSE_PCT  = 50;
+  const MARKER_BUTTON_PCT = 62.5;
+  const MARKER_BACK_PCT   = 75;
+
+  const DIST_ZERO  = 690;
+  const DIST_HOG   = HACK_Y - FAR_HOG_Y;               // 810px
+  const DIST_HOUSE = HACK_Y - (HOUSE_Y + HOUSE_R);     // 884px
+  const DIST_BACK  = HACK_Y - BACK_Y;                  // 987px
+  const DIST_MAX   = 1750;                             // High takeout weight
+
+  function getTargetDistanceFromPower(rawPct) {
+    const p = Math.max(0, Math.min(100, rawPct));
+    if (p <= MARKER_HOG_PCT) {
+      const t = p / MARKER_HOG_PCT;
+      return DIST_ZERO + t * (DIST_HOG - DIST_ZERO);
+    } else if (p <= MARKER_HOUSE_PCT) {
+      const t = (p - MARKER_HOG_PCT) / (MARKER_HOUSE_PCT - MARKER_HOG_PCT);
+      return DIST_HOG + t * (DIST_HOUSE - DIST_HOG);
+    } else if (p <= MARKER_BACK_PCT) {
+      const t = (p - MARKER_HOUSE_PCT) / (MARKER_BACK_PCT - MARKER_HOUSE_PCT);
+      return DIST_HOUSE + t * (DIST_BACK - DIST_HOUSE);
+    } else {
+      // Final 25% of bar ramps rapidly into heavy takeout weight
+      const t = (p - MARKER_BACK_PCT) / (100 - MARKER_BACK_PCT);
+      return DIST_BACK + Math.pow(t, 1.35) * (DIST_MAX - DIST_BACK);
+    }
+  }
+
+  function getReleaseSpeedFromPower(rawPct) {
+    const dist = getTargetDistanceFromPower(rawPct);
+    return Math.sqrt(2 * ICE_DECEL * dist);
+  }
+
+  function predictStoppingDistance(v0) {
+    return (v0 * v0) / (2 * ICE_DECEL);
+  }
+
+  let camY = WORLD_H - 240;
+  let targetCamY = WORLD_H - 240;
+
+  let aimAngle = -Math.PI / 2;
+  let powerVal = 0;
+  let powerDir = 0.625; // Half base speed with exponential acceleration curve
+  let spinDir = -1;
+
+  let stones = [];
+  let activeStone = null;
+  let sweepHeat = 0;
+  let sweepPulse = 0;
+  let sweeperAnim = 0;
+  let aiThinkTimer = 0;
+  let settleDelay = 0;
+  let statusBanner = '';
+
+  let dpad = { up: false, down: false, left: false, right: false };
+
+  function startMatch() {
+    currentEnd = 1;
+    playerTotalScore = 0;
+    aiTotalScore = 0;
+    startNewEnd();
+  }
+
+  function startNewEnd() {
+    stones = [];
+    playerStonesThrown = 0;
+    aiStonesThrown = 0;
+    isPlayerTurn = (currentEnd % 2 === 1);
+    prepareNextShot();
+  }
+
+  function prepareNextShot() {
+    if (playerStonesThrown >= stonesPerTeam && aiStonesThrown >= stonesPerTeam) {
+      evaluateEndScore();
+      return;
+    }
+
+    activeStone = {
+      x: HACK_X,
+      y: HACK_Y,
+      vx: 0,
+      vy: 0,
+      spin: 0,
+      angularVel: 0,
+      angle: 0,
+      team: isPlayerTurn ? 'PLAYER' : 'AI',
+      crossedHog: false
+    };
+
+    sweepHeat = 0;
+    sweepPulse = 0;
+    sweeperAnim = 0;
+    settleDelay = 0;
+
+    if (isPlayerTurn) {
+      aimAngle = -Math.PI / 2;
+      powerVal = 0;
+      powerDir = 0.625;
+      state = 'AIM';
+      statusBanner = `END ${currentEnd}/${totalEnds} • STONE ${playerStonesThrown + 1}/${stonesPerTeam}`;
+      targetCamY = WORLD_H - 240;
+    } else {
+      state = 'AI_PREP';
+      aiThinkTimer = 50;
+      statusBanner = `END ${currentEnd}/${totalEnds} • HBC STONE ${aiStonesThrown + 1}/${stonesPerTeam}`;
+      targetCamY = WORLD_H - 240;
+    }
+  }
+
+  function releaseStone(launchSpeed, lockedSpin, angle) {
+    activeStone.vx = Math.cos(angle) * launchSpeed;
+    activeStone.vy = Math.sin(angle) * launchSpeed;
+    activeStone.spin = lockedSpin;
+    activeStone.angularVel = lockedSpin * 0.042;
+    activeStone.angle = 0;
+    stones.push(activeStone);
+
+    if (activeStone.team === 'PLAYER') playerStonesThrown++;
+    else aiStonesThrown++;
+
+    playTone(180, 'triangle', 0.14, 0.14);
+    statusBanner = activeStone.team === 'PLAYER' ? "TAP 'A' TO SWEEP PEBBLE!" : "OFFICER RELEASES!";
+    state = 'SLIDE';
+  }
+
+  function triggerSweep() {
+    if (state !== 'SLIDE' || !activeStone || activeStone.team !== 'PLAYER') return;
+    if (activeStone.y < HOUSE_Y - 6) return;
+
+    const spd = Math.hypot(activeStone.vx, activeStone.vy);
+    if (spd > 0.35) {
+      sweepPulse = Math.min(1.0, sweepPulse + 0.55);
+      sweepHeat = Math.min(100, sweepHeat + 24);
+      sweeperAnim = 12;
+      playSweepNoise();
+    }
+  }
+
+  // --- AI SHOT PLANNER ---
+  function executeAIShot() {
+    let bestPlayerStone = null;
+    let bestPlayerDist = 999;
+    for (let s of stones) {
+      if (s.team === 'PLAYER') {
+        let d = Math.hypot(s.x - HOUSE_X, s.y - HOUSE_Y);
+        if (d < bestPlayerDist) { bestPlayerDist = d; bestPlayerStone = s; }
+      }
+    }
+
+    let targetX = HOUSE_X + (Math.random() - 0.5) * 14;
+    let targetY = HOUSE_Y + (Math.random() - 0.5) * 14;
+    let aiSpin = Math.random() > 0.5 ? 1 : -1;
+    let isTakeout = (bestPlayerStone && bestPlayerDist < 28 && Math.random() < 0.55);
+
+    if (isTakeout) {
+      targetX = bestPlayerStone.x;
+      targetY = bestPlayerStone.y;
+    }
+
+    let travelDist = Math.hypot(targetX - HACK_X, targetY - HACK_Y);
+    let aiSpeed = isTakeout
+      ? (6.45 + Math.random() * 0.55)
+      : (Math.sqrt(2 * ICE_DECEL * travelDist) + (Math.random() - 0.5) * 0.14);
+
+    let curlCompensation = isTakeout ? 4 : 11;
+    let compensatedX = targetX - (aiSpin * curlCompensation);
+    let aiAngle = Math.atan2(targetY - HACK_Y, compensatedX - HACK_X);
+    releaseStone(aiSpeed, aiSpin, aiAngle);
+  }
+
+  // --- REALISTIC CURLING PEBBLE FRICTION, CONTROLLED LATE HOOK & END-BOARD ELIMINATION ---
+  function updatePhysics() {
+    let anyMoving = false;
+
+    if (activeStone && activeStone.team === 'AI' && activeStone.y > HOUSE_Y + 35 && activeStone.y < NEAR_HOG_Y - 80) {
+      const spd = Math.hypot(activeStone.vx, activeStone.vy);
+      if (spd > 1.4 && spd < 3.6 && Math.random() < 0.12) {
+        sweepPulse = Math.min(1.0, sweepPulse + 0.45);
+        sweepHeat = Math.min(100, sweepHeat + 18);
+        sweeperAnim = 10;
+      }
+    }
+
+    if (sweepPulse > 0) sweepPulse = Math.max(0, sweepPulse - 0.065);
+    if (sweepHeat > 0) sweepHeat = Math.max(0, sweepHeat - 1.8);
+    if (sweeperAnim > 0) sweeperAnim--;
+
+    for (let i = 0; i < stones.length; i++) {
+      let s = stones[i];
+      let spd = Math.hypot(s.vx, s.vy);
+
+      if (spd > 0.025) {
+        anyMoving = true;
+
+        let isSwept = (s === activeStone && sweepPulse > 0.05);
+        let sweepFactor = isSwept ? sweepPulse : 0;
+
+        // 1. Controlled realistic late-break curl
+        let speedRatio = Math.min(1.0, spd / 6.2);
+        let crawlDamp = Math.min(1.0, spd / 0.75);
+        let lateBreakWeight = Math.pow(1.0 - speedRatio, 1.35) * crawlDamp;
+        let effectiveSpin = s.spin * (1.0 - 0.65 * sweepFactor);
+        let curlAccel = effectiveSpin * (0.0009 + 0.0042 * lateBreakWeight);
+
+        s.vx += curlAccel;
+        s.angle += s.angularVel * Math.min(1.0, spd / 2.2);
+
+        // 2. Natural inward-sloping riverbank ice shelves
+        const leftSlopeEdge = BANK_LEFT_X + SLOPE_ZONE;
+        const rightSlopeEdge = BANK_RIGHT_X - SLOPE_ZONE;
+        let bankDrag = 0;
+
+        if (s.x < leftSlopeEdge) {
+          let slopeDepth = Math.min(1.4, (leftSlopeEdge - s.x) / SLOPE_ZONE);
+          s.vx += 0.028 * slopeDepth;
+          bankDrag = 0.008 * slopeDepth;
+        } else if (s.x > rightSlopeEdge) {
+          let slopeDepth = Math.min(1.4, (s.x - rightSlopeEdge) / SLOPE_ZONE);
+          s.vx -= 0.028 * slopeDepth;
+          bankDrag = 0.008 * slopeDepth;
+        }
+
+        s.x += s.vx;
+        s.y += s.vy;
+
+        // 3. Standard Curling Boundary Rules (Side boards OR End board = instant elimination)
+        if (s.x - STONE_R <= BANK_LEFT_X || s.x + STONE_R >= BANK_RIGHT_X) {
+          s.outOfBounds = true;
+          if (s === activeStone) statusBanner = "OUT OF PLAY — HIT SIDE BANK!";
+          playTone(110, 'sawtooth', 0.14, 0.12);
+          continue;
+        }
+
+        if (s.y - STONE_R <= BACK_Y) {
+          s.outOfBounds = true;
+          if (s === activeStone) statusBanner = "OUT OF PLAY — HIT END BOARD!";
+          playTone(110, 'sawtooth', 0.14, 0.12);
+          continue;
+        }
+
+        // 4. True Kinetic Ice Friction
+        let currentDecel = ICE_DECEL * (1.0 - 0.28 * sweepFactor) + bankDrag;
+        if (spd < 0.45) currentDecel += (0.45 - spd) * 0.024;
+
+        let newSpd = Math.max(0, spd - currentDecel);
+        let scale = newSpd / spd;
+        s.vx *= scale;
+        s.vy *= scale;
+
+        if (s.y <= FAR_HOG_Y) s.crossedHog = true;
+      } else {
+        if (s.x < BANK_LEFT_X + 10) {
+          s.x += 0.20;
+          anyMoving = true;
+        } else if (s.x > BANK_RIGHT_X - 10) {
+          s.x -= 0.20;
+          anyMoving = true;
+        } else {
+          s.vx = 0;
+          s.vy = 0;
+        }
+      }
+    }
+
+    // 5. Elastic Granite Stone-to-Stone Collisions
+    for (let i = 0; i < stones.length; i++) {
+      for (let j = i + 1; j < stones.length; j++) {
+        let a = stones[i];
+        let b = stones[j];
+        if (a.outOfBounds || b.outOfBounds) continue;
+
+        let dx = b.x - a.x;
+        let dy = b.y - a.y;
+        let dist = Math.hypot(dx, dy);
+        const minDist = STONE_R * 2;
+
+        if (dist > 0 && dist < minDist) {
+          let overlap = (minDist - dist) * 0.5;
+          let nx = dx / dist;
+          let ny = dy / dist;
+          a.x -= nx * overlap;
+          a.y -= ny * overlap;
+          b.x += nx * overlap;
+          b.y += ny * overlap;
+
+          let rvx = b.vx - a.vx;
+          let rvy = b.vy - a.vy;
+          let velAlongNormal = rvx * nx + rvy * ny;
+
+          if (velAlongNormal < 0) {
+            const restitution = 0.90;
+            let impulse = -(1 + restitution) * velAlongNormal * 0.5;
+            a.vx -= impulse * nx;
+            a.vy -= impulse * ny;
+            b.vx += impulse * nx;
+            b.vy += impulse * ny;
+
+            b.spin = -a.spin * 0.30;
+            b.angularVel = b.spin * 0.03;
+            playStoneClack(Math.abs(velAlongNormal));
+          }
+        }
+      }
+    }
+
+    stones = stones.filter(s => !s.outOfBounds);
+
+    if (activeStone && !activeStone.outOfBounds) {
+      targetCamY = Math.max(SCOUT_CAM_Y, Math.min(WORLD_H - 240, activeStone.y - 115));
+    } else {
+      targetCamY = SCOUT_CAM_Y;
+    }
+
+    if (!anyMoving) {
+      settleDelay++;
+      if (settleDelay > 28) {
+        stones = stones.filter(s => s.y <= FAR_HOG_Y);
+        activeStone = null;
+        isPlayerTurn = !isPlayerTurn;
+        prepareNextShot();
+      }
+    } else {
+      settleDelay = 0;
+    }
+  }
+
+  // --- CURLING END SCORING ---
+  function evaluateEndScore() {
+    const maxRingR = HOUSE_R + STONE_R;
+    let inHouse = stones
+      .map(s => ({ team: s.team, dist: Math.hypot(s.x - HOUSE_X, s.y - HOUSE_Y) }))
+      .filter(s => s.dist <= maxRingR)
+      .sort((a, b) => a.dist - b.dist);
+
+    if (inHouse.length === 0) {
+      lastEndWinner = 'BLANK';
+      lastEndPoints = 0;
+    } else {
+      const winnerTeam = inHouse[0].team;
+      let pts = 0;
+      for (let item of inHouse) {
+        if (item.team === winnerTeam) pts++;
+        else break;
+      }
+      lastEndWinner = winnerTeam;
+      lastEndPoints = pts;
+      if (winnerTeam === 'PLAYER') {
+        playerTotalScore += pts;
+        playTone(587, 'square', 0.25);
+      } else {
+        aiTotalScore += pts;
+        playTone(196, 'sawtooth', 0.25);
+      }
+    }
+
+    targetCamY = SCOUT_CAM_Y;
+    state = 'END_SUMMARY';
+  }
+
+  // --- INPUT HANDLING ---
+  function handleA() {
+    initAudio();
+    if (state === 'TITLE') {
+      playTone(440, 'square', 0.1);
+      state = 'RINK_SELECT';
+    }
+    else if (state === 'RINK_SELECT') {
+      if (RINKS[selectedRinkIdx].status === 'OPEN') {
+        playTone(523, 'square', 0.12);
+        startMatch();
+      } else {
+        playTone(160, 'sawtooth', 0.1);
+      }
+    }
+    else if (state === 'AIM') {
+      playTone(392, 'square', 0.08);
+      powerVal = 0;
+      powerDir = 0.625;
+      state = 'POWER';
+      statusBanner = `LOCKED ${spinDir < 0 ? 'LEFT' : 'RIGHT'} CURL • SET WEIGHT!`;
+    }
+    else if (state === 'POWER') {
+      const launchSpd = getReleaseSpeedFromPower(powerVal);
+      releaseStone(launchSpd, spinDir, aimAngle);
+    }
+    else if (state === 'SLIDE') {
+      triggerSweep();
+    }
+    else if (state === 'END_SUMMARY') {
+      playTone(440, 'square', 0.1);
+      if (currentEnd >= totalEnds) {
+        state = 'MATCH_OVER';
+      } else {
+        currentEnd++;
+        startNewEnd();
+      }
+    }
+    else if (state === 'MATCH_OVER') {
+      playTone(440, 'square', 0.1);
+      state = 'RINK_SELECT';
+    }
+  }
+
+  function handleB() {
+    initAudio();
+    if (state === 'AIM') {
+      spinDir *= -1;
+      playTone(340, 'triangle', 0.06);
+    } else if (state === 'SLIDE') {
+      triggerSweep();
+    } else if (state === 'RINK_SELECT') {
+      state = 'TITLE';
+      playTone(300, 'triangle', 0.06);
+    }
+  }
+
+  function handleDpad(dir) {
+    if (state === 'RINK_SELECT') {
+      if (dir === 'UP') {
+        selectedRinkIdx = (selectedRinkIdx + RINKS.length - 1) % RINKS.length;
+        playTone(320, 'triangle', 0.05);
+      }
+      if (dir === 'DOWN') {
+        selectedRinkIdx = (selectedRinkIdx + 1) % RINKS.length;
+        playTone(320, 'triangle', 0.05);
+      }
+    }
+  }
+
+  // --- UPDATE LOOP ---
+  function update() {
+    frame++;
+
+    if (state === 'AIM') {
+      if (dpad.left)  aimAngle = Math.max(-Math.PI * 0.68, aimAngle - 0.011);
+      if (dpad.right) aimAngle = Math.min(-Math.PI * 0.32, aimAngle + 0.011);
+
+      // Hold UP to scout the Far Hog Line & House directly (frames y: 132..372 without overshooting into sky)
+      if (dpad.up) targetCamY = SCOUT_CAM_Y;
+      else targetCamY = WORLD_H - 240;
+    }
+    else if (state === 'POWER') {
+      targetCamY = WORLD_H - 240;
+      // Exponential bar speed-up at half overall sweep rate
+      const norm = powerVal / 100;
+      const accelMultiplier = 0.42 + Math.pow(norm, 1.55) * 2.35;
+      powerVal += powerDir * accelMultiplier;
+
+      if (powerVal >= 100) {
+        powerVal = 100;
+        powerDir = -Math.abs(powerDir);
+      }
+      if (powerVal <= 0) {
+        powerVal = 0;
+        powerDir = Math.abs(powerDir);
+      }
+    }
+    else if (state === 'AI_PREP') {
+      aiThinkTimer--;
+      if (aiThinkTimer <= 0) {
+        executeAIShot();
+      }
+    }
+    else if (state === 'SLIDE') {
+      updatePhysics();
+    }
+
+    camY += (targetCamY - camY) * 0.14;
+  }
+
+  // --- SNES PIXEL ART RENDERING HELPERS ---
+  function drawPixelText(txt, x, y, size, color, align = 'left', shadow = true) {
+    ctx.font = `${size}px "Press Start 2P", monospace`;
+    ctx.textAlign = align;
+    if (shadow) {
+      ctx.fillStyle = PAL.BLACK;
+      ctx.fillText(txt, x + 1, y + 1);
+    }
+    ctx.fillStyle = color;
+    ctx.fillText(txt, x, y);
+  }
+
+  function drawSnowSpruce(x, y, hScale = 1) {
+    const w = Math.floor(14 * hScale);
+    const trunkH = Math.floor(5 * hScale);
+    ctx.fillStyle = '#3E2723';
+    ctx.fillRect(x + Math.floor(w / 2) - 1, y + Math.floor(20 * hScale), 3, trunkH);
+
+    const tiers = [
+      { ty: 0,  tw: 4,  th: 5 },
+      { ty: 4,  tw: 8,  th: 5 },
+      { ty: 9,  tw: 11, th: 6 },
+      { ty: 14, tw: 14, th: 6 }
+    ];
+    tiers.forEach(t => {
+      let bx = x + Math.floor((w - t.tw * hScale) / 2);
+      let by = y + Math.floor(t.ty * hScale);
+      let bw = Math.floor(t.tw * hScale);
+      let bh = Math.floor(t.th * hScale);
+
+      ctx.fillStyle = PAL.SPRUCE_DARK;
+      ctx.fillRect(bx, by, bw, bh);
+      ctx.fillStyle = PAL.SPRUCE_MID;
+      ctx.fillRect(bx + 1, by, Math.max(1, bw - 3), bh - 1);
+      ctx.fillStyle = PAL.WHITE;
+      ctx.fillRect(bx, by, bw, Math.max(1, Math.floor(2 * hScale)));
+      ctx.fillStyle = PAL.ICE_MID;
+      ctx.fillRect(bx + 1, by + Math.max(1, Math.floor(2 * hScale)), Math.max(1, bw - 2), 1);
+    });
+  }
+
+  function drawWinterGrassClump(x, y) {
+    ctx.fillStyle = PAL.PRAIRIE_BROWN;
+    ctx.fillRect(x, y + 2, 1, 5);
+    ctx.fillRect(x + 3, y, 1, 7);
+    ctx.fillRect(x + 6, y + 3, 1, 4);
+    ctx.fillStyle = PAL.PRAIRIE_TAN;
+    ctx.fillRect(x + 2, y + 1, 1, 6);
+    ctx.fillRect(x + 5, y + 2, 1, 5);
+    ctx.fillStyle = PAL.WHITE;
+    ctx.fillRect(x, y + 1, 2, 1);
+    ctx.fillRect(x + 3, y - 1, 2, 1);
+    ctx.fillRect(x + 5, y + 1, 2, 1);
+  }
+
+  function drawWinterUpperFortGarry(x, y, scale = 0.85) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+
+    ctx.fillStyle = PAL.LIMESTONE_MID;
+    ctx.fillRect(14, 22, 112, 22);
+    ctx.fillStyle = PAL.LIMESTONE_DARK;
+    ctx.fillRect(14, 38, 112, 6);
+    for (let row = 0; row < 4; row++) {
+      ctx.fillRect(14, 25 + row * 4, 112, 1);
+    }
+    ctx.fillStyle = PAL.WHITE;
+    ctx.fillRect(14, 20, 112, 3);
+
+    ctx.fillStyle = PAL.LIMESTONE_LIGHT;
+    ctx.fillRect(32, 10, 34, 12);
+    ctx.fillStyle = PAL.BORDEAUX;
+    ctx.fillRect(30, 4, 38, 7);
+    ctx.fillStyle = PAL.WHITE;
+    ctx.fillRect(31, 3, 36, 3);
+    ctx.fillStyle = PAL.LIMESTONE_DARK;
+    ctx.fillRect(36, 0, 3, 5);
+    ctx.fillRect(59, 0, 3, 5);
+    ctx.fillStyle = PAL.BLACK;
+    ctx.fillRect(37, 13, 3, 4);
+    ctx.fillRect(47, 13, 3, 4);
+    ctx.fillRect(57, 13, 3, 4);
+
+    ctx.fillStyle = PAL.LIMESTONE_MID;
+    ctx.fillRect(76, 12, 28, 10);
+    ctx.fillStyle = '#4A220D';
+    ctx.fillRect(74, 8, 32, 4);
+    ctx.fillStyle = PAL.WHITE;
+    ctx.fillRect(75, 7, 30, 2);
+    ctx.fillRect(69, -8, 2, 30);
+    ctx.fillStyle = PAL.RED;
+    ctx.fillRect(71, -8, 14, 8);
+    ctx.fillStyle = PAL.OCEAN;
+    ctx.fillRect(71, -8, 6, 4);
+    ctx.fillStyle = PAL.WHITE;
+    ctx.fillRect(78, -5, 5, 2);
+
+    ctx.fillStyle = PAL.LIMESTONE_LIGHT;
+    ctx.fillRect(58, 16, 24, 28);
+    ctx.fillStyle = PAL.LIMESTONE_DARK;
+    ctx.fillRect(58, 16, 2, 28);
+    ctx.fillRect(80, 16, 2, 28);
+    ctx.fillStyle = PAL.BORDEAUX;
+    ctx.fillRect(56, 12, 28, 4);
+    ctx.fillStyle = PAL.WHITE;
+    ctx.fillRect(56, 11, 28, 2);
+    ctx.fillStyle = PAL.GOLD;
+    ctx.fillRect(66, 18, 8, 3);
+    ctx.fillStyle = '#2C1407';
+    ctx.fillRect(64, 27, 12, 17);
+    ctx.fillStyle = '#4A220D';
+    ctx.fillRect(65, 28, 10, 16);
+    ctx.fillStyle = PAL.BLACK;
+    ctx.fillRect(69, 27, 2, 17);
+
+    const bastions = [4, 116];
+    bastions.forEach(bx => {
+      ctx.fillStyle = PAL.LIMESTONE_MID;
+      ctx.fillRect(bx, 16, 20, 28);
+      ctx.fillStyle = PAL.LIMESTONE_LIGHT;
+      ctx.fillRect(bx + 2, 16, 6, 28);
+      ctx.fillStyle = PAL.LIMESTONE_DARK;
+      ctx.fillRect(bx + 14, 16, 6, 28);
+      ctx.fillStyle = PAL.BLACK;
+      ctx.fillRect(bx + 6, 22, 2, 5);
+      ctx.fillRect(bx + 12, 22, 2, 5);
+      ctx.fillStyle = PAL.BORDEAUX;
+      ctx.fillRect(bx - 2, 13, 24, 3);
+      ctx.fillStyle = PAL.WHITE;
+      ctx.fillRect(bx + 1, 10, 18, 3);
+      ctx.fillRect(bx + 4, 7, 12, 3);
+      ctx.fillStyle = PAL.RED;
+      ctx.fillRect(bx + 7, 4, 6, 3);
+      ctx.fillStyle = PAL.GOLD;
+      ctx.fillRect(bx + 9, 2, 2, 2);
+    });
+
+    ctx.restore();
+  }
+
+  function drawForksConjunctionBackdrop(offsetY) {
+    ctx.fillStyle = 'rgba(20, 48, 72, 0.72)';
+    ctx.fillRect(0, offsetY, 320, 40);
+    ctx.fillStyle = '#4A89AC';
+    ctx.fillRect(0, offsetY + 34, 320, 24);
+    ctx.fillStyle = '#7EB5D6';
+    ctx.fillRect(0, offsetY + 58, 320, 18);
+
+    ctx.fillStyle = PAL.ICE_LIGHT;
+    ctx.fillRect(0, offsetY + 72, 320, 42);
+    ctx.fillStyle = '#C5DCE8';
+    ctx.fillRect(0, offsetY + 96, 320, 18);
+
+    drawSnowSpruce(14, offsetY + 52, 1.1);
+    drawSnowSpruce(32, offsetY + 58, 0.9);
+    drawWinterGrassClump(56, offsetY + 75);
+    drawWinterGrassClump(76, offsetY + 78);
+
+    ctx.fillStyle = '#9BB8C9';
+    ctx.fillRect(58, offsetY + 86, 62, 12);
+    ctx.fillStyle = PAL.ICE_DARK;
+    ctx.fillRect(62, offsetY + 90, 56, 22);
+    ctx.fillStyle = PAL.ICE_MID;
+    ctx.fillRect(66, offsetY + 94, 52, 20);
+    ctx.fillStyle = PAL.WHITE;
+    ctx.fillRect(72, offsetY + 99, 18, 2);
+    ctx.fillRect(88, offsetY + 106, 22, 2);
+
+    drawWinterUpperFortGarry(124, offsetY + 38, 0.88);
+
+    drawSnowSpruce(256, offsetY + 55, 1.05);
+    drawSnowSpruce(278, offsetY + 60, 0.9);
+    drawWinterGrassClump(242, offsetY + 78);
+    drawWinterGrassClump(296, offsetY + 80);
+
+    ctx.fillStyle = PAL.ICE_DARK;
+    ctx.fillRect(0, offsetY + 112, 320, 6);
+    drawWinterGrassClump(18, offsetY + 106);
+    drawWinterGrassClump(44, offsetY + 107);
+    drawWinterGrassClump(134, offsetY + 106);
+    drawWinterGrassClump(178, offsetY + 107);
+    drawWinterGrassClump(232, offsetY + 106);
+    drawWinterGrassClump(282, offsetY + 107);
+  }
+
+  function drawCurlingStone(x, y, team, spinAngle = 0, isGlowing = false) {
+    const sx = Math.round(x);
+    const sy = Math.round(y);
+
+    ctx.fillStyle = 'rgba(0, 40, 60, 0.35)';
+    ctx.fillRect(sx - 6, sy + 4, 12, 4);
+
+    if (isGlowing && sweepHeat > 15) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+      ctx.fillRect(sx - 9, sy - 9, 18, 18);
+    }
+
+    ctx.fillStyle = PAL.BLACK;
+    ctx.fillRect(sx - 5, sy - 7, 10, 14);
+    ctx.fillRect(sx - 7, sy - 5, 14, 10);
+
+    ctx.fillStyle = '#4A525D';
+    ctx.fillRect(sx - 4, sy - 6, 8, 12);
+    ctx.fillRect(sx - 6, sy - 4, 12, 8);
+
+    ctx.fillStyle = '#7D8794';
+    ctx.fillRect(sx - 4, sy - 5, 6, 4);
+
+    ctx.fillStyle = team === 'PLAYER' ? PAL.GOLD : PAL.SEA_GREEN;
+    ctx.fillRect(sx - 6, sy - 1, 12, 2);
+
+    ctx.fillStyle = team === 'PLAYER' ? PAL.RED : PAL.OCEAN;
+    ctx.fillRect(sx - 3, sy - 3, 6, 6);
+    ctx.fillStyle = PAL.WHITE;
+    let hx = Math.round(Math.cos(spinAngle) * 2);
+    let hy = Math.round(Math.sin(spinAngle) * 2);
+    ctx.fillRect(sx - 1 + hx, sy - 1 + hy, 2, 2);
+  }
+
+  function drawSweeper(x, y, animTick) {
+    const sx = Math.round(x);
+    const sy = Math.round(y);
+    const sweepOffset = Math.sin(animTick * 0.9) * 5;
+
+    ctx.fillStyle = PAL.BLACK;
+    ctx.fillRect(sx - 4, sy - 12, 8, 14);
+    ctx.fillStyle = '#1A4B84';
+    ctx.fillRect(sx - 3, sy - 8, 6, 8);
+    ctx.fillStyle = PAL.RED;
+    ctx.fillRect(sx - 3, sy - 4, 6, 2);
+    ctx.fillRect(sx - 3, sy - 13, 6, 3);
+    ctx.fillStyle = PAL.SKIN;
+    ctx.fillRect(sx - 2, sy - 10, 4, 2);
+
+    ctx.fillStyle = '#7B3F1D';
+    ctx.fillRect(sx - 10 + sweepOffset, sy - 6, 8, 2);
+    ctx.fillStyle = PAL.GOLD;
+    ctx.fillRect(sx - 14 + sweepOffset, sy - 4, 6, 4);
+  }
+
+  // --- DRAW FROZEN RIVER RINK SHEET ---
+  function drawFrozenRink() {
+    ctx.save();
+    ctx.translate(0, -Math.round(camY));
+
+    drawForksConjunctionBackdrop(0);
+
+    ctx.fillStyle = PAL.ICE_LIGHT;
+    ctx.fillRect(0, 118, 52, WORLD_H - 118);
+    ctx.fillRect(268, 118, 52, WORLD_H - 118);
+
+    ctx.fillStyle = PAL.BORDEAUX;
+    ctx.fillRect(50, 118, 3, WORLD_H - 118);
+    ctx.fillRect(267, 118, 3, WORLD_H - 118);
+
+    for (let sy = 135; sy < WORLD_H - 30; sy += 75) {
+      drawSnowSpruce(10, sy, 0.95);
+      drawWinterGrassClump(34, sy + 16);
+      drawSnowSpruce(286, sy + 20, 0.95);
+      drawWinterGrassClump(272, sy + 6);
+    }
+
+    ctx.fillStyle = PAL.ICE_MID;
+    ctx.fillRect(53, 118, 214, WORLD_H - 118);
+
+    ctx.fillStyle = '#8FE3EE';
+    ctx.fillRect(53, 118, SLOPE_ZONE, WORLD_H - 118);
+    ctx.fillRect(267 - SLOPE_ZONE, 118, SLOPE_ZONE, WORLD_H - 118);
+
+    ctx.fillStyle = '#A8ECF4';
+    ctx.fillRect(77, 118, 166, WORLD_H - 118);
+    ctx.fillStyle = '#C0F3F9';
+    ctx.fillRect(102, 118, 116, WORLD_H - 118);
+
+    ctx.fillStyle = PAL.ICE_DARK;
+    for (let iy = 135; iy < WORLD_H - 25; iy += 48) {
+      ctx.fillRect(58, iy, 6, 1);
+      ctx.fillRect(64, iy + 3, 5, 1);
+      ctx.fillRect(256, iy, 6, 1);
+      ctx.fillRect(251, iy + 3, 5, 1);
+
+      ctx.fillStyle = PAL.WHITE;
+      ctx.fillRect(88, iy + 14, 14, 1);
+      ctx.fillRect(216, iy + 30, 16, 1);
+      ctx.fillStyle = PAL.ICE_DARK;
+    }
+
+    function drawPixelCircle(cx, cy, r, color) {
+      ctx.fillStyle = color;
+      for (let dy = -r; dy <= r; dy++) {
+        let dx = Math.floor(Math.sqrt(r * r - dy * dy));
+        ctx.fillRect(cx - dx, cy + dy, dx * 2, 1);
+      }
+    }
+    drawPixelCircle(HOUSE_X, HOUSE_Y, HOUSE_R, PAL.OCEAN);
+    drawPixelCircle(HOUSE_X, HOUSE_Y, 31, PAL.WHITE);
+    drawPixelCircle(HOUSE_X, HOUSE_Y, 16, PAL.RED);
+    drawPixelCircle(HOUSE_X, HOUSE_Y, 5, PAL.GOLD);
+
+    ctx.fillStyle = 'rgba(14, 42, 30, 0.35)';
+    ctx.fillRect(HOUSE_X, 130, 1, WORLD_H - 150);
+    ctx.fillRect(53, HOUSE_Y, 214, 1);
+
+    ctx.fillStyle = '#4A220D';
+    ctx.fillRect(50, BACK_Y - 3, 220, 3);
+    ctx.fillStyle = PAL.BORDEAUX;
+    ctx.fillRect(53, BACK_Y, 214, 2);
+    drawPixelText("END BOARD", 160, BACK_Y - 5, 5, PAL.BORDEAUX, 'center', false);
+
+    ctx.fillRect(53, FAR_HOG_Y, 214, 3);
+    drawPixelText("FAR HOG LINE", 60, FAR_HOG_Y - 3, 5, PAL.BORDEAUX, 'left', false);
+
+    ctx.fillRect(53, NEAR_HOG_Y, 214, 3);
+    drawPixelText("HOG LINE", 60, NEAR_HOG_Y - 3, 5, PAL.BORDEAUX, 'left', false);
+
+    ctx.fillStyle = '#4A220D';
+    ctx.fillRect(HACK_X - 14, HACK_Y + 4, 10, 5);
+    ctx.fillRect(HACK_X + 4, HACK_Y + 4, 10, 5);
+
+    if ((state === 'AIM' || state === 'POWER') && activeStone) {
+      let previewSpd = (state === 'AIM') ? getReleaseSpeedFromPower(MARKER_BUTTON_PCT) : getReleaseSpeedFromPower(powerVal);
+      let previewDist = predictStoppingDistance(previewSpd);
+      let isTakeoutSpd = previewSpd > 6.1;
+      let totalLateralBreak = spinDir * (isTakeoutSpd ? 4 : 12);
+
+      const steps = 18;
+      for (let step = 1; step <= steps; step++) {
+        let t = step / steps;
+        let straightX = activeStone.x + Math.cos(aimAngle) * (previewDist * t);
+        let straightY = activeStone.y + Math.sin(aimAngle) * (previewDist * t);
+        let curlBend = totalLateralBreak * Math.pow(t, 2.0);
+        let px = Math.round(straightX + curlBend);
+        let py = Math.round(straightY);
+
+        if (py > BACK_Y) {
+          ctx.fillStyle = (step % 2 === 0) ? PAL.GOLD : PAL.RED;
+          ctx.fillRect(px - 1, py - 1, 3, 3);
+        }
+      }
+    }
+
+    for (let s of stones) {
+      drawCurlingStone(s.x, s.y, s.team, s.angle || 0, s === activeStone);
+    }
+
+    if ((state === 'AIM' || state === 'POWER' || state === 'AI_PREP') && activeStone) {
+      drawCurlingStone(activeStone.x, activeStone.y, activeStone.team, spinDir * 0.5, false);
+    }
+
+    if (state === 'SLIDE' && activeStone && sweeperAnim > 0) {
+      drawSweeper(activeStone.x + 16, activeStone.y - 4, frame);
+    }
+
+    ctx.restore();
+  }
+
+  // --- MAIN RENDER LOOP ---
+  function draw() {
+    ctx.clearRect(0, 0, 320, 240);
+
+    if (state === 'TITLE') {
+      drawForksConjunctionBackdrop(76);
+      ctx.fillStyle = PAL.ICE_MID;
+      ctx.fillRect(0, 192, 320, 48);
+
+      drawCurlingStone(122, 214, 'PLAYER', 0.4, false);
+      drawCurlingStone(198, 214, 'AI', -0.4, false);
+
+      ctx.fillStyle = 'rgba(14, 42, 30, 0.90)';
+      ctx.fillRect(16, 12, 288, 66);
+      ctx.strokeStyle = PAL.GOLD; ctx.lineWidth = 2;
+      ctx.strokeRect(16, 12, 288, 66);
+
+      drawPixelText("LA GLACE ROUGE", 160, 38, 16, PAL.GOLD, 'center');
+      drawPixelText("RED RIVER CURLING AT THE FORKS", 160, 54, 6, PAL.HIDE, 'center');
+      if (frame % 50 < 30) {
+        drawPixelText("PRESS 'A' TO STEP ONTO THE ICE", 160, 70, 7, PAL.SEA_GREEN, 'center');
+      }
+    }
+    else if (state === 'RINK_SELECT') {
+      ctx.fillStyle = 'rgba(14, 42, 30, 0.88)';
+      ctx.fillRect(0, 0, 320, 240);
+      ctx.strokeStyle = PAL.HIDE; ctx.lineWidth = 2;
+      ctx.strokeRect(4, 4, 312, 232);
+
+      drawPixelText("SELECT FROZEN RINK", 160, 24, 11, PAL.GOLD, 'center');
+      drawPixelText("WINTER 1850 • RED RIVER VALLEY", 160, 37, 6, PAL.SEA_GREEN, 'center');
+
+      for (let i = 0; i < RINKS.length; i++) {
+        const r = RINKS[i];
+        const y = 48 + i * 54;
+        const isSel = (i === selectedRinkIdx);
+        const isOpen = (r.status === 'OPEN');
+
+        ctx.fillStyle = isSel ? 'rgba(84, 14, 17, 0.92)' : 'rgba(17, 17, 17, 0.78)';
+        ctx.fillRect(16, y, 288, 46);
+        ctx.strokeStyle = isSel ? PAL.GOLD : (isOpen ? PAL.SEA_GREEN : PAL.GRAY_DARK);
+        ctx.lineWidth = isSel ? 2 : 1;
+        ctx.strokeRect(16, y, 288, 46);
+
+        if (isSel) {
+          drawPixelText(">", 24, y + 27, 10, PAL.GOLD);
+        }
+
+        drawPixelText(r.name, 40, y + 18, 9, isOpen ? PAL.WHITE : PAL.GRAY_LIGHT);
+        drawPixelText(r.sub, 40, y + 30, 5, isOpen ? PAL.HIDE : PAL.GRAY_DARK);
+
+        if (isOpen) {
+          drawPixelText("3 ENDS • 4 ROCKS • OPEN ICE", 40, y + 40, 5, PAL.LUSH_GREEN);
+          drawPixelText("PLAY", 294, y + 27, 8, PAL.GOLD, 'right');
+        } else {
+          drawPixelText("COMING SOON", 294, y + 27, 7, PAL.ORANGE, 'right');
+        }
+      }
+
+      drawPixelText("UP/DOWN: RINK   A: START MATCH", 160, 226, 6, PAL.WHITE, 'center');
+    }
+    else {
+      drawFrozenRink();
+
+      // --- TOP SCOREBOARD HUD (4 Stones per Team) ---
+      ctx.fillStyle = 'rgba(17, 17, 17, 0.92)';
+      ctx.fillRect(0, 0, 320, 24);
+      ctx.fillStyle = PAL.GOLD;
+      ctx.fillRect(0, 24, 320, 2);
+
+      drawPixelText(`YOU:${playerTotalScore}`, 8, 15, 7, PAL.GOLD);
+      for (let i = 0; i < stonesPerTeam; i++) {
+        ctx.fillStyle = i < (stonesPerTeam - playerStonesThrown) ? PAL.RED : PAL.GRAY_DARK;
+        ctx.fillRect(66 + i * 8, 9, 6, 6);
+      }
+
+      drawPixelText(`END ${currentEnd}/${totalEnds}`, 160, 15, 7, PAL.WHITE, 'center');
+
+      for (let i = 0; i < stonesPerTeam; i++) {
+        ctx.fillStyle = i < (stonesPerTeam - aiStonesThrown) ? PAL.SEA_GREEN : PAL.GRAY_DARK;
+        ctx.fillRect(216 + i * 8, 9, 6, 6);
+      }
+      drawPixelText(`HBC:${aiTotalScore}`, 312, 15, 7, PAL.SEA_GREEN, 'right');
+
+      // --- FULL-WIDTH BOTTOM-SET HUD & DOWN-RINK WEIGHT BAR (25% / 50% / 75% Landmarks) ---
+      ctx.fillStyle = 'rgba(14, 42, 30, 0.94)';
+      ctx.fillRect(0, 196, 320, 44);
+      ctx.fillStyle = PAL.GOLD;
+      ctx.fillRect(0, 195, 320, 2);
+
+      if (state === 'AIM' || state === 'POWER') {
+        let curlTxt = spinDir < 0 ? "CURL: <- LEFT (B)" : "CURL: RIGHT -> (B)";
+        drawPixelText(curlTxt, 8, 207, 5, state === 'AIM' ? PAL.GOLD : PAL.SEA_GREEN);
+
+        let phaseHint = state === 'AIM' ? "UP:SCOUT  A:POWER" : "A:RELEASE STONE!";
+        drawPixelText(phaseHint, 312, 207, 5, state === 'POWER' ? PAL.ORANGE : PAL.WHITE, 'right');
+
+        const barX = 6;
+        const barY = 212;
+        const barW = 308;
+        const barH = 14;
+
+        // Exact 1/4 (25%), 1/2 (50%), 5/8 (62.5%), and 3/4 (75%) Positions
+        const hogX    = barX + Math.round(barW * 0.25);
+        const houseX  = barX + Math.round(barW * 0.50);
+        const buttonX = barX + Math.round(barW * 0.625);
+        const backX   = barX + Math.round(barW * 0.75);
+
+        ctx.fillStyle = PAL.BLACK;
+        ctx.fillRect(barX, barY, barW, barH);
+
+        // 1. Short / Pre-Hog Segment (0 .. 1/4)
+        ctx.fillStyle = 'rgba(60, 60, 60, 0.45)';
+        ctx.fillRect(barX + 1, barY + 1, hogX - barX - 1, barH - 2);
+
+        // 2. Guard Zone Segment (1/4 Far Hog Line .. 1/2 Top of House)
+        ctx.fillStyle = 'rgba(15, 111, 158, 0.55)';
+        ctx.fillRect(hogX, barY + 1, houseX - hogX, barH - 2);
+
+        // 3. House Scoring Segment (1/2 Top of House .. 3/4 Back of House)
+        ctx.fillStyle = 'rgba(18, 174, 162, 0.72)';
+        ctx.fillRect(houseX, barY + 1, backX - houseX, barH - 2);
+
+        // 4. Takeout / Overshot Segment (3/4 Back of House .. 100%)
+        ctx.fillStyle = 'rgba(173, 28, 33, 0.60)';
+        ctx.fillRect(backX, barY + 1, (barX + barW - 1) - backX, barH - 2);
+
+        // Active Power Fill Bar
+        if (state === 'POWER') {
+          let fillW = Math.round((powerVal / 100) * (barW - 2));
+          ctx.fillStyle = powerVal > MARKER_BACK_PCT ? PAL.RED : (powerVal >= MARKER_HOUSE_PCT ? PAL.LUSH_GREEN : PAL.GOLD);
+          ctx.fillRect(barX + 1, barY + 2, fillW, barH - 4);
+        }
+
+        // Crisp End-of-Sheet Landmark Tick Lines
+        // Far Hog Line Tick (1/4)
+        ctx.fillStyle = PAL.RED;
+        ctx.fillRect(hogX, barY, 2, barH);
+        // Top of House Tick (1/2)
+        ctx.fillStyle = PAL.ICE_LIGHT;
+        ctx.fillRect(houseX, barY, 2, barH);
+        // Button Center Pin Tick (5/8)
+        ctx.fillStyle = PAL.GOLD;
+        ctx.fillRect(buttonX - 1, barY - 1, 2, barH + 2);
+        // Back of House / End Board Tick (3/4)
+        ctx.fillStyle = PAL.ORANGE;
+        ctx.fillRect(backX, barY, 2, barH);
+
+        // Outer Bar Frame
+        ctx.strokeStyle = state === 'POWER' ? PAL.GOLD : PAL.HIDE;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(barX, barY, barW, barH);
+
+        // Active Cursor Needle
+        if (state === 'POWER') {
+          let fillW = Math.round((powerVal / 100) * (barW - 2));
+          ctx.fillStyle = PAL.WHITE;
+          ctx.fillRect(barX + fillW, barY - 2, 2, barH + 4);
+        }
+
+        // Accurate End-of-Sheet Landmark Labels Directly Below Their Exact Ticks
+        drawPixelText("HOG", hogX, 236, 5, PAL.RED, 'center', false);
+        drawPixelText("HOUSE", houseX, 236, 5, PAL.ICE_LIGHT, 'center', false);
+        drawPixelText("BTN", buttonX, 236, 5, PAL.GOLD, 'center', false);
+        drawPixelText("BACK", backX, 236, 5, PAL.ORANGE, 'center', false);
+        drawPixelText("OUT", barX + Math.round(barW * 0.90), 236, 5, PAL.RED, 'center', false);
+      } 
+      else if (state === 'SLIDE' && activeStone && activeStone.team === 'PLAYER') {
+        drawPixelText(statusBanner, 160, 207, 6, PAL.GOLD, 'center');
+
+        const barX = 6;
+        const barY = 213;
+        const barW = 308;
+        const barH = 12;
+
+        ctx.fillStyle = PAL.BLACK;
+        ctx.fillRect(barX, barY, barW, barH);
+        ctx.strokeStyle = PAL.SEA_GREEN;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(barX, barY, barW, barH);
+
+        ctx.fillStyle = PAL.ICE_MID;
+        ctx.fillRect(barX + 1, barY + 2, Math.round((sweepHeat / 100) * (barW - 2)), barH - 4);
+        drawPixelText("SWEEP REDUCES ICE FRICTION & STRAIGHTENS CURL", 160, 236, 5, PAL.HIDE, 'center', false);
+      } 
+      else {
+        drawPixelText(statusBanner, 160, 222, 6, PAL.WHITE, 'center');
+      }
+
+      if (state === 'END_SUMMARY') {
+        ctx.fillStyle = 'rgba(14, 42, 30, 0.94)';
+        ctx.fillRect(28, 60, 264, 114);
+        ctx.strokeStyle = PAL.GOLD; ctx.lineWidth = 2;
+        ctx.strokeRect(28, 60, 264, 114);
+
+        drawPixelText(`END ${currentEnd} COMPLETE`, 160, 82, 9, PAL.GOLD, 'center');
+
+        if (lastEndWinner === 'PLAYER') {
+          drawPixelText(`YOU SCORE +${lastEndPoints} PT${lastEndPoints > 1 ? 'S' : ''}!`, 160, 106, 8, PAL.LUSH_GREEN, 'center');
+        } else if (lastEndWinner === 'AI') {
+          drawPixelText(`OFFICER SCORES +${lastEndPoints}!`, 160, 106, 8, PAL.RED, 'center');
+        } else {
+          drawPixelText("BLANK END (0 PTS)", 160, 106, 8, PAL.HIDE, 'center');
+        }
+
+        drawPixelText(`YOU ${playerTotalScore}  -  ${aiTotalScore} HBC`, 160, 130, 8, PAL.WHITE, 'center');
+
+        if (frame % 50 < 30) {
+          drawPixelText("PRESS 'A' TO CONTINUE", 160, 158, 7, PAL.GOLD, 'center');
+        }
+      }
+
+      if (state === 'MATCH_OVER') {
+        ctx.fillStyle = 'rgba(14, 42, 30, 0.96)';
+        ctx.fillRect(22, 48, 276, 134);
+        ctx.strokeStyle = PAL.GOLD; ctx.lineWidth = 2;
+        ctx.strokeRect(22, 48, 276, 134);
+
+        drawPixelText("MATCH AT THE FORKS", 160, 72, 8, PAL.HIDE, 'center');
+        if (playerTotalScore > aiTotalScore) {
+          drawPixelText("VICTORY ON THE ICE!", 160, 96, 10, PAL.SEA_GREEN, 'center');
+        } else if (aiTotalScore > playerTotalScore) {
+          drawPixelText("OFFICERS TAKE THE MATCH", 160, 96, 8, PAL.RED, 'center');
+        } else {
+          drawPixelText("HONOURABLE DRAW!", 160, 96, 10, PAL.GOLD, 'center');
+        }
+
+        drawPixelText(`FINAL: YOU ${playerTotalScore} - ${aiTotalScore} HBC`, 160, 124, 8, PAL.WHITE, 'center');
+
+        if (frame % 50 < 30) {
+          drawPixelText("PRESS 'A' FOR RINK SELECT", 160, 160, 7, PAL.GOLD, 'center');
+        }
+      }
+    }
+  }
+
+  function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // --- ARCADE CABINET POSTMESSAGE BRIDGE ---
+  window.addEventListener('message', function(event) {
+    const cmd = event.data;
+    if (cmd === 'DPAD_UP_PRESS' || cmd === 'DPAD_UP') { dpad.up = true; handleDpad('UP'); }
+    if (cmd === 'DPAD_UP_RELEASE') dpad.up = false;
+    if (cmd === 'DPAD_DOWN_PRESS' || cmd === 'DPAD_DOWN') { dpad.down = true; handleDpad('DOWN'); }
+    if (cmd === 'DPAD_DOWN_RELEASE') dpad.down = false;
+    if (cmd === 'DPAD_LEFT_PRESS' || cmd === 'DPAD_LEFT') { dpad.left = true; handleDpad('LEFT'); }
+    if (cmd === 'DPAD_LEFT_RELEASE') dpad.left = false;
+    if (cmd === 'DPAD_RIGHT_PRESS' || cmd === 'DPAD_RIGHT') { dpad.right = true; handleDpad('RIGHT'); }
+    if (cmd === 'DPAD_RIGHT_RELEASE') dpad.right = false;
+    if (cmd === 'BUTTON_A') handleA();
+    if (cmd === 'BUTTON_B') handleB();
+  });
+
+  // Keyboard fallback for standalone testing
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowUp')    { dpad.up = true; handleDpad('UP'); }
+    if (e.key === 'ArrowDown')  { dpad.down = true; handleDpad('DOWN'); }
+    if (e.key === 'ArrowLeft')  { dpad.left = true; handleDpad('LEFT'); }
+    if (e.key === 'ArrowRight') { dpad.right = true; handleDpad('RIGHT'); }
+    if (e.key === 'a' || e.key === 'A' || e.key === 'z' || e.key === 'Z' || e.key === 'Enter' || e.key === ' ') handleA();
+    if (e.key === 'b' || e.key === 'B' || e.key === 'x' || e.key === 'X' || e.key === 'Shift') handleB();
+  });
+  window.addEventListener('keyup', (e) => {
+    if (e.key === 'ArrowUp')    dpad.up = false;
+    if (e.key === 'ArrowDown')  dpad.down = false;
+    if (e.key === 'ArrowLeft')  dpad.left = false;
+    if (e.key === 'ArrowRight') dpad.right = false;
+  });
+
+  loop();
+</script>
+</body>
+</html>
