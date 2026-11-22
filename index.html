@@ -6,12 +6,15 @@
   <title>Bwaa Brule</title>
   <style>
     :root {
-      /* Buffer to keep controls lifted above mobile Safari/Chrome bottom search bars */
+      /* Top clearance so Google Sites / website builder floating headers never clip the screen */
+      --site-header-clearance: max(54px, env(safe-area-inset-top, 0px));
+      /* Bottom clearance so mobile Safari/Chrome search bars never cover the controls */
       --browser-hud-clearance: max(64px, env(safe-area-inset-bottom, 0px));
     }
 
     @media (min-width: 768px) {
       :root {
+        --site-header-clearance: max(56px, env(safe-area-inset-top, 0px));
         --browser-hud-clearance: env(safe-area-inset-bottom, 0px);
       }
     }
@@ -43,7 +46,8 @@
       left: 0;
       width: 100vw;
       height: 100svh;
-      background: #080808;
+      background: #050505;
+      padding-top: var(--site-header-clearance);
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -57,6 +61,7 @@
       background: #000;
       position: relative;
       overflow: hidden;
+      border-top: 2px solid #1d1d1d;
       border-bottom: 2px solid #222;
     }
 
@@ -101,61 +106,170 @@
       z-index: 2;
     }
 
-    /* Full-Width DOS Game Selection Menu */
-    #dos-menu {
-      background: #000;
+    /* --- SUPER MARIO ALL-STARS STYLE GAME BANNER CAROUSEL --- */
+    #game-carousel {
+      background: #06070d;
       color: #12AEA2;
-      padding: calc(14px + env(safe-area-inset-top)) 20px 14px 20px;
+      padding: 10px 12px 12px 12px;
       flex-direction: column;
-      overflow-y: auto;
-      scrollbar-width: none;
+      justify-content: space-between;
+      align-items: center;
       z-index: 10;
     }
 
-    #dos-menu::-webkit-scrollbar {
-      display: none;
-    }
-
-    .dos-header {
-      font-weight: bold;
-      font-size: 16px;
-      margin-bottom: 10px;
+    .carousel-topbar {
+      width: 100%;
+      max-width: 560px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       border-bottom: 2px dashed #12AEA2;
-      padding-bottom: 6px;
+      padding-bottom: 5px;
+      font-size: 13px;
+      font-weight: bold;
+      letter-spacing: 1px;
       flex: 0 0 auto;
     }
 
-    .dos-list {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
+    .carousel-counter {
+      color: #F7C844;
+      background: #141829;
+      border: 1.5px solid #12AEA2;
+      padding: 2px 7px;
+      font-size: 12px;
     }
 
-    .dos-list li {
-      font-size: 15px;
-      text-transform: uppercase;
-      opacity: 0.62;
-      padding: 4px 6px;
+    .carousel-stage {
+      flex: 1 1 auto;
+      min-height: 0;
+      width: 100%;
+      max-width: 560px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 8px 0;
+    }
+
+    .nav-arrow {
+      flex: 0 0 34px;
+      height: 54px;
+      background: #111626;
+      border: 2px solid #12AEA2;
+      color: #F7C844;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 20px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 3px 0 #000, inset 0 0 8px rgba(18, 174, 162, 0.25);
+      animation: arrowBlink 1.1s infinite ease-in-out;
+    }
+
+    .nav-arrow:active, .nav-arrow.pulse-hit {
+      transform: scale(0.92);
+      background: #12AEA2;
+      color: #000;
+      animation: none;
+    }
+
+    @keyframes arrowBlink {
+      0%, 100% { opacity: 1; transform: translateX(0); }
+      50% { opacity: 0.45; }
+    }
+
+    /* Pixel Artbox Frame */
+    .artbox-frame {
+      flex: 1 1 auto;
+      height: 100%;
+      max-height: 310px;
+      background: #0d101d;
+      border: 3px solid #f4f4f4;
+      box-shadow:
+        inset 0 0 0 3px #12AEA2,
+        0 6px 0 #000,
+        0 0 22px rgba(18, 174, 162, 0.28);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
       cursor: pointer;
     }
 
-    .dos-list li.active {
-      opacity: 1;
+    #artboxCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      image-rendering: pixelated;
+    }
+
+    /* Curtain / Shutter Wipe Transition Overlay on Switch */
+    .artbox-wipe {
+      position: absolute;
+      inset: 0;
+      background: #000;
+      pointer-events: none;
+      opacity: 0;
+      z-index: 4;
+    }
+
+    .artbox-wipe.wipe-left {
+      animation: shutterWipeLeft 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .artbox-wipe.wipe-right {
+      animation: shutterWipeRight 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    @keyframes shutterWipeLeft {
+      0% { opacity: 1; transform: translateX(0%); }
+      100% { opacity: 0; transform: translateX(-100%); }
+    }
+
+    @keyframes shutterWipeRight {
+      0% { opacity: 1; transform: translateX(0%); }
+      100% { opacity: 0; transform: translateX(100%); }
+    }
+
+    .carousel-footer {
+      width: 100%;
+      max-width: 560px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      flex: 0 0 auto;
+    }
+
+    .pip-dots {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .pip-dot {
+      width: 8px;
+      height: 8px;
+      background: #1f293d;
+      border: 1px solid #12AEA2;
+      cursor: pointer;
+    }
+
+    .pip-dot.active {
+      width: 16px;
+      background: #F7C844;
+      border-color: #fff;
+    }
+
+    .carousel-prompt {
+      font-size: 12px;
       font-weight: bold;
-      background: #12AEA2;
-      color: #000;
-    }
-
-    .dos-list li::before {
-      content: "  ";
-      white-space: pre;
-    }
-
-    .dos-list li.active::before {
-      content: "> ";
+      color: #12AEA2;
+      letter-spacing: 0.5px;
+      text-align: center;
     }
 
     /* --- PAUSE HUD OVERLAY --- */
@@ -240,7 +354,7 @@
       height: 100%;
       border: none;
       z-index: 5;
-      pointer-events: none; /* Keeps keyboard focus locked on OS controls */
+      pointer-events: none;
     }
 
     /* Retro CRT Scanline & Vignette Overlay */
@@ -267,7 +381,6 @@
       padding-top: 10px;
       padding-left: calc(18px + env(safe-area-inset-left));
       padding-right: calc(18px + env(safe-area-inset-right));
-      /* Lifts joystick and buttons cleanly above mobile browser bottom search bar */
       padding-bottom: calc(12px + var(--browser-hud-clearance));
       display: flex;
       align-items: center;
@@ -453,20 +566,28 @@
         <canvas id="bwaaCanvas" width="600" height="450"></canvas>
       </div>
 
-      <div id="dos-menu" class="screen-layer">
-        <div class="dos-header">Bwaa_Brule.EXE<br>RAM OK...</div>
-        <ul class="dos-list" id="game-list">
-          <li class="active">Red River Run.html</li>
-          <li>La Grande Gigue.html</li>
-          <li>li rassad di fleur.html</li>
-          <li>Sîsîp.html</li>
-          <li>Land Thunder!.html</li>
-          <li>le Roi des traiteurs.html</li>
-          <li>Le Grand Portage.html</li>
-          <li>Scotch Pâkahatowân.html</li>
-          <li>Aen Zhwaal.html</li>
-          <li>La Glace Rouge.html</li>
-        </ul>
+      <!-- SUPER MARIO ALL-STARS STYLE GAME BANNER CAROUSEL -->
+      <div id="game-carousel" class="screen-layer">
+        <div class="carousel-topbar">
+          <span>BWAA_BRULE.EXE // SELECT GAME</span>
+          <span class="carousel-counter" id="carousel-counter">01 / 10</span>
+        </div>
+
+        <div class="carousel-stage">
+          <div class="nav-arrow" id="arrow-prev" aria-label="Previous Game">&#9664;</div>
+
+          <div class="artbox-frame" id="artbox-frame">
+            <canvas id="artboxCanvas" width="440" height="270"></canvas>
+            <div class="artbox-wipe" id="artbox-wipe"></div>
+          </div>
+
+          <div class="nav-arrow" id="arrow-next" aria-label="Next Game">&#9654;</div>
+        </div>
+
+        <div class="carousel-footer">
+          <div class="pip-dots" id="pip-dots"></div>
+          <div class="carousel-prompt">&#9664;/&#9654; BROWSE &nbsp;&bull;&nbsp; PRESS A TO PLAY</div>
+        </div>
       </div>
 
       <!-- PAUSE HUD OVERLAY -->
@@ -478,7 +599,7 @@
             <li data-action="RESTART">Restart Game</li>
             <li data-action="MENU">Return to Game Selection</li>
           </ul>
-          <div class="pause-hint">D-PAD: SELECT &nbsp;|&nbsp; A (Z): OK</div>
+          <div class="pause-hint">D-PAD: SELECT &nbsp;|&nbsp; A: OK</div>
         </div>
       </div>
 
@@ -501,11 +622,11 @@
         <div class="action-container">
           <div class="action-btn-wrapper">
             <div class="action-btn btn-b" id="btn-b" onmousedown="btnAction('BUTTON_B')" ontouchstart="preventGhostClick(event, 'BUTTON_B')"></div>
-            <span class="btn-label">B (X)</span>
+            <span class="btn-label">B</span>
           </div>
           <div class="action-btn-wrapper">
             <div class="action-btn btn-a" id="btn-a" onmousedown="btnAction('BUTTON_A')" ontouchstart="preventGhostClick(event, 'BUTTON_A')"></div>
-            <span class="btn-label">A (Z)</span>
+            <span class="btn-label">A</span>
           </div>
         </div>
       </div>
@@ -516,24 +637,109 @@
     let machineState = 'BOOT'; // BOOT, STATIC, MENU, PLAYING, PAUSED
     let currentIndex = 0;
     let pauseIndex = 0;
-    const games = [
-      'game1.html', 'game2.html', 'game3.html', 
-      'game4.html', 'game5.html', 'game6.html', 
-      'game7.html', 'game8.html', 'game9.html', 'game10.html'
+
+    const GAME_CATALOG = [
+      {
+        file: 'game1.html',
+        title: 'RED RIVER RUN',
+        genre: 'RIVER CANOE RUNNER',
+        accent: '#F7C844',
+        badge: '01',
+        artType: 'CANOE'
+      },
+      {
+        file: 'game2.html',
+        title: 'LA GRANDE GIGUE',
+        genre: "A JIG N' RHYTHM GAME",
+        accent: '#FB6604',
+        badge: '02',
+        artType: 'FIDDLE'
+      },
+      {
+        file: 'game3.html',
+        title: 'LI RASSAD DI FLEUR',
+        genre: 'FLORAL BEADWORK CRAFT',
+        accent: '#F7C844',
+        badge: '03',
+        artType: 'BEADWORK'
+      },
+      {
+        file: 'game4.html',
+        title: 'SÎSÎP',
+        genre: 'FUR TRADE HUNTING SIMULATOR',
+        accent: '#FB6604',
+        badge: '04',
+        artType: 'DUCK'
+      },
+      {
+        file: 'game5.html',
+        title: 'LAND THUNDER!',
+        genre: 'HIGH-SPEED PRAIRIE DODGE',
+        accent: '#F7C844',
+        badge: '05',
+        artType: 'BUFFALO'
+      },
+      {
+        file: 'game6.html',
+        title: 'LE ROI DES TRAITEURS',
+        genre: 'RED RIVER FREETRADE',
+        accent: '#12AEA2',
+        badge: '06',
+        artType: 'CART'
+      },
+      {
+        file: 'game7.html',
+        title: 'LE GRAND PORTAGE',
+        genre: 'PLATFORM PACK HAULER',
+        accent: '#F7C844',
+        badge: '07',
+        artType: 'PORTAGE'
+      },
+      {
+        file: 'game8.html',
+        title: 'SCOTCH PÂKAHATOWÂN',
+        genre: 'TOP-DOWN ARCADE GOLF',
+        accent: '#F7C844',
+        badge: '08',
+        artType: 'GOLF'
+      },
+      {
+        file: 'game9.html',
+        title: 'AEN ZHWAAL',
+        genre: 'HIGH STAKES HORSE RACING',
+        accent: '#F7C844',
+        badge: '09',
+        artType: 'HORSE'
+      },
+      {
+        file: 'game10.html',
+        title: 'LA GLACE ROUGE',
+        genre: 'FROZEN RIVER CURLING',
+        accent: '#12AEA2',
+        badge: '10',
+        artType: 'ICE'
+      }
     ];
+
     let isPlaying = false;
 
     const embedShell = document.getElementById('embed-shell');
     const bootSplash = document.getElementById('boot-splash');
     const staticSplash = document.getElementById('static-splash');
-    const dosMenu = document.getElementById('dos-menu');
+    const gameCarousel = document.getElementById('game-carousel');
     const pauseOverlay = document.getElementById('pause-overlay');
     const gameFrame = document.getElementById('arcade-frame');
-    const listItems = document.querySelectorAll('#game-list li');
     const pauseItems = document.querySelectorAll('#pause-list li');
     const btnAEl = document.getElementById('btn-a');
     const btnBEl = document.getElementById('btn-b');
     const btnHomeEl = document.getElementById('btn-home');
+
+    const carouselCounter = document.getElementById('carousel-counter');
+    const artboxFrame = document.getElementById('artbox-frame');
+    const artboxWipe = document.getElementById('artbox-wipe');
+    const arrowPrev = document.getElementById('arrow-prev');
+    const arrowNext = document.getElementById('arrow-next');
+    const pipDotsContainer = document.getElementById('pip-dots');
 
     let staticStartTime = 0;
 
@@ -560,7 +766,6 @@
     window.addEventListener('resize', syncViewportBounds);
     syncViewportBounds();
 
-    // Ensure full-page embedded window grabs keyboard focus on load & interaction
     window.addEventListener('load', () => {
       syncViewportBounds();
       window.focus();
@@ -570,6 +775,21 @@
     embedShell.addEventListener('pointerdown', () => {
       window.focus();
       embedShell.focus({ preventScroll: true });
+    });
+
+    /* --- BUILD CAROUSEL PIP DOTS --- */
+    const pipDots = [];
+    GAME_CATALOG.forEach((g, idx) => {
+      const dot = document.createElement('div');
+      dot.className = 'pip-dot' + (idx === 0 ? ' active' : '');
+      dot.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (machineState !== 'MENU' || idx === currentIndex) return;
+        const dir = idx > currentIndex ? 1 : -1;
+        setCarouselIndex(idx, dir);
+      });
+      pipDotsContainer.appendChild(dot);
+      pipDots.push(dot);
     });
 
     /* --- IFRAME PAUSE / FREEZE CONTROLLER --- */
@@ -599,9 +819,7 @@
             }
           }, delay);
         };
-      } catch (err) {
-        // Cross-origin fallback relies on postMessage('PAUSE'/'RESUME')
-      }
+      } catch (err) {}
     }
 
     gameFrame.addEventListener('load', () => {
@@ -637,10 +855,19 @@
       machineState = 'STATIC';
       bootSplash.style.display = 'none';
       pauseOverlay.style.display = 'none';
-      dosMenu.style.display = 'none';
+      gameCarousel.style.display = 'none';
       staticSplash.style.display = 'flex';
       staticStartTime = performance.now();
       requestAnimationFrame(staticLoop);
+    }
+
+    function openCarouselMenu() {
+      machineState = 'MENU';
+      staticSplash.style.display = 'none';
+      pauseOverlay.style.display = 'none';
+      gameCarousel.style.display = 'flex';
+      updateCarouselUI();
+      requestAnimationFrame(artboxLoop);
     }
 
     function sendSignal(command) {
@@ -667,22 +894,58 @@
       if (machineState === 'PLAYING') {
         sendSignal(directionStr);
       } else if (machineState === 'MENU') {
-        if (directionStr === 'DPAD_UP') moveMenu(-1);
-        if (directionStr === 'DPAD_DOWN') moveMenu(1);
+        if (directionStr === 'DPAD_LEFT' || directionStr === 'DPAD_UP') cycleCarousel(-1);
+        if (directionStr === 'DPAD_RIGHT' || directionStr === 'DPAD_DOWN') cycleCarousel(1);
       } else if (machineState === 'PAUSED') {
         if (directionStr === 'DPAD_UP') movePauseMenu(-1);
         if (directionStr === 'DPAD_DOWN') movePauseMenu(1);
       }
     }
 
-    function moveMenu(direction) {
-      listItems[currentIndex].classList.remove('active');
-      currentIndex += direction;
-      if (currentIndex < 0) currentIndex = games.length - 1;
-      if (currentIndex >= games.length) currentIndex = 0;
-      listItems[currentIndex].classList.add('active');
-      listItems[currentIndex].scrollIntoView({ block: 'nearest' });
+    function updateCarouselUI() {
+      const numStr = String(currentIndex + 1).padStart(2, '0');
+      const totStr = String(GAME_CATALOG.length).padStart(2, '0');
+      carouselCounter.textContent = `${numStr} / ${totStr}`;
+      pipDots.forEach((dot, idx) => {
+        dot.classList.toggle('active', idx === currentIndex);
+      });
     }
+
+    function triggerWipeReveal(direction) {
+      artboxWipe.classList.remove('wipe-left', 'wipe-right');
+      void artboxWipe.offsetWidth;
+      artboxWipe.classList.add(direction >= 0 ? 'wipe-left' : 'wipe-right');
+
+      const arrowEl = direction >= 0 ? arrowNext : arrowPrev;
+      arrowEl.classList.add('pulse-hit');
+      setTimeout(() => arrowEl.classList.remove('pulse-hit'), 160);
+    }
+
+    function setCarouselIndex(newIdx, direction = 1) {
+      currentIndex = ((newIdx % GAME_CATALOG.length) + GAME_CATALOG.length) % GAME_CATALOG.length;
+      updateCarouselUI();
+      triggerWipeReveal(direction);
+      playCarouselTick(direction);
+    }
+
+    function cycleCarousel(step) {
+      setCarouselIndex(currentIndex + step, step);
+    }
+
+    arrowPrev.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (machineState === 'MENU') cycleCarousel(-1);
+    });
+
+    arrowNext.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (machineState === 'MENU') cycleCarousel(1);
+    });
+
+    artboxFrame.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (machineState === 'MENU') btnAction('BUTTON_A');
+    });
 
     function movePauseMenu(direction) {
       pauseItems[pauseIndex].classList.remove('active');
@@ -719,7 +982,7 @@
       gameFrame.style.display = 'block';
       gameFrame.src = 'about:blank';
       setTimeout(() => {
-        gameFrame.src = games[currentIndex];
+        gameFrame.src = GAME_CATALOG[currentIndex].file;
       }, 20);
     }
 
@@ -730,8 +993,7 @@
       gameFrame.src = "";
       gameFrame.style.display = 'none';
       isPlaying = false;
-      machineState = 'MENU';
-      dosMenu.style.display = 'flex';
+      openCarouselMenu();
     }
 
     function executePauseSelection() {
@@ -741,7 +1003,6 @@
       else if (action === 'MENU') returnToGameMenu();
     }
 
-    // Allow direct tap/click on Pause HUD options
     pauseItems.forEach((item, idx) => {
       item.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -753,18 +1014,6 @@
       });
     });
 
-    // Allow direct tap/click on DOS Game List items
-    listItems.forEach((item, idx) => {
-      item.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (machineState !== 'MENU') return;
-        listItems[currentIndex].classList.remove('active');
-        currentIndex = idx;
-        listItems[currentIndex].classList.add('active');
-        btnAction('BUTTON_A');
-      });
-    });
-
     function btnAction(buttonStr) {
       if (machineState === 'PLAYING') {
         sendSignal(buttonStr);
@@ -772,15 +1021,17 @@
         if (buttonStr === 'BUTTON_A') executePauseSelection();
         else if (buttonStr === 'BUTTON_B') resumeGame();
       } else if (machineState === 'STATIC' && buttonStr === 'BUTTON_A') {
-        machineState = 'MENU';
-        staticSplash.style.display = 'none';
-        dosMenu.style.display = 'flex';
-      } else if (machineState === 'MENU' && buttonStr === 'BUTTON_A') {
-        machineState = 'PLAYING';
-        dosMenu.style.display = 'none';
-        gameFrame.style.display = 'block';
-        gameFrame.src = games[currentIndex];
-        isPlaying = true;
+        openCarouselMenu();
+      } else if (machineState === 'MENU') {
+        if (buttonStr === 'BUTTON_A') {
+          machineState = 'PLAYING';
+          gameCarousel.style.display = 'none';
+          gameFrame.style.display = 'block';
+          gameFrame.src = GAME_CATALOG[currentIndex].file;
+          isPlaying = true;
+        } else if (buttonStr === 'BUTTON_B') {
+          returnToSplash();
+        }
       }
     }
 
@@ -791,7 +1042,7 @@
       pauseOverlay.style.display = 'none';
       gameFrame.src = ""; 
       gameFrame.style.display = 'none';
-      dosMenu.style.display = 'none';
+      gameCarousel.style.display = 'none';
       machineState = 'STATIC';
       staticSplash.style.display = 'flex';
       isPlaying = false;
@@ -799,7 +1050,6 @@
       requestAnimationFrame(staticLoop);
     }
 
-    // Shared handler for both the HOME button and the ESC key
     function handleSystemMenuTrigger() {
       if (machineState === 'PLAYING') {
         openPauseMenu();
@@ -830,7 +1080,7 @@
       }
       pressDpad(dir); 
       holdTimer = setTimeout(() => {
-        repeatInterval = setInterval(() => { pressDpad(dir); }, 100); 
+        repeatInterval = setInterval(() => { pressDpad(dir); }, 130); 
       }, 300);
     }
 
@@ -919,17 +1169,13 @@
     window.addEventListener('mouseup', endDrag);
     window.addEventListener('touchend', endDrag);
 
-    /* --- KEYBOARD INPUT HANDLERS --- */
+    /* --- KEYBOARD INPUT HANDLERS (ARROWS = DPAD, Z/A = A, X/B = B, ESC = PAUSE) --- */
     const activeDirectionKeys = new Set();
-    const KEY_TO_DIR = {
+    const ARROW_TO_DIR = {
       ArrowUp: 'DPAD_UP',
       ArrowDown: 'DPAD_DOWN',
       ArrowLeft: 'DPAD_LEFT',
-      ArrowRight: 'DPAD_RIGHT',
-      w: 'DPAD_UP',
-      s: 'DPAD_DOWN',
-      a: 'DPAD_LEFT',
-      d: 'DPAD_RIGHT'
+      ArrowRight: 'DPAD_RIGHT'
     };
     const DIR_TO_OFFSET = {
       DPAD_UP: [0, -maxRadius],
@@ -937,13 +1183,6 @@
       DPAD_LEFT: [-maxRadius, 0],
       DPAD_RIGHT: [maxRadius, 0]
     };
-
-    function normalizeDirKey(key) {
-      if (KEY_TO_DIR[key]) return key;
-      const lower = key.toLowerCase();
-      if (KEY_TO_DIR[lower]) return lower;
-      return null;
-    }
 
     function syncKeyboardJoystick() {
       if (isDragging) return;
@@ -956,7 +1195,7 @@
         return;
       }
       const latestKey = keysArray[keysArray.length - 1];
-      const newDir = KEY_TO_DIR[latestKey];
+      const newDir = ARROW_TO_DIR[latestKey];
       const [ox, oy] = DIR_TO_OFFSET[newDir];
       joyStick.classList.add('dragging');
       joyStick.style.transform = `translate(${ox}px, ${oy}px)`;
@@ -970,17 +1209,16 @@
     window.addEventListener('keydown', (e) => {
       const key = e.key;
       const lower = key.toLowerCase();
-      const dirKey = normalizeDirKey(key);
 
-      if (dirKey) {
+      if (ARROW_TO_DIR[key]) {
         e.preventDefault();
         if (e.repeat) return;
-        activeDirectionKeys.add(dirKey);
+        activeDirectionKeys.add(key);
         syncKeyboardJoystick();
         return;
       }
 
-      if (lower === 'z' || key === 'Enter') {
+      if (lower === 'a' || lower === 'z' || key === 'Enter') {
         e.preventDefault();
         if (e.repeat) return;
         btnAEl.classList.add('active-press');
@@ -992,7 +1230,7 @@
         return;
       }
 
-      if (lower === 'x') {
+      if (lower === 'b' || lower === 'x') {
         e.preventDefault();
         if (e.repeat) return;
         btnBEl.classList.add('active-press');
@@ -1012,22 +1250,21 @@
     window.addEventListener('keyup', (e) => {
       const key = e.key;
       const lower = key.toLowerCase();
-      const dirKey = normalizeDirKey(key);
 
-      if (dirKey) {
+      if (ARROW_TO_DIR[key]) {
         e.preventDefault();
-        activeDirectionKeys.delete(dirKey);
+        activeDirectionKeys.delete(key);
         syncKeyboardJoystick();
         return;
       }
 
-      if (lower === 'z' || key === 'Enter') {
+      if (lower === 'a' || lower === 'z' || key === 'Enter') {
         e.preventDefault();
         btnAEl.classList.remove('active-press');
         return;
       }
 
-      if (lower === 'x') {
+      if (lower === 'b' || lower === 'x') {
         e.preventDefault();
         btnBEl.classList.remove('active-press');
         return;
@@ -1048,6 +1285,677 @@
       btnHomeEl.classList.remove('active-press');
     });
 
+    /* --- PIXEL ARTBOX BANNER RENDERER (SMAS STYLE) --- */
+    const artCanvas = document.getElementById('artboxCanvas');
+    const aCtx = artCanvas.getContext('2d');
+    aCtx.imageSmoothingEnabled = false;
+
+    function drawPineTree(ctx, x, y, scale, snowy = false) {
+      const s = scale;
+      ctx.fillStyle = '#3a2311';
+      ctx.fillRect(x - 2 * s, y, 4 * s, 6 * s);
+      ctx.fillStyle = snowy ? '#1d4d3e' : '#1b4728';
+      ctx.fillRect(x - 10 * s, y - 6 * s, 20 * s, 6 * s);
+      ctx.fillRect(x - 7 * s, y - 13 * s, 14 * s, 7 * s);
+      ctx.fillRect(x - 4 * s, y - 19 * s, 8 * s, 6 * s);
+      if (snowy) {
+        ctx.fillStyle = '#e8fbff';
+        ctx.fillRect(x - 8 * s, y - 6 * s, 16 * s, 2 * s);
+        ctx.fillRect(x - 5 * s, y - 13 * s, 10 * s, 2 * s);
+        ctx.fillRect(x - 2 * s, y - 19 * s, 4 * s, 2 * s);
+      }
+    }
+
+    function drawWesternTipi(ctx, x, baseY, scale = 1, tick = 0) {
+      const s = scale;
+      ctx.fillStyle = '#5c3419';
+      ctx.fillRect(x - 6 * s, baseY - 46 * s, 2 * s, 12 * s);
+      ctx.fillRect(x + 4 * s, baseY - 46 * s, 2 * s, 12 * s);
+      ctx.fillStyle = '#f2dec0';
+      ctx.fillRect(x - 4 * s, baseY - 38 * s, 8 * s, 8 * s);
+      ctx.fillRect(x - 9 * s, baseY - 30 * s, 18 * s, 8 * s);
+      ctx.fillRect(x - 14 * s, baseY - 22 * s, 28 * s, 8 * s);
+      ctx.fillRect(x - 19 * s, baseY - 14 * s, 38 * s, 8 * s);
+      ctx.fillRect(x - 23 * s, baseY - 6 * s, 46 * s, 6 * s);
+      ctx.fillStyle = '#c4451c';
+      ctx.fillRect(x - 14 * s, baseY - 20 * s, 28 * s, 3 * s);
+      ctx.fillRect(x - 21 * s, baseY - 8 * s, 42 * s, 4 * s);
+      ctx.fillStyle = '#F7C844';
+      ctx.fillRect(x - 18 * s, baseY - 12 * s, 36 * s, 2 * s);
+      ctx.fillStyle = '#d9b88c';
+      ctx.fillRect(x - 8 * s, baseY - 36 * s, 5 * s, 6 * s);
+      ctx.fillRect(x + 3 * s, baseY - 36 * s, 5 * s, 6 * s);
+      ctx.fillStyle = '#3b150c';
+      ctx.fillRect(x - 4 * s, baseY - 11 * s, 8 * s, 11 * s);
+      const drift = Math.round(Math.sin(tick * 0.06) * 2);
+      ctx.fillStyle = 'rgba(255, 244, 224, 0.45)';
+      ctx.fillRect(x - 2 + drift, baseY - 52 * s, 4, 4);
+      ctx.fillRect(x + 2 - drift, baseY - 58 * s, 3, 3);
+    }
+
+    function drawSnowfall(ctx, W, maxY, tick, count = 24) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      for (let i = 0; i < count; i++) {
+        const seedX = (i * 73 + 19) % W;
+        const speed = 0.7 + (i % 3) * 0.35;
+        const drift = Math.round(Math.sin(tick * 0.04 + i) * 6);
+        const sx = ((seedX + drift) % W + W) % W;
+        const sy = Math.floor((tick * speed + i * 29) % maxY);
+        const size = (i % 4 === 0) ? 3 : 2;
+        ctx.fillRect(sx, sy, size, size);
+      }
+    }
+
+    function drawArtboxScene(ctx, game, tick) {
+      const W = artCanvas.width;
+      const H = artCanvas.height;
+      const bob = Math.sin(tick * 0.08) * 3;
+      const wave = Math.floor(tick / 14) % 2;
+      const cx = Math.round(W / 2);
+      const cy = Math.round(H * 0.43 + bob);
+
+      // Clear stage
+      ctx.fillStyle = '#090b12';
+      ctx.fillRect(0, 0, W, H);
+
+      if (game.artType === 'CANOE') {
+        // 1. RED RIVER RUN: One-man canoe on parallax Red River + Prairie
+        ctx.fillStyle = '#2d1832';
+        ctx.fillRect(0, 0, W, 56);
+        ctx.fillStyle = '#732c3f';
+        ctx.fillRect(0, 56, W, 42);
+        ctx.fillStyle = '#c45b33';
+        ctx.fillRect(0, 98, W, 24);
+
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(W - 86, 28, 26, 26);
+
+        const farScroll = Math.floor(tick * 0.5) % 110;
+        ctx.fillStyle = '#5c4b23';
+        ctx.fillRect(0, 108, W, 26);
+        ctx.fillStyle = '#826e2e';
+        for (let x = -farScroll; x < W + 110; x += 110) {
+          ctx.fillRect(x, 102, 74, 12);
+          ctx.fillRect(x + 18, 97, 38, 6);
+        }
+
+        const midScroll = Math.floor(tick * 1.2) % 90;
+        ctx.fillStyle = '#a38936';
+        ctx.fillRect(0, 124, W, 24);
+        ctx.fillStyle = '#3D5948';
+        for (let x = -midScroll; x < W + 90; x += 90) {
+          ctx.fillRect(x + 10, 114, 16, 12);
+          ctx.fillRect(x + 15, 124, 5, 6);
+        }
+
+        ctx.fillStyle = '#7a2520';
+        ctx.fillRect(0, 144, W, H - 144);
+        ctx.fillStyle = '#9e382b';
+        ctx.fillRect(0, 152, W, 28);
+        const fastScroll = Math.floor(tick * 2.4) % 64;
+        ctx.fillStyle = 'rgba(247, 200, 68, 0.35)';
+        for (let x = -fastScroll; x < W + 64; x += 64) {
+          ctx.fillRect(x, 158, 24, 3);
+          ctx.fillRect(x + 28, 174, 18, 3);
+        }
+
+        const canoeY = Math.round(148 + bob);
+        ctx.fillStyle = '#d9a760';
+        ctx.fillRect(cx - 56, canoeY, 112, 14);
+        ctx.fillRect(cx - 66, canoeY - 6, 14, 10);
+        ctx.fillRect(cx + 52, canoeY - 6, 14, 10);
+        ctx.fillStyle = '#AD1C21';
+        ctx.fillRect(cx - 50, canoeY + 4, 100, 4);
+
+        ctx.fillStyle = '#12AEA2';
+        ctx.fillRect(cx - 8, canoeY - 18, 16, 18);
+        ctx.fillStyle = '#dcd7c9';
+        ctx.fillRect(cx - 5, canoeY - 27, 10, 9);
+        ctx.fillStyle = '#AD1C21';
+        ctx.fillRect(cx - 6, canoeY - 32, 12, 6);
+        ctx.fillRect(cx - 11, canoeY - 30, 5, 5);
+        const strokeX = wave === 0 ? -6 : 6;
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(cx - 18 + strokeX, canoeY - 12, 36, 3);
+        ctx.fillRect(cx - 22 + strokeX, canoeY - 4, 8, 14);
+
+      } else if (game.artType === 'FIDDLE') {
+        // 2. LA GRANDE GIGUE: Métis Fiddle (with mini-sash tied to neck) leaning against a rock
+        ctx.fillStyle = '#1a122b';
+        ctx.fillRect(0, 0, W, 65);
+        ctx.fillStyle = '#382259';
+        ctx.fillRect(0, 65, W, 65);
+        ctx.fillStyle = '#3D5948';
+        ctx.fillRect(0, 126, W, H - 126);
+
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(64, 30, 4, 4);
+        ctx.fillRect(360, 42, 4, 4);
+        ctx.fillRect(310, 24, 3, 3);
+
+        const rockX = cx + 14;
+        const rockY = 104;
+        ctx.fillStyle = '#5a6275';
+        ctx.fillRect(rockX - 36, rockY + 14, 84, 38);
+        ctx.fillRect(rockX - 24, rockY, 64, 18);
+        ctx.fillStyle = '#7e889e';
+        ctx.fillRect(rockX - 20, rockY + 3, 44, 8);
+        ctx.fillStyle = '#3b4152';
+        ctx.fillRect(rockX + 18, rockY + 12, 26, 38);
+
+        ctx.save();
+        ctx.translate(cx - 12, 118);
+        ctx.rotate(-0.34);
+
+        ctx.fillStyle = '#7a2e08';
+        ctx.fillRect(-20, -14, 40, 46);
+        ctx.fillStyle = '#d96b14';
+        ctx.fillRect(-17, -11, 34, 40);
+        ctx.fillStyle = '#382259';
+        ctx.fillRect(-18, 4, 5, 10);
+        ctx.fillRect(13, 4, 5, 10);
+        ctx.fillStyle = '#1e1b18';
+        ctx.fillRect(-9, 3, 3, 12);
+        ctx.fillRect(6, 3, 3, 12);
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(-6, 9, 12, 3);
+        ctx.fillStyle = '#1e1b18';
+        ctx.fillRect(-4, 20, 8, 11);
+
+        ctx.fillStyle = '#3a2311';
+        ctx.fillRect(-4, -46, 8, 34);
+        ctx.fillStyle = '#d96b14';
+        ctx.fillRect(-6, -54, 12, 10);
+        ctx.fillStyle = '#dcd7c9';
+        ctx.fillRect(-2, -46, 1, 66);
+        ctx.fillRect(2, -46, 1, 66);
+
+        ctx.fillStyle = '#AD1C21';
+        ctx.fillRect(-9, -36, 18, 6);
+        ctx.fillStyle = '#12AEA2';
+        ctx.fillRect(-6, -36, 4, 6);
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(2, -36, 4, 6);
+        const sway = wave === 0 ? 0 : 3;
+        ctx.fillStyle = '#AD1C21';
+        ctx.fillRect(8, -34, 7, 16 + sway);
+        ctx.fillRect(13, -31, 6, 14 - sway);
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(8, -18 + sway, 7, 4);
+        ctx.fillRect(13, -17 - sway, 6, 4);
+
+        ctx.restore();
+
+      } else if (game.artType === 'BEADWORK') {
+        // 3. LI RASSAD DI FLEUR: Warm woodstove cabin scene with a Red River Loom beside it
+        ctx.fillStyle = '#2e180c';
+        ctx.fillRect(0, 0, W, 146);
+        ctx.fillStyle = '#472613';
+        for (let y = 12; y < 142; y += 26) {
+          ctx.fillRect(0, y, W, 18);
+        }
+        ctx.fillStyle = '#241208';
+        ctx.fillRect(0, 146, W, H - 146);
+        ctx.fillStyle = '#331b0e';
+        ctx.fillRect(0, 152, W, 6);
+        ctx.fillRect(0, 166, W, 6);
+
+        const stoveX = cx - 118;
+        const stoveY = 74;
+        ctx.fillStyle = '#1b1d24';
+        ctx.fillRect(stoveX + 30, 0, 18, 76);
+        ctx.fillStyle = '#323642';
+        ctx.fillRect(stoveX + 27, 44, 24, 5);
+        ctx.fillStyle = '#252830';
+        ctx.fillRect(stoveX, stoveY, 78, 58);
+        ctx.fillStyle = '#383d4a';
+        ctx.fillRect(stoveX - 4, stoveY, 86, 6);
+        ctx.fillRect(stoveX + 6, stoveY + 58, 9, 18);
+        ctx.fillRect(stoveX + 63, stoveY + 58, 9, 18);
+        ctx.fillStyle = wave === 0 ? '#FB6604' : '#F7C844';
+        ctx.fillRect(stoveX + 12, stoveY + 18, 36, 24);
+        ctx.fillStyle = '#AD1C21';
+        ctx.fillRect(stoveX + 16, stoveY + 28, 28, 14);
+        ctx.fillStyle = '#1b1d24';
+        ctx.fillRect(stoveX + 22, stoveY + 18, 3, 24);
+        ctx.fillRect(stoveX + 34, stoveY + 18, 3, 24);
+        ctx.fillStyle = 'rgba(251, 102, 4, 0.16)';
+        ctx.fillRect(stoveX - 18, stoveY - 10, 126, 98);
+
+        const loomX = cx + 16;
+        const loomY = 76;
+        ctx.fillStyle = '#8f5a2b';
+        ctx.fillRect(loomX, loomY + 66, 108, 10);
+        ctx.fillRect(loomX + 10, loomY + 10, 10, 58);
+        ctx.fillRect(loomX + 88, loomY + 10, 10, 58);
+        ctx.fillStyle = '#c4864b';
+        ctx.fillRect(loomX + 4, loomY + 14, 100, 10);
+        ctx.fillRect(loomX + 4, loomY + 52, 100, 10);
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(loomX + 104, loomY + 16, 8, 6);
+        ctx.fillRect(loomX + 104, loomY + 54, 8, 6);
+
+        ctx.fillStyle = '#dcd7c9';
+        for (let wx = loomX + 24; wx <= loomX + 84; wx += 6) {
+          ctx.fillRect(wx, loomY + 24, 2, 28);
+        }
+
+        const bandY = loomY + 31;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(loomX + 22, bandY, 64, 16);
+        ctx.fillStyle = '#AD1C21';
+        ctx.fillRect(loomX + 24, bandY + 2, 60, 4);
+        ctx.fillRect(loomX + 24, bandY + 10, 60, 4);
+        ctx.fillStyle = '#12AEA2';
+        ctx.fillRect(loomX + 30, bandY + 5, 14, 6);
+        ctx.fillRect(loomX + 64, bandY + 5, 14, 6);
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(loomX + 48, bandY + 3, 12, 10);
+
+      } else if (game.artType === 'DUCK') {
+        // 4. SÎSÎP: Spot-on flying Mallard animation on crisp Autumn / Fall Marsh
+        ctx.fillStyle = '#2b2438';
+        ctx.fillRect(0, 0, W, 46);
+        ctx.fillStyle = '#753a28';
+        ctx.fillRect(0, 46, W, 46);
+        ctx.fillStyle = '#c46d29';
+        ctx.fillRect(0, 92, W, 42);
+
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(W - 84, 32, 24, 24);
+
+        ctx.fillStyle = '#5c3419';
+        ctx.fillRect(0, 128, W, 12);
+
+        ctx.fillStyle = '#144966';
+        ctx.fillRect(0, 138, W, H - 138);
+        ctx.fillStyle = 'rgba(247, 200, 68, 0.3)';
+        for (let x = 22; x < W - 20; x += 56) {
+          const offset = wave === 0 ? 0 : 12;
+          ctx.fillRect(x + offset, 150, 22, 3);
+          ctx.fillRect(x + 12 - offset, 166, 16, 3);
+        }
+
+        ctx.fillStyle = '#826e2e';
+        ctx.fillRect(18, 114, 4, 34);
+        ctx.fillRect(28, 120, 4, 28);
+        ctx.fillRect(W - 22, 116, 4, 32);
+        ctx.fillStyle = '#3a2311';
+        ctx.fillRect(16, 118, 8, 12);
+        ctx.fillRect(W - 24, 120, 8, 12);
+
+        ctx.fillStyle = '#2d5e3e';
+        ctx.fillRect(cx + 14, cy - 18, 18, 14);
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(cx + 32, cy - 12, 12, 6);
+        ctx.fillStyle = '#6b4423';
+        ctx.fillRect(cx - 24, cy - 8, 42, 18);
+        ctx.fillStyle = '#dcd7c9';
+        const wingY = wave === 0 ? -28 : 4;
+        ctx.fillRect(cx - 14, cy + wingY, 22, 14);
+
+      } else if (game.artType === 'BUFFALO') {
+        // 5. LAND THUNDER!: Orange-Terracotta-Golden Prairie, Parallax Western Tipi,
+        //    Sashed Mounted Hunter chasing/hunting behind the Rumbling Buffalo Herd
+        ctx.fillStyle = '#5c1f14'; // Deep terracotta dusk
+        ctx.fillRect(0, 0, W, 38);
+        ctx.fillStyle = '#a83c18'; // Rich terracotta-orange
+        ctx.fillRect(0, 38, W, 36);
+        ctx.fillStyle = '#e07a22'; // Warm amber-orange horizon
+        ctx.fillRect(0, 74, W, 32);
+
+        // Large Golden Prairie Sun
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(W - 88, 22, 28, 28);
+        ctx.fillStyle = '#ffe58f';
+        ctx.fillRect(W - 84, 26, 20, 20);
+
+        // Far Parallax Terracotta Ridge + Western Tipi Camp (Slow Scroll)
+        const farScroll = Math.floor(tick * 0.45) % 240;
+        ctx.fillStyle = '#8f3718';
+        ctx.fillRect(0, 96, W, 18);
+        for (let bx = -farScroll; bx < W + 240; bx += 240) {
+          ctx.fillStyle = '#a8471c';
+          ctx.fillRect(bx + 12, 88, 92, 12);
+          ctx.fillRect(bx + 30, 82, 54, 8);
+          drawWesternTipi(ctx, bx + 156, 102, 0.88, tick);
+        }
+
+        // Golden-Terracotta Sunlit Prairie Ground (Mid & Foreground)
+        ctx.fillStyle = '#d99626';
+        ctx.fillRect(0, 106, W, 36);
+        ctx.fillStyle = '#b8621b';
+        ctx.fillRect(0, 138, W, H - 138);
+
+        // Fast Parallax Golden Grass Tufts
+        const grassScroll = Math.floor(tick * 2.2) % 48;
+        ctx.fillStyle = '#F7C844';
+        for (let gx = -grassScroll; gx < W + 48; gx += 48) {
+          ctx.fillRect(gx + 6, 114, 10, 3);
+          ctx.fillRect(gx + 24, 128, 12, 3);
+        }
+
+        const strideA = wave === 0 ? 0 : 4;
+        const strideB = wave === 0 ? 4 : 0;
+
+        // Sashed Mounted Buffalo Hunter on Horseback (Left-Rear, chasing & hunting the herd!)
+        const hx = cx - 108;
+        const hy = Math.round(118 + strideB * 0.8);
+        // Horse flowing tail
+        ctx.fillStyle = '#2e1a0c';
+        ctx.fillRect(hx - 40, hy - 10, 10, 18);
+        // Warm chestnut-bay horse body
+        ctx.fillStyle = '#8c3b19';
+        ctx.fillRect(hx - 30, hy - 12, 48, 20);
+        // Horse neck & head (facing right toward the fleeing herd)
+        ctx.fillRect(hx + 12, hy - 28, 14, 20);
+        ctx.fillRect(hx + 22, hy - 24, 15, 10);
+        // Dark mane
+        ctx.fillStyle = '#1e1b18';
+        ctx.fillRect(hx + 8, hy - 28, 5, 16);
+        // Galloping horse legs
+        ctx.fillStyle = '#8c3b19';
+        ctx.fillRect(hx - 26 - (wave * 4), hy + 8, 7, 18);
+        ctx.fillRect(hx - 14 + (wave * 4), hy + 8, 7, 16);
+        ctx.fillRect(hx + 8 - (wave * 4), hy + 8, 7, 16);
+        ctx.fillRect(hx + 18 + (wave * 4), hy + 8, 7, 18);
+
+        // Mounted Buffalo Hunter (Teal capote, wide-brim hat, & flowing red/gold sash)
+        ctx.fillStyle = '#12AEA2';
+        ctx.fillRect(hx - 10, hy - 27, 15, 15);
+        // Sash wrapped across chest/waist + trailing fringed tail
+        ctx.fillStyle = '#AD1C21';
+        ctx.fillRect(hx - 10, hy - 20, 15, 4);
+        ctx.fillRect(hx - 24, hy - 21 + (wave * 2), 14, 5);
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(hx - 28, hy - 20 + (wave * 2), 5, 4);
+        // Hunter head & hat
+        ctx.fillStyle = '#dcd7c9';
+        ctx.fillRect(hx - 7, hy - 35, 9, 8);
+        ctx.fillStyle = '#3b150c';
+        ctx.fillRect(hx - 11, hy - 38, 17, 4);
+        ctx.fillRect(hx - 7, hy - 42, 9, 4);
+
+        // Rumbling Herd of Buffalo Ahead of the Hunter (Center to Right, charging forward)
+        // Distant back-row buffalo
+        drawMatrix(ctx, BUFFALO_SPRITE, PALETTE, cx - 28, 74 + strideA, 4);
+        drawMatrix(ctx, BUFFALO_SPRITE, PALETTE, cx + 68, 76 + strideB, 4);
+        // Mid-herd charging bulls
+        drawMatrix(ctx, BUFFALO_SPRITE, PALETTE, cx - 44, 94 + strideB, 5);
+        drawMatrix(ctx, BUFFALO_SPRITE, PALETTE, cx + 48, 92 + strideA, 5);
+        // Foreground stampeding bulls
+        drawMatrix(ctx, BUFFALO_SPRITE, PALETTE, cx - 10, 108 + strideA, 6);
+        drawMatrix(ctx, BUFFALO_SPRITE, PALETTE, cx + 86, 104 + strideB, 6);
+
+        // Kicked-Up Golden-Terracotta Prairie Dust Clouds behind hooves
+        ctx.fillStyle = '#ffe58f';
+        ctx.fillRect(hx - 48 - strideA * 2,  140, 18, 7);
+        ctx.fillRect(cx - 56 - strideB * 2,  142, 18, 7);
+        ctx.fillRect(cx - 24 - strideA * 2,  166, 24, 8);
+        ctx.fillRect(cx + 72 - strideB * 2,  162, 22, 8);
+
+      } else if (game.artType === 'CART') {
+        // 6. LE ROI DES TRAITEURS: Winter scene at the Red River Valley with falling snow & static cart
+        ctx.fillStyle = '#102236';
+        ctx.fillRect(0, 0, W, 56);
+        ctx.fillStyle = '#294c6e';
+        ctx.fillRect(0, 56, W, 56);
+
+        drawPineTree(ctx, 44, 110, 1.3, true);
+        drawPineTree(ctx, 92, 112, 1.0, true);
+        drawPineTree(ctx, W - 52, 110, 1.4, true);
+        drawPineTree(ctx, W - 96, 112, 1.0, true);
+
+        ctx.fillStyle = '#e8f4f8';
+        ctx.fillRect(0, 108, W, 42);
+        ctx.fillStyle = '#9ccbe0';
+        ctx.fillRect(0, 146, W, H - 146);
+        ctx.fillStyle = '#c4f5ff';
+        ctx.fillRect(24, 156, 90, 4);
+        ctx.fillRect(260, 166, 110, 4);
+
+        const cartY = 114;
+        ctx.fillStyle = '#6b4423';
+        ctx.fillRect(cx - 42, cartY - 14, 72, 22);
+        ctx.fillStyle = '#3a2311';
+        ctx.fillRect(cx - 36, cartY - 26, 26, 12);
+        ctx.fillStyle = '#826e2e';
+        ctx.fillRect(cx - 6, cartY - 28, 28, 14);
+        ctx.fillStyle = '#dcd7c9';
+        ctx.fillRect(cx + 30, cartY + 4, 34, 5);
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(cx - 26, cartY - 4, 34, 34);
+        ctx.fillStyle = '#102236';
+        ctx.fillRect(cx - 18, cartY + 4, 18, 18);
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(cx - 11, cartY + 4, 4, 18);
+        ctx.fillRect(cx - 18, cartY + 11, 18, 4);
+
+        drawSnowfall(ctx, W, H - 76, tick, 26);
+
+      } else if (game.artType === 'PORTAGE') {
+        // 7. LE GRAND PORTAGE: Voyageur carrying a cargo pack against the riverbank
+        ctx.fillStyle = '#1b2b44';
+        ctx.fillRect(0, 0, W, 56);
+        ctx.fillStyle = '#38587a';
+        ctx.fillRect(0, 56, W, 56);
+
+        drawPineTree(ctx, 48, 108, 1.3, false);
+        drawPineTree(ctx, 88, 110, 1.0, false);
+        drawPineTree(ctx, W - 56, 108, 1.4, false);
+
+        ctx.fillStyle = '#0F6F9E';
+        ctx.fillRect(0, 108, W, 38);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+        ctx.fillRect(28 + (wave * 8), 118, 26, 3);
+        ctx.fillRect(300 - (wave * 8), 126, 24, 3);
+
+        ctx.fillStyle = '#476337';
+        ctx.fillRect(0, 134, W, 16);
+        ctx.fillStyle = '#5c4128';
+        ctx.fillRect(0, 146, W, H - 146);
+
+        const vx = cx - 6;
+        const vy = Math.round(126 + (wave === 0 ? 0 : -2));
+        ctx.fillStyle = '#252830';
+        ctx.fillRect(vx - 6 + (wave * 5), vy + 10, 7, 16);
+        ctx.fillRect(vx + 6 - (wave * 5), vy + 10, 7, 16);
+        ctx.fillStyle = '#12AEA2';
+        ctx.fillRect(vx - 8, vy - 12, 20, 22);
+        ctx.fillStyle = '#AD1C21';
+        ctx.fillRect(vx - 8, vy + 2, 20, 4);
+        ctx.fillStyle = '#dcd7c9';
+        ctx.fillRect(vx + 2, vy - 22, 10, 10);
+        ctx.fillStyle = '#AD1C21';
+        ctx.fillRect(vx + 1, vy - 27, 12, 6);
+        ctx.fillStyle = '#826e2e';
+        ctx.fillRect(vx - 28, vy - 24, 22, 28);
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(vx - 24, vy - 24, 4, 28);
+        ctx.fillRect(vx - 14, vy - 24, 4, 28);
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(vx - 8, vy - 21, 14, 3);
+
+      } else if (game.artType === 'GOLF') {
+        // 8. SCOTCH PÂKAHATOWÂN: Plains Links with Woodland Forest Background
+        ctx.fillStyle = '#1b4242';
+        ctx.fillRect(0, 0, W, 56);
+        ctx.fillStyle = '#326e65';
+        ctx.fillRect(0, 56, W, 58);
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(W - 76, 22, 22, 22);
+
+        ctx.fillStyle = '#143322';
+        ctx.fillRect(0, 96, W, 24);
+        const treePositions = [22, 54, 88, 126, 164, 268, 308, 346, 384, 416];
+        treePositions.forEach((tx, idx) => {
+          drawPineTree(ctx, tx, 114, idx % 2 === 0 ? 1.35 : 1.1, false);
+        });
+
+        ctx.fillStyle = '#476337';
+        ctx.fillRect(0, 114, W, H - 114);
+        ctx.fillStyle = '#88cc44';
+        ctx.fillRect(cx - 86, 134, 172, 24);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(cx + 24, 86, 4, 54);
+        ctx.fillStyle = '#FB6604';
+        ctx.fillRect(cx + 28, 86, 26 - (wave * 4), 14);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(cx - 38, 138, 9, 9);
+
+      } else if (game.artType === 'HORSE') {
+        // 9. AEN ZHWAAL: Tan Buffalo Rider Horse on Muddy Spring Prairie Backdrop
+        ctx.fillStyle = '#294d6e';
+        ctx.fillRect(0, 0, W, 56);
+        ctx.fillStyle = '#5a8fb8';
+        ctx.fillRect(0, 56, W, 54);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(54, 28, 34, 10);
+        ctx.fillRect(62, 22, 18, 8);
+        ctx.fillRect(310, 36, 38, 10);
+
+        ctx.fillStyle = '#5c7538';
+        ctx.fillRect(0, 106, W, 22);
+        ctx.fillStyle = '#593b22';
+        ctx.fillRect(0, 124, W, H - 124);
+        ctx.fillStyle = '#3b2514';
+        ctx.fillRect(28, 146, 76, 8);
+        ctx.fillRect(260, 158, 94, 8);
+        ctx.fillStyle = '#5a8fb8';
+        ctx.fillRect(42, 148, 42, 4);
+
+        const hx = cx - 4;
+        const hy = Math.round(114 + (wave === 0 ? 0 : -2));
+        ctx.fillStyle = '#2e1a0c';
+        ctx.fillRect(hx - 48, hy - 12, 12, 22);
+        ctx.fillStyle = '#c9935b';
+        ctx.fillRect(hx - 36, hy - 14, 58, 24);
+        ctx.fillRect(hx + 14, hy - 32, 18, 24);
+        ctx.fillRect(hx + 28, hy - 28, 18, 12);
+        ctx.fillStyle = '#a87440';
+        ctx.fillRect(hx + 22, hy - 36, 5, 5);
+        ctx.fillStyle = '#2e1a0c';
+        ctx.fillRect(hx + 10, hy - 32, 6, 20);
+        ctx.fillStyle = '#c9935b';
+        ctx.fillRect(hx - 32 - (wave * 4), hy + 10, 8, 22);
+        ctx.fillRect(hx - 18 + (wave * 4), hy + 10, 8, 20);
+        ctx.fillRect(hx + 10 - (wave * 4), hy + 10, 8, 20);
+        ctx.fillRect(hx + 22 + (wave * 4), hy + 10, 8, 22);
+        ctx.fillStyle = '#2e1a0c';
+        ctx.fillRect(hx - 32 - (wave * 4), hy + 28, 8, 4);
+        ctx.fillRect(hx + 22 + (wave * 4), hy + 28, 8, 4);
+
+        ctx.fillStyle = '#12AEA2';
+        ctx.fillRect(hx - 12, hy - 30, 16, 16);
+        ctx.fillStyle = '#AD1C21';
+        ctx.fillRect(hx - 12, hy - 22, 16, 4);
+        ctx.fillStyle = '#dcd7c9';
+        ctx.fillRect(hx - 9, hy - 39, 10, 9);
+        ctx.fillStyle = '#3a2311';
+        ctx.fillRect(hx - 13, hy - 42, 18, 4);
+
+      } else if (game.artType === 'ICE') {
+        // 10. LA GLACE ROUGE: Cornbroom & Curling Rock on clean frozen river ice with falling snow
+        ctx.fillStyle = '#0d1b2a';
+        ctx.fillRect(0, 0, W, 56);
+        ctx.fillStyle = '#1b3b5c';
+        ctx.fillRect(0, 56, W, 56);
+        ctx.fillStyle = 'rgba(18, 174, 162, 0.25)';
+        ctx.fillRect(30, 22, 160, 10);
+        ctx.fillRect(210, 30, 140, 8);
+
+        ctx.fillStyle = '#e8f4f8';
+        ctx.fillRect(0, 104, W, 18);
+        drawPineTree(ctx, 42, 108, 1.4, true);
+        drawPineTree(ctx, 84, 110, 1.0, true);
+        drawPineTree(ctx, W - 46, 108, 1.4, true);
+        drawPineTree(ctx, W - 88, 110, 1.0, true);
+
+        ctx.fillStyle = '#8ad4eb';
+        ctx.fillRect(0, 120, W, H - 120);
+        ctx.fillStyle = '#c4f5ff';
+        ctx.fillRect(0, 126, W, 32);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+        ctx.fillRect(36, 148, 74, 3);
+        ctx.fillRect(290, 158, 86, 3);
+        ctx.fillRect(140, 168, 54, 3);
+
+        const rockX = cx + 22;
+        const rockY = Math.round(136 + bob * 0.5);
+        ctx.fillStyle = '#5a6275';
+        ctx.fillRect(rockX - 24, rockY - 6, 48, 22);
+        ctx.fillStyle = '#AD1C21';
+        ctx.fillRect(rockX - 26, rockY + 2, 52, 7);
+        ctx.fillStyle = '#9aa3b8';
+        ctx.fillRect(rockX - 18, rockY - 4, 36, 4);
+        ctx.fillStyle = '#AD1C21';
+        ctx.fillRect(rockX - 6, rockY - 14, 10, 8);
+        ctx.fillRect(rockX - 14, rockY - 16, 22, 5);
+
+        ctx.save();
+        ctx.translate(cx - 32, 116);
+        ctx.rotate(-0.38);
+        ctx.fillStyle = '#826e2e';
+        ctx.fillRect(-3, -46, 6, 54);
+        ctx.fillStyle = '#AD1C21';
+        ctx.fillRect(-8, 6, 16, 6);
+        ctx.fillStyle = '#12AEA2';
+        ctx.fillRect(-10, 12, 20, 4);
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(-14, 16, 28, 24);
+        ctx.fillStyle = '#c9933b';
+        ctx.fillRect(-10, 18, 3, 22);
+        ctx.fillRect(-2, 18, 3, 22);
+        ctx.fillRect(6, 18, 3, 22);
+        ctx.restore();
+
+        drawSnowfall(ctx, W, H - 76, tick, 28);
+      }
+
+      // 4. Lower Title Banner Plate (Universal Genre Subtext Only)
+      const plateY = H - 76;
+      ctx.fillStyle = 'rgba(6, 8, 16, 0.92)';
+      ctx.fillRect(10, plateY, W - 20, 66);
+      ctx.strokeStyle = game.accent;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(10, plateY, W - 20, 66);
+
+      // Cartridge Number Pill
+      ctx.fillStyle = game.accent;
+      ctx.fillRect(18, plateY + 10, 34, 22);
+      ctx.fillStyle = '#000';
+      ctx.font = 'bold 14px "Courier New"';
+      ctx.textAlign = 'center';
+      ctx.fillText(game.badge, 35, plateY + 26);
+
+      // Main Game Title
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 20px "Courier New"';
+      ctx.textAlign = 'left';
+      ctx.fillText(game.title, 62, plateY + 27);
+
+      // Universal Genre / Description Subtext Only
+      ctx.fillStyle = '#12AEA2';
+      ctx.font = 'bold 12px "Courier New"';
+      ctx.fillText(game.genre, 18, plateY + 51);
+    }
+
+    let carouselTick = 0;
+    function artboxLoop() {
+      if (machineState !== 'MENU') return;
+      carouselTick++;
+      drawArtboxScene(aCtx, GAME_CATALOG[currentIndex], carouselTick);
+      requestAnimationFrame(artboxLoop);
+    }
+
+    function playCarouselTick(dir) {
+      if (!audioCtx) return;
+      const baseFreq = dir >= 0 ? 523.25 : 440.0;
+      playPulseCall(baseFreq, 0, 0.06, 0.08);
+      playPulseCall(baseFreq * 1.25, 0.045, 0.08, 0.09);
+    }
+
     function drawMatrix(context, matrix, palette, startX, startY, pixelSize, alpha = 1.0) {
         context.globalAlpha = alpha;
         for (let y = 0; y < matrix.length; y++) {
@@ -1065,8 +1973,8 @@
     /* --- BWAA BRULE STACKED ANIMATION (STATIC SPLASH) --- */
     const BWAA_PALETTE = {
         '0': null,
-        '1': '#540E11', // Deep Bordeaux Border 
-        '2': '#ffffff'  // Solid White Stencil Fill
+        '1': '#540E11',
+        '2': '#ffffff'
     };
 
     const BWAA_SPRITE = [
@@ -1188,7 +2096,6 @@
         }
         if (audioCtx.state === 'suspended') audioCtx.resume();
 
-        // Build a 25% duty cycle chiptune pulse wave
         if (!customPulseWave && audioCtx.createPeriodicWave) {
             const harmonics = 16;
             const real = new Float32Array(harmonics);
@@ -1205,14 +2112,14 @@
         if (!audioCtx) return;
 
         const herdGallop = [
-            { freq: 49.00,  delay: 0.00, dur: 0.14, vol: 0.44 }, // G1
-            { freq: 49.00,  delay: 0.08, dur: 0.14, vol: 0.36 }, // G1
-            { freq: 58.27,  delay: 0.16, dur: 0.16, vol: 0.46 }, // Bb1
-            { freq: 65.41,  delay: 0.26, dur: 0.14, vol: 0.44 }, // C2
-            { freq: 65.41,  delay: 0.34, dur: 0.14, vol: 0.38 }, // C2
-            { freq: 73.42,  delay: 0.42, dur: 0.16, vol: 0.48 }, // D2
-            { freq: 87.31,  delay: 0.52, dur: 0.14, vol: 0.46 }, // F2
-            { freq: 98.00,  delay: 0.60, dur: 0.28, vol: 0.52 }  // G2 ground-thud landing
+            { freq: 49.00,  delay: 0.00, dur: 0.14, vol: 0.44 },
+            { freq: 49.00,  delay: 0.08, dur: 0.14, vol: 0.36 },
+            { freq: 58.27,  delay: 0.16, dur: 0.16, vol: 0.46 },
+            { freq: 65.41,  delay: 0.26, dur: 0.14, vol: 0.44 },
+            { freq: 65.41,  delay: 0.34, dur: 0.14, vol: 0.38 },
+            { freq: 73.42,  delay: 0.42, dur: 0.16, vol: 0.48 },
+            { freq: 87.31,  delay: 0.52, dur: 0.14, vol: 0.46 },
+            { freq: 98.00,  delay: 0.60, dur: 0.28, vol: 0.52 }
         ];
 
         herdGallop.forEach(step => {
@@ -1226,10 +2133,10 @@
         });
 
         const fanfareNotes = [
-            { freq: 293.66, delay: 0.68, dur: 0.10, vol: 0.11 }, // D4
-            { freq: 392.00, delay: 0.77, dur: 0.10, vol: 0.12 }, // G4
-            { freq: 440.00, delay: 0.86, dur: 0.10, vol: 0.12 }, // A4
-            { freq: 587.33, delay: 0.95, dur: 0.34, vol: 0.14 }  // D5
+            { freq: 293.66, delay: 0.68, dur: 0.10, vol: 0.11 },
+            { freq: 392.00, delay: 0.77, dur: 0.10, vol: 0.12 },
+            { freq: 440.00, delay: 0.86, dur: 0.10, vol: 0.12 },
+            { freq: 587.33, delay: 0.95, dur: 0.34, vol: 0.14 }
         ];
 
         fanfareNotes.forEach(note => {
@@ -1332,7 +2239,7 @@
                 ctx.textAlign = 'center';
                 ctx.fillText("POWER ON", canvas.width / 2, canvas.height / 2 - 20);
                 ctx.font = '16px "Courier New"';
-                ctx.fillText("(TAP OR PRESS Z TO START)", canvas.width / 2, canvas.height / 2 + 15);
+                ctx.fillText("(TAP OR PRESS A TO START)", canvas.width / 2, canvas.height / 2 + 15);
             }
         } 
         else if (splashState === 'PLAYING') {
