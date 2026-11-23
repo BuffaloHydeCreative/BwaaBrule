@@ -150,21 +150,17 @@
         LEDGER_GOLD: '#F4D03F', LEDGER_CREAM: '#FCF3CF'
     };
 
-    // Level Definitions
+    // Level Definitions (Clean titles & subtitles without scoring/roster clutter)
     const LEVELS = [
         {
             id: 'POND',
             title: 'AEN PCHI LAAK',
-            subtitle: 'FALL MARSH WATERFOWL',
-            desc: 'Hunt Mallards, Canada Geese & Woodducks on the autumn pond edge.',
-            targets: 'MALLARD (100) • GOOSE (50) • WOODDUCK (200)'
+            subtitle: 'FALL MARSH WATERFOWL'
         },
         {
             id: 'WOODS',
             title: 'LI BWAA',
-            subtitle: 'NOCTURNAL WOODLAND & FOREST',
-            desc: 'Track Snowshoe Hares, Spruce Grouse, Red Foxes & Peeking Porcupines.',
-            targets: 'HARE (100) • GROUSE (50) • FOX (200) • PORCUPINE (300)'
+            subtitle: 'NOCTURNAL WOODLAND & FOREST'
         }
     ];
     let selectedLevelIdx = 0;
@@ -174,9 +170,9 @@
     // Two tree blinds (Spruce & Birch) where Porcupines peek out at Row 4, plus two 1x1 Blueberry Bush blinds
     const WOODLAND_BLIND_MATRIX = [
         { type: 'SPRUCE', depth: 2, colStart: 1, colEnd: 3, rowStart: 1, rowEnd: 6, peekCol: 2, peekRow: 4 },
-        { type: 'BUSH',   depth: 1, colStart: 5, colEnd: 5, rowStart: 7, rowEnd: 7 }, // 1x1 Blueberry Bush
+        { type: 'BUSH',   depth: 2, colStart: 5, colEnd: 5, rowStart: 7, rowEnd: 7 }, // 1x1 Blueberry Bush
         { type: 'BIRCH',  depth: 3, colStart: 7, colEnd: 9, rowStart: 1, rowEnd: 8, peekCol: 8, peekRow: 4 },
-        { type: 'BUSH',   depth: 2, colStart: 10, colEnd: 10, rowStart: 9, rowEnd: 9 } // 1x1 Blueberry Bush
+        { type: 'BUSH',   depth: 3, colStart: 10, colEnd: 10, rowStart: 9, rowEnd: 9 } // 1x1 Blueberry Bush
     ];
 
     // Procedural Environment Arrays
@@ -208,7 +204,7 @@
                 x: i,
                 w: 12 + (seed % 7),
                 h: (12 + (seed % 14)) * hScale,
-                kind: seed % 3 // 0 = rounded cottonwood/oak, 1 = tapered aspen, 2 = low prairie willow cluster
+                kind: seed % 3
             });
         }
 
@@ -257,7 +253,6 @@
             });
         }
 
-        // Stars confined to the top 3 sky rows (Rows 0..2) in Li Bwaa
         const woodsHorizonY = Math.floor(3 * TILE_H);
         nightStars = [];
         for (let i = 0; i < 20; i++) {
@@ -537,7 +532,7 @@
             [0,0,0,0,1,1,1,1,1,1,1,1,2,2,2,2,2,0],
             [0,0,0,4,4,1,1,1,1,1,1,1,2,2,0,0,0,0],
             [0,0,4,4,4,4,4,4,1,1,1,0,0,0,0,0,0,0],
-            [0,4,4,4,4,4,4,4,4,0,0,0,0,0,0,0,0],
+            [0,4,4,4,4,4,4,4,4,0,0,0,0,0,0,0,0,0],
             [0,0,4,4,4,4,0,0,0,0,0,0,0,0,0,0,0,0]
         ]
     ];
@@ -707,11 +702,10 @@
         ['#1A0405', '#2C0709', '#3A090B', '#540E11', '#7B241C', '#922B21'].map(hexToRgb)
     ];
 
-    // 3-Row Nocturnal Sky Palettes for Li Bwaa (Upper, Mid, Lower Sky Rows 0..2)
     const nocturnalPalettes = [
-        ['#06141A', '#0E2D36', '#184A56'].map(hexToRgb), // Start: Dark Twilight Teal
-        ['#0B0A18', '#161A33', '#22314D'].map(hexToRgb), // Mid: Deep Dusk Indigo
-        ['#0B0514', '#1E0E36', '#381C5E'].map(hexToRgb)  // End: Midnight Purple
+        ['#06141A', '#0E2D36', '#184A56'].map(hexToRgb),
+        ['#0B0A18', '#161A33', '#22314D'].map(hexToRgb),
+        ['#0B0514', '#1E0E36', '#381C5E'].map(hexToRgb)
     ];
 
     function drawSprite(x, y, matrix, paletteMap, scale) {
@@ -740,16 +734,15 @@
             pts: 300,
             x: peekCol,
             y: peekRow,
-            homeY: peekRow - 1.35, // Tucked inside upper tree branches
-            peekY: peekRow,        // Exposed peeking tile (Row 4)
+            homeY: peekRow - 1.35,
+            peekY: peekRow,
             currentY: peekRow - 1.35,
-            peekPhase: 'DROP',     // 'DROP' -> 'HOLD' -> 'RETREAT'
+            peekPhase: 'DROP',
             peekTimer: 0,
             speed: 0,
             dir: (hostTree.type === 'SPRUCE') ? 1 : -1,
             scale: 2,
-            depth: 1, // Renders in front of the tree trunk/boughs once dropped into peekRow so it is 100% hittable
-            hitRadius: 0.9,
+            depth: 3, // Renders in front of the tree trunk/boughs so it is 100% visible & hittable while peeking
             bobAmp: 0.4,
             bobFreq: 0.08,
             dead: false,
@@ -763,64 +756,63 @@
     }
 
     function spawnTarget() {
-        // Calm hunt cap: keep active wildlife sparse & unhurried
+        // Keep active targets at a steady, calm pace (up to 3 simultaneous)
         if (entities.filter(e => !e.dead).length >= 3) return;
 
         let rand = Math.random();
         let ent = { id: Math.random(), isPeeker: false, dead: false, hitDelay: 0, dropY: 0, animFrame: 0 };
 
         if (activeLevel === 'POND') {
-            if (rand < 0.18) {
+            if (rand < 0.20) {
                 // Woodduck floating calmly on pond water rows 8, 9, 10
                 ent.slot = 'c3'; ent.pts = 200; ent.y = 8 + Math.floor(Math.random() * 3);
-                ent.speed = 0.024; ent.scale = 2; ent.depth = 1; ent.hitRadius = 0.95;
-                ent.bobAmp = 1.2; ent.bobFreq = 0.12;
+                ent.speed = 0.025; ent.scale = 2; ent.depth = 1;
+                ent.bobAmp = 1.0; ent.bobFreq = 0.12;
                 ent.colorMap = {1: '#751A1E', 2: '#1E8449', 3: '#F39C12', 4: '#FFFFFF', 6: '#D4AC0D'};
                 ent.spriteFrames = sprWoodduck;
-            } else if (rand < 0.60) {
+            } else if (rand < 0.62) {
                 // Mallard gliding across upper sky rows 0..5
                 ent.slot = 'c1'; ent.pts = 100; ent.y = Math.floor(Math.random() * 6);
-                ent.speed = 0.078; ent.scale = 2; ent.depth = 1; ent.hitRadius = 1.05;
-                ent.bobAmp = 1.5; ent.bobFreq = 0.14;
+                ent.speed = 0.068; ent.scale = 2; ent.depth = 1;
+                ent.bobAmp = 1.2; ent.bobFreq = 0.14;
                 ent.colorMap = {1: '#111111', 2: '#1E8449', 3: '#F39C12', 4: '#FFFFFF', 5: '#444444'};
                 ent.spriteFrames = sprDuck;
             } else {
                 // Canada Goose flying steadily across sky & horizon rows 0..6
                 ent.slot = 'c2'; ent.pts = 50; ent.y = Math.floor(Math.random() * 7);
-                ent.speed = 0.045; ent.scale = 2; ent.depth = 1; ent.hitRadius = 1.15;
-                ent.bobAmp = 1.5; ent.bobFreq = 0.12;
+                ent.speed = 0.042; ent.scale = 2; ent.depth = 1;
+                ent.bobAmp = 1.2; ent.bobFreq = 0.12;
                 ent.colorMap = {1: '#5c3a21', 2: '#000000', 3: '#FFFFFF', 4: '#3a2010'};
                 ent.spriteFrames = sprGoose;
             }
         } else {
             // LI BWAA — Calm woodland small fur game on the 8-row forest floor (Rows 4..10)
-            // Every row has open clearings between the compact blinds so 100% of animals are hittable
-            if (rand < 0.22) {
+            if (rand < 0.24) {
                 // Red Fox prowling Rows 5..9
                 ent.slot = 'c3'; ent.pts = 200; ent.y = 5 + Math.floor(Math.random() * 5);
-                ent.speed = 0.044; ent.scale = 2; ent.depth = (ent.y <= 6) ? 1 : 2;
-                ent.hitRadius = 1.05; ent.bobAmp = 1.0; ent.bobFreq = 0.14;
+                ent.speed = 0.042; ent.scale = 2; ent.depth = (ent.y <= 6) ? 1 : 2;
+                ent.bobAmp = 0.8; ent.bobFreq = 0.14;
                 ent.colorMap = {1: '#D35400', 2: '#EAECEE', 3: '#111111', 4: '#922B21'};
                 ent.spriteFrames = sprRedFox;
-            } else if (rand < 0.60) {
+            } else if (rand < 0.62) {
                 // Snowshoe Hare bounding across Rows 7..10
                 ent.slot = 'c1'; ent.pts = 100; ent.y = 7 + Math.floor(Math.random() * 4);
-                ent.speed = 0.064; ent.scale = 2; ent.depth = (ent.y === 10) ? 3 : 2;
-                ent.hitRadius = 1.1; ent.bobAmp = 1.8; ent.bobFreq = 0.18;
+                ent.speed = 0.058; ent.scale = 2; ent.depth = (ent.y === 10) ? 3 : 2;
+                ent.bobAmp = 1.4; ent.bobFreq = 0.18;
                 ent.colorMap = {1: '#F2F4F4', 2: '#BDC3C7', 3: '#111111', 4: '#2C3E50'};
                 ent.spriteFrames = sprHare;
             } else {
                 // Spruce Grouse strutting Rows 4..9
                 ent.slot = 'c2'; ent.pts = 50; ent.y = 4 + Math.floor(Math.random() * 6);
-                ent.speed = 0.030; ent.scale = 2; ent.depth = (ent.y <= 6) ? 1 : 2;
-                ent.hitRadius = 0.95; ent.bobAmp = 1.8; ent.bobFreq = 0.16;
+                ent.speed = 0.028; ent.scale = 2; ent.depth = (ent.y <= 6) ? 1 : 2;
+                ent.bobAmp = 1.4; ent.bobFreq = 0.16;
                 ent.colorMap = {1: '#5D6D7E', 2: '#8E281C', 3: '#E74C3C', 4: '#EAECEE'};
                 ent.spriteFrames = sprSpruceGrouse;
             }
         }
 
         let fromLeft = Math.random() > 0.5;
-        ent.x = fromLeft ? -1 : GRID_W;
+        ent.x = fromLeft ? -0.8 : (GRID_W - 0.2);
         ent.dir = fromLeft ? 1 : -1;
         entities.push(ent);
     }
@@ -846,16 +838,16 @@
         // Smoothly interpolate gun aim point toward active 12x12 crosshair tile center
         const targetAimX = (crosshair.x * TILE_W) + (TILE_W / 2);
         const targetAimY = (crosshair.y * TILE_H) + (TILE_H / 2);
-        gunAim.x += (targetAimX - gunAim.x) * 0.35;
-        gunAim.y += (targetAimY - gunAim.y) * 0.35;
+        gunAim.x += (targetAimX - gunAim.x) * 0.42;
+        gunAim.y += (targetAimY - gunAim.y) * 0.42;
 
         const maxDrop = Math.round(VIEW_H * 0.36);
         if (!isLoaded && gunDropY < maxDrop) gunDropY += Math.max(4, Math.round(VIEW_H * 0.036));
         else if (isLoaded && gunDropY > 0) gunDropY -= Math.max(3, Math.round(VIEW_H * 0.028));
         gunDropY = Math.max(0, Math.min(maxDrop, gunDropY));
 
-        // Calm, unhurried wildlife respawn rate (~11 seconds between spawns, with an early opening target)
-        if (frame === 140 || frame % 680 === 0) spawnTarget();
+        // Calm, steady spawn cadence (~4.5 seconds between spawns, with an opening target at ~1s)
+        if (frame === 60 || frame % 280 === 0) spawnTarget();
         if (flashEffect > 0) flashEffect--;
 
         for (let i = entities.length - 1; i >= 0; i--) {
@@ -864,14 +856,13 @@
                 if (b.hitDelay > 0) b.hitDelay--;
                 else { b.dropY += (VIEW_H / 60); if (b.dropY > VIEW_H + 60) entities.splice(i, 1); }
             } else if (b.isPeeker) {
-                // Slow tree-branch drop & nocturnal peek cycle
                 b.animFrame = (frame % 36 < 18) ? 0 : 1;
                 if (b.peekPhase === 'DROP') {
                     b.currentY += 0.008;
                     if (b.currentY >= b.peekY) {
                         b.currentY = b.peekY;
                         b.peekPhase = 'HOLD';
-                        b.peekTimer = 320; // Peeks calmly for ~5.3 seconds
+                        b.peekTimer = 340;
                     }
                 } else if (b.peekPhase === 'HOLD') {
                     b.peekTimer--;
@@ -885,7 +876,7 @@
             } else {
                 b.x += b.speed * b.dir;
                 b.animFrame = (frame % 24 < 12) ? 0 : 1;
-                if ((b.dir === 1 && b.x > GRID_W + 0.5) || (b.dir === -1 && b.x < -1.5)) entities.splice(i, 1);
+                if ((b.dir === 1 && b.x > GRID_W + 0.8) || (b.dir === -1 && b.x < -1.8)) entities.splice(i, 1);
             }
         }
 
@@ -896,7 +887,7 @@
         }
     }
 
-    // --- POND-IN-THE-FALL PARALLAX BACKGROUND (With Distant Prairie Treeline Silhouette) ---
+    // --- POND-IN-THE-FALL PARALLAX BACKGROUND ---
     function drawPondFallBackdrop(progress, parallaxShift) {
         const horizonY = Math.floor(VIEW_H * 0.5);
         const skyBandH = Math.ceil(horizonY / 6);
@@ -910,7 +901,6 @@
             ctx.fillRect(0, i * skyBandH, VIEW_W, skyBandH + 1);
         }
 
-        // Setting Sun behind the distant prairie treeline
         let sunX = Math.floor(VIEW_W * 0.5);
         let sunY = (progress * (horizonY + 10)) - 10;
         ctx.fillStyle = C.SUN;
@@ -922,7 +912,6 @@
             let tx = ((tr.x + parallaxShift * 0.2) % (VIEW_W + 20) + (VIEW_W + 20)) % (VIEW_W + 20) - 10;
             const base = horizonY;
             if (tr.kind === 0) {
-                // Silhouetted Cottonwood / Bur Oak
                 ctx.fillStyle = C.PRAIRIE_SILHOUETTE;
                 ctx.fillRect(tx + Math.floor(tr.w * 0.4), base - Math.floor(tr.h * 0.45), 3, Math.floor(tr.h * 0.45));
                 ctx.fillRect(tx, base - tr.h + 3, tr.w, Math.floor(tr.h * 0.65));
@@ -931,7 +920,6 @@
                 ctx.fillStyle = C.PRAIRIE_RUST;
                 ctx.fillRect(tx + 3, base - tr.h + 1, Math.max(2, Math.floor(tr.w * 0.45)), 3);
             } else if (tr.kind === 1) {
-                // Tapered Prairie Aspen / Poplar
                 ctx.fillStyle = C.PRAIRIE_SILHOUETTE;
                 ctx.fillRect(tx + 2, base - Math.floor(tr.h * 0.7), tr.w - 4, Math.floor(tr.h * 0.7));
                 ctx.fillStyle = C.PRAIRIE_CROWN;
@@ -939,7 +927,6 @@
                 ctx.fillStyle = C.PRAIRIE_RUST;
                 ctx.fillRect(tx + 5, base - tr.h - 2, Math.max(2, tr.w - 10), 4);
             } else {
-                // Low Fall Prairie Scrub & Golden-Rust Brush
                 ctx.fillStyle = C.PRAIRIE_SILHOUETTE;
                 ctx.fillRect(tx, base - Math.floor(tr.h * 0.55), tr.w + 2, Math.floor(tr.h * 0.55));
                 ctx.fillStyle = C.PRAIRIE_RUST;
@@ -947,14 +934,12 @@
             }
         });
 
-        // Near-bank shoreline shrubs
         horizonShrubs.forEach(s => {
             let sx = ((s.x + parallaxShift * 0.35) % VIEW_W + VIEW_W) % VIEW_W;
             ctx.fillStyle = C.DISTANT_SHRUB; ctx.fillRect(sx, horizonY - s.h, s.w, s.h);
             ctx.fillStyle = C.SHRUB_HIGHLIGHT; ctx.fillRect(sx + 1, horizonY - s.h + 1, Math.max(1, s.w - 2), 2);
         });
 
-        // Pond Water
         ctx.fillStyle = C.WATER;
         ctx.fillRect(0, horizonY, VIEW_W, VIEW_H - horizonY);
 
@@ -971,9 +956,8 @@
         }
     }
 
-    // --- NOCTURNAL WOODLAND & FOREST BACKDROP (Li Bwaa: 3-Row Sky + Horizon + Extra Ground Layer) ---
+    // --- NOCTURNAL WOODLAND & FOREST BACKDROP (Li Bwaa) ---
     function drawWoodlandBackdrop(progress) {
-        // Sky strictly occupies the top 3 rows (Rows 0, 1, 2: Upper, Mid, Lower Sky)
         const horizonY = Math.floor(3 * TILE_H);
         const skyBandH = Math.ceil(horizonY / 3);
 
@@ -986,7 +970,6 @@
             ctx.fillRect(0, i * skyBandH, VIEW_W, skyBandH + 1);
         }
 
-        // Twinkling twilight stars in the 3 sky rows
         nightStars.forEach(st => {
             if ((Math.floor(frame / 30) + st.twinkle) % 3 !== 0) {
                 ctx.fillStyle = 'rgba(234, 236, 238, 0.35)';
@@ -994,7 +977,6 @@
             }
         });
 
-        // Moon sweeping horizontally across the 3-row night sky
         const moonX = Math.floor(14 + progress * (VIEW_W - 28));
         const moonArc = Math.sin(progress * Math.PI) * Math.round(horizonY * 0.14);
         const moonY = Math.floor(horizonY * 0.44 - moonArc);
@@ -1008,7 +990,6 @@
         ctx.fillRect(moonX - 3, moonY - 2, 2, 2);
         ctx.fillRect(moonX + 2, moonY + 1, 3, 2);
 
-        // Drifting nocturnal fog bands across sky & treeline horizon
         const fogShift1 = (frame * 0.14) % (VIEW_W + 90);
         const fogShift2 = (frame * 0.09) % (VIEW_W + 110);
         ctx.fillStyle = 'rgba(180, 200, 215, 0.09)';
@@ -1017,7 +998,6 @@
         ctx.fillStyle = 'rgba(165, 150, 205, 0.08)';
         ctx.fillRect(VIEW_W - fogShift2, Math.floor(horizonY * 0.50), 100, 6);
 
-        // Distant Nocturnal Treeline along the Row 3 Horizon
         forestTrees.forEach(tr => {
             if (tr.isBirch) {
                 ctx.fillStyle = '#808B96';
@@ -1038,7 +1018,6 @@
             }
         });
 
-        // Extra Woodland Ground Layer (Rows 3..11) — Upper Forest Ridge + Lower Woodland Floor
         const midGroundY = Math.floor(6 * TILE_H);
         ctx.fillStyle = C.FOREST_MID;
         ctx.fillRect(0, horizonY, VIEW_W, midGroundY - horizonY);
@@ -1046,7 +1025,6 @@
         ctx.fillStyle = C.FOREST_FLOOR;
         ctx.fillRect(0, midGroundY, VIEW_W, VIEW_H - midGroundY);
 
-        // Horizon ridge seam & subtle horizontal trail lines aligned to the 12x12 rows (Rows 3..11)
         ctx.fillStyle = C.FOREST_DEEP;
         ctx.fillRect(0, horizonY, VIEW_W, 2);
         for (let r = 4; r <= 11; r++) {
@@ -1060,7 +1038,7 @@
         });
     }
 
-    // --- LAYERED WOODLAND COVER BLINDS (Spruce, Birch & 1x1 Blueberry Bushes) ---
+    // --- LAYERED WOODLAND COVER BLINDS ---
     function drawWoodlandBlind(blind) {
         const x = blind.x;
         const w = blind.w;
@@ -1110,28 +1088,23 @@
             ctx.fillStyle = '#934822';
             ctx.fillRect(x + 5, topY + 2, Math.floor(w * 0.5), 10);
         } else if (blind.type === 'BUSH') {
-            // Compact 1x1 Tile Pixel-Shaded Blueberry Bush Blind
             const bx = x + 1;
             const by = topY + 2;
             const bw = Math.max(12, w - 2);
             const bh = Math.max(12, h - 2);
 
-            // Deep shadow foliage base
             ctx.fillStyle = C.BUSH_DARK;
             ctx.fillRect(bx, by + Math.floor(bh * 0.3), bw, Math.floor(bh * 0.7));
             ctx.fillRect(bx + 2, by + 1, bw - 4, Math.floor(bh * 0.45));
 
-            // Mid-tone nocturnal blueberry foliage
             ctx.fillStyle = C.BUSH_MID;
             ctx.fillRect(bx + 1, by + Math.floor(bh * 0.25), bw - 3, Math.floor(bh * 0.55));
             ctx.fillRect(bx + 3, by + 2, bw - 6, Math.floor(bh * 0.35));
 
-            // Moonlit sage-green top leaf highlights
             ctx.fillStyle = '#2E5445';
             ctx.fillRect(bx + 3, by + 2, Math.floor(bw * 0.45), 2);
             ctx.fillRect(bx + Math.floor(bw * 0.45), by + Math.floor(bh * 0.35), Math.floor(bw * 0.35), 2);
 
-            // Pixel-Shaded Wild Blueberry Clusters (Dark Indigo base + Cobalt berry + Pale Blue specular glint)
             const berryClusters = [
                 { cx: bx + Math.floor(bw * 0.25), cy: by + Math.floor(bh * 0.35) },
                 { cx: bx + Math.floor(bw * 0.62), cy: by + Math.floor(bh * 0.28) },
@@ -1213,7 +1186,7 @@
         blocks.forEach(b => { ctx.fillStyle = b.c; ctx.fillRect(b.x, b.y, b.s, b.s); });
     }
 
-    // --- STYLIZED FRENCH SCRIPT HBC LEDGER PIXEL WORDMARK ("Sîsîp") ---
+    // --- STYLIZED FRENCH SCRIPT HBC LEDGER PIXEL WORDMARK ("Sîsîp") — NO UNDERLINE ---
     function drawFrenchScriptWordmark(cx, cy) {
         const glyphs = {
             S_CAP: [
@@ -1290,18 +1263,7 @@
             '#196F3D', '#145A32', '#0E4B28', '#0B3B24', '#082B1A', '#062013'
         ];
 
-        const lineY = startY + totalH - px;
-        const lineStartX = startX + px * 2;
-        const lineEndX = startX + totalW - px * 2;
-        ctx.fillStyle = C.BLACK;
-        ctx.fillRect(lineStartX - 1, lineY - 1, (lineEndX - lineStartX) + 3, px + 2);
-        ctx.fillStyle = C.LEDGER_GOLD;
-        ctx.fillRect(lineStartX, lineY, lineEndX - lineStartX, Math.max(1, Math.floor(px * 0.7)));
-        ctx.fillStyle = C.BLACK;
-        ctx.fillRect(lineStartX - px * 2 - 1, lineY - px - 1, px * 2 + 2, px + 2);
-        ctx.fillStyle = C.LEDGER_GOLD;
-        ctx.fillRect(lineStartX - px * 2, lineY - px, px * 2, Math.max(1, Math.floor(px * 0.7)));
-
+        // Ink drop-shadow & crisp black pixel outline
         let cursorX = startX;
         word.forEach(item => {
             const mat = item.mat;
@@ -1320,6 +1282,7 @@
             cursorX += (item.w + 1) * px;
         });
 
+        // Shaded Mallard Green calligraphic fill & specular highlights
         cursorX = startX;
         word.forEach(item => {
             const mat = item.mat;
@@ -1358,9 +1321,9 @@
         ctx.textAlign = 'center';
         ctx.font = 'bold 10px "Courier New", monospace';
         ctx.fillStyle = C.BLACK;
-        ctx.fillText('ARCADE HUNTING SIMULATOR', VIEW_W / 2 + 1, titleY + 28);
+        ctx.fillText('ARCADE HUNTING SIMULATOR', VIEW_W / 2 + 1, titleY + 26);
         ctx.fillStyle = C.SUN;
-        ctx.fillText('ARCADE HUNTING SIMULATOR', VIEW_W / 2, titleY + 27);
+        ctx.fillText('ARCADE HUNTING SIMULATOR', VIEW_W / 2, titleY + 25);
 
         if (Math.floor(frame / 25) % 2 === 0) {
             ctx.font = 'bold 12px "Courier New", monospace';
@@ -1383,17 +1346,17 @@
         ctx.textAlign = 'center';
         ctx.font = 'bold 15px "Courier New", monospace';
         ctx.fillStyle = C.SUN;
-        ctx.fillText('SELECT HUNTING GROUND', VIEW_W / 2, Math.floor(VIEW_H * 0.14));
+        ctx.fillText('SELECT HUNTING GROUND', VIEW_W / 2, Math.floor(VIEW_H * 0.16));
 
-        const cardW = Math.min(VIEW_W - 24, 216);
-        const cardH = Math.floor(VIEW_H * 0.24);
+        const cardW = Math.min(VIEW_W - 28, 212);
+        const cardH = Math.floor(VIEW_H * 0.20);
         const cardX = Math.floor((VIEW_W - cardW) / 2);
 
         LEVELS.forEach((lvl, idx) => {
             const isSel = (idx === selectedLevelIdx);
-            const cardY = Math.floor(VIEW_H * 0.21) + idx * (cardH + 10);
+            const cardY = Math.floor(VIEW_H * 0.24) + idx * (cardH + 14);
 
-            ctx.fillStyle = isSel ? 'rgba(18, 174, 162, 0.20)' : 'rgba(20, 20, 20, 0.85)';
+            ctx.fillStyle = isSel ? 'rgba(18, 174, 162, 0.22)' : 'rgba(20, 20, 20, 0.85)';
             ctx.fillRect(cardX, cardY, cardW, cardH);
 
             ctx.strokeStyle = isSel ? C.SUN : '#555555';
@@ -1401,29 +1364,25 @@
             ctx.strokeRect(cardX, cardY, cardW, cardH);
 
             ctx.textAlign = 'left';
-            ctx.font = 'bold 13px "Courier New", monospace';
+            ctx.font = 'bold 14px "Courier New", monospace';
             ctx.fillStyle = isSel ? C.SUN : '#AAAAAA';
             const prefix = isSel ? '► ' : '  ';
-            ctx.fillText(prefix + lvl.title, cardX + 8, cardY + 16);
+            ctx.fillText(prefix + lvl.title, cardX + 10, cardY + Math.floor(cardH * 0.44));
 
             ctx.font = 'bold 9px "Courier New", monospace';
             ctx.fillStyle = isSel ? C.TEAL : '#777777';
-            ctx.fillText('  ' + lvl.subtitle, cardX + 8, cardY + 29);
-
-            ctx.font = '7px "Courier New", monospace';
-            ctx.fillStyle = isSel ? C.WHITE : '#888888';
-            ctx.fillText('  ' + lvl.targets, cardX + 8, cardY + 42);
+            ctx.fillText('   ' + lvl.subtitle, cardX + 10, cardY + Math.floor(cardH * 0.78));
         });
 
         ctx.textAlign = 'center';
         ctx.font = '10px "Courier New", monospace';
         ctx.fillStyle = '#D4D0C5';
-        ctx.fillText('D-PAD: CHOOSE   •   B: TITLE', VIEW_W / 2, Math.floor(VIEW_H * 0.82));
+        ctx.fillText('D-PAD: CHOOSE   •   B: TITLE', VIEW_W / 2, Math.floor(VIEW_H * 0.80));
 
         if (Math.floor(frame / 25) % 2 === 0) {
             ctx.font = 'bold 12px "Courier New", monospace';
             ctx.fillStyle = C.TEAL;
-            ctx.fillText("PRESS 'A' TO HUNT", VIEW_W / 2, Math.floor(VIEW_H * 0.91));
+            ctx.fillText("PRESS 'A' TO HUNT", VIEW_W / 2, Math.floor(VIEW_H * 0.90));
         }
         ctx.textAlign = 'left';
     }
@@ -1444,9 +1403,11 @@
         }
     }
 
+    // True Full-Barrel Trade Gun Physics:
+    // Whole rifle pivots from the hunter's shoulder mount along the exact sightline vector toward the crosshair
     function drawFirstPersonGun() {
         const pivotX = Math.floor(VIEW_W * 0.52);
-        const pivotY = VIEW_H + 18 + gunDropY;
+        const pivotY = VIEW_H + 14 + gunDropY;
 
         const dx = gunAim.x - pivotX;
         const dy = gunAim.y - pivotY;
@@ -1454,21 +1415,23 @@
         const ux = dx / dist;
         const uy = dy / dist;
 
-        const barrelLen = Math.round(VIEW_H * 0.26) - Math.round((gunAim.y / VIEW_H) * (VIEW_H * 0.08));
+        // Dynamic barrel reach scales naturally with vertical elevation so the whole barrel angles cleanly at the target
+        const elevationFactor = 1 - (gunAim.y / VIEW_H); // 1.0 at top row, 0.0 at bottom row
+        const barrelLen = Math.round(VIEW_H * (0.20 + elevationFactor * 0.14));
         const tipX = Math.round(pivotX + ux * barrelLen);
         const tipY = Math.round(pivotY + uy * barrelLen);
 
-        const segments = 14;
+        const segments = 16;
         for (let s = segments; s >= 0; s--) {
-            const frac = s / segments;
+            const frac = s / segments; // 1 = shoulder stock at bottom, 0 = muzzle crown at guntip
             const segX = Math.round(tipX + (pivotX - tipX) * frac);
             const segY = Math.round(tipY + (pivotY - tipY) * frac);
 
-            if (frac > 0.12) {
+            if (frac > 0.14) {
                 const stockHalfW = Math.round(4 + frac * 6);
                 ctx.fillStyle = C.GUN_WOOD;
                 ctx.fillRect(segX - stockHalfW, segY - 2, stockHalfW * 2, 6);
-                if (s === 4 || s === 9) {
+                if (s === 5 || s === 11) {
                     ctx.fillStyle = C.LEDGER_GOLD;
                     ctx.fillRect(segX - stockHalfW, segY, stockHalfW * 2, 2);
                 }
@@ -1481,6 +1444,7 @@
             ctx.fillRect(segX - Math.max(1, barrelHalfW - 2), segY - 3, Math.max(2, (barrelHalfW - 2) * 2), 5);
         }
 
+        // Muzzle crown & front sight post at exact guntip
         ctx.fillStyle = C.BLACK;
         ctx.fillRect(tipX - 4, tipY - 2, 8, 4);
         ctx.fillStyle = C.WHITE;
@@ -1489,18 +1453,27 @@
         return { x: tipX, y: tipY };
     }
 
-    function drawEntity(b) {
-        let matrix = b.spriteFrames[b.animFrame];
-        let rawSine = Math.sin(frame * b.bobFreq);
-        let rowY = b.isPeeker ? b.currentY : b.y;
-        let bobY = b.dead ? 0 : (activeLevel === 'WOODS' && rowY >= 4 && !b.isPeeker ? -Math.floor(Math.abs(rawSine) * b.bobAmp) : Math.floor(rawSine * b.bobAmp));
+    // Unified helper returning exact screen-space bounding box of any entity on the 12x12 grid
+    function getEntityBounds(b) {
+        const matrix = b.spriteFrames[b.animFrame];
+        const rawSine = Math.sin(frame * b.bobFreq);
+        const rowY = b.isPeeker ? b.currentY : b.y;
+        const bobY = b.dead ? 0 : (activeLevel === 'WOODS' && rowY >= 4 && !b.isPeeker ? -Math.floor(Math.abs(rawSine) * b.bobAmp) : Math.floor(rawSine * b.bobAmp));
 
-        let drawX = b.x * TILE_W + (TILE_W / 2) - (matrix[0].length * (b.scale / 2));
-        let drawY = b.dead ? b.dropY : (rowY * TILE_H + (TILE_H / 2) - (matrix.length * (b.scale / 2)) + bobY);
+        const w = matrix[0].length * b.scale;
+        const h = matrix.length * b.scale;
+        const drawX = (b.x * TILE_W) + (TILE_W / 2) - (w / 2);
+        const drawY = b.dead ? b.dropY : ((rowY * TILE_H) + (TILE_H / 2) - (h / 2) + bobY);
+        return { drawX, drawY, w, h, rowY };
+    }
+
+    function drawEntity(b) {
+        const matrix = b.spriteFrames[b.animFrame];
+        const { drawX, drawY, w, h } = getEntityBounds(b);
 
         ctx.save();
         if (b.dir === -1) {
-            ctx.translate(drawX + matrix[0].length * b.scale, drawY);
+            ctx.translate(drawX + w, drawY);
             ctx.scale(-1, 1);
             drawSprite(0, 0, matrix, b.colorMap, b.scale);
         } else {
@@ -1511,8 +1484,8 @@
         if (b.dead && b.hitDelay > 0) {
             ctx.fillStyle = b.colorMap[1] || C.WHITE;
             let p = 20 - b.hitDelay;
-            let cx = drawX + (matrix[0].length * b.scale) / 2;
-            let cy = drawY + (matrix.length * b.scale) / 2;
+            let cx = drawX + w / 2;
+            let cy = drawY + h / 2;
 
             ctx.fillRect(cx - p - 4, cy - p - 4, 4, 2); ctx.fillRect(cx + p + 2, cy - p - 2, 2, 2);
             ctx.fillRect(cx - p - 2, cy + p + 2, 2, 2); ctx.fillRect(cx + p + 4, cy + p + 4, 4, 2);
@@ -1549,11 +1522,21 @@
             let muzzlePos = drawFirstPersonGun();
             if (flashEffect > 0) drawMuzzleFlash(muzzlePos.x, muzzlePos.y);
 
-            let cx = Math.floor((crosshair.x * TILE_W) + (TILE_W / 2));
-            let cy = Math.floor((crosshair.y * TILE_H) + (TILE_H / 2));
+            // 12x12 Fine-Aiming Crosshair + subtle tile corner brackets so player sees exact tile alignment
+            const tileLeft = Math.floor(crosshair.x * TILE_W);
+            const tileTop = Math.floor(crosshair.y * TILE_H);
+            const cx = Math.floor(tileLeft + TILE_W / 2);
+            const cy = Math.floor(tileTop + TILE_H / 2);
+
             ctx.fillStyle = isLoaded ? 'rgba(220, 28, 36, 0.65)' : 'rgba(255, 255, 255, 0.35)';
+            // Center cross
             ctx.fillRect(cx - 1, cy - 4, 2, 8);
             ctx.fillRect(cx - 4, cy - 1, 8, 2);
+            // Subtle 2px corner ticks showing exact 12x12 tile bounds
+            ctx.fillRect(tileLeft + 1, tileTop + 1, 2, 1);
+            ctx.fillRect(tileLeft + Math.floor(TILE_W) - 3, tileTop + 1, 2, 1);
+            ctx.fillRect(tileLeft + 1, tileTop + Math.floor(TILE_H) - 2, 2, 1);
+            ctx.fillRect(tileLeft + Math.floor(TILE_W) - 3, tileTop + Math.floor(TILE_H) - 2, 2, 1);
         }
 
         ctx.font = "bold 12px Courier New";
@@ -1590,10 +1573,11 @@
         }
     }
 
+    // Only block a shot if a cover blind is strictly in front of the target (blind.depth > targetDepth)
     function isShotBlockedByBlind(aimX, aimY, targetDepth, targetIsPeeker) {
         if (activeLevel !== 'WOODS' || targetIsPeeker) return false;
         for (let bl of forestBlinds) {
-            if (bl.depth >= targetDepth) {
+            if (bl.depth > targetDepth) {
                 if (aimX >= bl.x && aimX <= bl.x + bl.w && aimY >= bl.topY && aimY <= bl.bottomY) {
                     return true;
                 }
@@ -1614,19 +1598,28 @@
         flashEffect = 15;
         updateUI();
 
-        const aimX = (crosshair.x * TILE_W) + (TILE_W / 2);
-        const aimY = (crosshair.y * TILE_H) + (TILE_H / 2);
+        // Crosshair tile bounding box on the 12x12 grid (with generous 2px edge forgiveness)
+        const tileLeft = crosshair.x * TILE_W - 2;
+        const tileRight = (crosshair.x + 1) * TILE_W + 2;
+        const tileTop = crosshair.y * TILE_H - 2;
+        const tileBottom = (crosshair.y + 1) * TILE_H + 2;
+        const aimX = (crosshair.x + 0.5) * TILE_W;
+        const aimY = (crosshair.y + 0.5) * TILE_H;
+
         let anyHit = false;
         let blockedByCover = false;
 
         entities.forEach(b => {
             if (b.dead) return;
-            const activeRow = b.isPeeker ? Math.round(b.currentY) : b.y;
-            const radius = b.hitRadius || 0.9;
-            // Synchronized 12x12 row/column hit check across full sprite footprint
-            if (activeRow === crosshair.y && Math.abs(b.x - crosshair.x) <= radius) {
+            const { drawX, drawY, w, h, rowY } = getEntityBounds(b);
+            const activeRow = Math.round(rowY);
+
+            // Check exact AABB overlap between crosshair's 12x12 tile and the animal's visual sprite box
+            const overlapsX = (drawX + w >= tileLeft) && (drawX <= tileRight);
+            const overlapsY = (activeRow === crosshair.y) || ((drawY + h >= tileTop) && (drawY <= tileBottom));
+
+            if (overlapsX && overlapsY) {
                 if (b.isPeeker && b.currentY < b.peekY - 0.35) {
-                    // Still tucked up inside branches
                     blockedByCover = true;
                 } else if (isShotBlockedByBlind(aimX, aimY, b.depth, b.isPeeker)) {
                     blockedByCover = true;
@@ -1634,13 +1627,13 @@
                     anyHit = true;
                     b.dead = true;
                     b.hitDelay = 20;
-                    b.dropY = activeRow * TILE_H;
+                    b.dropY = drawY;
                     score += b.pts;
                     stats[b.slot]++;
                     popups.push({
                         text: `+${b.pts}`,
-                        x: b.x * TILE_W + (TILE_W * 0.25),
-                        y: activeRow * TILE_H + (TILE_H * 0.5),
+                        x: Math.max(6, Math.min(VIEW_W - 44, drawX + w * 0.25)),
+                        y: Math.max(24, drawY),
                         life: 1.0
                     });
                 }
@@ -1746,7 +1739,9 @@
 
     let lastBtnATime = 0;
     let lastBtnBTime = 0;
+    let lastMenuNavTime = 0;
     const BTN_DEBOUNCE_MS = 110;
+    const MENU_DEBOUNCE_MS = 160;
     const HOLD_WINDOW_MS = 145;
 
     function releaseDir(dir) {
@@ -1767,10 +1762,18 @@
     function handleDirSignal(dir, isPulse) {
         if (isPaused) return;
 
+        // Crisp, non-sticky directional selection on Level Select screen
         if (state === 'SELECT') {
-            if (dir === 'UP' || dir === 'DOWN') {
-                selectedLevelIdx = (selectedLevelIdx + 1) % LEVELS.length;
-                playMenuBlip(320);
+            const now = Date.now();
+            if (now - lastMenuNavTime < MENU_DEBOUNCE_MS) return;
+            if (dir === 'UP' && selectedLevelIdx !== 0) {
+                selectedLevelIdx = 0;
+                lastMenuNavTime = now;
+                playMenuBlip(360);
+            } else if (dir === 'DOWN' && selectedLevelIdx !== 1) {
+                selectedLevelIdx = 1;
+                lastMenuNavTime = now;
+                playMenuBlip(300);
             }
             return;
         }
