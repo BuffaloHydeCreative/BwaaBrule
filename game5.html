@@ -148,7 +148,6 @@
   
   let VIEW_W = 320;
   let VIEW_H = 240;
-  const TILE = 24; 
   const HUD_HEIGHT = 24;
 
   // Game states: 'TITLE', 'CUTSCENE', 'PLAYING', 'TRANSITION', 'LEVEL_POPUP', 'GAMEOVER'
@@ -157,15 +156,18 @@
   let peltsCollected = 0;
   let shakeFrames = 0;
   let frame = 0;
-  let bgScrollY = 0;
   let isPaused = false;
   let cutsceneScroll = 0;
+  let worldScrollDist = 0;
   
-  let player = { x: 144, y: 180, dead: false, w: 32, h: 32 };
+  // Player dimensions (20x24 matrix at scale 2 = 40x48 rendered; tight hitbox inside)
+  let player = { x: 140, y: 175, dead: false, w: 40, h: 48, inCreek: false, inBrush: false };
   let obstacles = [];
+  let terrainFeatures = []; // Creeks, Rocky Ledges, Dense Timber Zones
   let buffaloes = [];
-  let groundDetails = [];
-  let baseSpeed = 1.0;
+  let groundPatches = [];
+  let baseSpeed = 1.05;
+  let effectiveSpeed = 1.05;
 
   function resizeViewport() {
     const w = window.innerWidth;
@@ -179,11 +181,11 @@
     cvs.height = VIEW_H;
     ctx.imageSmoothingEnabled = false;
 
-    if (player.y > VIEW_H - player.h - 10) {
-      player.y = VIEW_H - player.h - 10;
+    if (player.y > VIEW_H - player.h - 6) {
+      player.y = VIEW_H - player.h - 6;
     }
-    if (player.x > VIEW_W - player.w) {
-      player.x = VIEW_W - player.w - 10;
+    if (player.x > VIEW_W - player.w - 6) {
+      player.x = VIEW_W - player.w - 6;
     }
   }
   
@@ -191,52 +193,48 @@
   resizeViewport();
 
   // ==========================================
-  // 16-BIT SNES BIOME PALETTES & LORE
+  // 16-BIT SNES WILD BIOME PALETTES & LORE
   // ==========================================
   const BIOMES = [
     { 
       name: "ROCKY FOOTHILLS", 
-      bg: '#4e5d66', 
-      bgAlt: '#435159', 
-      patch: '#667882', 
-      patchDark: '#36424a',
-      track: '#5e5045',
-      trackEdge: '#473c33',
+      bg: '#59656b', 
+      patch1: '#6e7b82', 
+      patch2: '#465054', 
+      tuft: '#7c8a62',
+      tuftDark: '#394238',
       type: 'mountain',
-      desc: "THE WESTERN FOOTHILLS! NAVIGATE THE BOULDER-STREWN PASSES AS THE HERD THUNDERS EAST."
+      desc: "THE WESTERN FOOTHILLS! WATCH FOR STEPPED ROCK LEDGES JUTTING FROM THE SLOPES AND FIND THE SHALLOW FORD."
     },
     { 
       name: "DRY PRAIRIE", 
-      bg: '#8a643d', 
-      bgAlt: '#7d5935', 
-      patch: '#a67b4e', 
-      patchDark: '#634527',
-      track: '#735334',
-      trackEdge: '#593f26',
+      bg: '#8c6943', 
+      patch1: '#a37c52', 
+      patch2: '#735434', 
+      tuft: '#b59259',
+      tuftDark: '#5c4125',
       type: 'desert',
-      desc: "THE SUN-BAKED PLAINS! DODGE SCRUB BRUSH AND DARTING FOXES ACROSS THE DUSTY TRAIL."
+      desc: "THE SUN-BAKED PLAINS! CROSS WINDING PRAIRIE CREEKS AT THEIR CENTER SHALLOWS AND DODGE DARTING FOXES."
     },
     { 
       name: "RED RIVER VALLEY", 
-      bg: '#9e7c24', 
-      bgAlt: '#91711e', 
-      patch: '#bd9632', 
-      patchDark: '#755a14',
-      track: '#785a26',
-      trackEdge: '#5c4319',
+      bg: '#9c7b27', 
+      patch1: '#b59033', 
+      patch2: '#80631b', 
+      tuft: '#cfa83e',
+      tuftDark: '#695012',
       type: 'grass',
-      desc: "THE GOLDEN TALLGRASS! THE HERD RACES THROUGH THICK SAVANNA GRASSES AND SCATTERED OAKS."
+      desc: "THE GOLDEN TALLGRASS! FORD RUSHING VALLEY STREAMS AT THE CENTER AND THREAD THROUGH OAK GROVES."
     },
     { 
       name: "EASTERN WOODLANDS", 
-      bg: '#23421a', 
-      bgAlt: '#1d3815', 
-      patch: '#315926', 
-      patchDark: '#14290e',
-      track: '#543d2b',
-      trackEdge: '#3d2b1d',
+      bg: '#26471c', 
+      patch1: '#345e27', 
+      patch2: '#1b3313', 
+      tuft: '#487d36',
+      tuftDark: '#12240c',
       type: 'forest',
-      desc: "LAKE OF THE WOODS! WEAVE THROUGH DENSE PINE AND BIRCH TIMBER AS THE CHASE INTENSIFIES."
+      desc: "LAKE OF THE WOODS! SLALOM THROUGH THICK TIMBER STANDS OR THREAD THE NARROW CLEARINGS."
     }
   ];
 
@@ -258,114 +256,137 @@
     }
   };
 
-  // Top-down SNES Métis Buffalo Hunter & Horse (16x16 shaded)
+  // Sculpted Top-Down Mounted Buffalo Runner (20x24 SNES shaded - distinct horse head, neck, shoulders, saddle, rider shoulders/hat, and animated legs)
   const PAL_PLAYER = {
-    1: '#120e0b', // Outline
-    2: '#7a4b2a', // Horse Bay Coat
-    3: '#54321a', // Horse Shadow
-    4: '#1c1816', // Horse Mane/Tail
-    5: '#0f6f9e', // Métis Capote Blue
-    6: '#094969', // Capote Shading
-    7: '#ad1c21', // L'Assomption Sash Red
-    8: '#f7c844', // Sash Gold / Hat Band
-    9: '#d4a373', // Hunter Skin
-    10: '#2d241e' // Hat Dark Felt
+    1: '#120d09', // Crisp Dark Outline
+    2: '#8f5932', // Warm Bay Horse Coat
+    3: '#61391d', // Horse Muscle Shading
+    4: '#b37546', // Horse Shoulder/Hip Highlight
+    5: '#1c1714', // Jet Black Mane, Tail & Hooves
+    6: '#0f6f9e', // Métis Capote Blue
+    7: '#084766', // Capote Fold Shading
+    8: '#ad1c21', // L'Assomption Sash Crimson
+    9: '#f7c844', // Sash Gold & Brass Tack
+    10: '#dba874', // Hunter Hands & Neck
+    11: '#2e241d'  // Felt Hunter Hat
   };
 
   const sprPlayerAnim = [
-    [ // Frame 1: Gallop Stride Extended
-      [0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0],
-      [0,0,0,0,0,1,2,2,2,2,1,0,0,0,0,0],
-      [0,0,0,0,1,2,4,2,2,4,2,1,0,0,0,0],
-      [0,0,0,1,2,2,4,10,10,4,2,2,1,0,0,0],
-      [0,0,1,3,2,10,10,8,8,10,10,2,3,1,0,0],
-      [0,1,3,2,1,5,5,9,9,5,5,1,2,3,1,0],
-      [0,1,2,1,5,5,6,5,5,6,5,5,1,2,1,0],
-      [1,3,2,1,5,6,7,8,7,8,6,5,1,2,3,1],
-      [1,2,2,1,5,5,7,7,7,7,5,5,1,2,2,1],
-      [0,1,3,2,1,6,5,5,5,5,6,1,2,3,1,0],
-      [0,1,2,2,2,1,1,1,1,1,1,2,2,2,1,0],
-      [0,0,1,3,2,2,2,4,4,2,2,2,3,1,0,0],
-      [0,1,3,1,3,2,4,4,4,4,2,3,1,3,1,0],
-      [0,1,1,0,1,3,1,4,4,1,3,1,0,1,1,0],
-      [0,0,0,0,0,1,0,1,1,0,1,0,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+    [ // Frame 1: Extended Gallop (Front Left / Back Right reaching)
+      [0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,1,4,2,2,4,1,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,1,2,2,2,2,2,2,1,0,0,0,0,0,0],
+      [0,0,0,0,0,1,5,1,2,4,4,2,1,5,1,0,0,0,0,0],
+      [0,0,0,0,0,1,5,2,2,2,2,2,2,5,1,0,0,0,0,0],
+      [0,0,0,0,1,3,2,5,2,2,2,2,5,2,3,1,0,0,0,0],
+      [0,0,0,1,3,4,2,5,5,9,9,5,5,2,4,3,1,0,0,0],
+      [0,0,1,5,3,2,2,1,11,11,11,11,1,2,2,3,5,1,0,0],
+      [0,0,1,1,3,2,1,11,11,9,9,11,11,1,2,3,1,1,0,0],
+      [0,0,0,1,2,1,6,6,11,11,11,11,6,6,1,2,1,0,0,0],
+      [0,0,1,3,2,1,6,7,6,10,10,6,7,6,1,2,3,1,0,0],
+      [0,0,1,2,2,1,6,6,8,9,8,9,6,6,1,2,2,1,0,0],
+      [0,0,1,3,2,1,7,6,8,8,8,8,6,7,1,2,3,1,0,0],
+      [0,0,0,1,2,2,1,6,7,6,6,7,6,1,2,2,1,0,0,0],
+      [0,0,0,1,3,4,2,1,1,1,1,1,1,2,4,3,1,0,0,0],
+      [0,0,0,1,3,2,2,2,2,5,5,2,2,2,2,3,1,0,0,0],
+      [0,0,0,0,1,3,2,2,5,5,5,5,2,2,3,1,0,0,0],
+      [0,0,0,0,1,3,3,2,5,5,5,5,2,3,3,1,0,0,0],
+      [0,0,0,0,0,1,3,1,5,5,5,5,1,3,1,0,0,0,0],
+      [0,0,0,0,0,1,5,1,1,5,5,1,1,5,1,0,0,0,0],
+      [0,0,0,0,0,0,1,0,0,5,5,0,0,1,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
     ],
-    [ // Frame 2: Gallop Stride Gathered
-      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-      [0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0],
-      [0,0,0,0,0,1,2,2,2,2,1,0,0,0,0,0],
-      [0,0,0,0,1,2,4,2,2,4,2,1,0,0,0,0],
-      [0,0,0,1,2,2,4,10,10,4,2,2,1,0,0,0],
-      [0,0,1,3,2,10,10,8,8,10,10,2,3,1,0,0],
-      [0,0,1,2,1,5,5,9,9,5,5,1,2,1,0,0],
-      [0,1,3,2,1,5,6,5,5,6,5,5,1,2,3,1],
-      [0,1,2,2,1,5,6,7,8,7,8,6,5,1,2,1],
-      [0,0,1,3,2,1,5,7,7,7,7,5,1,2,3,1],
-      [0,0,1,2,2,1,6,5,5,5,5,6,1,2,2,1],
-      [0,0,0,1,3,2,1,1,1,1,1,1,2,3,1,0],
-      [0,0,0,1,3,2,2,4,4,2,2,2,3,1,0,0],
-      [0,0,0,0,1,1,3,4,4,3,1,1,0,0,0,0],
-      [0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+    [ // Frame 2: Gathered Gallop Stride (Alternate Legs & Flowing Mane/Tail)
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,1,4,2,2,4,1,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,1,2,2,2,2,2,2,1,0,0,0,0,0,0],
+      [0,0,0,0,0,1,5,1,2,4,4,2,1,5,1,0,0,0,0,0],
+      [0,0,0,0,0,1,5,2,2,2,2,2,2,5,1,0,0,0,0,0],
+      [0,0,0,0,1,3,2,5,2,2,2,2,5,2,3,1,0,0,0,0],
+      [0,0,0,1,3,4,2,5,5,9,9,5,5,2,4,3,1,0,0,0],
+      [0,0,0,1,3,2,2,1,11,11,11,11,1,2,2,3,1,0,0,0],
+      [0,0,1,5,3,2,1,11,11,9,9,11,11,1,2,3,5,1,0,0],
+      [0,0,1,1,2,1,6,6,11,11,11,11,6,6,1,2,1,1,0,0],
+      [0,0,0,1,2,1,6,7,6,10,10,6,7,6,1,2,1,0,0,0],
+      [0,0,0,1,2,1,6,6,8,9,8,9,6,6,1,2,1,0,0,0],
+      [0,0,0,1,3,2,1,6,7,6,6,7,6,1,2,3,1,0,0,0],
+      [0,0,0,1,3,4,2,1,1,1,1,1,1,2,4,3,1,0,0,0],
+      [0,0,0,0,1,3,2,2,2,5,5,2,2,2,3,1,0,0,0,0],
+      [0,0,0,0,1,3,2,2,5,5,5,5,2,2,3,1,0,0,0],
+      [0,0,0,0,0,1,3,2,5,5,5,5,2,3,1,0,0,0,0,0],
+      [0,0,0,0,0,1,5,1,5,5,5,5,1,5,1,0,0,0,0,0],
+      [0,0,0,0,0,0,1,0,1,5,5,1,0,1,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,1,5,5,1,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
     ]
   ];
 
-  // Top-down Rumbling Buffalo (12x14 shaded)
+  // Anatomically Sculpted Top-Down Buffalo (16x18 shaded - curved ivory horns, massive shaggy shoulder hump, tapered dark hindquarters, hooves)
+  // Strict deep brown hide & ivory horns (zero red markings)
   const PAL_BUFFALO_TOP = {
-    1: '#140e0a', // Outline
-    2: '#4a3222', // Shaggy Shoulder Hump
-    3: '#332115', // Dark Hindquarters
-    4: '#694832', // Fur Highlight
-    5: '#e6dec8'  // Curved Horns
+    1: '#120c08', // Dark Outline
+    2: '#593b27', // Shaggy Shoulder Hump (Rich Deep Brown)
+    3: '#362215', // Tapered Hindquarters (Dark Umber Brown)
+    4: '#785238', // Fur Ridge Highlight
+    5: '#ede5cf'  // Curved Ivory Horns
   };
   const sprBuffaloTop = [
-    [0,0,0,1,1,1,1,1,1,0,0,0],
-    [0,0,1,2,4,2,2,4,2,1,0,0],
-    [0,5,1,2,2,4,4,2,2,1,5,0],
-    [5,1,2,4,2,2,2,2,4,2,1,5],
-    [0,1,2,2,4,4,4,4,2,2,1,0],
-    [1,2,2,2,2,2,2,2,2,2,2,1],
-    [1,2,3,2,2,2,2,2,2,3,2,1],
-    [1,3,3,3,2,2,2,2,3,3,3,1],
-    [0,1,3,3,3,3,3,3,3,3,1,0],
-    [0,1,3,1,3,3,3,3,1,3,1,0],
-    [0,0,1,0,1,3,3,1,0,1,0,0],
-    [0,0,0,0,0,1,1,0,0,0,0,0]
+    [0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0],
+    [0,0,0,5,1,2,2,4,4,2,2,1,5,0,0,0],
+    [0,0,5,5,1,2,4,2,2,4,2,1,5,5,0,0],
+    [0,0,5,1,2,2,4,4,4,4,2,2,1,5,0,0],
+    [0,0,0,1,2,4,2,2,2,2,4,2,1,0,0,0],
+    [0,0,1,2,2,2,4,4,4,4,2,2,2,1,0,0],
+    [0,1,2,2,4,2,2,2,2,2,2,4,2,2,1,0],
+    [0,1,2,2,2,2,4,4,4,4,2,2,2,2,1,0],
+    [0,1,2,3,2,2,2,2,2,2,2,2,3,2,1,0],
+    [0,0,1,3,3,2,2,3,3,2,2,3,3,1,0,0],
+    [0,0,1,3,3,3,3,3,3,3,3,3,3,1,0,0],
+    [0,0,0,1,3,3,3,3,3,3,3,3,1,0,0,0],
+    [0,0,0,1,3,3,3,3,3,3,3,3,1,0,0,0],
+    [0,0,0,1,3,1,3,3,3,3,1,3,1,0,0,0],
+    [0,0,0,0,1,0,1,3,3,1,0,1,0,0,0,0],
+    [0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
   ];
 
-  // Side-Profile Buffalo for Title Screen & Cutscene (16x12 SNES Shaded)
+  // Side-Profile Buffalo for Title Screen & Cutscene (18x12 SNES Shaded - strictly deep brown hide & ivory horns, zero red markings)
   const PAL_BUFFALO_SIDE = {
-    1: '#120d0a', // Outline
-    2: '#4f3524', // Shaggy Hump Fur
-    3: '#362317', // Rear Body Fur
-    4: '#6e4c36', // Highlight Fur
-    5: '#ede6d3', // Ivory Horn
-    6: '#ad1c21'  // Eye Glint
+    1: '#120c08', // Dark Outline
+    2: '#593b27', // Shaggy Hump Fur (Deep Brown)
+    3: '#362215', // Rear Body Fur (Dark Brown)
+    4: '#785238', // Fur Highlight
+    5: '#ede5cf'  // Ivory Horn
   };
   const sprBuffaloSide = [
-    [0,0,0,0,0,0,1,1,1,1,1,0,0,0,0,0],
-    [0,0,0,0,1,1,2,4,2,2,2,1,5,0,0,0],
-    [0,0,1,1,3,2,2,2,4,2,2,2,1,5,0,0],
-    [0,1,3,3,3,2,4,2,2,2,2,2,2,1,0,0],
-    [1,3,3,3,3,2,2,2,2,2,6,2,2,2,1,0],
-    [1,3,3,3,3,3,2,2,2,2,2,2,2,2,1,0],
-    [0,1,3,3,3,3,3,2,2,2,2,2,2,1,0,0],
-    [0,0,1,3,1,1,3,3,2,2,1,2,1,0,0,0],
-    [0,0,1,3,1,0,1,3,1,1,2,1,0,0,0,0],
-    [0,0,1,1,0,0,0,1,1,0,1,1,0,0,0,0]
+    [0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0],
+    [0,0,0,0,0,1,1,2,4,2,2,2,2,1,5,0,0,0],
+    [0,0,1,1,1,3,2,2,2,4,2,2,2,2,1,5,0,0],
+    [0,1,3,3,3,3,2,4,2,2,2,2,2,2,2,1,0,0],
+    [1,3,3,3,3,3,2,2,2,2,2,1,2,2,2,2,1,0],
+    [1,3,3,3,3,3,3,2,2,2,2,2,2,2,2,2,1,0],
+    [0,1,3,3,3,3,3,3,2,2,2,2,2,2,2,1,0,0],
+    [0,0,1,3,3,1,1,3,3,2,2,2,1,2,1,0,0,0],
+    [0,0,1,3,1,0,0,1,3,1,1,2,2,1,0,0,0,0],
+    [0,0,1,1,0,0,0,0,1,1,0,1,1,0,0,0,0,0]
   ];
 
-  // Side-Profile Mounted Hunter for Title Screen & Cutscene (16x14 SNES Shaded)
+  // Side-Profile Mounted Hunter for Title Screen & Cutscene (16x12 SNES Shaded)
   const PAL_HUNTER_SIDE = {
     1: '#120d0a', // Outline
-    2: '#8c5832', // Horse Coat
-    3: '#5e391e', // Horse Shadow
+    2: '#8f5932', // Horse Coat
+    3: '#61391d', // Horse Shadow
     4: '#1c1816', // Mane/Tail/Hat
     5: '#0f6f9e', // Métis Blue Capote
     6: '#ad1c21', // Red Sash
     7: '#f7c844', // Gold Accent
-    8: '#d4a373'  // Face
+    8: '#dba874'  // Face
   };
   const sprHunterSide = [
     [0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0],
@@ -473,16 +494,13 @@
             const px = curX + c * scale;
             const py = startY + r * scale;
             
-            // Deep drop shadow
             ctx.fillStyle = '#1c0507';
             ctx.fillRect(px + scale, py + scale, scale, scale);
             
-            // Outline
             ctx.fillStyle = '#000000';
             ctx.fillRect(px - 1, py, scale + 2, scale);
             ctx.fillRect(px, py - 1, scale, scale + 2);
 
-            // SNES Vertical Gradient Fill (Gold -> Blaze Orange -> Crimson)
             if (r < 2) ctx.fillStyle = '#F7C844';
             else if (r < 5) ctx.fillStyle = '#FB6604';
             else ctx.fillStyle = '#AD1C21';
@@ -498,22 +516,18 @@
   // SNES RPG DIALOGUE BOX HELPER
   // ==========================================
   function drawSNESWindow(x, y, w, h) {
-    // Outer drop shadow
     ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
     ctx.fillRect(x + 4, y + 4, w, h);
 
-    // Deep Navy/Indigo SNES Box Fill
     ctx.fillStyle = '#182238';
     ctx.fillRect(x, y, w, h);
 
-    // Outer White Pixel Border
     ctx.fillStyle = '#F4F4F4';
     ctx.fillRect(x, y, w, 2);
     ctx.fillRect(x, y + h - 2, w, 2);
     ctx.fillRect(x, y, 2, h);
     ctx.fillRect(x + w - 2, y, 2, h);
 
-    // Inner Gold/Teal Trim
     ctx.fillStyle = '#F7C844';
     ctx.fillRect(x + 3, y + 3, w - 6, 1);
     ctx.fillRect(x + 3, y + h - 4, w - 6, 1);
@@ -539,54 +553,158 @@
   }
 
   // ==========================================
-  // GAMEPLAY SPAWNING & LEVEL PROGRESSION
+  // WILD TERRAIN FEATURES & NATURAL SPAWNING
   // ==========================================
-  function initGroundDetails() {
-    groundDetails = [];
-    for (let i = 0; i < 36; i++) {
-      groundDetails.push({
+  function initGroundPatches() {
+    groundPatches = [];
+    for (let i = 0; i < 65; i++) {
+      groundPatches.push({
         x: Math.random() * VIEW_W,
         y: Math.random() * VIEW_H,
-        w: Math.random() > 0.5 ? 6 : 4,
-        h: Math.random() > 0.5 ? 4 : 2,
-        tone: Math.random() > 0.4 ? 'light' : 'dark'
+        w: 4 + Math.floor(Math.random() * 14),
+        h: 3 + Math.floor(Math.random() * 8),
+        kind: i % 3 // 0: patch1, 1: patch2, 2: grass tuft
       });
     }
   }
 
-  function spawnObstacle() {
-    let spawnRate = Math.max(46, 115 - (level * 9)); 
-    if (frame % spawnRate === 0) {
-      let bIdx = (level - 1) % BIOMES.length;
-      let pool = [];
-      if (BIOMES[bIdx].type === 'mountain') pool = ['rock','rock','rock','shrub','fox'];
-      else if (BIOMES[bIdx].type === 'desert') pool = ['rock','rock','shrub','shrub','fox'];
-      else if (BIOMES[bIdx].type === 'grass') pool = ['rock','shrub','shrub','tree','fox'];
-      else if (BIOMES[bIdx].type === 'forest') pool = ['rock','shrub','tree','tree','tree','fox'];
+  function spawnTerrainFeature() {
+    let bIdx = (level - 1) % BIOMES.length;
+    let bType = BIOMES[bIdx].type;
 
-      let type = pool[Math.floor(Math.random() * pool.length)];
-      if (Math.random() < 0.28) type = 'pelt';
+    // 1. Rocky Foothills: Impassable stepped rocky ledges jutting from left/right slopes
+    if (bType === 'mountain') {
+      let ledgeW = 72 + Math.floor(Math.random() * 44);
+      let fromLeft = Math.random() > 0.5;
+      let lx = fromLeft ? 0 : (VIEW_W - ledgeW);
+      let lh = 26;
+      terrainFeatures.push({
+        kind: 'LEDGE',
+        x: lx,
+        y: -36,
+        w: ledgeW,
+        h: lh,
+        fromLeft: fromLeft
+      });
+      // Scatter natural talus rocks below the ledge so it integrates organically
+      obstacles.push({
+        x: fromLeft ? ledgeW - 18 : lx - 6,
+        y: -12,
+        dx: 0,
+        dy: 0,
+        type: 'rock',
+        w: 24,
+        h: 18,
+        scale: 3,
+        dead: false
+      });
+    }
 
-      let x = 12 + Math.random() * (VIEW_W - 64);
-      let dx = (type === 'fox') ? (Math.random() > 0.5 ? 0.45 : -0.45) : 0;
-      let dy = baseSpeed + (Math.random() * 0.35);
+    // 2. Dry Prairie & Red River Valley: Winding creeks with a shallow passable ford near center
+    if (bType === 'desert' || bType === 'grass') {
+      let fordCenter = Math.floor(VIEW_W * (0.42 + Math.random() * 0.16));
+      let fordHalfW = 34; // 68px wide passable shallow ford
+      terrainFeatures.push({
+        kind: 'CREEK',
+        x: 0,
+        y: -36,
+        w: VIEW_W,
+        h: 26,
+        fordStart: fordCenter - fordHalfW,
+        fordEnd: fordCenter + fordHalfW
+      });
+      // Place riparian shrubs & rocks along the creek banks for natural integration
+      let bankX = Math.random() > 0.5 ? Math.max(8, fordCenter - fordHalfW - 34) : Math.min(VIEW_W - 34, fordCenter + fordHalfW + 10);
+      obstacles.push({
+        x: bankX,
+        y: -52,
+        dx: 0,
+        dy: 0,
+        type: 'shrub',
+        w: 24,
+        h: 18,
+        scale: 3,
+        dead: false
+      });
+    }
 
-      let w = 24, h = 18, scale = 3; 
-      if (type === 'tree') { w = 40; h = 40; scale = 4; } 
-      if (type === 'shrub') { w = 24; h = 18; scale = 3; }
-      if (type === 'fox') { w = 24; h = 18; scale = 3; }
-      if (type === 'pelt') { w = 20; h = 18; scale = 2; } 
+    // 3. Eastern Woodlands: Thick timber woods with a slalom clearing corridor
+    if (bType === 'forest') {
+      let clearingCenter = Math.floor(VIEW_W * (0.28 + Math.random() * 0.44));
+      let clearingHalfW = 42;
+      terrainFeatures.push({
+        kind: 'WOODS',
+        x: 0,
+        y: -52,
+        w: VIEW_W,
+        h: 44,
+        clearStart: clearingCenter - clearingHalfW,
+        clearEnd: clearingCenter + clearingHalfW
+      });
+      // Embed solid pine trees inside the thick woodland flanks so player slaloms or slows through brush
+      let leftTreeX = Math.max(4, clearingCenter - clearingHalfW - 44);
+      let rightTreeX = Math.min(VIEW_W - 44, clearingCenter + clearingHalfW + 6);
+      if (clearingCenter - clearingHalfW > 32) {
+        obstacles.push({ x: leftTreeX, y: -50, dx: 0, dy: 0, type: 'tree', w: 40, h: 40, scale: 4, dead: false });
+      }
+      if (VIEW_W - (clearingCenter + clearingHalfW) > 32) {
+        obstacles.push({ x: rightTreeX, y: -46, dx: 0, dy: 0, type: 'tree', w: 40, h: 40, scale: 4, dead: false });
+      }
+    }
+  }
 
-      obstacles.push({ x: x, y: -50, dx: dx, dy: dy, type: type, w: w, h: h, scale: scale, dead: false });
+  function spawnNaturalEntities() {
+    let bIdx = (level - 1) % BIOMES.length;
+    let bType = BIOMES[bIdx].type;
+
+    // Prevent spawning on top of active incoming terrain bands at top of screen
+    for (let tf of terrainFeatures) {
+      if (tf.y < 14) return;
+    }
+
+    // Chance to spawn a Golden Beaded Pelt in a fair, reachable spot
+    if (Math.random() < 0.30) {
+      let px = 28 + Math.random() * (VIEW_W - 76);
+      obstacles.push({ x: px, y: -24, dx: 0, dy: 0, type: 'pelt', w: 20, h: 18, scale: 2, dead: false });
+      return;
+    }
+
+    // Spawn natural cluster or roaming wildlife integrated with the scrolling ground
+    let pool = [];
+    if (bType === 'mountain') pool = ['rock', 'rock', 'shrub', 'fox'];
+    else if (bType === 'desert') pool = ['rock', 'shrub', 'shrub', 'fox'];
+    else if (bType === 'grass') pool = ['shrub', 'shrub', 'tree', 'fox'];
+    else if (bType === 'forest') pool = ['shrub', 'tree', 'tree', 'fox'];
+
+    let type = pool[Math.floor(Math.random() * pool.length)];
+    let x = 14 + Math.random() * (VIEW_W - 64);
+
+    if (type === 'fox') {
+      // Fox darts laterally across the wild terrain while scrolling with the ground
+      let dir = Math.random() > 0.5 ? 0.65 : -0.65;
+      obstacles.push({ x: x, y: -24, dx: dir, dy: 0, type: 'fox', w: 24, h: 18, scale: 3, dead: false });
+    } else if (type === 'tree') {
+      obstacles.push({ x: x, y: -44, dx: 0, dy: 0, type: 'tree', w: 40, h: 40, scale: 4, dead: false });
+    } else if (type === 'rock') {
+      obstacles.push({ x: x, y: -24, dx: 0, dy: 0, type: 'rock', w: 24, h: 18, scale: 3, dead: false });
+      // Natural cluster: companion pebble/shrub nearby
+      if (Math.random() > 0.45 && x + 28 < VIEW_W - 30) {
+        obstacles.push({ x: x + 24, y: -16, dx: 0, dy: 0, type: 'shrub', w: 24, h: 18, scale: 3, dead: false });
+      }
+    } else {
+      obstacles.push({ x: x, y: -24, dx: 0, dy: 0, type: 'shrub', w: 24, h: 18, scale: 3, dead: false });
     }
   }
 
   function startLevelGameplay(withRumble = true) {
-    baseSpeed = 1.05 + (level * 0.14); 
+    baseSpeed = 1.1 + (level * 0.14); 
+    effectiveSpeed = baseSpeed;
     obstacles = [];
+    terrainFeatures = [];
     peltsCollected = 0;
-    player = { x: (VIEW_W / 2) - 16, y: VIEW_H - 48, dead: false, w: 32, h: 32 };
-    initGroundDetails();
+    worldScrollDist = 0;
+    player = { x: (VIEW_W / 2) - 20, y: VIEW_H - 58, dead: false, w: 40, h: 48, inCreek: false, inBrush: false };
+    initGroundPatches();
     
     if (withRumble) {
       triggerRumble();
@@ -599,10 +717,10 @@
     state = 'TRANSITION';
     shakeFrames = 95;
     buffaloes = [];
-    for (let i = 0; i < 22; i++) {
+    for (let i = 0; i < 20; i++) {
       buffaloes.push({
-        x: Math.random() * (VIEW_W - 36),
-        y: VIEW_H + Math.random() * 220, 
+        x: Math.random() * (VIEW_W - 48),
+        y: VIEW_H + Math.random() * 240, 
         dy: -(3.2 + Math.random() * 2.2)
       });
     }
@@ -610,11 +728,23 @@
 
   function move(dx, dy) {
     if (state !== 'PLAYING') return;
-    let spd = 20; 
-    let nx = player.x + (dx * spd);
-    let ny = player.y + (dy * spd);
-    if (nx >= 6 && nx <= VIEW_W - player.w - 6) player.x = nx;
-    if (ny >= HUD_HEIGHT + 4 && ny <= VIEW_H - player.h - 4) player.y = ny;
+    // Slow down lateral/vertical responsiveness slightly when wading through shallow creek or heavy brush
+    let step = (player.inCreek || player.inBrush) ? 13 : 20; 
+    let nx = player.x + (dx * step);
+    let ny = player.y + (dy * step);
+
+    // Prevent stepping directly into impassable rocky ledges
+    for (let tf of terrainFeatures) {
+      if (tf.kind === 'LEDGE') {
+        if (nx + 8 < tf.x + tf.w && nx + player.w - 8 > tf.x &&
+            ny + 10 < tf.y + tf.h && ny + player.h - 6 > tf.y) {
+          return; // Blocked by rocky cliff ledge
+        }
+      }
+    }
+
+    if (nx >= 4 && nx <= VIEW_W - player.w - 4) player.x = nx;
+    if (ny >= HUD_HEIGHT + 2 && ny <= VIEW_H - player.h - 4) player.y = ny;
   }
 
   // ==========================================
@@ -637,33 +767,92 @@
     }
 
     if (state === 'PLAYING') {
-      bgScrollY += baseSpeed;
-      if (bgScrollY >= TILE * 2) bgScrollY = 0;
+      // Evaluate terrain modifiers under player hooves
+      player.inCreek = false;
+      player.inBrush = false;
 
-      for (let gd of groundDetails) {
-        gd.y += baseSpeed;
-        if (gd.y > VIEW_H) {
-          gd.y = -6;
-          gd.x = Math.random() * VIEW_W;
+      const pLeft = player.x + 10;
+      const pRight = player.x + player.w - 10;
+      const pTop = player.y + 12;
+      const pBottom = player.y + player.h - 6;
+      const pCenterX = player.x + player.w / 2;
+
+      for (let i = terrainFeatures.length - 1; i >= 0; i--) {
+        let tf = terrainFeatures[i];
+        
+        if (pLeft < tf.x + tf.w && pRight > tf.x && pTop < tf.y + tf.h && pBottom > tf.y) {
+          if (tf.kind === 'LEDGE') {
+            // Impassable rocky ledge pushes player back; if pinned off bottom screen, crash
+            player.y = tf.y + tf.h - 10;
+            if (player.y + player.h > VIEW_H + 6) {
+              state = 'GAMEOVER';
+              stopChiptuneTrack();
+              return;
+            }
+          } else if (tf.kind === 'CREEK') {
+            // Deep creek flanks are impassable/fatal; shallow center ford slows down horse
+            if (pCenterX < tf.fordStart || pCenterX > tf.fordEnd) {
+              state = 'GAMEOVER';
+              stopChiptuneTrack();
+              return;
+            } else {
+              player.inCreek = true;
+            }
+          } else if (tf.kind === 'WOODS') {
+            // Thick woods outside the clearing slow down movement
+            if (pCenterX < tf.clearStart || pCenterX > tf.clearEnd) {
+              player.inBrush = true;
+            }
+          }
         }
       }
 
-      spawnObstacle();
+      // Terrain speed modifier (shallow creek or thick woods slows the horse's pace)
+      effectiveSpeed = (player.inCreek || player.inBrush) ? (baseSpeed * 0.55) : baseSpeed;
+      worldScrollDist += effectiveSpeed;
 
+      // Scroll ground patches seamlessly at exact effectiveSpeed
+      for (let gp of groundPatches) {
+        gp.y += effectiveSpeed;
+        if (gp.y > VIEW_H) {
+          gp.y = -10;
+          gp.x = Math.random() * VIEW_W;
+        }
+      }
+
+      // Scroll terrain features at exact effectiveSpeed so everything is anchored to the earth
+      for (let i = terrainFeatures.length - 1; i >= 0; i--) {
+        terrainFeatures[i].y += effectiveSpeed;
+        if (terrainFeatures[i].y > VIEW_H + 20) {
+          terrainFeatures.splice(i, 1);
+        }
+      }
+
+      // Periodic terrain & natural object spawning tied to world distance traveled
+      const terrainInterval = 215;
+      if (Math.floor(worldScrollDist / terrainInterval) > Math.floor((worldScrollDist - effectiveSpeed) / terrainInterval)) {
+        spawnTerrainFeature();
+      }
+
+      const objInterval = Math.max(54, 118 - (level * 8));
+      if (Math.floor(worldScrollDist / objInterval) > Math.floor((worldScrollDist - effectiveSpeed) / objInterval)) {
+        spawnNaturalEntities();
+      }
+
+      // Update obstacles (anchored to ground scroll + any horizontal wildlife movement)
       for (let i = obstacles.length - 1; i >= 0; i--) {
         let obs = obstacles[i];
         obs.x += obs.dx;
         if (obs.x < 4 || obs.x + obs.w > VIEW_W - 4) obs.dx *= -1;
-        obs.y += obs.dy;
+        obs.y += effectiveSpeed;
 
         let inset = (obs.type === 'pelt') ? 0 : 4;
-        let playerInset = 6; 
 
         if (!obs.dead && 
-            player.x + playerInset < obs.x + obs.w - inset && 
-            player.x + player.w - playerInset > obs.x + inset &&
-            player.y + playerInset < obs.y + obs.h - inset && 
-            player.y + player.h - playerInset > obs.y + inset) {
+            pLeft < obs.x + obs.w - inset && 
+            pRight > obs.x + inset &&
+            pTop < obs.y + obs.h - inset && 
+            pBottom > obs.y + inset) {
           
           if (obs.type === 'pelt') {
             peltsCollected++;
@@ -678,19 +867,16 @@
           }
         }
 
-        if (obs.y > VIEW_H || obs.dead) obstacles.splice(i, 1);
+        if (obs.y > VIEW_H + 10 || obs.dead) obstacles.splice(i, 1);
       }
 
     } else if (state === 'TRANSITION') {
       shakeFrames--;
-      bgScrollY += baseSpeed * 1.5;
-      if (bgScrollY >= TILE * 2) bgScrollY = 0;
-
-      for (let gd of groundDetails) {
-        gd.y += baseSpeed * 1.5;
-        if (gd.y > VIEW_H) {
-          gd.y = -6;
-          gd.x = Math.random() * VIEW_W;
+      for (let gp of groundPatches) {
+        gp.y += baseSpeed * 1.4;
+        if (gp.y > VIEW_H) {
+          gp.y = -10;
+          gp.x = Math.random() * VIEW_W;
         }
       }
 
@@ -702,7 +888,7 @@
   }
 
   // ==========================================
-  // PARALLAX SCENERY & RENDERING
+  // PARALLAX SCENERY & WILDERNESS RENDERING
   // ==========================================
   function drawPrairieParallax(scrollOffset, isCutscene) {
     // 1. SNES Sunset / Prairie Sky Banded Gradient
@@ -714,7 +900,7 @@
       ctx.fillRect(0, i * bandH, VIEW_W, bandH + 1);
     }
 
-    // 2. Distant Sun & Drifting Clouds (Slow Parallax Layer 1)
+    // 2. Distant Sun & Drifting Clouds (Parallax Layer 1)
     ctx.fillStyle = '#fff5b8';
     ctx.fillRect(Math.floor(VIEW_W * 0.72), Math.floor(horizonY * 0.35), 22, 22);
     ctx.fillStyle = '#f7c844';
@@ -748,34 +934,30 @@
       ctx.fillRect(tx + 2, horizonY - 6, 10, 6);
     }
 
-    // 5. Foreground Open Golden Prairie & Trail (Parallax Layer 4 - Fast)
+    // 5. Foreground Wild Untamed Golden Prairie (No artificial straight road)
     const groundY = horizonY + 14;
     ctx.fillStyle = '#8a681a';
     ctx.fillRect(0, groundY, VIEW_W, VIEW_H - groundY);
 
-    // Trail band where the chase runs
-    const trailY = groundY + 14;
-    const trailH = Math.min(54, VIEW_H - trailY - 8);
-    ctx.fillStyle = '#634729';
-    ctx.fillRect(0, trailY, VIEW_W, trailH);
-    ctx.fillStyle = '#4a331c';
-    ctx.fillRect(0, trailY, VIEW_W, 2);
-    ctx.fillRect(0, trailY + trailH - 2, VIEW_W, 2);
+    // Natural Earth & Tallgrass Bands across the wild prairie
+    ctx.fillStyle = '#755614';
+    ctx.fillRect(0, groundY + 18, VIEW_W, 14);
+    ctx.fillStyle = '#9c7821';
+    ctx.fillRect(0, groundY + 42, VIEW_W, 16);
 
-    // Scrolling Prairie Grass Tufts & Pebbles
-    for (let g = 0; g < 22; g++) {
-      let gx = ((g * 29) - Math.floor(scrollOffset * 2.2)) % (VIEW_W + 20);
+    // Scrolling Wild Prairie Grass Tufts & Earth Stones
+    for (let g = 0; g < 28; g++) {
+      let gx = ((g * 27) - Math.floor(scrollOffset * 2.2)) % (VIEW_W + 20);
       if (gx < -20) gx += VIEW_W + 20;
-      let gy = (g % 2 === 0) ? groundY + 4 : trailY + trailH + 4;
-      if (gy < VIEW_H - 4) {
-        ctx.fillStyle = '#bd9632';
-        ctx.fillRect(gx, gy, 3, 6);
-        ctx.fillRect(gx + 4, gy + 2, 3, 4);
-      }
+      let gy = groundY + 6 + ((g * 13) % Math.max(24, VIEW_H - groundY - 12));
+      ctx.fillStyle = (g % 2 === 0) ? '#bd9632' : '#5e4310';
+      ctx.fillRect(gx, gy, 3, 6);
+      ctx.fillRect(gx + 4, gy + 2, 3, 4);
     }
 
-    // 6. Animated Herd of Buffalo Chased by Mounted Hunter!
+    // 6. Animated Herd of Deep-Brown Buffalo Chased by Mounted Hunter
     const bob = Math.floor(frame / 6) % 2 === 0 ? 0 : -2;
+    const chaseY = groundY + Math.min(22, Math.floor((VIEW_H - groundY) * 0.25));
     const chaseBaseX = isCutscene 
       ? ((Math.floor(frame * 1.4) % (VIEW_W + 160)) - 130)
       : Math.floor(VIEW_W * 0.52);
@@ -784,31 +966,28 @@
     ctx.fillStyle = '#d4d0c5';
     for (let d = 0; d < 6; d++) {
       let dx = chaseBaseX - 45 + ((d * 23 + frame * 2) % 130);
-      let dy = trailY + trailH - 6 - ((d * 7 + frame) % 8);
+      let dy = chaseY + 24 - ((d * 7 + frame) % 8);
       ctx.fillRect(dx, dy, 3, 3);
     }
 
-    // Buffalo Herd (3 staggered 16-bit buffalo)
-    drawSprite(chaseBaseX + 46, trailY + 6 + bob, sprBuffaloSide, PAL_BUFFALO_SIDE, 2);
-    drawSprite(chaseBaseX + 18, trailY + 16 - bob, sprBuffaloSide, PAL_BUFFALO_SIDE, 2);
-    drawSprite(chaseBaseX + 34, trailY + 24 + bob, sprBuffaloSide, PAL_BUFFALO_SIDE, 2);
+    // Buffalo Herd (Deep brown hide & ivory horns, zero red markings)
+    drawSprite(chaseBaseX + 46, chaseY + bob, sprBuffaloSide, PAL_BUFFALO_SIDE, 2);
+    drawSprite(chaseBaseX + 16, chaseY + 10 - bob, sprBuffaloSide, PAL_BUFFALO_SIDE, 2);
+    drawSprite(chaseBaseX + 34, chaseY + 18 + bob, sprBuffaloSide, PAL_BUFFALO_SIDE, 2);
 
-    // Mounted Métis Buffalo Hunter pursuing closely behind
-    drawSprite(chaseBaseX - 38, trailY + 12 - bob, sprHunterSide, PAL_HUNTER_SIDE, 2);
+    // Mounted Hunter pursuing closely behind
+    drawSprite(chaseBaseX - 42, chaseY + 6 - bob, sprHunterSide, PAL_HUNTER_SIDE, 2);
   }
 
   function drawTitleScreen() {
     drawPrairieParallax(frame * 1.2, false);
 
-    // Subtle dark vignette at top for crisp title contrast
     ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
     ctx.fillRect(0, 0, VIEW_W, 76);
 
-    // Stylized 16-Bit Block Pixel Wordmark
     drawStylizedTitle("LAND", VIEW_W / 2, 14, 3);
     drawStylizedTitle("THUNDER!", VIEW_W / 2, 42, 3);
 
-    // Bottom Prompt Banner
     if (Math.floor(Date.now() / 480) % 2 === 0) {
       const boxW = 190;
       const boxH = 22;
@@ -831,7 +1010,6 @@
   function drawCutsceneScreen() {
     drawPrairieParallax(cutsceneScroll, true);
 
-    // Top Cutscene Story & Game Description RPG Box
     const pad = 14;
     const boxW = VIEW_W - pad * 2;
     const boxH = 112;
@@ -848,7 +1026,7 @@
 
     ctx.fillStyle = '#F4F4F4';
     ctx.font = "10px 'Courier New', Courier, monospace";
-    const story = "THE BUFFALO HERD THUNDERS ACROSS THE LAND! RIDE NORTH ON YOUR RUNNER STEED, DODGE WILDLIFE AND TIMBER, AND GATHER 10 GOLDEN PELTS PER REGION.";
+    const story = "THE BUFFALO HERD THUNDERS ACROSS THE WILD LAND! RIDE NORTH ON YOUR RUNNER STEED, FORD CREEKS AT SHALLOWS, AND GATHER 10 GOLDEN PELTS PER REGION.";
     const lines = wrapText(story, boxW - 20);
     for (let i = 0; i < lines.length; i++) {
       ctx.fillText(lines[i], bx + 10, by + 24 + (i * 13));
@@ -859,6 +1037,78 @@
       ctx.font = "bold 10px 'Courier New', Courier, monospace";
       ctx.textAlign = 'right';
       ctx.fillText("PRESS 'A' TO RIDE ►", bx + boxW - 10, by + boxH - 16);
+    }
+  }
+
+  function drawTerrainFeatures() {
+    for (let tf of terrainFeatures) {
+      const y = Math.floor(tf.y);
+
+      if (tf.kind === 'LEDGE') {
+        // Stepped 16-bit Rocky Cliff Ledge (impassable barrier)
+        ctx.fillStyle = '#2c3338';
+        ctx.fillRect(tf.x, y, tf.w, tf.h);
+        ctx.fillStyle = '#78848c';
+        ctx.fillRect(tf.x, y, tf.w, tf.h - 6);
+        ctx.fillStyle = '#9aa6b0';
+        ctx.fillRect(tf.x, y, tf.w, 5);
+        // Vertical cliff strata cracks
+        ctx.fillStyle = '#434d54';
+        for (let sx = tf.x + 8; sx < tf.x + tf.w - 6; sx += 14) {
+          ctx.fillRect(sx, y + 6, 3, tf.h - 10);
+        }
+        // Tapered rocky edge cap
+        const capX = tf.fromLeft ? (tf.x + tf.w - 6) : tf.x;
+        ctx.fillStyle = '#1c2024';
+        ctx.fillRect(capX, y, 6, tf.h);
+      }
+
+      if (tf.kind === 'CREEK') {
+        // Organic winding creek banks
+        ctx.fillStyle = '#4a3825';
+        ctx.fillRect(0, y - 3, VIEW_W, tf.h + 6);
+
+        // Deep rushing creek water on flanks
+        ctx.fillStyle = '#0f6f9e';
+        ctx.fillRect(0, y, VIEW_W, tf.h);
+
+        // Shallow passable gravel/pebble ford in the center
+        const fordW = tf.fordEnd - tf.fordStart;
+        ctx.fillStyle = '#38a3b8';
+        ctx.fillRect(tf.fordStart, y, fordW, tf.h);
+        // Stepping cobbles & sandbar ripples in shallow ford
+        ctx.fillStyle = '#8c7d65';
+        for (let cx = tf.fordStart + 6; cx < tf.fordEnd - 8; cx += 14) {
+          ctx.fillRect(cx, y + 5, 6, 4);
+          ctx.fillRect(cx + 4, y + 15, 7, 4);
+        }
+
+        // Animated water current lines & whitewater foam
+        ctx.fillStyle = '#a3e8f5';
+        const rippleShift = Math.floor(frame * 0.8) % 24;
+        for (let rx = -24; rx < VIEW_W; rx += 24) {
+          ctx.fillRect(rx + rippleShift, y + 6, 8, 2);
+          ctx.fillRect(rx + ((rippleShift + 12) % 24), y + 17, 10, 2);
+        }
+      }
+
+      if (tf.kind === 'WOODS') {
+        // Dense forest undergrowth & mossy floor on the flanks (slows movement if entered)
+        ctx.fillStyle = '#142b0d';
+        ctx.fillRect(0, y, tf.clearStart, tf.h);
+        ctx.fillRect(tf.clearEnd, y, VIEW_W - tf.clearEnd, tf.h);
+
+        // Leafy brush texture & ferns inside thick woods
+        ctx.fillStyle = '#2d591f';
+        for (let bx = 4; bx < tf.clearStart - 6; bx += 12) {
+          ctx.fillRect(bx, y + 6, 6, 5);
+          ctx.fillRect(bx + 3, y + 24, 7, 6);
+        }
+        for (let bx = tf.clearEnd + 4; bx < VIEW_W - 6; bx += 12) {
+          ctx.fillRect(bx, y + 8, 6, 5);
+          ctx.fillRect(bx + 3, y + 26, 7, 6);
+        }
+      }
     }
   }
 
@@ -874,40 +1124,37 @@
     let bIdx = (level - 1) % BIOMES.length;
     let b = BIOMES[bIdx];
 
-    // 1. Base SNES Terrain Fill
+    // 1. Wild Untamed Earth & Grassland Base (Zero artificial road/path)
     ctx.fillStyle = b.bg;
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
 
-    // 2. Alternating Dithered Terrain Bands for Depth
-    const bandSize = 24;
-    const numBands = Math.ceil(VIEW_H / bandSize) + 2;
-    ctx.fillStyle = b.bgAlt;
-    for (let r = -2; r < numBands; r++) {
-      if (Math.abs(r) % 2 === 0) {
-        ctx.fillRect(0, (r * bandSize) + bgScrollY, VIEW_W, bandSize);
+    // 2. Organic Ground Patches & Tallgrass Tufts synced to scroll speed
+    for (let gp of groundPatches) {
+      const gx = Math.floor(gp.x);
+      const gy = Math.floor(gp.y);
+      if (gp.kind === 0) {
+        ctx.fillStyle = b.patch1;
+        ctx.fillRect(gx, gy, gp.w, gp.h);
+      } else if (gp.kind === 1) {
+        ctx.fillStyle = b.patch2;
+        ctx.fillRect(gx, gy, gp.w, gp.h);
+      } else {
+        ctx.fillStyle = b.tuftDark;
+        ctx.fillRect(gx, gy + 2, 2, 4);
+        ctx.fillStyle = b.tuft;
+        ctx.fillRect(gx + 1, gy, 2, 5);
+        ctx.fillRect(gx + 4, gy + 1, 2, 4);
       }
-    }
-
-    // 3. Centralworn Prairie Cart/Horse Trail for Visual Atmosphere
-    const trailW = Math.floor(VIEW_W * 0.44);
-    const trailX = Math.floor((VIEW_W - trailW) / 2);
-    ctx.fillStyle = b.trackEdge;
-    ctx.fillRect(trailX - 3, 0, trailW + 6, VIEW_H);
-    ctx.fillStyle = b.track;
-    ctx.fillRect(trailX, 0, trailW, VIEW_H);
-
-    // Scrolling Trail Ruts & Ground Patches
-    for (let gd of groundDetails) {
-      ctx.fillStyle = (gd.tone === 'light') ? b.patch : b.patchDark;
-      ctx.fillRect(Math.floor(gd.x), Math.floor(gd.y), gd.w, gd.h);
     }
 
     ctx.translate(shakeX, shakeY);
 
-    // 4. Draw Obstacles & Golden Pelts with Ground Shadows
+    // 3. Draw Integrated Terrain Features (Rocky Ledges, Shallow-Ford Creeks, Thick Woods)
+    drawTerrainFeatures();
+
+    // 4. Draw Natural Obstacles & Golden Pelts with Ground Shadows
     obstacles.forEach(obs => {
-      // Pixel drop shadow under entity
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
       ctx.fillRect(Math.floor(obs.x + 2), Math.floor(obs.y + obs.h - 2), obs.w - 4, 4);
 
       let pal, spr;
@@ -921,20 +1168,27 @@
       drawSprite(obs.x, obs.y, spr, pal, obs.scale, flip);
     });
 
-    // 5. Draw Mounted Hunter & Horse
+    // 5. Draw Sculpted Mounted Hunter & Horse (40x48px)
     if (state !== 'GAMEOVER' || frame % 10 < 5) { 
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-      ctx.fillRect(Math.floor(player.x + 4), Math.floor(player.y + player.h - 3), player.w - 8, 5);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
+      ctx.fillRect(Math.floor(player.x + 6), Math.floor(player.y + player.h - 6), player.w - 12, 6);
 
-      let animFrame = (Math.floor(frame / 7) % 2 === 0) ? sprPlayerAnim[0] : sprPlayerAnim[1];
+      // Water splash ripple if wading through shallow creek ford
+      if (player.inCreek) {
+        ctx.fillStyle = '#d4f6fc';
+        ctx.fillRect(Math.floor(player.x + 4), Math.floor(player.y + player.h - 8), player.w - 8, 3);
+      }
+
+      let animSpeed = (player.inCreek || player.inBrush) ? 11 : 7;
+      let animFrame = (Math.floor(frame / animSpeed) % 2 === 0) ? sprPlayerAnim[0] : sprPlayerAnim[1];
       drawSprite(player.x, player.y, animFrame, PAL_PLAYER, 2);
     }
 
-    // 6. Draw Rumbling Buffalo Herd Transition
+    // 6. Draw Rumbling Buffalo Herd Transition (Deep Brown Hide & Ivory Horns)
     if (state === 'TRANSITION') {
       buffaloes.forEach(buf => {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-        ctx.fillRect(Math.floor(buf.x + 4), Math.floor(buf.y + 30), 28, 6);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
+        ctx.fillRect(Math.floor(buf.x + 6), Math.floor(buf.y + 44), 36, 7);
         drawSprite(buf.x, buf.y, sprBuffaloTop, PAL_BUFFALO_TOP, 3);
       });
     }
@@ -1021,7 +1275,6 @@
       drawGameplay();
     }
 
-    // System Pause Overlay
     if (isPaused) {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
       ctx.fillRect(0, 0, VIEW_W, VIEW_H);
@@ -1137,7 +1390,7 @@
   }
 
   resizeViewport();
-  initGroundDetails();
+  initGroundPatches();
   loop();
 
 </script>
