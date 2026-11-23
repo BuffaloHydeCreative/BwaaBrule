@@ -2,74 +2,34 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Land Thunder!</title>
 <style>
-  body {
-    margin: 0; padding: 0;
-    background: transparent;
-    display: flex; justify-content: center; align-items: center;
-    height: 100vh; width: 100vw;
-    font-family: 'Courier New', Courier, monospace;
-    user-select: none; touch-action: manipulation; overflow: hidden;
-  }
-  #game-container {
-    width: 100%; height: 100%; max-width: 500px;
-    display: flex; flex-direction: column; justify-content: center;
-    box-sizing: border-box; padding: 10px;
-  }
-  #header {
-    flex: 0 0 auto; display: flex; justify-content: space-between;
-    color: #F7C844; font-weight: bold; margin-bottom: 10px;
-    border-bottom: 2px solid #3D5948; padding-bottom: 5px;
-    font-size: 14px; text-transform: uppercase;
-    text-shadow: 1px 1px 0 #000;
-  }
-  #screen-container {
-    flex: 0 0 auto; width: 100%;
-    aspect-ratio: 1 / 1; 
-    border: 4px solid #D4D0C5; 
-    position: relative; background: #0E2A1E;
-    overflow: hidden; box-sizing: border-box;
+  html, body, #game-container {
+    width: 100vw; 
+    height: 100vh;
+    margin: 0; 
+    padding: 0; 
+    overflow: hidden;
+    background: #000;
+    user-select: none; 
+    touch-action: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
   }
   canvas {
-    width: 100%; height: 100%;
-    display: block; image-rendering: pixelated;
+    width: 100%; 
+    height: 100%;
+    display: block; 
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
   }
-  .overlay {
-    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(14, 42, 30, 0.9); 
-    display: flex; flex-direction: column; justify-content: center; align-items: center;
-    color: #fff; text-align: center; padding: 15px; box-sizing: border-box;
-    z-index: 10;
-  }
-  h2 { color: #F7C844; margin: 0 0 10px 0; font-size: 20px; text-transform: uppercase; }
-  p { font-size: 12px; line-height: 1.5; margin: 0 0 15px 0; color: #D4D0C5; }
-  .blink-text { font-weight: bold; color: #12AEA2; font-size: 14px; animation: blink 1s infinite; }
-  @keyframes blink { 50% { opacity: 0; } }
 </style>
 </head>
 <body>
 <div id="game-container">
-  <div id="header">
-    <span id="title-display">LAND THUNDER!</span>
-    <span id="score-display">PELTS: 0/10 | LVL 1</span>
-  </div>
-  
-  <div id="screen-container">
-    <canvas id="gameCanvas" width="240" height="240"></canvas>
-    
-    <div id="intro-screen" class="overlay">
-      <h2>LAND THUNDER!</h2>
-      <p>Race North across the changing lands.<br>Collect 10 Golden Pelts to advance!<br>Dodge wildlife and oncoming obstacles.</p>
-      <div class="blink-text">PRESS 'A' TO START</div>
-    </div>
-    
-    <div id="msg" class="overlay" style="display: none;">
-      <h2>CRASHED!</h2>
-      <div class="blink-text">PRESS 'A' TO RESTART</div>
-    </div>
-  </div>
+  <canvas id="gameCanvas"></canvas>
 </div>
 
 <script>
@@ -81,11 +41,9 @@
   let chiptuneIsPlaying = false;
   let currentChiptuneStep = 0;
 
-  const songTitle = "Gourmet Blossom Express";
   const CHIPTUNE_BPM = 165; 
-  const CHIPTUNE_NOTE_LEN = 60 / CHIPTUNE_BPM / 4; // Fast 16th-note clock resolution
+  const CHIPTUNE_NOTE_LEN = 60 / CHIPTUNE_BPM / 4; 
 
-  // High-energy G-Major/Blues crossover scale
   const CHIPTUNE_NOTES = {
     'G2': 98.00,  'C3': 130.81,  'D3': 146.83,  'E3': 164.81,
     'G3': 196.00, 'A3': 220.00,  'A#3': 233.08, 'B3': 246.94,
@@ -94,7 +52,6 @@
     'G5': 783.99, 'A5': 880.00
   };
 
-  // High-speed, hyperactive lead mimicking leaping platformer runs and screeching fiddle train whistles
   const trainFiddleLead = [
     'G5', 'E5', 'D5', 'B4', 'G4', 'B4', 'D5', 'E5',
     'G5', 'G5', 'E5', 'E5', 'D5', 'D5', 'B4', 'G4',
@@ -102,7 +59,6 @@
     'E5', 'D5', 'B4', 'A#4', 'A4', 'E4', 'D4', 'E4'
   ];
 
-  // Relentless, driving alternating bassline to simulate the heavy chug and rumble of a racing steam locomotive
   const runawayTrainBass = [
     'G2', 'D3', 'G2', 'D3', 'G2', 'E3', 'G2', 'D3',
     'G2', 'D3', 'G2', 'D3', 'G2', 'E3', 'G2', 'D3',
@@ -110,17 +66,15 @@
     'D3', 'A3', 'D3', 'A3', 'D3', 'B3', 'D3', 'A3'
   ];
 
-  // Audio Context Setup with Mobile Safari Unlock Support[cite: 1, 2]
   function initChiptuneAudio() {
     if (!chiptuneAudioCtx) {
-        chiptuneAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      chiptuneAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
     if (chiptuneAudioCtx.state === 'suspended') {
-        chiptuneAudioCtx.resume();
+      chiptuneAudioCtx.resume();
     }
   }
 
-  // Low-level synthesizer tone generator[cite: 5, 8]
   function playChiptuneTone(freq, type, duration, volume) {
     if (!freq || !chiptuneAudioCtx) return;
 
@@ -140,146 +94,470 @@
     osc.stop(chiptuneAudioCtx.currentTime + duration);
   }
 
-  // Sequencer Step Engine
   function stepChiptuneTrack() {
     const leadNote = trainFiddleLead[currentChiptuneStep];
     const bassNote = runawayTrainBass[currentChiptuneStep];
 
-    // Track 1: Square Wave Lead (Frantic, bright fiddle and whistle simulation)
     if (leadNote && CHIPTUNE_NOTES[leadNote]) {
-        playChiptuneTone(CHIPTUNE_NOTES[leadNote], 'square', CHIPTUNE_NOTE_LEN * 0.85, 0.06);
+      playChiptuneTone(CHIPTUNE_NOTES[leadNote], 'square', CHIPTUNE_NOTE_LEN * 0.85, 0.06);
     }
     
-    // Track 2: Triangle Bass (Driving low-end locomotive chug)
     if (bassNote && CHIPTUNE_NOTES[bassNote]) {
-        playChiptuneTone(CHIPTUNE_NOTES[bassNote], 'triangle', CHIPTUNE_NOTE_LEN * 1.8, 0.35);
+      playChiptuneTone(CHIPTUNE_NOTES[bassNote], 'triangle', CHIPTUNE_NOTE_LEN * 1.8, 0.35);
     }
 
     currentChiptuneStep = (currentChiptuneStep + 1) % 32;
   }
 
-  // Public Methods to Control Music[cite: 5]
   function startChiptuneTrack() {
     initChiptuneAudio();
     if (!chiptuneIsPlaying) {
-        chiptuneIsPlaying = true;
-        currentChiptuneStep = 0;
-        chiptuneInterval = setInterval(stepChiptuneTrack, CHIPTUNE_NOTE_LEN * 1000);
+      chiptuneIsPlaying = true;
+      currentChiptuneStep = 0;
+      chiptuneInterval = setInterval(stepChiptuneTrack, CHIPTUNE_NOTE_LEN * 1000);
     }
   }
 
   function stopChiptuneTrack() {
     if (chiptuneIsPlaying) {
-        clearInterval(chiptuneInterval);
-        chiptuneIsPlaying = false;
-        currentChiptuneStep = 0;
+      clearInterval(chiptuneInterval);
+      chiptuneIsPlaying = false;
+      currentChiptuneStep = 0;
     }
   }
 
-  // Safari initial touch/click policy fulfillment[cite: 5, 6]
-  document.addEventListener('touchstart', initChiptuneAudio, { once: true });
-  document.addEventListener('click', initChiptuneAudio, { once: true });
+  function pauseChiptuneTrack() {
+    if (chiptuneIsPlaying) {
+      clearInterval(chiptuneInterval);
+      chiptuneIsPlaying = false;
+    }
+  }
+
+  function resumeChiptuneTrack() {
+    if (!chiptuneIsPlaying && (state === 'PLAYING' || state === 'TRANSITION')) {
+      chiptuneIsPlaying = true;
+      chiptuneInterval = setInterval(stepChiptuneTrack, CHIPTUNE_NOTE_LEN * 1000);
+    }
+  }
 
   // ==========================================
-  // LAND THUNDER GAME ENGINE
+  // VIEWPORT & SNES PIXEL RENDERING SETUP
   // ==========================================
   const cvs = document.getElementById('gameCanvas');
   const ctx = cvs.getContext('2d');
-  const introScreen = document.getElementById('intro-screen');
-  const msgScreen = document.getElementById('msg');
-  const scoreDisplay = document.getElementById('score-display');
   
+  let VIEW_W = 320;
+  let VIEW_H = 240;
   const TILE = 24; 
-  const ROWS = 10;
-  const COLS = 10;
-  
-  // Progression: Mountains to Woodlands
-  const BIOMES = [
-    { name: "ROCKY FOOTHILLS", bg: '#455A64', detail: '#607D8B', type: 'mountain' },
-    { name: "DRY PRAIRIE", bg: '#5D4037', detail: '#795548', type: 'desert' },
-    { name: "TALL GRASS PRAIRIE", bg: '#8A681A', detail: '#A88022', type: 'grass' },
-    { name: "EASTERN WOODLANDS", bg: '#1A3311', detail: '#2D4A22', type: 'forest' }
-  ];
+  const HUD_HEIGHT = 24;
 
-  let state = 'START'; 
+  // Game states: 'TITLE', 'CUTSCENE', 'PLAYING', 'TRANSITION', 'LEVEL_POPUP', 'GAMEOVER'
+  let state = 'TITLE'; 
   let level = 1;
   let peltsCollected = 0;
   let shakeFrames = 0;
   let frame = 0;
   let bgScrollY = 0;
+  let isPaused = false;
+  let cutsceneScroll = 0;
   
-  let player = { x: 104, y: 190, dead: false, w: 32, h: 32 };
+  let player = { x: 144, y: 180, dead: false, w: 32, h: 32 };
   let obstacles = [];
   let buffaloes = [];
+  let groundDetails = [];
   let baseSpeed = 1.0;
 
-  const drawSprite = (x, y, matrix, palette, scale = 2) => {
-    for(let r=0; r<matrix.length; r++) {
-      for(let c=0; c<matrix[r].length; c++) {
+  function resizeViewport() {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const ratio = w / h;
+    
+    VIEW_W = 320; 
+    VIEW_H = Math.max(200, Math.floor(VIEW_W / ratio));
+    
+    cvs.width = VIEW_W;
+    cvs.height = VIEW_H;
+    ctx.imageSmoothingEnabled = false;
+
+    if (player.y > VIEW_H - player.h - 10) {
+      player.y = VIEW_H - player.h - 10;
+    }
+    if (player.x > VIEW_W - player.w) {
+      player.x = VIEW_W - player.w - 10;
+    }
+  }
+  
+  window.addEventListener('resize', resizeViewport);
+  resizeViewport();
+
+  // ==========================================
+  // 16-BIT SNES BIOME PALETTES & LORE
+  // ==========================================
+  const BIOMES = [
+    { 
+      name: "ROCKY FOOTHILLS", 
+      bg: '#4e5d66', 
+      bgAlt: '#435159', 
+      patch: '#667882', 
+      patchDark: '#36424a',
+      track: '#5e5045',
+      trackEdge: '#473c33',
+      type: 'mountain',
+      desc: "THE WESTERN FOOTHILLS! NAVIGATE THE BOULDER-STREWN PASSES AS THE HERD THUNDERS EAST."
+    },
+    { 
+      name: "DRY PRAIRIE", 
+      bg: '#8a643d', 
+      bgAlt: '#7d5935', 
+      patch: '#a67b4e', 
+      patchDark: '#634527',
+      track: '#735334',
+      trackEdge: '#593f26',
+      type: 'desert',
+      desc: "THE SUN-BAKED PLAINS! DODGE SCRUB BRUSH AND DARTING FOXES ACROSS THE DUSTY TRAIL."
+    },
+    { 
+      name: "RED RIVER VALLEY", 
+      bg: '#9e7c24', 
+      bgAlt: '#91711e', 
+      patch: '#bd9632', 
+      patchDark: '#755a14',
+      track: '#785a26',
+      trackEdge: '#5c4319',
+      type: 'grass',
+      desc: "THE GOLDEN TALLGRASS! THE HERD RACES THROUGH THICK SAVANNA GRASSES AND SCATTERED OAKS."
+    },
+    { 
+      name: "EASTERN WOODLANDS", 
+      bg: '#23421a', 
+      bgAlt: '#1d3815', 
+      patch: '#315926', 
+      patchDark: '#14290e',
+      track: '#543d2b',
+      trackEdge: '#3d2b1d',
+      type: 'forest',
+      desc: "LAKE OF THE WOODS! WEAVE THROUGH DENSE PINE AND BIRCH TIMBER AS THE CHASE INTENSIFIES."
+    }
+  ];
+
+  // ==========================================
+  // 16-BIT SNES SHADED SPRITE MATRICES
+  // ==========================================
+  const drawSprite = (x, y, matrix, palette, scale = 2, flipX = false) => {
+    const rows = matrix.length;
+    const cols = matrix[0].length;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
         let v = matrix[r][c];
-        if(v > 0 && palette[v]) {
+        if (v > 0 && palette[v]) {
           ctx.fillStyle = palette[v];
-          ctx.fillRect(x + c*scale, y + r*scale, scale, scale);
+          let drawX = flipX ? (x + (cols - 1 - c) * scale) : (x + c * scale);
+          ctx.fillRect(Math.floor(drawX), Math.floor(y + r * scale), scale, scale);
         }
       }
     }
   };
 
-  // 2-frame animation for galloping horse
+  // Top-down SNES Métis Buffalo Hunter & Horse (16x16 shaded)
+  const PAL_PLAYER = {
+    1: '#120e0b', // Outline
+    2: '#7a4b2a', // Horse Bay Coat
+    3: '#54321a', // Horse Shadow
+    4: '#1c1816', // Horse Mane/Tail
+    5: '#0f6f9e', // Métis Capote Blue
+    6: '#094969', // Capote Shading
+    7: '#ad1c21', // L'Assomption Sash Red
+    8: '#f7c844', // Sash Gold / Hat Band
+    9: '#d4a373', // Hunter Skin
+    10: '#2d241e' // Hat Dark Felt
+  };
+
   const sprPlayerAnim = [
-    [ // Frame 1: Legs Extended
-      [0,0,0,1,1,1,0,0],
-      [0,0,1,2,2,2,1,0],
-      [0,1,3,3,3,3,3,1],
-      [1,4,3,2,3,4,4,1],
-      [1,4,4,4,4,4,4,1],
-      [1,4,4,4,4,4,4,1],
-      [0,1,4,0,4,4,1,0],
-      [0,1,0,0,4,0,1,0]
+    [ // Frame 1: Gallop Stride Extended
+      [0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0],
+      [0,0,0,0,0,1,2,2,2,2,1,0,0,0,0,0],
+      [0,0,0,0,1,2,4,2,2,4,2,1,0,0,0,0],
+      [0,0,0,1,2,2,4,10,10,4,2,2,1,0,0,0],
+      [0,0,1,3,2,10,10,8,8,10,10,2,3,1,0,0],
+      [0,1,3,2,1,5,5,9,9,5,5,1,2,3,1,0],
+      [0,1,2,1,5,5,6,5,5,6,5,5,1,2,1,0],
+      [1,3,2,1,5,6,7,8,7,8,6,5,1,2,3,1],
+      [1,2,2,1,5,5,7,7,7,7,5,5,1,2,2,1],
+      [0,1,3,2,1,6,5,5,5,5,6,1,2,3,1,0],
+      [0,1,2,2,2,1,1,1,1,1,1,2,2,2,1,0],
+      [0,0,1,3,2,2,2,4,4,2,2,2,3,1,0,0],
+      [0,1,3,1,3,2,4,4,4,4,2,3,1,3,1,0],
+      [0,1,1,0,1,3,1,4,4,1,3,1,0,1,1,0],
+      [0,0,0,0,0,1,0,1,1,0,1,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
     ],
-    [ // Frame 2: Legs Tucked
-      [0,0,0,1,1,1,0,0],
-      [0,0,1,2,2,2,1,0],
-      [0,1,3,3,3,3,3,1],
-      [1,4,3,2,3,4,4,1],
-      [1,4,4,4,4,4,4,1],
-      [1,4,4,4,4,4,4,1],
-      [0,1,0,4,4,0,1,0],
-      [0,0,1,0,0,1,0,0]
+    [ // Frame 2: Gallop Stride Gathered
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0],
+      [0,0,0,0,0,1,2,2,2,2,1,0,0,0,0,0],
+      [0,0,0,0,1,2,4,2,2,4,2,1,0,0,0,0],
+      [0,0,0,1,2,2,4,10,10,4,2,2,1,0,0,0],
+      [0,0,1,3,2,10,10,8,8,10,10,2,3,1,0,0],
+      [0,0,1,2,1,5,5,9,9,5,5,1,2,1,0,0],
+      [0,1,3,2,1,5,6,5,5,6,5,5,1,2,3,1],
+      [0,1,2,2,1,5,6,7,8,7,8,6,5,1,2,1],
+      [0,0,1,3,2,1,5,7,7,7,7,5,1,2,3,1],
+      [0,0,1,2,2,1,6,5,5,5,5,6,1,2,2,1],
+      [0,0,0,1,3,2,1,1,1,1,1,1,2,3,1,0],
+      [0,0,0,1,3,2,2,4,4,2,2,2,3,1,0,0],
+      [0,0,0,0,1,1,3,4,4,3,1,1,0,0,0,0],
+      [0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
     ]
   ];
 
-  const sprBuffalo = [
-    [0,0,1,1,1,1,0,0],
-    [0,1,2,2,2,2,1,0],
-    [1,2,2,2,2,2,2,1],
-    [1,3,2,2,2,2,3,1],
-    [1,2,2,2,2,2,2,1],
-    [1,2,1,2,2,1,2,1],
-    [0,1,0,1,1,0,1,0]
-  ]; 
-
-  const sprPelt = [
-    [0,0,1,1,1,1,1,0,0],
-    [0,1,2,2,2,2,2,1,0],
-    [1,2,3,2,4,2,3,2,1],
-    [1,2,2,4,5,4,2,2,1],
-    [1,2,2,4,5,4,2,2,1],
-    [1,2,3,2,4,2,3,2,1],
-    [0,1,2,2,2,2,2,1,0],
-    [0,0,1,1,1,1,1,0,0]
+  // Top-down Rumbling Buffalo (12x14 shaded)
+  const PAL_BUFFALO_TOP = {
+    1: '#140e0a', // Outline
+    2: '#4a3222', // Shaggy Shoulder Hump
+    3: '#332115', // Dark Hindquarters
+    4: '#694832', // Fur Highlight
+    5: '#e6dec8'  // Curved Horns
+  };
+  const sprBuffaloTop = [
+    [0,0,0,1,1,1,1,1,1,0,0,0],
+    [0,0,1,2,4,2,2,4,2,1,0,0],
+    [0,5,1,2,2,4,4,2,2,1,5,0],
+    [5,1,2,4,2,2,2,2,4,2,1,5],
+    [0,1,2,2,4,4,4,4,2,2,1,0],
+    [1,2,2,2,2,2,2,2,2,2,2,1],
+    [1,2,3,2,2,2,2,2,2,3,2,1],
+    [1,3,3,3,2,2,2,2,3,3,3,1],
+    [0,1,3,3,3,3,3,3,3,3,1,0],
+    [0,1,3,1,3,3,3,3,1,3,1,0],
+    [0,0,1,0,1,3,3,1,0,1,0,0],
+    [0,0,0,0,0,1,1,0,0,0,0,0]
   ];
 
-  const sprRock = [[0,0,1,1,1,0,0],[0,1,2,2,2,1,0],[1,2,3,2,3,2,1],[1,2,2,2,2,2,1],[1,1,1,1,1,1,1]]; 
-  const sprTree = [[0,0,0,1,1,0,0,0],[0,0,1,2,2,1,0,0],[0,1,2,3,2,2,1,0],[1,2,2,2,3,2,2,1],[1,2,3,2,2,2,2,1],[1,2,2,2,2,2,2,1],[0,0,1,4,4,1,0,0],[0,0,1,4,4,1,0,0]]; 
-  const sprShrub = [[0,0,1,1,0,0],[0,1,2,2,1,0],[1,2,3,2,2,1],[1,2,2,2,2,1],[0,1,1,1,1,0]];
-  const sprFox = [[0,0,0,1,0,0],[0,1,1,2,1,1],[1,2,3,2,3,2,1],[1,2,2,2,2,1,0],[0,1,1,0,1,1,0]]; 
+  // Side-Profile Buffalo for Title Screen & Cutscene (16x12 SNES Shaded)
+  const PAL_BUFFALO_SIDE = {
+    1: '#120d0a', // Outline
+    2: '#4f3524', // Shaggy Hump Fur
+    3: '#362317', // Rear Body Fur
+    4: '#6e4c36', // Highlight Fur
+    5: '#ede6d3', // Ivory Horn
+    6: '#ad1c21'  // Eye Glint
+  };
+  const sprBuffaloSide = [
+    [0,0,0,0,0,0,1,1,1,1,1,0,0,0,0,0],
+    [0,0,0,0,1,1,2,4,2,2,2,1,5,0,0,0],
+    [0,0,1,1,3,2,2,2,4,2,2,2,1,5,0,0],
+    [0,1,3,3,3,2,4,2,2,2,2,2,2,1,0,0],
+    [1,3,3,3,3,2,2,2,2,2,6,2,2,2,1,0],
+    [1,3,3,3,3,3,2,2,2,2,2,2,2,2,1,0],
+    [0,1,3,3,3,3,3,2,2,2,2,2,2,1,0,0],
+    [0,0,1,3,1,1,3,3,2,2,1,2,1,0,0,0],
+    [0,0,1,3,1,0,1,3,1,1,2,1,0,0,0,0],
+    [0,0,1,1,0,0,0,1,1,0,1,1,0,0,0,0]
+  ];
+
+  // Side-Profile Mounted Hunter for Title Screen & Cutscene (16x14 SNES Shaded)
+  const PAL_HUNTER_SIDE = {
+    1: '#120d0a', // Outline
+    2: '#8c5832', // Horse Coat
+    3: '#5e391e', // Horse Shadow
+    4: '#1c1816', // Mane/Tail/Hat
+    5: '#0f6f9e', // Métis Blue Capote
+    6: '#ad1c21', // Red Sash
+    7: '#f7c844', // Gold Accent
+    8: '#d4a373'  // Face
+  };
+  const sprHunterSide = [
+    [0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0],
+    [0,0,0,0,0,1,4,4,4,1,0,0,0,0,0,0],
+    [0,0,0,0,0,0,1,8,8,1,0,0,0,0,0,0],
+    [0,0,0,0,0,1,5,5,5,1,0,1,1,0,0,0],
+    [0,0,0,0,0,1,5,6,7,5,1,2,2,1,0,0],
+    [0,0,1,1,1,1,6,6,5,2,2,2,4,2,1,0],
+    [0,1,4,2,2,2,2,2,2,2,2,2,2,2,1,0],
+    [1,4,2,2,3,2,2,2,2,2,3,2,1,1,0,0],
+    [1,4,1,2,1,3,3,3,3,3,2,1,0,0,0,0],
+    [0,0,1,2,1,0,0,0,0,1,2,1,0,0,0,0],
+    [0,1,3,1,0,0,0,0,0,0,1,3,1,0,0,0],
+    [0,1,1,0,0,0,0,0,0,0,0,1,1,0,0,0]
+  ];
+
+  // SNES Shaded Obstacles & Collectibles
+  const PAL_ROCK = { 1: '#1c2024', 2: '#7a8691', 3: '#a8b5c2', 4: '#4c545c' };
+  const sprRock = [
+    [0,0,1,1,1,1,0,0],
+    [0,1,3,3,2,2,1,0],
+    [1,3,2,2,2,4,2,1],
+    [1,2,2,4,4,4,4,1],
+    [1,4,4,4,4,4,4,1],
+    [0,1,1,1,1,1,1,0]
+  ];
+
+  const PAL_TREE = { 1: '#0e1f0b', 2: '#23591b', 3: '#3b822e', 4: '#173b12', 5: '#52341e' };
+  const sprTree = [
+    [0,0,0,1,1,1,1,0,0,0],
+    [0,0,1,3,3,2,2,1,0,0],
+    [0,1,3,3,2,2,4,2,1,0],
+    [1,3,2,2,2,4,4,4,2,1],
+    [1,2,2,4,4,4,4,4,4,1],
+    [0,1,4,4,4,4,4,4,1,0],
+    [0,0,1,1,5,5,1,1,0,0],
+    [0,0,0,1,5,5,1,0,0,0],
+    [0,0,0,1,5,5,1,0,0,0],
+    [0,0,1,1,1,1,1,1,0,0]
+  ];
+
+  const PAL_SHRUB = { 1: '#14290e', 2: '#437a28', 3: '#68a63c', 4: '#294f17', 5: '#ad1c21' };
+  const sprShrub = [
+    [0,0,1,1,1,1,0,0],
+    [0,1,3,3,2,2,1,0],
+    [1,3,5,2,2,5,2,1],
+    [1,2,2,4,4,2,4,1],
+    [0,1,4,4,4,4,1,0],
+    [0,0,1,1,1,1,0,0]
+  ];
+
+  const PAL_FOX = { 1: '#260d05', 2: '#e35b14', 3: '#ff8533', 4: '#ffffff' };
+  const sprFox = [
+    [0,1,0,0,0,0,1,0],
+    [0,1,2,1,1,2,1,0],
+    [1,2,3,2,2,3,2,1],
+    [1,2,2,1,1,2,2,1],
+    [0,1,2,2,2,2,1,0],
+    [0,0,1,4,4,1,0,0]
+  ];
+
+  // Rich Golden Beaded Pelt (10x9)
+  const PAL_PELT = { 1: '#1c1206', 2: '#f7c844', 3: '#fff2a6', 4: '#c98e18', 5: '#ad1c21', 6: '#12aea2' };
+  const sprPelt = [
+    [0,0,1,1,1,1,1,1,0,0],
+    [0,1,3,3,2,2,2,2,1,0],
+    [1,3,2,5,2,2,5,2,4,1],
+    [1,2,2,2,6,6,2,2,4,1],
+    [1,2,2,6,3,3,6,2,4,1],
+    [1,2,2,2,6,6,2,2,4,1],
+    [1,2,4,5,4,4,5,4,4,1],
+    [0,1,4,4,4,4,4,4,1,0],
+    [0,0,1,1,1,1,1,1,0,0]
+  ];
+
+  // ==========================================
+  // STYLIZED PIXEL TEXT RENDERER (SNES BLOCK)
+  // ==========================================
+  const FONT_5X7 = {
+    'L': ["10000","10000","10000","10000","10000","10000","11111"],
+    'A': ["01110","10001","10001","11111","10001","10001","10001"],
+    'N': ["10001","11001","10101","10011","10001","10001","10001"],
+    'D': ["11110","10001","10001","10001","10001","10001","11110"],
+    'T': ["11111","00100","00100","00100","00100","00100","00100"],
+    'H': ["10001","10001","10001","11111","10001","10001","10001"],
+    'U': ["10001","10001","10001","10001","10001","10001","01110"],
+    'E': ["11111","10000","10000","11110","10000","10000","11111"],
+    'R': ["11110","10001","10001","11110","10100","10010","10001"],
+    '!': ["00100","00100","00100","00100","00100","00000","00100"],
+    ' ': ["00000","00000","00000","00000","00000","00000","00000"]
+  };
+
+  function drawStylizedTitle(text, centerX, startY, scale) {
+    const spacing = 1;
+    const totalCols = text.length * (5 + spacing) - spacing;
+    let curX = Math.floor(centerX - (totalCols * scale) / 2);
+
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      const glyph = FONT_5X7[ch] || FONT_5X7[' '];
+      
+      for (let r = 0; r < 7; r++) {
+        for (let c = 0; c < 5; c++) {
+          if (glyph[r][c] === '1') {
+            const px = curX + c * scale;
+            const py = startY + r * scale;
+            
+            // Deep drop shadow
+            ctx.fillStyle = '#1c0507';
+            ctx.fillRect(px + scale, py + scale, scale, scale);
+            
+            // Outline
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(px - 1, py, scale + 2, scale);
+            ctx.fillRect(px, py - 1, scale, scale + 2);
+
+            // SNES Vertical Gradient Fill (Gold -> Blaze Orange -> Crimson)
+            if (r < 2) ctx.fillStyle = '#F7C844';
+            else if (r < 5) ctx.fillStyle = '#FB6604';
+            else ctx.fillStyle = '#AD1C21';
+            ctx.fillRect(px, py, scale, scale);
+          }
+        }
+      }
+      curX += (5 + spacing) * scale;
+    }
+  }
+
+  // ==========================================
+  // SNES RPG DIALOGUE BOX HELPER
+  // ==========================================
+  function drawSNESWindow(x, y, w, h) {
+    // Outer drop shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+    ctx.fillRect(x + 4, y + 4, w, h);
+
+    // Deep Navy/Indigo SNES Box Fill
+    ctx.fillStyle = '#182238';
+    ctx.fillRect(x, y, w, h);
+
+    // Outer White Pixel Border
+    ctx.fillStyle = '#F4F4F4';
+    ctx.fillRect(x, y, w, 2);
+    ctx.fillRect(x, y + h - 2, w, 2);
+    ctx.fillRect(x, y, 2, h);
+    ctx.fillRect(x + w - 2, y, 2, h);
+
+    // Inner Gold/Teal Trim
+    ctx.fillStyle = '#F7C844';
+    ctx.fillRect(x + 3, y + 3, w - 6, 1);
+    ctx.fillRect(x + 3, y + h - 4, w - 6, 1);
+    ctx.fillRect(x + 3, y + 3, 1, h - 6);
+    ctx.fillRect(x + w - 4, y + 3, 1, h - 6);
+  }
+
+  function wrapText(text, maxWidth) {
+    const words = text.split(' ');
+    let lines = [];
+    let currentLine = words[0];
+    for (let i = 1; i < words.length; i++) {
+      let testLine = currentLine + " " + words[i];
+      if (ctx.measureText(testLine).width < maxWidth) {
+        currentLine = testLine;
+      } else {
+        lines.push(currentLine);
+        currentLine = words[i];
+      }
+    }
+    lines.push(currentLine);
+    return lines;
+  }
+
+  // ==========================================
+  // GAMEPLAY SPAWNING & LEVEL PROGRESSION
+  // ==========================================
+  function initGroundDetails() {
+    groundDetails = [];
+    for (let i = 0; i < 36; i++) {
+      groundDetails.push({
+        x: Math.random() * VIEW_W,
+        y: Math.random() * VIEW_H,
+        w: Math.random() > 0.5 ? 6 : 4,
+        h: Math.random() > 0.5 ? 4 : 2,
+        tone: Math.random() > 0.4 ? 'light' : 'dark'
+      });
+    }
+  }
 
   function spawnObstacle() {
-    let spawnRate = Math.max(50, 120 - (level * 10)); 
+    let spawnRate = Math.max(46, 115 - (level * 9)); 
     if (frame % spawnRate === 0) {
       let bIdx = (level - 1) % BIOMES.length;
-      
       let pool = [];
       if (BIOMES[bIdx].type === 'mountain') pool = ['rock','rock','rock','shrub','fox'];
       else if (BIOMES[bIdx].type === 'desert') pool = ['rock','rock','shrub','shrub','fox'];
@@ -287,32 +565,30 @@
       else if (BIOMES[bIdx].type === 'forest') pool = ['rock','shrub','tree','tree','tree','fox'];
 
       let type = pool[Math.floor(Math.random() * pool.length)];
-      
-      if (Math.random() < 0.25) type = 'pelt';
+      if (Math.random() < 0.28) type = 'pelt';
 
-      let x = Math.random() * (cvs.width - 40);
-      let dx = (type === 'fox') ? (Math.random() > 0.5 ? 0.4 : -0.4) : 0;
-      let dy = baseSpeed + (Math.random() * 0.4);
+      let x = 12 + Math.random() * (VIEW_W - 64);
+      let dx = (type === 'fox') ? (Math.random() > 0.5 ? 0.45 : -0.45) : 0;
+      let dy = baseSpeed + (Math.random() * 0.35);
 
-      let w = 28, h = 20, scale = 4; 
-      if (type === 'tree') { w = 48; h = 48; scale = 6; } 
-      if (type === 'shrub') { w = 24; h = 20; scale = 4; }
-      if (type === 'fox') { w = 24; h = 20; scale = 4; }
-      if (type === 'pelt') { w = 18; h = 16; scale = 2; } 
+      let w = 24, h = 18, scale = 3; 
+      if (type === 'tree') { w = 40; h = 40; scale = 4; } 
+      if (type === 'shrub') { w = 24; h = 18; scale = 3; }
+      if (type === 'fox') { w = 24; h = 18; scale = 3; }
+      if (type === 'pelt') { w = 20; h = 18; scale = 2; } 
 
       obstacles.push({ x: x, y: -50, dx: dx, dy: dy, type: type, w: w, h: h, scale: scale, dead: false });
     }
   }
 
-  function initLevel(initialRumble = false) {
-    let bIdx = (level - 1) % BIOMES.length;
-    baseSpeed = 1.0 + (level * 0.15); 
+  function startLevelGameplay(withRumble = true) {
+    baseSpeed = 1.05 + (level * 0.14); 
     obstacles = [];
     peltsCollected = 0;
-    player = { x: 104, y: 190, dead: false, w: 32, h: 32 };
-    updateScore();
+    player = { x: (VIEW_W / 2) - 16, y: VIEW_H - 48, dead: false, w: 32, h: 32 };
+    initGroundDetails();
     
-    if (initialRumble || level % 2 === 1) {
+    if (withRumble) {
       triggerRumble();
     } else {
       state = 'PLAYING';
@@ -321,32 +597,63 @@
 
   function triggerRumble() {
     state = 'TRANSITION';
-    shakeFrames = 100;
+    shakeFrames = 95;
     buffaloes = [];
-    for(let i=0; i<20; i++) {
+    for (let i = 0; i < 22; i++) {
       buffaloes.push({
-        x: Math.random() * cvs.width,
-        y: cvs.height + Math.random() * 200, 
-        dy: -(3 + Math.random() * 2)
+        x: Math.random() * (VIEW_W - 36),
+        y: VIEW_H + Math.random() * 220, 
+        dy: -(3.2 + Math.random() * 2.2)
       });
     }
   }
 
-  function updateScore() {
-    scoreDisplay.innerText = `PELTS: ${peltsCollected}/10 | LVL ${level}`;
+  function move(dx, dy) {
+    if (state !== 'PLAYING') return;
+    let spd = 20; 
+    let nx = player.x + (dx * spd);
+    let ny = player.y + (dy * spd);
+    if (nx >= 6 && nx <= VIEW_W - player.w - 6) player.x = nx;
+    if (ny >= HUD_HEIGHT + 4 && ny <= VIEW_H - player.h - 4) player.y = ny;
   }
 
+  // ==========================================
+  // MAIN UPDATE LOOP
+  // ==========================================
   function update() {
     frame++;
+
+    if (state === 'TITLE') {
+      return;
+    }
+
+    if (state === 'CUTSCENE') {
+      cutsceneScroll += 1.5;
+      return;
+    }
+
+    if (state === 'LEVEL_POPUP' || state === 'GAMEOVER') {
+      return;
+    }
+
     if (state === 'PLAYING') {
       bgScrollY += baseSpeed;
-      if (bgScrollY >= TILE) bgScrollY = 0;
+      if (bgScrollY >= TILE * 2) bgScrollY = 0;
+
+      for (let gd of groundDetails) {
+        gd.y += baseSpeed;
+        if (gd.y > VIEW_H) {
+          gd.y = -6;
+          gd.x = Math.random() * VIEW_W;
+        }
+      }
 
       spawnObstacle();
 
       for (let i = obstacles.length - 1; i >= 0; i--) {
         let obs = obstacles[i];
         obs.x += obs.dx;
+        if (obs.x < 4 || obs.x + obs.w > VIEW_W - 4) obs.dx *= -1;
         obs.y += obs.dy;
 
         let inset = (obs.type === 'pelt') ? 0 : 4;
@@ -361,23 +668,32 @@
           if (obs.type === 'pelt') {
             peltsCollected++;
             obs.dead = true; 
-            updateScore();
             if (peltsCollected >= 10) {
               level++;
-              initLevel(true); 
+              state = 'LEVEL_POPUP';
             }
           } else {
             state = 'GAMEOVER';
-            msgScreen.style.display = 'flex';
-            stopChiptuneTrack(); // Halt track on crash
+            stopChiptuneTrack(); 
           }
         }
 
-        if (obs.y > cvs.height || obs.dead) obstacles.splice(i, 1);
+        if (obs.y > VIEW_H || obs.dead) obstacles.splice(i, 1);
       }
 
     } else if (state === 'TRANSITION') {
       shakeFrames--;
+      bgScrollY += baseSpeed * 1.5;
+      if (bgScrollY >= TILE * 2) bgScrollY = 0;
+
+      for (let gd of groundDetails) {
+        gd.y += baseSpeed * 1.5;
+        if (gd.y > VIEW_H) {
+          gd.y = -6;
+          gd.x = Math.random() * VIEW_W;
+        }
+      }
+
       buffaloes.forEach(b => b.y += b.dy);
       if (shakeFrames <= 0) {
         state = 'PLAYING';
@@ -385,7 +701,168 @@
     }
   }
 
-  function draw() {
+  // ==========================================
+  // PARALLAX SCENERY & RENDERING
+  // ==========================================
+  function drawPrairieParallax(scrollOffset, isCutscene) {
+    // 1. SNES Sunset / Prairie Sky Banded Gradient
+    const skyBands = ['#241438', '#541b36', '#8f2929', '#c95822', '#eb9634', '#f7c844'];
+    const horizonY = Math.floor(VIEW_H * 0.56);
+    const bandH = Math.ceil(horizonY / skyBands.length);
+    for (let i = 0; i < skyBands.length; i++) {
+      ctx.fillStyle = skyBands[i];
+      ctx.fillRect(0, i * bandH, VIEW_W, bandH + 1);
+    }
+
+    // 2. Distant Sun & Drifting Clouds (Slow Parallax Layer 1)
+    ctx.fillStyle = '#fff5b8';
+    ctx.fillRect(Math.floor(VIEW_W * 0.72), Math.floor(horizonY * 0.35), 22, 22);
+    ctx.fillStyle = '#f7c844';
+    ctx.fillRect(Math.floor(VIEW_W * 0.72) - 2, Math.floor(horizonY * 0.35) + 2, 26, 18);
+
+    ctx.fillStyle = '#f7b267';
+    for (let c = 0; c < 4; c++) {
+      let cx = ((c * 110) - Math.floor(scrollOffset * 0.15)) % (VIEW_W + 60);
+      if (cx < -60) cx += VIEW_W + 60;
+      let cy = 18 + (c % 2) * 16;
+      ctx.fillRect(cx, cy, 36, 6);
+      ctx.fillRect(cx + 6, cy - 4, 22, 4);
+    }
+
+    // 3. Distant Rocky Foothills & Buttes (Parallax Layer 2)
+    ctx.fillStyle = '#472836';
+    for (let m = -1; m < 6; m++) {
+      let mx = (m * 80) - (Math.floor(scrollOffset * 0.35) % 80);
+      ctx.fillRect(mx, horizonY - 22, 60, 22);
+      ctx.fillRect(mx + 12, horizonY - 32, 36, 10);
+      ctx.fillRect(mx + 22, horizonY - 38, 16, 6);
+    }
+
+    // 4. Midground Rolling Prairie Hills & Pine Silhouettes (Parallax Layer 3)
+    ctx.fillStyle = '#5e4318';
+    ctx.fillRect(0, horizonY, VIEW_W, 18);
+    ctx.fillStyle = '#382a10';
+    for (let t = -1; t < 12; t++) {
+      let tx = (t * 34) - (Math.floor(scrollOffset * 0.7) % 34);
+      ctx.fillRect(tx + 4, horizonY - 10, 6, 10);
+      ctx.fillRect(tx + 2, horizonY - 6, 10, 6);
+    }
+
+    // 5. Foreground Open Golden Prairie & Trail (Parallax Layer 4 - Fast)
+    const groundY = horizonY + 14;
+    ctx.fillStyle = '#8a681a';
+    ctx.fillRect(0, groundY, VIEW_W, VIEW_H - groundY);
+
+    // Trail band where the chase runs
+    const trailY = groundY + 14;
+    const trailH = Math.min(54, VIEW_H - trailY - 8);
+    ctx.fillStyle = '#634729';
+    ctx.fillRect(0, trailY, VIEW_W, trailH);
+    ctx.fillStyle = '#4a331c';
+    ctx.fillRect(0, trailY, VIEW_W, 2);
+    ctx.fillRect(0, trailY + trailH - 2, VIEW_W, 2);
+
+    // Scrolling Prairie Grass Tufts & Pebbles
+    for (let g = 0; g < 22; g++) {
+      let gx = ((g * 29) - Math.floor(scrollOffset * 2.2)) % (VIEW_W + 20);
+      if (gx < -20) gx += VIEW_W + 20;
+      let gy = (g % 2 === 0) ? groundY + 4 : trailY + trailH + 4;
+      if (gy < VIEW_H - 4) {
+        ctx.fillStyle = '#bd9632';
+        ctx.fillRect(gx, gy, 3, 6);
+        ctx.fillRect(gx + 4, gy + 2, 3, 4);
+      }
+    }
+
+    // 6. Animated Herd of Buffalo Chased by Mounted Hunter!
+    const bob = Math.floor(frame / 6) % 2 === 0 ? 0 : -2;
+    const chaseBaseX = isCutscene 
+      ? ((Math.floor(frame * 1.4) % (VIEW_W + 160)) - 130)
+      : Math.floor(VIEW_W * 0.52);
+
+    // Kicking prairie dust particles
+    ctx.fillStyle = '#d4d0c5';
+    for (let d = 0; d < 6; d++) {
+      let dx = chaseBaseX - 45 + ((d * 23 + frame * 2) % 130);
+      let dy = trailY + trailH - 6 - ((d * 7 + frame) % 8);
+      ctx.fillRect(dx, dy, 3, 3);
+    }
+
+    // Buffalo Herd (3 staggered 16-bit buffalo)
+    drawSprite(chaseBaseX + 46, trailY + 6 + bob, sprBuffaloSide, PAL_BUFFALO_SIDE, 2);
+    drawSprite(chaseBaseX + 18, trailY + 16 - bob, sprBuffaloSide, PAL_BUFFALO_SIDE, 2);
+    drawSprite(chaseBaseX + 34, trailY + 24 + bob, sprBuffaloSide, PAL_BUFFALO_SIDE, 2);
+
+    // Mounted Métis Buffalo Hunter pursuing closely behind
+    drawSprite(chaseBaseX - 38, trailY + 12 - bob, sprHunterSide, PAL_HUNTER_SIDE, 2);
+  }
+
+  function drawTitleScreen() {
+    drawPrairieParallax(frame * 1.2, false);
+
+    // Subtle dark vignette at top for crisp title contrast
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.fillRect(0, 0, VIEW_W, 76);
+
+    // Stylized 16-Bit Block Pixel Wordmark
+    drawStylizedTitle("LAND", VIEW_W / 2, 14, 3);
+    drawStylizedTitle("THUNDER!", VIEW_W / 2, 42, 3);
+
+    // Bottom Prompt Banner
+    if (Math.floor(Date.now() / 480) % 2 === 0) {
+      const boxW = 190;
+      const boxH = 22;
+      const bx = Math.floor((VIEW_W - boxW) / 2);
+      const by = VIEW_H - 30;
+      ctx.fillStyle = 'rgba(14, 42, 30, 0.88)';
+      ctx.fillRect(bx, by, boxW, boxH);
+      ctx.strokeStyle = '#F7C844';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(bx, by, boxW, boxH);
+
+      ctx.fillStyle = '#12AEA2';
+      ctx.font = "bold 12px 'Courier New', Courier, monospace";
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText("PRESS 'A' TO START", VIEW_W / 2, by + boxH / 2 + 1);
+    }
+  }
+
+  function drawCutsceneScreen() {
+    drawPrairieParallax(cutsceneScroll, true);
+
+    // Top Cutscene Story & Game Description RPG Box
+    const pad = 14;
+    const boxW = VIEW_W - pad * 2;
+    const boxH = 112;
+    const bx = pad;
+    const by = 12;
+
+    drawSNESWindow(bx, by, boxW, boxH);
+
+    ctx.fillStyle = '#F7C844';
+    ctx.font = "bold 11px 'Courier New', Courier, monospace";
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText("THE GREAT PLAINS RUN", bx + 10, by + 8);
+
+    ctx.fillStyle = '#F4F4F4';
+    ctx.font = "10px 'Courier New', Courier, monospace";
+    const story = "THE BUFFALO HERD THUNDERS ACROSS THE LAND! RIDE NORTH ON YOUR RUNNER STEED, DODGE WILDLIFE AND TIMBER, AND GATHER 10 GOLDEN PELTS PER REGION.";
+    const lines = wrapText(story, boxW - 20);
+    for (let i = 0; i < lines.length; i++) {
+      ctx.fillText(lines[i], bx + 10, by + 24 + (i * 13));
+    }
+
+    if (Math.floor(Date.now() / 450) % 2 === 0) {
+      ctx.fillStyle = '#12AEA2';
+      ctx.font = "bold 10px 'Courier New', Courier, monospace";
+      ctx.textAlign = 'right';
+      ctx.fillText("PRESS 'A' TO RIDE ►", bx + boxW - 10, by + boxH - 16);
+    }
+  }
+
+  function drawGameplay() {
     let shakeX = 0, shakeY = 0;
     if (state === 'TRANSITION') {
       shakeX = (Math.random() - 0.5) * 6;
@@ -393,92 +870,274 @@
     }
 
     ctx.save();
-    ctx.translate(shakeX, shakeY);
-
+    
     let bIdx = (level - 1) % BIOMES.length;
     let b = BIOMES[bIdx];
 
+    // 1. Base SNES Terrain Fill
     ctx.fillStyle = b.bg;
-    ctx.fillRect(0, 0, cvs.width, cvs.height);
-    
-    ctx.fillStyle = b.detail;
-    for (let r = -1; r <= ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        if ((r + c) % 2 === 0) {
-          ctx.fillRect(c * TILE, (r * TILE) + bgScrollY, 4, 4);
-        }
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+
+    // 2. Alternating Dithered Terrain Bands for Depth
+    const bandSize = 24;
+    const numBands = Math.ceil(VIEW_H / bandSize) + 2;
+    ctx.fillStyle = b.bgAlt;
+    for (let r = -2; r < numBands; r++) {
+      if (Math.abs(r) % 2 === 0) {
+        ctx.fillRect(0, (r * bandSize) + bgScrollY, VIEW_W, bandSize);
       }
     }
 
-    obstacles.forEach(obs => {
-      let pal, spr;
-      if (obs.type === 'rock') { spr = sprRock; pal = {1:'#212121', 2:'#757575', 3:'#E0E0E0'}; }
-      else if (obs.type === 'tree') { spr = sprTree; pal = {1:'#1B5E20', 2:'#2E7D32', 3:'#4CAF50', 4:'#3E2723'}; }
-      else if (obs.type === 'shrub') { spr = sprShrub; pal = {1:'#33691E', 2:'#558B2F', 3:'#7CB342'}; }
-      else if (obs.type === 'fox') { spr = sprFox; pal = {1:'#540E11', 2:'#FB6604', 3:'#FFF'}; }
-      else if (obs.type === 'pelt') { spr = sprPelt; pal = {1:'#000', 2:'#F7C844', 3:'#FFF', 4:'#AD1C21', 5:'#12AEA2'}; }
-      drawSprite(obs.x, obs.y, spr, pal, obs.scale);
-    });
+    // 3. Centralworn Prairie Cart/Horse Trail for Visual Atmosphere
+    const trailW = Math.floor(VIEW_W * 0.44);
+    const trailX = Math.floor((VIEW_W - trailW) / 2);
+    ctx.fillStyle = b.trackEdge;
+    ctx.fillRect(trailX - 3, 0, trailW + 6, VIEW_H);
+    ctx.fillStyle = b.track;
+    ctx.fillRect(trailX, 0, trailW, VIEW_H);
 
-    if (state !== 'GAMEOVER' || frame % 10 < 5) { 
-      let animFrame = (Math.floor(frame / 8) % 2 === 0) ? sprPlayerAnim[0] : sprPlayerAnim[1];
-      drawSprite(player.x, player.y, animFrame, {1:'#000', 2:'#D4D0C5', 3:'#0F6F9E', 4:'#5D4037'}, 4);
+    // Scrolling Trail Ruts & Ground Patches
+    for (let gd of groundDetails) {
+      ctx.fillStyle = (gd.tone === 'light') ? b.patch : b.patchDark;
+      ctx.fillRect(Math.floor(gd.x), Math.floor(gd.y), gd.w, gd.h);
     }
 
+    ctx.translate(shakeX, shakeY);
+
+    // 4. Draw Obstacles & Golden Pelts with Ground Shadows
+    obstacles.forEach(obs => {
+      // Pixel drop shadow under entity
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+      ctx.fillRect(Math.floor(obs.x + 2), Math.floor(obs.y + obs.h - 2), obs.w - 4, 4);
+
+      let pal, spr;
+      if (obs.type === 'rock') { spr = sprRock; pal = PAL_ROCK; }
+      else if (obs.type === 'tree') { spr = sprTree; pal = PAL_TREE; }
+      else if (obs.type === 'shrub') { spr = sprShrub; pal = PAL_SHRUB; }
+      else if (obs.type === 'fox') { spr = sprFox; pal = PAL_FOX; }
+      else if (obs.type === 'pelt') { spr = sprPelt; pal = PAL_PELT; }
+      
+      let flip = (obs.type === 'fox' && obs.dx < 0);
+      drawSprite(obs.x, obs.y, spr, pal, obs.scale, flip);
+    });
+
+    // 5. Draw Mounted Hunter & Horse
+    if (state !== 'GAMEOVER' || frame % 10 < 5) { 
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+      ctx.fillRect(Math.floor(player.x + 4), Math.floor(player.y + player.h - 3), player.w - 8, 5);
+
+      let animFrame = (Math.floor(frame / 7) % 2 === 0) ? sprPlayerAnim[0] : sprPlayerAnim[1];
+      drawSprite(player.x, player.y, animFrame, PAL_PLAYER, 2);
+    }
+
+    // 6. Draw Rumbling Buffalo Herd Transition
     if (state === 'TRANSITION') {
       buffaloes.forEach(buf => {
-        drawSprite(buf.x, buf.y, sprBuffalo, {1:'#000', 2:'#3E2723', 3:'#AD1C21'}, 4);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        ctx.fillRect(Math.floor(buf.x + 4), Math.floor(buf.y + 30), 28, 6);
+        drawSprite(buf.x, buf.y, sprBuffaloTop, PAL_BUFFALO_TOP, 3);
       });
     }
 
     ctx.restore();
+    
+    // 7. Top HUD Bar (Anchored y = 0)
+    ctx.fillStyle = '#182238';
+    ctx.fillRect(0, 0, VIEW_W, HUD_HEIGHT);
+    ctx.fillStyle = '#F7C844'; 
+    ctx.fillRect(0, HUD_HEIGHT - 2, VIEW_W, 2);
+
+    ctx.fillStyle = '#F7C844';
+    ctx.font = "bold 11px 'Courier New', Courier, monospace";
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    ctx.fillText(b.name, 6, HUD_HEIGHT / 2);
+
+    ctx.fillStyle = '#12AEA2';
+    ctx.textAlign = 'right';
+    ctx.fillText(`PELTS:${peltsCollected}/10 LVL:${level}`, VIEW_W - 6, HUD_HEIGHT / 2);
+
+    // 8. Pop-up Cutscene Text Box on Level Change
+    if (state === 'LEVEL_POPUP') {
+      const boxW = VIEW_W - 32;
+      const boxH = 104;
+      const bx = 16;
+      const by = Math.floor((VIEW_H - boxH) / 2);
+
+      drawSNESWindow(bx, by, boxW, boxH);
+
+      ctx.fillStyle = '#12AEA2';
+      ctx.font = "bold 11px 'Courier New', Courier, monospace";
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(`REGION ${level}: ${b.name}`, bx + 10, by + 8);
+
+      ctx.fillStyle = '#F4F4F4';
+      ctx.font = "10px 'Courier New', Courier, monospace";
+      const lines = wrapText(b.desc, boxW - 20);
+      for (let i = 0; i < lines.length; i++) {
+        ctx.fillText(lines[i], bx + 10, by + 25 + (i * 13));
+      }
+
+      if (Math.floor(Date.now() / 450) % 2 === 0) {
+        ctx.fillStyle = '#F7C844';
+        ctx.font = "bold 10px 'Courier New', Courier, monospace";
+        ctx.textAlign = 'right';
+        ctx.fillText("PRESS 'A' TO CONTINUE ►", bx + boxW - 10, by + boxH - 16);
+      }
+    }
+
+    // 9. Game Over Box
+    if (state === 'GAMEOVER') {
+      const boxW = 220;
+      const boxH = 74;
+      const bx = Math.floor((VIEW_W - boxW) / 2);
+      const by = Math.floor((VIEW_H - boxH) / 2);
+
+      drawSNESWindow(bx, by, boxW, boxH);
+
+      ctx.fillStyle = '#AD1C21';
+      ctx.font = "bold 18px 'Courier New', Courier, monospace";
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText("TRAIL ENDED!", VIEW_W / 2, by + 12);
+
+      if (Math.floor(Date.now() / 480) % 2 === 0) {
+        ctx.fillStyle = '#12AEA2';
+        ctx.font = "bold 11px 'Courier New', Courier, monospace";
+        ctx.fillText("PRESS 'A' TO RESTART", VIEW_W / 2, by + 44);
+      }
+    }
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, VIEW_W, VIEW_H);
+
+    if (state === 'TITLE') {
+      drawTitleScreen();
+    } else if (state === 'CUTSCENE') {
+      drawCutsceneScreen();
+    } else {
+      drawGameplay();
+    }
+
+    // System Pause Overlay
+    if (isPaused) {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
+      ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+      const bw = 150, bh = 44;
+      drawSNESWindow(Math.floor((VIEW_W - bw) / 2), Math.floor((VIEW_H - bh) / 2), bw, bh);
+      ctx.fillStyle = '#F7C844';
+      ctx.font = "bold 16px 'Courier New', Courier, monospace";
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText("PAUSED", VIEW_W / 2, VIEW_H / 2 + 1);
+    }
+  }
+
+  // ==========================================
+  // ARCADE CABINET POSTMESSAGE BRIDGE
+  // ==========================================
+  let inputState = { up: false, down: false, left: false, right: false };
+  let inputTimers = { up: 0, down: 0, left: 0, right: 0 };
+  let btnALast = 0;
+  let btnBLast = 0;
+
+  window.addEventListener('message', function(event) {
+    const cmd = (typeof event.data === 'string') ? event.data : (event.data && (event.data.cmd || event.data.action || event.data.type));
+    if (!cmd) return;
+
+    const now = Date.now();
+
+    if (cmd === 'PAUSE') { 
+      isPaused = true; 
+      pauseChiptuneTrack();
+      inputState.up = inputState.down = inputState.left = inputState.right = false;
+      return; 
+    }
+    if (cmd === 'RESUME') { 
+      isPaused = false; 
+      resumeChiptuneTrack();
+      return; 
+    }
+
+    if (isPaused) return;
+
+    if (cmd === 'BUTTON_A' && now - btnALast > 110) {
+      btnALast = now;
+      if (state === 'TITLE') {
+        state = 'CUTSCENE';
+        cutsceneScroll = 0;
+        startChiptuneTrack();
+      } else if (state === 'CUTSCENE') {
+        level = 1;
+        startLevelGameplay(true);
+      } else if (state === 'LEVEL_POPUP') {
+        startLevelGameplay(true);
+      } else if (state === 'GAMEOVER') {
+        level = 1;
+        stopChiptuneTrack();
+        startLevelGameplay(true);
+        startChiptuneTrack();
+      }
+    }
+
+    if (cmd === 'BUTTON_B' && now - btnBLast > 110) {
+      btnBLast = now;
+      if (state === 'CUTSCENE') {
+        level = 1;
+        startLevelGameplay(true);
+      } else if (state === 'LEVEL_POPUP') {
+        startLevelGameplay(true);
+      }
+    }
+
+    const parseDpad = (dirCmd, pressCmd, releaseCmd, stateKey, dx, dy) => {
+      if (cmd === pressCmd) { 
+        inputState[stateKey] = true; 
+        inputTimers[stateKey] = now; 
+        move(dx, dy); 
+      }
+      else if (cmd === releaseCmd) {
+        inputState[stateKey] = false;
+      }
+      else if (cmd === dirCmd) { 
+        inputState[stateKey] = true; 
+        inputTimers[stateKey] = now; 
+        move(dx, dy);
+      }
+    };
+
+    parseDpad('DPAD_UP', 'DPAD_UP_PRESS', 'DPAD_UP_RELEASE', 'up', 0, -1);
+    parseDpad('DPAD_DOWN', 'DPAD_DOWN_PRESS', 'DPAD_DOWN_RELEASE', 'down', 0, 1);
+    parseDpad('DPAD_LEFT', 'DPAD_LEFT_PRESS', 'DPAD_LEFT_RELEASE', 'left', -1, 0);
+    parseDpad('DPAD_RIGHT', 'DPAD_RIGHT_PRESS', 'DPAD_RIGHT_RELEASE', 'right', 1, 0);
+
+    if (cmd === 'RELEASE' || cmd === 'STOP' || cmd === 'NEUTRAL') {
+      inputState.up = inputState.down = inputState.left = inputState.right = false;
+    }
+  });
+
+  function processHoldInputs() {
+    const now = Date.now();
+    const holdDelay = 145; 
+    if (inputState.up && now - inputTimers.up > holdDelay) { inputTimers.up = now; move(0, -1); }
+    if (inputState.down && now - inputTimers.down > holdDelay) { inputTimers.down = now; move(0, 1); }
+    if (inputState.left && now - inputTimers.left > holdDelay) { inputTimers.left = now; move(-1, 0); }
+    if (inputState.right && now - inputTimers.right > holdDelay) { inputTimers.right = now; move(1, 0); }
   }
 
   function loop() {
-    update();
+    if (!isPaused) {
+      processHoldInputs();
+      update();
+    }
     draw();
     requestAnimationFrame(loop);
   }
 
-  function move(dx, dy) {
-    if (state !== 'PLAYING') return;
-    let spd = 20; 
-    let nx = player.x + (dx * spd);
-    let ny = player.y + (dy * spd);
-    if (nx >= 0 && nx <= cvs.width - player.w) player.x = nx;
-    if (ny >= 0 && ny <= cvs.height - player.h) player.y = ny;
-  }
-
-  // Universal Gamepad Listener
-  window.addEventListener('message', function(event) {
-    const cmd = event.data;
-    if (cmd === 'BUTTON_A') {
-      if (state === 'START' || state === 'GAMEOVER') {
-        if (state === 'GAMEOVER') {
-            level = 1;
-            stopChiptuneTrack();
-        }
-        initLevel(true); 
-        introScreen.style.display = 'none';
-        msgScreen.style.display = 'none';
-        startChiptuneTrack(); // Start background track
-      }
-    }
-    if (cmd === 'DPAD_UP') move(0, -1);
-    if (cmd === 'DPAD_DOWN') move(0, 1);
-    if (cmd === 'DPAD_LEFT') move(-1, 0);
-    if (cmd === 'DPAD_RIGHT') move(1, 0);
-  });
-
-  // Keyboard Fallback
-  window.addEventListener('keydown', (e) => {
-    if(e.key === 'ArrowUp') move(0, -1);
-    if(e.key === 'ArrowDown') move(0, 1);
-    if(e.key === 'ArrowLeft') move(-1, 0);
-    if(e.key === 'ArrowRight') move(1, 0);
-    if(e.key === 'a' || e.key === 'Enter') window.postMessage('BUTTON_A', '*');
-  });
-
+  resizeViewport();
+  initGroundDetails();
   loop();
 
 </script>
