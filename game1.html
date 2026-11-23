@@ -2,445 +2,1037 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Red River Run</title>
 <style>
-  body {
-    margin: 0; padding: 0;
-    background: transparent;
-    display: flex; justify-content: center; align-items: center;
-    height: 100vh; width: 100vw;
-    font-family: 'Courier New', Courier, monospace;
-    user-select: none; touch-action: manipulation; overflow: hidden;
+  html, body, #game-container {
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: #081710;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
   }
+
   #game-container {
-    width: 100%; height: 100%; max-width: 500px;
-    display: flex; flex-direction: column; justify-content: center;
-    box-sizing: border-box; padding: 10px;
-    background: transparent; 
+    position: relative;
+    display: flex;
+    flex-direction: column;
   }
+
   #header {
-    flex: 0 0 auto; display: flex; justify-content: space-between;
-    color: #F7C844; font-weight: bold; margin-bottom: 10px;
-    border-bottom: 2px solid #3D5948; padding-bottom: 5px;
-    font-size: 14px; text-transform: uppercase;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 36px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(180deg, rgba(10, 26, 19, 0.92) 0%, rgba(10, 26, 19, 0.65) 100%);
+    border-bottom: 2px solid #D4A338;
+    color: #F7C844;
+    font-weight: bold;
+    font-size: 14px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-family: 'Courier New', Courier, monospace;
+    padding: 0 18px;
+    box-sizing: border-box;
+    z-index: 20;
+    text-shadow: 2px 2px 0 #000;
   }
+
   #screen-container {
-    flex: 0 0 auto; width: 100%;
-    aspect-ratio: 2 / 1; 
-    border: 4px solid #D4D0C5; 
-    position: relative; background: transparent;
-    overflow: hidden; box-sizing: border-box;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
   }
+
   canvas {
-    width: 100%; height: 100%;
-    display: block; image-rendering: pixelated;
+    width: 100%;
+    height: 100%;
+    display: block;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
   }
-  /* Overlay Screens */
+
   .overlay {
-    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(14, 42, 30, 0.9); 
-    display: flex; flex-direction: column; justify-content: center; align-items: center;
-    color: #fff; text-align: center; padding: 15px; box-sizing: border-box;
-    z-index: 10;
+    position: absolute;
+    inset: 0;
+    background: rgba(10, 28, 20, 0.88);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: #fff;
+    text-align: center;
+    padding: 24px;
+    box-sizing: border-box;
+    z-index: 15;
+    font-family: 'Courier New', Courier, monospace;
   }
+
   #intro-screen h2 {
-    color: #F7C844; margin: 0 0 10px 0; font-size: 18px; text-transform: uppercase;
+    color: #F7C844;
+    margin: 0 0 12px 0;
+    font-size: 24px;
+    text-transform: uppercase;
+    text-shadow: 2px 2px 0 #540E11;
+    letter-spacing: 2px;
   }
+
   #intro-screen p {
-    font-size: 11px; line-height: 1.4; margin: 0 0 15px 0; color: #D4D0C5;
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 0 0 22px 0;
+    color: #E8E2D2;
+    max-width: 440px;
+    text-shadow: 1px 1px 0 #000;
   }
+
   .blink-text {
-    font-weight: bold; color: #12AEA2; font-size: 12px;
+    font-weight: bold;
+    color: #18D4C4;
+    font-size: 16px;
+    text-shadow: 1px 1px 0 #000;
     animation: blink 1s infinite;
   }
+
   @keyframes blink { 50% { opacity: 0; } }
-  
+
   #msg {
-    position: absolute; top: 40%; left: 50%; transform: translateX(-50%);
-    font-weight: bold; color: #ffffff; background: #540E11; 
-    font-size: 14px; padding: 6px 12px; display: none; white-space: nowrap;
-    border: 2px solid #F7C844; text-align: center; z-index: 10;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-weight: bold;
+    color: #ffffff;
+    background: #4A0C10;
+    font-size: 16px;
+    padding: 14px 24px;
+    display: none;
+    white-space: nowrap;
+    border: 3px solid #F7C844;
+    box-shadow: 0 6px 0 #000;
+    text-align: center;
+    z-index: 15;
+    font-family: 'Courier New', Courier, monospace;
   }
 </style>
 </head>
 <body>
 <div id="game-container">
   <div id="header">
-    <span id="title-display">RED RIVER RUN</span>
+    <span id="title-display">THE FORKS</span>
     <span id="score-display">DIST: 0</span>
   </div>
-  
+
   <div id="screen-container">
-    <canvas id="gameCanvas" width="160" height="80"></canvas>
-    
+    <canvas id="gameCanvas"></canvas>
+
     <div id="intro-screen" class="overlay">
       <h2>Red River Run</h2>
-      <p>Navigate the treacherous currents from the Red River valley, through the rocky shores of Lake Winnipeg, and into the frozen winter trails.<br><br>Use the D-PAD to dodge bright white debris and whirlpools!</p>
+      <p>Steer your birchbark canoe across the 3 river tracks from Upper Fort Garry through Lake Winnipeg into the frozen Boreal winter.<br><br>UP / DOWN changes tracks to avoid encroaching riverbanks, island forks, and shallow rocks. Floating logs rumble your hull!</p>
       <div class="blink-text">PRESS 'A' TO START</div>
     </div>
-    
-    <div id="msg">CRASHED!<br><br>PRESS 'A' TO RESTART</div>
+
+    <div id="msg">RUN AGROUND!<br><br>PRESS 'A' TO RESTART</div>
   </div>
 </div>
 
 <script>
   // ==========================================
-  // GAME ENGINE & VISUALS
+  // 1. FULL-SCREEN VIEWPORT & SNES RESOLUTION
   // ==========================================
   const cvs = document.getElementById('gameCanvas');
   const ctx = cvs.getContext('2d');
+
+  let VIEW_W = 240;
+  let VIEW_H = 135;
+
+  function resizeViewport() {
+    const aspect = window.innerWidth / window.innerHeight;
+    if (window.innerWidth >= window.innerHeight) {
+      VIEW_H = 135;
+      VIEW_W = Math.max(240, Math.round(135 * aspect));
+    } else {
+      VIEW_W = 220;
+      VIEW_H = Math.max(135, Math.round(220 / aspect));
+    }
+    cvs.width = VIEW_W;
+    cvs.height = VIEW_H;
+    ctx.imageSmoothingEnabled = false;
+  }
+
+  window.addEventListener('resize', resizeViewport);
+  resizeViewport();
+
+  // ==========================================
+  // 2. SNES SHADED PALETTE & GAME STATE
+  // ==========================================
   const msg = document.getElementById('msg');
   const introScreen = document.getElementById('intro-screen');
   const scoreDisplay = document.getElementById('score-display');
   const titleDisplay = document.getElementById('title-display');
-  
-  // Custom Extended Palette
-  const C_BASE = '#0E2A1E';  // Dark Green
-  const C_SEC  = '#F7C844';  // Gold/Yellow
-  const C_ACC1 = '#3a090b';  // Darkened Red River
-  const C_ACC2 = '#3D5948';  // Muted Green
-  const C_ACC3 = '#D4D0C5';  // Beige/Hide
-  const C_LAKE = '#083B54';  // Darkened Lake Winnipeg
-  const C_FOAM = '#12AEA2';  // Light Sea Green 
-  const C_NIGHT = '#1a0f25'; // Darker Purple Midnight
-  const C_SNOW = '#ffffff';  // Snow White
-  const C_CHARTREUSE = '#A8D038'; // Marsh Grass
-  const C_INDIGO = '#0A1C28'; // Midnight Lake
-  const C_STONE = '#8B8B8B'; // Fort Stone
 
-  let isPlaying = false, isGameOver = false;
-  let score = 0, frame = 0, speed = 2.5;
+  const PAL = {
+    OUTLINE: '#0B1610',
+    DARK_PINE: '#123324',
+    MID_PINE: '#275940',
+    LIGHT_PINE: '#458761',
+    GOLD_LIGHT: '#FBE07A',
+    GOLD_MID: '#E2AC32',
+    GOLD_DARK: '#A8741A',
+    CHARTREUSE_L: '#BCE254',
+    CHARTREUSE_D: '#7EA626',
+    MAROON_DEEP: '#36090C',
+    MAROON_MID: '#591418',
+    MAROON_FOAM: '#B87A68',
+    LAKE_DEEP: '#08364F',
+    LAKE_MID: '#105A7E',
+    LAKE_FOAM: '#38C8BC',
+    INDIGO_DEEP: '#071422',
+    INDIGO_MID: '#112942',
+    NIGHT_SKY_T: '#0D0B1E',
+    NIGHT_SKY_B: '#231942',
+    DAY_SKY_T: '#87B5C9',
+    DAY_SKY_B: '#E6DFCE',
+    HIDE_LIGHT: '#EFE8D5',
+    HIDE_MID: '#C8BCA2',
+    HIDE_DARK: '#8F8268',
+    WOOD_LIGHT: '#C88446',
+    WOOD_MID: '#8C5022',
+    WOOD_DARK: '#4D280E',
+    STONE_LIGHT: '#B5B8B4',
+    STONE_MID: '#7A7E7A',
+    STONE_DARK: '#424644',
+    SNOW_LIGHT: '#FFFFFF',
+    SNOW_MID: '#CFE4F2',
+    SNOW_DARK: '#8FB2CC',
+    ICE_DEEP: '#72A8C8',
+    ICE_MID: '#9FD0EA',
+    SASH_RED: '#C42424'
+  };
+
+  let isPlaying = false, isGameOver = false, isPaused = false;
+  let score = 0, frame = 0, speed = 1.65;
   let bgOffset = 0;
-  
-  let playerLane = 1; 
-  let returnTimer = null;
-  let isSpinning = false;
-  let spinFrame = 0;
-  
-  let obstacles = [];
 
-  const canoeSprite = [
-    [0,0,0,0,0,1,1,0,0,0,0,0,0,0],
-    [0,0,0,0,0,5,5,5,0,0,0,0,0,0],
-    [0,0,0,0,0,5,5,4,0,0,0,0,0,0],
-    [0,2,2,2,2,2,2,2,2,2,2,2,2,0],
-    [0,0,2,2,2,2,2,2,2,2,2,2,0,0]
-  ];
+  // 3 Persistent Tracks: 0 (Top), 1 (Middle), 2 (Bottom)
+  let playerLane = 1;
+  let playerVisualY = 0;
+  let shakeTimer = 0;
+  let slowTimer = 0;
+  let crashReason = "RUN AGROUND!";
 
-  const dogsledSprite = [
-    [0,0,0,0,0,0,0,1,1,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,5,5,5,0,0,0,0,0],
-    [0,0,0,0,0,0,0,5,5,1,0,0,0,0,0],
-    [0,2,2,0,2,2,0,5,5,1,0,0,0,0,0],
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,0,0]
-  ];
+  // Terrain & Hazard Entities
+  let terrainSegments = []; // Encroaching banks & center islands
+  let hazards = [];         // Floating logs (rumble) & shallow rocks (fatal)
+  let nextSpawnX = 0;
+  let lastBankPattern = 'OPEN';
 
-  const logSprite = [
-    [0,5,5,5,5,5,0],
-    [5,4,4,4,4,4,5],
-    [0,5,5,5,5,5,0]
-  ];
-  
-  const rockSprite = [
-    [0,0,5,5,0],
-    [0,5,2,2,5],
-    [5,5,5,5,5]
-  ];
+  // Unique One-Off Landmarks
+  let upperFortSpawned = false;
+  let lowerFortSpawned = false;
+  let landmarks = [];
 
-  const whirlSprite = [
-    [0,5,5,5,0],
-    [5,0,0,0,5],
-    [5,0,5,0,5],
-    [5,0,0,0,5],
-    [0,5,5,5,0]
-  ];
-
-  function drawSprite(sprite, x, y, paletteMap) {
-    for(let r=0; r<sprite.length; r++) {
-      for(let c=0; c<sprite[r].length; c++) {
-        let val = sprite[r][c];
-        if(val !== 0) {
-          ctx.fillStyle = paletteMap[val];
-          ctx.fillRect(x + c*2, y + r*2, 2, 2); 
-        }
-      }
-    }
-  }
-
-  function spawnObstacle() {
-    if(frame % Math.max(35, 90 - Math.floor(score/100)) === 0) {
-      let lane = Math.floor(Math.random() * 3);
-      let rand = Math.random();
-      let type = 'log';
-      if(rand > 0.85) type = 'whirlpool';
-      else if(rand > 0.40) type = 'rock';
-      obstacles.push({ x: 170, lane: lane, type: type, passed: false, hit: false });
-    }
-  }
-
-  // --- Scenery Functions ---
-  function drawTipi(x, y, colorStr, accentStr) {
-    ctx.fillStyle = colorStr; 
-    ctx.beginPath(); ctx.moveTo(x+6, y); ctx.lineTo(x+12, y+10); ctx.lineTo(x, y+10); ctx.fill();
-    ctx.fillStyle = accentStr; 
-    ctx.fillRect(x+5, y-2, 1, 3); ctx.fillRect(x+7, y-2, 1, 3);
-    ctx.fillRect(x+5, y+6, 2, 4);
-  }
-  
-  function drawBuffalo(x, y, colorStr) {
-    ctx.fillStyle = colorStr;
-    ctx.fillRect(x+2, y, 6, 4);   
-    ctx.fillRect(x, y+2, 4, 4);   
-    ctx.fillRect(x+2, y+4, 2, 4); 
-    ctx.fillRect(x+6, y+4, 2, 4);
-  }
-  
-  function drawTreePatch(x, y, leafColor, trunkColor) {
-    ctx.fillStyle = leafColor;
-    ctx.fillRect(x+4, y, 8, 8);
-    ctx.fillRect(x, y+4, 16, 6);
-    ctx.fillStyle = trunkColor;
-    ctx.fillRect(x+6, y+8, 4, 6); 
-  }
-  
-  function drawShorelineRock(x, y, rockColor, shadowColor) {
-    ctx.fillStyle = rockColor;
-    ctx.fillRect(x+2, y, 12, 8);
-    ctx.fillRect(x, y+4, 16, 6);
-    if(shadowColor) {
-      ctx.fillStyle = shadowColor; 
-      ctx.fillRect(x+4, y+6, 6, 4);
-    }
-  }
-
-  function drawFort(x, y, sil) {
-    ctx.fillStyle = sil ? C_BASE : C_STONE;
-    ctx.fillRect(x, y, 20, 10); 
-    ctx.fillRect(x+8, y-4, 4, 14); 
-    if(!sil) {
-      ctx.fillStyle = C_BASE;
-      ctx.fillRect(x+9, y+4, 2, 6); 
-    }
-  }
-
-  // --- Color Interpolation Helper ---
+  // ==========================================
+  // 3. COLOR INTERPOLATION HELPERS
+  // ==========================================
   function hexToRgb(hex) {
-    let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : {r:0,g:0,b:0};
+    const res = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return res ? {
+      r: parseInt(res[1], 16),
+      g: parseInt(res[2], 16),
+      b: parseInt(res[3], 16)
+    } : { r: 0, g: 0, b: 0 };
   }
+
   function lerpColor(c1, c2, t) {
-    if (t <= 0) return c1; if (t >= 1) return c2;
-    let rgb1 = hexToRgb(c1), rgb2 = hexToRgb(c2);
-    let r = Math.round(rgb1.r + (rgb2.r - rgb1.r) * t);
-    let g = Math.round(rgb1.g + (rgb2.g - rgb1.g) * t);
-    let b = Math.round(rgb1.b + (rgb2.b - rgb1.b) * t);
-    return `rgb(${r},${g},${b})`;
+    if (t <= 0) return c1;
+    if (t >= 1) return c2;
+    const a = hexToRgb(c1), b = hexToRgb(c2);
+    const r = Math.round(a.r + (b.r - a.r) * t);
+    const g = Math.round(a.g + (b.g - a.g) * t);
+    const bl = Math.round(a.b + (b.b - a.b) * t);
+    return `rgb(${r},${g},${bl})`;
   }
 
-  function drawScene() {
-    let skyCol = C_ACC3, gndCol = C_SEC, watCol = C_ACC1, foamCol = C_ACC3;
-    let levelTitle = "RED RIVER RUN";
-    
+  function getEnvColors() {
+    let skyTop = PAL.DAY_SKY_T, skyBot = PAL.DAY_SKY_B;
+    let gndTop = PAL.GOLD_LIGHT, gndMid = PAL.GOLD_MID, gndDark = PAL.GOLD_DARK;
+    let watDeep = PAL.MAROON_DEEP, watMid = PAL.MAROON_MID, watFoam = PAL.MAROON_FOAM;
+    let title = "THE FORKS";
+
     if (score < 250) {
-      levelTitle = "THE FORKS";
-      let t = score / 250;
-      gndCol = lerpColor(C_SEC, C_CHARTREUSE, t); 
+      title = "THE FORKS";
+      const t = score / 250;
+      gndTop = lerpColor(PAL.GOLD_LIGHT, PAL.CHARTREUSE_L, t);
+      gndMid = lerpColor(PAL.GOLD_MID, PAL.CHARTREUSE_D, t);
+      gndDark = lerpColor(PAL.GOLD_DARK, PAL.MID_PINE, t);
     } else if (score < 500) {
-      levelTitle = "LOWER FORT GARRY";
-      let t = (score - 250) / 250;
-      gndCol = lerpColor(C_CHARTREUSE, C_ACC2, t);
-      watCol = lerpColor(C_ACC1, C_LAKE, t);
-      foamCol = lerpColor(C_ACC3, C_FOAM, t);
+      title = "LOWER FORT GARRY";
+      const t = (score - 250) / 250;
+      gndTop = lerpColor(PAL.CHARTREUSE_L, PAL.LIGHT_PINE, t);
+      gndMid = lerpColor(PAL.CHARTREUSE_D, PAL.MID_PINE, t);
+      gndDark = lerpColor(PAL.MID_PINE, PAL.DARK_PINE, t);
+      watDeep = lerpColor(PAL.MAROON_DEEP, PAL.LAKE_DEEP, t);
+      watMid = lerpColor(PAL.MAROON_MID, PAL.LAKE_MID, t);
+      watFoam = lerpColor(PAL.MAROON_FOAM, PAL.LAKE_FOAM, t);
     } else if (score < 750) {
-      levelTitle = "LAKE WINNIPEG MOUTH";
-      let t = (score - 500) / 250;
-      gndCol = lerpColor(C_ACC2, '#284A41', t);
-      watCol = C_LAKE;
-      foamCol = C_FOAM;
+      title = "LAKE WINNIPEG MOUTH";
+      const t = (score - 500) / 250;
+      gndTop = lerpColor(PAL.LIGHT_PINE, PAL.MID_PINE, t);
+      gndMid = lerpColor(PAL.MID_PINE, PAL.DARK_PINE, t);
+      gndDark = PAL.DARK_PINE;
+      watDeep = PAL.LAKE_DEEP;
+      watMid = PAL.LAKE_MID;
+      watFoam = PAL.LAKE_FOAM;
     } else if (score < 1000) {
-      levelTitle = "MID-LAKE WINNIPEG";
-      let t = (score - 750) / 250;
-      skyCol = lerpColor(C_ACC3, C_NIGHT, t);
-      gndCol = lerpColor('#284A41', C_BASE, t);
-      watCol = lerpColor(C_LAKE, C_INDIGO, t);
-      foamCol = C_FOAM;
+      title = "MID-LAKE WINNIPEG";
+      const t = (score - 750) / 250;
+      skyTop = lerpColor(PAL.DAY_SKY_T, PAL.NIGHT_SKY_T, t);
+      skyBot = lerpColor(PAL.DAY_SKY_B, PAL.NIGHT_SKY_B, t);
+      gndTop = lerpColor(PAL.MID_PINE, '#14262E', t);
+      gndMid = lerpColor(PAL.DARK_PINE, '#0B161C', t);
+      gndDark = '#060D12';
+      watDeep = lerpColor(PAL.LAKE_DEEP, PAL.INDIGO_DEEP, t);
+      watMid = lerpColor(PAL.LAKE_MID, PAL.INDIGO_MID, t);
+      watFoam = lerpColor(PAL.LAKE_FOAM, '#277DA1', t);
     } else if (score < 1250) {
-      levelTitle = "MIDNIGHT LAKE";
-      let t = (score - 1000) / 250;
-      skyCol = lerpColor(C_NIGHT, C_ACC3, t);
-      gndCol = lerpColor(C_BASE, C_SNOW, t);
-      watCol = lerpColor(C_INDIGO, C_ACC3, t);
-      foamCol = lerpColor(C_FOAM, C_SNOW, t);
+      title = "MIDNIGHT LAKE";
+      const t = (score - 1000) / 250;
+      skyTop = lerpColor(PAL.NIGHT_SKY_T, PAL.DAY_SKY_T, t);
+      skyBot = lerpColor(PAL.NIGHT_SKY_B, PAL.DAY_SKY_B, t);
+      gndTop = lerpColor('#14262E', PAL.SNOW_LIGHT, t);
+      gndMid = lerpColor('#0B161C', PAL.SNOW_MID, t);
+      gndDark = lerpColor('#060D12', PAL.SNOW_DARK, t);
+      watDeep = lerpColor(PAL.INDIGO_DEEP, PAL.ICE_DEEP, t);
+      watMid = lerpColor(PAL.INDIGO_MID, PAL.ICE_MID, t);
+      watFoam = lerpColor('#277DA1', PAL.SNOW_LIGHT, t);
     } else {
-      levelTitle = "BOREAL WINTER TRAIL";
-      skyCol = C_ACC3; gndCol = C_SNOW; watCol = C_ACC3; foamCol = C_SNOW;
+      title = "BOREAL WINTER TRAIL";
+      skyTop = PAL.DAY_SKY_T;
+      skyBot = PAL.DAY_SKY_B;
+      gndTop = PAL.SNOW_LIGHT;
+      gndMid = PAL.SNOW_MID;
+      gndDark = PAL.SNOW_DARK;
+      watDeep = PAL.ICE_DEEP;
+      watMid = PAL.ICE_MID;
+      watFoam = PAL.SNOW_LIGHT;
     }
 
-    if (titleDisplay.innerText !== levelTitle) titleDisplay.innerText = levelTitle;
+    return { skyTop, skyBot, gndTop, gndMid, gndDark, watDeep, watMid, watFoam, title };
+  }
 
-    // 1. Sky
-    ctx.fillStyle = skyCol;
-    ctx.fillRect(0, 0, 160, 80);
-
-    // 2. Parallax Ground
-    ctx.fillStyle = gndCol;
-    ctx.fillRect(0, 20, 160, 16);
-    
-    let grassOffset = (bgOffset * 0.3) % 40;
-    if (score < 1250) {
-      ctx.fillStyle = (score > 750 && score < 1250) ? C_ACC3 : C_BASE;
-      for(let i=-40; i<200; i+=20) {
-        ctx.fillRect(i - grassOffset, 22, 2, 4);
-        ctx.fillRect(i - grassOffset + 8, 26, 2, 3);
-      }
+  // ==========================================
+  // 4. SNES SHADED SPRITE & SCENERY ART
+  // ==========================================
+  function drawCanoeAndHunter(x, y, frameCount) {
+    const isWinter = score >= 1250;
+    if (isWinter) {
+      drawDogSledAndHunter(x, y, frameCount);
+      return;
     }
 
-    // 3. Scenery
-    let sceneOffset = (bgOffset * 0.4) % 240;
-    let isSil = (score > 900 && score < 1200);
-    let isWinter = (score >= 1250);
-    
-    for(let i=-240; i<320; i+=240) {
-      if (score < 250) {
-        drawTreePatch(i - sceneOffset + 20, 12, C_ACC2, C_BASE);
-        drawBuffalo(i - sceneOffset + 70, 24, '#A83318');
-        drawTipi(i - sceneOffset + 145, 20, C_ACC3, C_BASE);
-      } else if (score < 500) {
-        drawTreePatch(i - sceneOffset + 20, 12, '#88A326', C_BASE);
-        drawTreePatch(i - sceneOffset + 140, 10, '#88A326', C_BASE);
-      } else {
-        drawShorelineRock(i - sceneOffset + 10, 20, isSil ? C_BASE : (isWinter ? C_SNOW : C_ACC3), isSil || isWinter ? null : C_ACC2);
-        drawTreePatch(i - sceneOffset + 40, 10, isSil ? C_BASE : (isWinter ? C_ACC3 : C_ACC2), C_BASE);
-        drawShorelineRock(i - sceneOffset + 160, 18, isSil ? C_BASE : (isWinter ? C_SNOW : C_ACC3), isSil || isWinter ? null : C_ACC2);
-        drawTreePatch(i - sceneOffset + 200, 14, isSil ? C_BASE : (isWinter ? C_ACC3 : C_ACC2), C_BASE);
-      }
-    }
+    const bob = Math.sin(frameCount * 0.14) * 1;
+    const py = Math.round(y + bob);
 
-    // Static Landmarks
-    let absoluteVirtualX = (bgOffset * 0.4);
-    if (absoluteVirtualX < 200) {
-      drawFort(100 - absoluteVirtualX, 15, false);
-    }
-    if (absoluteVirtualX > 1100 && absoluteVirtualX < 1400) {
-      drawFort(1300 - absoluteVirtualX, 15, false);
-    }
+    // Water shadow under hull
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.fillRect(x + 2, py + 11, 24, 2);
 
-    // 4. River / Track
-    ctx.fillStyle = watCol;
-    ctx.fillRect(0, 36, 160, 44);
+    // Birchbark Canoe Hull (Shaded 3-tone)
+    ctx.fillStyle = PAL.OUTLINE;
+    ctx.fillRect(x + 1, py + 6, 26, 5);
+    ctx.fillRect(x, py + 5, 2, 3);
+    ctx.fillRect(x + 26, py + 5, 2, 3);
 
-    // 5. Current Lines
-    ctx.fillStyle = foamCol;
-    for(let i=0; i<6; i++) {
-      ctx.fillRect(((bgOffset * 0.5) + i*35) % 160, 42, 14, 2);
-      ctx.fillRect(((bgOffset * 0.55) + i*40 + 20) % 160, 56, 10, 2);
-      ctx.fillRect(((bgOffset * 0.6) + i*30 + 10) % 160, 70, 16, 2);
-    }
+    // Upper rim highlight
+    ctx.fillStyle = PAL.HIDE_LIGHT;
+    ctx.fillRect(x + 2, py + 6, 24, 1);
+    ctx.fillRect(x + 1, py + 5, 2, 1);
+    ctx.fillRect(x + 25, py + 5, 2, 1);
 
-    // 6. Obstacles
-    for(let i=0; i<obstacles.length; i++) {
-      let obs = obstacles[i];
-      let yPos = obs.lane === 0 ? 38 : (obs.lane === 1 ? 52 : 66);
-      
-      if(obs.type === 'whirlpool') {
-        ctx.save();
-        ctx.translate(obs.x + 5, yPos + 5);
-        ctx.rotate(frame * 0.2); 
-        ctx.translate(-(obs.x + 5), -(yPos + 5));
-        drawSprite(whirlSprite, obs.x, yPos, {5: C_SNOW});
-        ctx.restore();
-      } else {
-        let palette = obs.type === 'log' ? {4: C_ACC3, 5: C_SNOW} : {2: C_SEC, 5: C_SNOW};
-        let sprite = obs.type === 'log' ? logSprite : rockSprite;
-        drawSprite(sprite, obs.x, yPos, palette);
-      }
-    }
+    // Mid birchbark body
+    ctx.fillStyle = PAL.HIDE_MID;
+    ctx.fillRect(x + 2, py + 7, 24, 2);
 
-    // 7. Player
-    let playerY = playerLane === 0 ? 34 : (playerLane === 1 ? 48 : 62);
-    let pSprite = isWinter ? dogsledSprite : canoeSprite;
-    
-    if (isSpinning) {
-      ctx.save();
-      ctx.translate(29, playerY + 5); 
-      ctx.rotate((60 - spinFrame) * 0.4); 
-      ctx.translate(-29, -(playerY + 5));
-      drawSprite(pSprite, 15, playerY, {1: '#000000', 2: C_SEC, 4: C_ACC2, 5: C_ACC3});
-      ctx.restore();
+    // Lower hull shadow
+    ctx.fillStyle = PAL.HIDE_DARK;
+    ctx.fillRect(x + 4, py + 9, 20, 1);
+
+    // Decorative gunwale stitching
+    ctx.fillStyle = PAL.SASH_RED;
+    ctx.fillRect(x + 5, py + 7, 2, 1);
+    ctx.fillRect(x + 21, py + 7, 2, 1);
+
+    // Cargo bundle in bow
+    ctx.fillStyle = PAL.WOOD_MID;
+    ctx.fillRect(x + 17, py + 4, 5, 2);
+    ctx.fillStyle = PAL.WOOD_LIGHT;
+    ctx.fillRect(x + 18, py + 4, 3, 1);
+
+    // Cree Trapper (Seated in stern/mid, fringed hide jacket, no headdress)
+    const hx = x + 9;
+    const hy = py - 2;
+
+    // Torso (Fringed buckskin jacket)
+    ctx.fillStyle = PAL.OUTLINE;
+    ctx.fillRect(hx, hy + 3, 6, 4);
+    ctx.fillStyle = PAL.HIDE_MID;
+    ctx.fillRect(hx + 1, hy + 3, 4, 3);
+    ctx.fillStyle = PAL.HIDE_LIGHT;
+    ctx.fillRect(hx + 1, hy + 3, 2, 2);
+    // Fringe pixels
+    ctx.fillStyle = PAL.HIDE_LIGHT;
+    ctx.fillRect(hx + 1, hy + 6, 1, 1);
+    ctx.fillRect(hx + 3, hy + 6, 1, 1);
+    ctx.fillRect(hx + 5, hy + 6, 1, 1);
+    // Red sash belt
+    ctx.fillStyle = PAL.SASH_RED;
+    ctx.fillRect(hx + 1, hy + 5, 4, 1);
+
+    // Head & Dark Hair (Steady, never bends at neck)
+    ctx.fillStyle = PAL.OUTLINE;
+    ctx.fillRect(hx + 1, hy - 1, 4, 4);
+    ctx.fillStyle = '#C98E63'; // Face
+    ctx.fillRect(hx + 3, hy, 2, 2);
+    ctx.fillStyle = '#14110F'; // Hair
+    ctx.fillRect(hx + 1, hy - 1, 3, 3);
+    ctx.fillRect(hx, hy + 1, 2, 2);
+
+    // Animated Paddling Cycle (4-frame smooth stroke with solid, straight paddle)
+    const strokePhase = Math.floor(frameCount / 7) % 4;
+    // Paddle angle/offset: 0 = forward reach, 1 = mid pull, 2 = back sweep, 3 = recovery lift
+    let handFrontX = hx + 5, handFrontY = hy + 4;
+    let handBackX = hx + 2, handBackY = hy + 3;
+    let tipX = hx + 8, tipY = py + 11;
+    let bladeX = hx + 6, bladeY = py + 10;
+
+    if (strokePhase === 0) {
+      // Forward dip
+      handFrontX = hx + 6; handFrontY = hy + 4;
+      handBackX = hx + 3; handBackY = hy + 2;
+      bladeX = hx + 8; bladeY = py + 10;
+    } else if (strokePhase === 1) {
+      // Power pull straight down
+      handFrontX = hx + 4; handFrontY = hy + 4;
+      handBackX = hx + 2; handBackY = hy + 2;
+      bladeX = hx + 4; bladeY = py + 11;
+    } else if (strokePhase === 2) {
+      // Aft sweep
+      handFrontX = hx + 2; handFrontY = hy + 4;
+      handBackX = hx + 0; handBackY = hy + 2;
+      bladeX = hx - 1; bladeY = py + 10;
     } else {
-      let bob = (frame % 12 < 6 && !isWinter) ? 1 : 0;
-      drawSprite(pSprite, 15, playerY + bob, {1: '#000000', 2: C_SEC, 4: C_ACC2, 5: C_ACC3});
+      // Recovery lift above water
+      handFrontX = hx + 4; handFrontY = hy + 3;
+      handBackX = hx + 1; handBackY = hy + 2;
+      bladeX = hx + 3; bladeY = py + 8;
+    }
+
+    // Arms
+    ctx.fillStyle = PAL.HIDE_LIGHT;
+    ctx.fillRect(handBackX, handBackY, 2, 2);
+    ctx.fillRect(handFrontX, handFrontY, 2, 2);
+
+    // Solid Straight Wooden Paddle (Drawn from top grip to blade via Bresenham/linear steps)
+    const topX = handBackX;
+    const topY = handBackY - 2;
+    const steps = 8;
+    for (let s = 0; s <= steps; s++) {
+      const t = s / steps;
+      const sx = Math.round(topX + (bladeX - topX) * t);
+      const sy = Math.round(topY + (bladeY - topY) * t);
+      ctx.fillStyle = s >= 6 ? PAL.WOOD_LIGHT : PAL.WOOD_MID;
+      ctx.fillRect(sx, sy, s >= 6 ? 2 : 1, 1);
+    }
+
+    // Water splash ripple when blade is submerged (phases 0, 1, 2)
+    if (strokePhase !== 3) {
+      ctx.fillStyle = PAL.SNOW_LIGHT;
+      ctx.fillRect(bladeX - 1, py + 10, 3, 1);
     }
   }
 
+  function drawDogSledAndHunter(x, y, frameCount) {
+    const py = Math.round(y);
+    const runStep = Math.floor(frameCount / 5) % 2;
+
+    // Two Huskies pulling ahead
+    for (let d = 0; d < 2; d++) {
+      const dx = x + 22 + d * 11;
+      const dy = py + 4 + (d === runStep ? 0 : 1);
+      // Harness line
+      ctx.fillStyle = PAL.WOOD_LIGHT;
+      ctx.fillRect(x + 17, py + 7, dx - (x + 17), 1);
+
+      // Dog body (SNES shaded grey/white husky)
+      ctx.fillStyle = PAL.STONE_DARK;
+      ctx.fillRect(dx, dy, 7, 4);
+      ctx.fillStyle = PAL.SNOW_LIGHT;
+      ctx.fillRect(dx + 1, dy + 1, 5, 2);
+      // Head & ears
+      ctx.fillStyle = PAL.STONE_DARK;
+      ctx.fillRect(dx + 6, dy - 2, 3, 3);
+      ctx.fillStyle = PAL.SNOW_LIGHT;
+      ctx.fillRect(dx + 7, dy - 1, 2, 2);
+      // Tail
+      ctx.fillStyle = PAL.STONE_MID;
+      ctx.fillRect(dx - 2, dy - 1, 2, 2);
+      // Animated legs
+      ctx.fillStyle = PAL.SNOW_LIGHT;
+      if (runStep === 0) {
+        ctx.fillRect(dx, dy + 4, 1, 2);
+        ctx.fillRect(dx + 6, dy + 4, 1, 2);
+      } else {
+        ctx.fillRect(dx + 2, dy + 4, 1, 2);
+        ctx.fillRect(dx + 4, dy + 4, 1, 2);
+      }
+    }
+
+    // Wooden Toboggan Sled
+    ctx.fillStyle = PAL.WOOD_DARK;
+    ctx.fillRect(x + 2, py + 9, 16, 2);
+    ctx.fillRect(x + 16, py + 6, 2, 4);
+    ctx.fillStyle = PAL.WOOD_LIGHT;
+    ctx.fillRect(x + 3, py + 8, 13, 1);
+
+    // Fur cargo pack on sled
+    ctx.fillStyle = PAL.HIDE_DARK;
+    ctx.fillRect(x + 8, py + 4, 7, 4);
+    ctx.fillStyle = PAL.HIDE_LIGHT;
+    ctx.fillRect(x + 9, py + 4, 5, 2);
+
+    // Hunter standing on sled runners
+    ctx.fillStyle = PAL.HIDE_MID;
+    ctx.fillRect(x + 2, py + 1, 4, 7);
+    ctx.fillStyle = PAL.SASH_RED;
+    ctx.fillRect(x + 2, py + 4, 4, 1);
+    ctx.fillStyle = '#14110F';
+    ctx.fillRect(x + 2, py - 2, 4, 3);
+  }
+
+  // Shaded SNES Background Props
+  function drawShadedPine(x, y, isWinter, isSil) {
+    if (isSil) {
+      ctx.fillStyle = '#070E14';
+      ctx.fillRect(x + 5, y, 2, 14);
+      ctx.fillRect(x + 3, y + 3, 6, 3);
+      ctx.fillRect(x + 2, y + 6, 8, 3);
+      ctx.fillRect(x + 1, y + 9, 10, 3);
+      return;
+    }
+    // Trunk
+    ctx.fillStyle = PAL.WOOD_DARK;
+    ctx.fillRect(x + 5, y + 11, 2, 4);
+    // 3-tier shaded foliage
+    const cDark = isWinter ? PAL.SNOW_DARK : PAL.DARK_PINE;
+    const cMid = isWinter ? PAL.SNOW_MID : PAL.MID_PINE;
+    const cLight = isWinter ? PAL.SNOW_LIGHT : PAL.LIGHT_PINE;
+
+    ctx.fillStyle = cDark;
+    ctx.fillRect(x + 4, y, 4, 4);
+    ctx.fillRect(x + 2, y + 4, 8, 4);
+    ctx.fillRect(x + 1, y + 8, 10, 4);
+
+    ctx.fillStyle = cMid;
+    ctx.fillRect(x + 4, y, 3, 3);
+    ctx.fillRect(x + 3, y + 4, 6, 3);
+    ctx.fillRect(x + 2, y + 8, 7, 3);
+
+    ctx.fillStyle = cLight;
+    ctx.fillRect(x + 4, y + 1, 2, 2);
+    ctx.fillRect(x + 3, y + 4, 3, 2);
+    ctx.fillRect(x + 2, y + 8, 4, 2);
+  }
+
+  function drawShadedTipi(x, y) {
+    // Tipi Shadow & Base
+    ctx.fillStyle = PAL.HIDE_DARK;
+    ctx.beginPath();
+    ctx.moveTo(x + 7, y);
+    ctx.lineTo(x + 14, y + 12);
+    ctx.lineTo(x, y + 12);
+    ctx.fill();
+
+    // Sunlit left face
+    ctx.fillStyle = PAL.HIDE_LIGHT;
+    ctx.beginPath();
+    ctx.moveTo(x + 7, y);
+    ctx.lineTo(x + 8, y + 12);
+    ctx.lineTo(x, y + 12);
+    ctx.fill();
+
+    // Smoke flaps & poles
+    ctx.fillStyle = PAL.WOOD_DARK;
+    ctx.fillRect(x + 6, y - 2, 1, 3);
+    ctx.fillRect(x + 8, y - 2, 1, 3);
+    // Doorway
+    ctx.fillStyle = PAL.OUTLINE;
+    ctx.fillRect(x + 6, y + 8, 2, 4);
+    // Decorative red band
+    ctx.fillStyle = PAL.SASH_RED;
+    ctx.fillRect(x + 3, y + 6, 8, 1);
+  }
+
+  function drawShadedBuffalo(x, y) {
+    // Deep brown shaded hide with ivory horns
+    ctx.fillStyle = '#2B1810';
+    ctx.fillRect(x + 1, y + 1, 8, 5);
+    ctx.fillRect(x, y + 2, 3, 4); // Shaggy shoulder hump
+    ctx.fillStyle = '#4A2C1D';
+    ctx.fillRect(x + 1, y + 1, 5, 2); // Top highlight
+    // Horns
+    ctx.fillStyle = PAL.HIDE_LIGHT;
+    ctx.fillRect(x, y + 1, 1, 2);
+    // Legs
+    ctx.fillStyle = '#1A0E09';
+    ctx.fillRect(x + 2, y + 6, 1, 2);
+    ctx.fillRect(x + 7, y + 6, 1, 2);
+  }
+
+  function drawShieldOutcrop(x, y, isWinter, isSil) {
+    if (isSil) {
+      ctx.fillStyle = '#070E14';
+      ctx.fillRect(x + 2, y + 2, 14, 7);
+      ctx.fillRect(x, y + 5, 18, 4);
+      return;
+    }
+    ctx.fillStyle = PAL.STONE_DARK;
+    ctx.fillRect(x + 1, y + 2, 16, 7);
+    ctx.fillRect(x, y + 5, 18, 4);
+    ctx.fillStyle = isWinter ? PAL.SNOW_MID : PAL.STONE_MID;
+    ctx.fillRect(x + 2, y + 2, 12, 4);
+    ctx.fillStyle = isWinter ? PAL.SNOW_LIGHT : PAL.STONE_LIGHT;
+    ctx.fillRect(x + 3, y + 2, 8, 2);
+  }
+
+  // One-Off Historic Fort Landmark
+  function drawFortLandmark(x, y, name) {
+    // Bastion walls (Stone/Timber shaded)
+    ctx.fillStyle = PAL.STONE_DARK;
+    ctx.fillRect(x, y + 4, 34, 10);
+    ctx.fillStyle = PAL.STONE_MID;
+    ctx.fillRect(x + 1, y + 4, 32, 8);
+    ctx.fillStyle = PAL.STONE_LIGHT;
+    ctx.fillRect(x + 1, y + 4, 32, 2);
+
+    // Corner Bastion Towers
+    ctx.fillStyle = PAL.STONE_MID;
+    ctx.fillRect(x - 2, y, 7, 14);
+    ctx.fillRect(x + 29, y, 7, 14);
+    ctx.fillStyle = PAL.MAROON_MID; // Pitched roofs
+    ctx.fillRect(x - 3, y - 2, 9, 2);
+    ctx.fillRect(x + 28, y - 2, 9, 2);
+
+    // Central Gate & Flagpole
+    ctx.fillStyle = PAL.WOOD_DARK;
+    ctx.fillRect(x + 14, y + 7, 6, 7);
+    ctx.fillStyle = PAL.WOOD_LIGHT;
+    ctx.fillRect(x + 16, y - 6, 1, 10);
+    ctx.fillStyle = PAL.SASH_RED;
+    ctx.fillRect(x + 17, y - 6, 5, 3);
+  }
+
+  // ==========================================
+  // 5. MEANDERING BANKS, FORKED ISLANDS & DEBRIS
+  // ==========================================
+  function resetWorld() {
+    terrainSegments = [];
+    hazards = [];
+    landmarks = [];
+    upperFortSpawned = false;
+    lowerFortSpawned = false;
+    nextSpawnX = 0;
+    lastBankPattern = 'OPEN';
+
+    // Spawn Upper Fort Garry ONCE at the start
+    landmarks.push({ x: 38, type: 'UPPER_FORT' });
+    upperFortSpawned = true;
+
+    // Pre-populate safe starting river segments
+    while (nextSpawnX < VIEW_W + 120) {
+      terrainSegments.push({
+        x: nextSpawnX,
+        w: 48,
+        pattern: 'OPEN', // All 3 lanes open
+        topBlock: false,
+        midBlock: false,
+        botBlock: false
+      });
+      nextSpawnX += 48;
+    }
+  }
+
+  function generateNextSegment() {
+    // Trigger Lower Fort Garry ONCE around score 380-420
+    if (!lowerFortSpawned && score >= 380) {
+      landmarks.push({ x: VIEW_W + 30, type: 'LOWER_FORT' });
+      lowerFortSpawned = true;
+    }
+
+    const segW = 64;
+    // Choose a meandering river pattern that ALWAYS leaves at least 1 valid track open
+    const patterns = ['OPEN', 'OPEN', 'TOP_BANK', 'BOT_BANK', 'ISLAND_FORK'];
+    let chosen = patterns[Math.floor(Math.random() * patterns.length)];
+
+    // Ensure smooth transitions so impossible walls never occur
+    if (lastBankPattern === 'TOP_BANK' && chosen === 'BOT_BANK') chosen = 'OPEN';
+    if (lastBankPattern === 'BOT_BANK' && chosen === 'TOP_BANK') chosen = 'OPEN';
+    if (lastBankPattern === 'ISLAND_FORK' && chosen === 'ISLAND_FORK') chosen = 'OPEN';
+
+    const seg = {
+      x: nextSpawnX,
+      w: segW,
+      pattern: chosen,
+      topBlock: chosen === 'TOP_BANK',
+      midBlock: chosen === 'ISLAND_FORK',
+      botBlock: chosen === 'BOT_BANK'
+    };
+
+    terrainSegments.push(seg);
+    lastBankPattern = chosen;
+
+    // Spawn river debris (rumble logs) or infrequent impassable shallow rocks on open lanes
+    const openLanes = [];
+    if (!seg.topBlock) openLanes.push(0);
+    if (!seg.midBlock) openLanes.push(1);
+    if (!seg.botBlock) openLanes.push(2);
+
+    if (openLanes.length > 0 && Math.random() < 0.62) {
+      const targetLane = openLanes[Math.floor(Math.random() * openLanes.length)];
+      // Infrequent shallow rock only if there is at least 1 other open lane to dodge into
+      const canSpawnRock = openLanes.length >= 2 && Math.random() < 0.24;
+      hazards.push({
+        x: nextSpawnX + Math.floor(segW * 0.45),
+        lane: targetLane,
+        type: canSpawnRock ? 'SHALLOW_ROCK' : 'LOG',
+        triggered: false
+      });
+    }
+
+    nextSpawnX += segW;
+  }
+
+  // ==========================================
+  // 6. RENDERING PIPELINE
+  // ==========================================
+  function drawScene() {
+    const env = getEnvColors();
+    if (titleDisplay.innerText !== env.title) {
+      titleDisplay.innerText = env.title;
+    }
+
+    // Track Geometry (Dynamic vertical layout anchored to viewport height)
+    const hudH = 36;
+    const playTop = hudH;
+    const playH = VIEW_H - hudH;
+    const bankTopY = playTop + Math.floor(playH * 0.22);
+    const riverTopY = bankTopY + 14;
+    const riverH = VIEW_H - riverTopY;
+    const laneH = Math.floor(riverH / 3);
+
+    // Smoothly interpolate player's visual Y position toward selected lane
+    const targetPlayerY = riverTopY + playerLane * laneH + Math.floor((laneH - 12) / 2);
+    if (playerVisualY === 0) playerVisualY = targetPlayerY;
+    playerVisualY += (targetPlayerY - playerVisualY) * 0.28;
+
+    ctx.save();
+    // Apply hull rumble screen shake when hitting floating logs/currents
+    if (shakeTimer > 0) {
+      const sx = (Math.random() - 0.5) * 3;
+      const sy = (Math.random() - 0.5) * 3;
+      ctx.translate(Math.round(sx), Math.round(sy));
+    }
+
+    // 1. Shaded Sky Band
+    ctx.fillStyle = env.skyTop;
+    ctx.fillRect(0, 0, VIEW_W, bankTopY);
+    ctx.fillStyle = env.skyBot;
+    ctx.fillRect(0, Math.floor(bankTopY * 0.55), VIEW_W, bankTopY);
+
+    // Distant Parallax Clouds
+    const cloudOff = (bgOffset * 0.12) % 160;
+    ctx.fillStyle = (score >= 750 && score < 1200) ? '#2E2354' : '#FFFFFF';
+    for (let cx = -160; cx < VIEW_W + 160; cx += 160) {
+      ctx.fillRect(Math.round(cx - cloudOff + 20), playTop + 4, 24, 3);
+      ctx.fillRect(Math.round(cx - cloudOff + 24), playTop + 2, 14, 2);
+    }
+
+    // 2. Parallax Horizon Bank
+    ctx.fillStyle = env.gndTop;
+    ctx.fillRect(0, bankTopY, VIEW_W, 5);
+    ctx.fillStyle = env.gndMid;
+    ctx.fillRect(0, bankTopY + 5, VIEW_W, 5);
+    ctx.fillStyle = env.gndDark;
+    ctx.fillRect(0, bankTopY + 10, VIEW_W, 4);
+
+    // 3. Repeating Parallax Scenery Props
+    const isSil = (score >= 820 && score < 1200);
+    const isWinter = (score >= 1250);
+    const propSpacing = 180;
+    const propOff = (bgOffset * 0.38) % propSpacing;
+
+    for (let px = -propSpacing; px < VIEW_W + propSpacing; px += propSpacing) {
+      const baseX = Math.round(px - propOff);
+      if (score < 250) {
+        drawShadedPine(baseX + 16, bankTopY - 10, false, false);
+        drawShadedBuffalo(baseX + 64, bankTopY + 1);
+        drawShadedBuffalo(baseX + 78, bankTopY + 3);
+        drawShadedTipi(baseX + 122, bankTopY - 7);
+      } else if (score < 500) {
+        drawShadedPine(baseX + 20, bankTopY - 10, false, false);
+        drawShadedPine(baseX + 95, bankTopY - 11, false, false);
+        drawShieldOutcrop(baseX + 140, bankTopY - 3, false, false);
+      } else {
+        drawShieldOutcrop(baseX + 14, bankTopY - 3, isWinter, isSil);
+        drawShadedPine(baseX + 46, bankTopY - 10, isWinter, isSil);
+        drawShieldOutcrop(baseX + 108, bankTopY - 2, isWinter, isSil);
+        drawShadedPine(baseX + 142, bankTopY - 11, isWinter, isSil);
+      }
+    }
+
+    // 4. Unique One-Off Historic Landmarks (Upper & Lower Fort Garry)
+    for (let i = 0; i < landmarks.length; i++) {
+      const lm = landmarks[i];
+      drawFortLandmark(Math.round(lm.x), bankTopY - 9, lm.type);
+    }
+
+    // 5. Main River / Ice Channel
+    ctx.fillStyle = env.watDeep;
+    ctx.fillRect(0, riverTopY, VIEW_W, riverH);
+
+    // Subtle shaded lane currents & water shimmer
+    ctx.fillStyle = env.watMid;
+    ctx.fillRect(0, riverTopY + laneH, VIEW_W, laneH);
+
+    ctx.fillStyle = env.watFoam;
+    const rippleCount = Math.ceil(VIEW_W / 38) + 1;
+    for (let i = 0; i < rippleCount; i++) {
+      const rx1 = Math.round(((bgOffset * 0.55) + i * 38) % VIEW_W);
+      const rx2 = Math.round(((bgOffset * 0.65) + i * 44 + 18) % VIEW_W);
+      const rx3 = Math.round(((bgOffset * 0.50) + i * 34 + 9) % VIEW_W);
+      ctx.fillRect(rx1, riverTopY + Math.floor(laneH * 0.5), 10, 1);
+      ctx.fillRect(rx2, riverTopY + laneH + Math.floor(laneH * 0.5), 12, 1);
+      ctx.fillRect(rx3, riverTopY + laneH * 2 + Math.floor(laneH * 0.5), 9, 1);
+    }
+
+    // 6. Meandering Riverbanks & Forked Islands (Natural Shaded Blend)
+    for (let i = 0; i < terrainSegments.length; i++) {
+      const seg = terrainSegments[i];
+      const sx = Math.round(seg.x);
+      const sw = seg.w;
+
+      // Top Bank Encroaching into Lane 0
+      if (seg.topBlock) {
+        const by = riverTopY;
+        const bh = laneH + 2;
+        // Foam border
+        ctx.fillStyle = env.watFoam;
+        ctx.fillRect(sx + 2, by + bh, sw - 4, 2);
+        // Shaded bank body
+        ctx.fillStyle = env.gndDark;
+        ctx.fillRect(sx + 2, by, sw - 4, bh);
+        ctx.fillStyle = env.gndMid;
+        ctx.fillRect(sx + 4, by, sw - 8, bh - 2);
+        ctx.fillStyle = env.gndTop;
+        ctx.fillRect(sx + 6, by, sw - 12, bh - 5);
+        // Bank foliage detail
+        drawShadedPine(sx + Math.floor(sw / 2) - 6, by - 4, isWinter, isSil);
+      }
+
+      // Bottom Bank Encroaching into Lane 2
+      if (seg.botBlock) {
+        const by = riverTopY + laneH * 2 - 2;
+        const bh = riverH - (laneH * 2) + 2;
+        // Foam border
+        ctx.fillStyle = env.watFoam;
+        ctx.fillRect(sx + 2, by - 2, sw - 4, 2);
+        // Shaded bank body
+        ctx.fillStyle = env.gndTop;
+        ctx.fillRect(sx + 4, by, sw - 8, bh);
+        ctx.fillStyle = env.gndMid;
+        ctx.fillRect(sx + 2, by + 3, sw - 4, bh - 3);
+        ctx.fillStyle = env.gndDark;
+        ctx.fillRect(sx, by + 6, sw, bh - 6);
+        drawShieldOutcrop(sx + Math.floor(sw / 2) - 8, by + 1, isWinter, isSil);
+      }
+
+      // Center Island Fork Blocking Lane 1 (Forcing Upper or Lower Fork)
+      if (seg.midBlock) {
+        const iy = riverTopY + laneH + 1;
+        const ih = laneH - 2;
+        // White-water foam around island
+        ctx.fillStyle = env.watFoam;
+        ctx.fillRect(sx + 3, iy - 1, sw - 6, ih + 2);
+        ctx.fillRect(sx + 1, iy + 2, sw - 2, ih - 4);
+        // Shaded island sandbar/rock & grass
+        ctx.fillStyle = env.gndDark;
+        ctx.fillRect(sx + 3, iy, sw - 6, ih);
+        ctx.fillStyle = env.gndMid;
+        ctx.fillRect(sx + 5, iy + 1, sw - 10, ih - 2);
+        ctx.fillStyle = env.gndTop;
+        ctx.fillRect(sx + 7, iy + 2, sw - 14, ih - 5);
+        drawShadedPine(sx + Math.floor(sw / 2) - 6, iy - 6, isWinter, isSil);
+      }
+    }
+
+    // 7. Floating Debris (Rumble Logs) & Shallow Impassable Rocks
+    for (let i = 0; i < hazards.length; i++) {
+      const h = hazards[i];
+      const hx = Math.round(h.x);
+      const hy = riverTopY + h.lane * laneH + Math.floor((laneH - 8) / 2);
+
+      if (h.type === 'LOG') {
+        // Shaded floating timber log (Causes unstable canoe rumble, non-fatal)
+        ctx.fillStyle = PAL.OUTLINE;
+        ctx.fillRect(hx, hy + 1, 14, 5);
+        ctx.fillStyle = PAL.WOOD_DARK;
+        ctx.fillRect(hx + 1, hy + 3, 12, 2);
+        ctx.fillStyle = PAL.WOOD_MID;
+        ctx.fillRect(hx + 1, hy + 2, 12, 2);
+        ctx.fillStyle = PAL.WOOD_LIGHT;
+        ctx.fillRect(hx + 2, hy + 1, 10, 1);
+        // Subtle water ripple
+        ctx.fillStyle = env.watFoam;
+        ctx.fillRect(hx - 1, hy + 6, 15, 1);
+      } else {
+        // Clearly highlighted shallow jagged rock with white water foam (Fatal if hit)
+        ctx.fillStyle = PAL.SNOW_LIGHT;
+        ctx.fillRect(hx - 1, hy + 5, 14, 3); // Bright foam collar
+        ctx.fillStyle = PAL.OUTLINE;
+        ctx.fillRect(hx + 1, hy, 10, 6);
+        ctx.fillStyle = PAL.STONE_DARK;
+        ctx.fillRect(hx + 2, hy + 3, 8, 3);
+        ctx.fillStyle = PAL.STONE_MID;
+        ctx.fillRect(hx + 2, hy + 1, 8, 3);
+        ctx.fillStyle = PAL.SNOW_LIGHT;
+        ctx.fillRect(hx + 3, hy + 1, 5, 1); // Dry sunlit peak highlight
+      }
+    }
+
+    // 8. Player Canoe / Dog Sled Sprite
+    drawCanoeAndHunter(18, playerVisualY, frame);
+
+    ctx.restore();
+  }
+
+  // ==========================================
+  // 7. COLLISIONS & UPDATE LOOP
+  // ==========================================
   function checkCollisions() {
-    let pBox = { x: 19, y: playerLane === 0 ? 34 : (playerLane === 1 ? 48 : 62), w: 20, h: 8 };
-    for(let i=0; i<obstacles.length; i++) {
-      let obs = obstacles[i];
-      let oBox = { x: obs.x, y: obs.lane === 0 ? 38 : (obs.lane === 1 ? 52 : 66), w: 10, h: 6 };
-      
-      if (!obs.hit && pBox.x < oBox.x + oBox.w && pBox.x + pBox.w > oBox.x &&
-          pBox.y < oBox.y + oBox.h && pBox.y + pBox.h > oBox.y) {
-        if(obs.type === 'whirlpool') {
-          obs.hit = true; isSpinning = true; spinFrame = 60; playerLane = 1; 
-        } else {
+    const pLeft = 20;
+    const pRight = 40;
+
+    // 1. Check Meandering Riverbank & Forked Island Groundings (Fatal)
+    for (let i = 0; i < terrainSegments.length; i++) {
+      const seg = terrainSegments[i];
+      // Inner hit margin (+5px) so visual tapered edges feel fair
+      if (pRight > seg.x + 5 && pLeft < seg.x + seg.w - 5) {
+        if ((playerLane === 0 && seg.topBlock) ||
+            (playerLane === 1 && seg.midBlock) ||
+            (playerLane === 2 && seg.botBlock)) {
+          crashReason = seg.midBlock ? "STRANDED ON ISLAND!" : "RUN AGROUND ON BANK!";
           gameOver();
+          return;
         }
       }
-      
-      if(!obs.passed && obs.x < 15) {
-        if(!obs.hit) score += 10; 
-        obs.passed = true;
+    }
+
+    // 2. Check Floating Logs (Unstable Rumble) & Shallow Rocks (Fatal)
+    for (let i = 0; i < hazards.length; i++) {
+      const h = hazards[i];
+      if (!h.triggered && h.lane === playerLane && pRight > h.x + 2 && pLeft < h.x + 11) {
+        h.triggered = true;
+        if (h.type === 'SHALLOW_ROCK') {
+          crashReason = "HIT SHALLOW ROCK!";
+          gameOver();
+          return;
+        } else if (h.type === 'LOG') {
+          // Unstable canoe rumble & slight current drag without ending run
+          shakeTimer = 28;
+          slowTimer = 35;
+          playRumbleSound();
+        }
       }
     }
   }
 
   function update() {
-    if(!isPlaying) return;
-    
-    bgOffset += speed;
-    scoreDisplay.innerText = 'DIST: ' + score;
-    speed += 0.0005; 
+    if (!isPlaying || isPaused) return;
 
-    if (isSpinning) {
-      spinFrame--;
-      if (spinFrame <= 0) isSpinning = false;
+    const currentSpeed = slowTimer > 0 ? speed * 0.65 : speed;
+    if (slowTimer > 0) slowTimer--;
+    if (shakeTimer > 0) shakeTimer--;
+
+    bgOffset += currentSpeed;
+    nextSpawnX -= currentSpeed;
+
+    // Score increments steadily with distance traveled
+    if (frame % 4 === 0) {
+      score += 1;
+      scoreDisplay.innerText = 'DIST: ' + score;
     }
 
-    for(let i=0; i<obstacles.length; i++) {
-      obstacles[i].x -= speed;
-    }
-    obstacles = obstacles.filter(o => o.x > -20);
+    // Gradual, balanced speed progression
+    speed = Math.min(3.4, speed + 0.00025);
 
-    spawnObstacle();
+    // Scroll terrain segments & spawn new ones
+    for (let i = 0; i < terrainSegments.length; i++) {
+      terrainSegments[i].x -= currentSpeed;
+    }
+    terrainSegments = terrainSegments.filter(s => s.x + s.w > -40);
+
+    while (nextSpawnX < VIEW_W + 120) {
+      generateNextSegment();
+    }
+
+    // Scroll hazards
+    for (let i = 0; i < hazards.length; i++) {
+      hazards[i].x -= currentSpeed;
+    }
+    hazards = hazards.filter(h => h.x > -30);
+
+    // Scroll one-off landmarks (Parallax rate)
+    for (let i = 0; i < landmarks.length; i++) {
+      landmarks[i].x -= currentSpeed * 0.38;
+    }
+    landmarks = landmarks.filter(lm => lm.x > -60);
+
     drawScene();
     checkCollisions();
-    
+
     frame++;
     requestAnimationFrame(update);
   }
 
-  function movePlayer(direction) {
-    if(!isPlaying || isGameOver || isSpinning) return;
-    clearTimeout(returnTimer);
-    
-    if(direction === 'up') playerLane = 0;
-    if(direction === 'down') playerLane = 2;
-    
-    returnTimer = setTimeout(() => {
-      if(isPlaying && !isSpinning) playerLane = 1;
-    }, 800);
+  // Persistent Track Switching (No snap-back to middle)
+  function changeTrack(direction) {
+    if (!isPlaying || isGameOver || isPaused) return;
+    if (direction === 'UP' && playerLane > 0) {
+      playerLane--;
+      playPaddleSound();
+    } else if (direction === 'DOWN' && playerLane < 2) {
+      playerLane++;
+      playPaddleSound();
+    }
   }
 
   // ==========================================
-  // CHIPTUNE AUDIO ENGINE
+  // 8. CHIPTUNE AUDIO & SFX ENGINE
   // ==========================================
   let audioCtx = null;
   let audioTimer = null;
   let currentStepAudio = 0;
-  const AUDIO_BPM = 132; 
-  const noteLength = 60 / AUDIO_BPM / 4; 
+  const AUDIO_BPM = 132;
+  const noteLength = 60 / AUDIO_BPM / 4;
 
   const NOTES = {
     'E3': 164.81, 'F#3': 185.00, 'G3': 196.00, 'A3': 220.00, 'B3': 246.94, 'D4': 293.66,
@@ -481,38 +1073,52 @@
     osc.stop(audioCtx.currentTime + duration);
   }
 
+  function playPaddleSound() {
+    playTone(260, 'triangle', 0.07, 0.12);
+  }
+
+  function playRumbleSound() {
+    playTone(95, 'sawtooth', 0.22, 0.18);
+  }
+
   function sequenceTrack() {
-    let leadNote = wilyLead[currentStepAudio];
-    let bassNote = powWowDrum[currentStepAudio];
+    if (isPaused || isGameOver) return;
+    const leadNote = wilyLead[currentStepAudio];
+    const bassNote = powWowDrum[currentStepAudio];
 
     if (leadNote && NOTES[leadNote]) {
-        playTone(NOTES[leadNote], 'square', noteLength * 0.95, 0.03);
+      playTone(NOTES[leadNote], 'square', noteLength * 0.95, 0.03);
     }
     if (bassNote && NOTES[bassNote]) {
-        playTone(NOTES[bassNote], 'triangle', noteLength * 2.2, 0.25);
+      playTone(NOTES[bassNote], 'triangle', noteLength * 2.2, 0.25);
     }
-    
+
     currentStepAudio = (currentStepAudio + 1) % 32;
   }
 
   // ==========================================
-  // GAME STATE MANAGEMENT
+  // 9. GAME STATE & ARCADE POSTMESSAGE BRIDGE
   // ==========================================
   function startGame() {
-    initAudio(); // Unlocks Web Audio on interaction
-    
+    initAudio();
+
     isPlaying = true;
     isGameOver = false;
-    isSpinning = false;
+    isPaused = false;
     score = 0;
-    speed = 2.5;
+    frame = 0;
+    speed = 1.65;
     bgOffset = 0;
-    obstacles = [];
     playerLane = 1;
-    
+    playerVisualY = 0;
+    shakeTimer = 0;
+    slowTimer = 0;
+
+    resetWorld();
+
     introScreen.style.display = 'none';
     msg.style.display = 'none';
-    
+
     if (!audioTimer) {
       currentStepAudio = 0;
       audioTimer = setInterval(sequenceTrack, noteLength * 1000);
@@ -524,30 +1130,65 @@
   function gameOver() {
     isPlaying = false;
     isGameOver = true;
+    playTone(110, 'sawtooth', 0.35, 0.25);
+    msg.innerHTML = `${crashReason}<br><br>PRESS 'A' TO RESTART`;
     msg.style.display = 'block';
-    
+
     if (audioTimer) {
       clearInterval(audioTimer);
       audioTimer = null;
     }
   }
 
-  // Arcade Cabinet UI postMessage Listener
+  let lastA = 0;
+  let lastB = 0;
+  let dpadHolds = { UP: 0, DOWN: 0, LEFT: 0, RIGHT: 0 };
+
   window.addEventListener('message', function(event) {
-    const command = event.data;
-    if (command === 'DPAD_UP') movePlayer('up');
-    else if (command === 'DPAD_DOWN') movePlayer('down');
-    else if (command === 'BUTTON_A' && !isPlaying) startGame();
+    let cmd = event.data;
+    if (typeof cmd === 'object' && cmd.type) cmd = cmd.type;
+    if (typeof cmd !== 'string') return;
+
+    if (cmd === 'PAUSE') {
+      isPaused = true;
+      dpadHolds = { UP: 0, DOWN: 0, LEFT: 0, RIGHT: 0 };
+      if (audioCtx && audioCtx.state === 'running') audioCtx.suspend();
+      return;
+    }
+    if (cmd === 'RESUME') {
+      isPaused = false;
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      if (isPlaying && !isGameOver) requestAnimationFrame(update);
+      return;
+    }
+
+    if (isPaused) return;
+    const now = Date.now();
+
+    if (cmd === 'BUTTON_A' && now - lastA > 110) {
+      lastA = now;
+      if (!isPlaying) startGame();
+    }
+    if (cmd === 'BUTTON_B' && now - lastB > 110) {
+      lastB = now;
+    }
+
+    if (cmd.startsWith('DPAD_')) {
+      const dir = cmd.replace('DPAD_', '').replace('_PRESS', '').replace('_RELEASE', '');
+      if (cmd.includes('_RELEASE')) {
+        dpadHolds[dir] = 0;
+      } else {
+        if (now - dpadHolds[dir] > 145) {
+          dpadHolds[dir] = now;
+          changeTrack(dir);
+        }
+      }
+    }
   });
 
-  // Fallback Start on screen tap
-  document.getElementById('screen-container').addEventListener('click', () => {
-    if(!isPlaying) startGame();
-  });
-
-  // Initial render (draws the scene behind the intro overlay)
+  // Initial background render behind intro overlay
+  resetWorld();
   drawScene();
-
 </script>
 </body>
 </html>
