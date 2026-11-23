@@ -90,74 +90,67 @@
       z-index: 2;
     }
 
-    /* --- SYSTEM SAVE WARNING LOADING SCREEN --- */
+    /* --- SYSTEM SAVE WARNING LOADING SCREEN (MÉTIS FLAG & MATCHING COLOURSET) --- */
     #loading-warning {
-      background: #000;
+      background: #020817;
       z-index: 15;
       justify-content: center;
       align-items: center;
       flex-direction: column;
-      padding: 20px;
+      padding: 16px;
+      gap: 12px;
     }
 
     .warning-box {
       width: 92%;
-      max-width: 390px;
-      background: #06090e;
-      border: 2px solid #F7C844;
-      box-shadow: 0 0 24px rgba(247, 200, 68, 0.2), inset 0 0 14px rgba(0, 0, 0, 0.9);
-      padding: 18px 16px;
+      max-width: 410px;
+      background: #002366;
+      border: 2px solid #ffffff;
+      box-shadow: 0 0 0 2px #0038A8, 0 8px 24px rgba(0, 0, 0, 0.85), inset 0 0 14px rgba(0, 12, 42, 0.75);
+      padding: 14px 16px;
       text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
 
     .warning-badge {
       display: inline-block;
       background: #AD1C21;
-      color: #fff;
+      color: #ffffff;
       font-weight: bold;
-      font-size: 12px;
+      font-size: 11px;
       letter-spacing: 1.5px;
-      padding: 3px 10px;
-      margin-bottom: 12px;
-      border: 1px solid #F7C844;
+      padding: 2px 10px;
+      margin-bottom: 10px;
+      border: 1.5px solid #ffffff;
     }
 
     .warning-text {
-      color: #F7C844;
-      font-size: 15px;
+      color: #ffffff;
+      font-size: 14px;
       font-weight: bold;
       line-height: 1.45;
-      letter-spacing: 0.5px;
-      margin-bottom: 16px;
+      letter-spacing: 0.4px;
       text-transform: uppercase;
     }
 
-    .loading-bar-track {
-      width: 100%;
-      height: 14px;
-      background: #111622;
-      border: 1.5px solid #12AEA2;
-      padding: 2px;
-      margin-bottom: 8px;
-    }
-
-    .loading-bar-fill {
-      height: 100%;
-      width: 0%;
-      background: repeating-linear-gradient(
-        90deg,
-        #12AEA2 0px,
-        #12AEA2 10px,
-        #0c7d74 10px,
-        #0c7d74 13px
-      );
-      transition: width 0.08s linear;
+    #metisFlagCanvas {
+      width: 240px;
+      height: 128px;
+      display: block;
+      image-rendering: pixelated;
     }
 
     .loading-sub {
-      font-size: 11px;
-      color: #12AEA2;
-      letter-spacing: 1px;
+      font-size: 12px;
+      font-weight: bold;
+      color: #ffffff;
+      background: #002366;
+      border: 1.5px solid #6699ff;
+      padding: 4px 12px;
+      letter-spacing: 0.6px;
+      text-align: center;
     }
 
     #static-splash {
@@ -171,12 +164,12 @@
     #bwaaCanvas {
       width: 100%;
       height: 100%;
-      object-fit: contain;
+      object-fit: cover;
       image-rendering: pixelated; 
       z-index: 2;
     }
 
-    /* --- SUPER MARIO ALL-STARS STYLE GAME BANNER CAROUSEL --- */
+    /* --- SUPER MARIO ALL-STARS STYLE GAME BANNER CAROUSEL WITH 360 FORKS PANORAMA --- */
     #game-carousel {
       background: #06070d;
       color: #12AEA2;
@@ -185,6 +178,26 @@
       justify-content: space-between;
       align-items: center;
       z-index: 10;
+      position: relative;
+    }
+
+    #forksPanoramaCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      image-rendering: pixelated;
+      opacity: 0.24;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .carousel-topbar,
+    .carousel-stage,
+    .carousel-footer {
+      position: relative;
+      z-index: 2;
     }
 
     .carousel-topbar {
@@ -194,11 +207,12 @@
       align-items: center;
       justify-content: space-between;
       border-bottom: 2px dashed #12AEA2;
-      padding-bottom: 5px;
       font-size: 13px;
       font-weight: bold;
       letter-spacing: 1px;
       flex: 0 0 auto;
+      background: rgba(6, 7, 13, 0.72);
+      padding: 4px 6px 5px 6px;
     }
 
     .carousel-counter {
@@ -207,6 +221,7 @@
       border: 1.5px solid #12AEA2;
       padding: 2px 7px;
       font-size: 12px;
+      flex: 0 0 auto;
     }
 
     .carousel-stage {
@@ -224,7 +239,7 @@
     .nav-arrow {
       flex: 0 0 34px;
       height: 54px;
-      background: #111626;
+      background: rgba(17, 22, 38, 0.9);
       border: 2px solid #12AEA2;
       color: #F7C844;
       font-family: 'Courier New', Courier, monospace;
@@ -340,6 +355,8 @@
       color: #12AEA2;
       letter-spacing: 0.5px;
       text-align: center;
+      background: rgba(6, 7, 13, 0.72);
+      padding: 2px 10px;
     }
 
     /* --- PAUSE HUD OVERLAY --- */
@@ -635,26 +652,27 @@
         <canvas id="introCanvas" width="600" height="450"></canvas>
       </div>
 
-      <!-- SIMULATED LOADING / SAVE WARNING SCREEN -->
+      <!-- SIMULATED LOADING / SAVE WARNING SCREEN WITH WAVING MÉTIS FLAG -->
       <div id="loading-warning" class="screen-layer">
         <div class="warning-box">
           <div class="warning-badge">NOTICE</div>
           <div class="warning-text">
-            Games do not save, do not close browser/turn off screen.
+            Games do not save.<br>
+            Do not close web browser or turn off screen.
           </div>
-          <div class="loading-bar-track">
-            <div class="loading-bar-fill" id="loading-bar-fill"></div>
-          </div>
-          <div class="loading-sub" id="loading-sub">LOADING BWAA_BRULE.EXE...</div>
         </div>
+        <canvas id="metisFlagCanvas" width="240" height="128"></canvas>
+        <div class="loading-sub" id="loading-sub">Loading Bwaa_Brule.exe [1/8 Iron Confederacy]</div>
       </div>
 
       <div id="static-splash" class="screen-layer">
         <canvas id="bwaaCanvas" width="600" height="450"></canvas>
       </div>
 
-      <!-- SUPER MARIO ALL-STARS STYLE GAME BANNER CAROUSEL -->
+      <!-- SUPER MARIO ALL-STARS STYLE GAME BANNER CAROUSEL WITH 360 FORKS PANORAMA -->
       <div id="game-carousel" class="screen-layer">
+        <canvas id="forksPanoramaCanvas" width="600" height="360"></canvas>
+
         <div class="carousel-topbar">
           <span>BWAA_BRULE.EXE // SELECT GAME</span>
           <span class="carousel-counter" id="carousel-counter">01 / 10</span>
@@ -813,7 +831,7 @@
     const embedShell = document.getElementById('embed-shell');
     const bootSplash = document.getElementById('boot-splash');
     const loadingWarning = document.getElementById('loading-warning');
-    const loadingBarFill = document.getElementById('loading-bar-fill');
+    const loadingSub = document.getElementById('loading-sub');
     const staticSplash = document.getElementById('static-splash');
     const gameCarousel = document.getElementById('game-carousel');
     const pauseOverlay = document.getElementById('pause-overlay');
@@ -832,6 +850,7 @@
 
     let staticStartTime = 0;
     let warningStartTime = 0;
+    let lastInfinityStep = -1;
 
     /* --- DYNAMIC MOBILE BROWSER VIEWPORT SYNC --- */
     function syncViewportBounds() {
@@ -941,14 +960,92 @@
       }
     }
 
-    /* --- SIMULATED LOADING / SAVE WARNING SCREEN --- */
+    /* --- MÉTIS FLAG 8-SEGMENT DISCRETE INFINITY LOADER --- */
+    const flagCanvas = document.getElementById('metisFlagCanvas');
+    const flagCtx = flagCanvas.getContext('2d');
+    flagCtx.imageSmoothingEnabled = false;
+
+    const LOADING_MILESTONES = [
+      'Loading Bwaa_Brule.exe [1/8 Iron Confederacy]',
+      'Loading Bwaa_Brule.exe [2/8 La Verendry]',
+      'Loading Bwaa_Brule.exe [3/8 Gens Libre]',
+      'Loading Bwaa_Brule.exe [4/8 Saulteaux Arrival]',
+      'Loading Bwaa_Brule.exe [5/8 Selkirk Settlers]',
+      'Loading Bwaa_Brule.exe [6/8 Pemmican Wars]',
+      'Loading Bwaa_Brule.exe [7/8 Battle of Seven Oaks]',
+      'Loading Bwaa_Brule.exe [8/8 HBC/NWC Merger]'
+    ];
+
+    // 8 sequential segments tracing a continuous white figure-8 Métis infinity symbol
+    const INFINITY_SEGMENTS = [
+      { blocks: [[102, 58, 16, 10], [88, 48, 16, 10]] },
+      { blocks: [[68, 38, 22, 10], [50, 38, 20, 10]] },
+      { blocks: [[36, 48, 16, 12], [36, 62, 16, 12]] },
+      { blocks: [[50, 74, 20, 10], [68, 74, 22, 10], [88, 64, 16, 10]] },
+      { blocks: [[122, 58, 16, 10], [136, 48, 16, 10]] },
+      { blocks: [[150, 38, 22, 10], [170, 38, 20, 10]] },
+      { blocks: [[188, 48, 16, 12], [188, 62, 16, 12]] },
+      { blocks: [[170, 74, 20, 10], [150, 74, 22, 10], [136, 64, 16, 10]] }
+    ];
+
+    function drawWavingMetisFlag(filledCount, elapsedSec) {
+      const W = flagCanvas.width;
+      const H = flagCanvas.height;
+      flagCtx.fillStyle = '#020817';
+      flagCtx.fillRect(0, 0, W, H);
+
+      // Subtle vertical cloth ripple across vertical slices of the Métis Blue flag
+      const flagX = 14;
+      const flagW = W - 28;
+      const flagBaseY = 12;
+      const flagH = H - 24;
+      const sliceW = 4;
+
+      // Render classic Métis Blue flag field with gentle sinusoidal cloth wave
+      for (let sx = 0; sx < flagW; sx += sliceW) {
+        const waveOffset = Math.round(Math.sin(elapsedSec * 3.2 + sx * 0.042) * 2.2);
+        const shade = Math.sin(elapsedSec * 3.2 + sx * 0.042) > 0.25 ? '#0042c4' : '#0038A8';
+
+        // Outer white border trim
+        flagCtx.fillStyle = '#ffffff';
+        flagCtx.fillRect(flagX + sx, flagBaseY + waveOffset - 2, sliceW, flagH + 4);
+
+        // True Métis Blue banner field
+        flagCtx.fillStyle = shade;
+        flagCtx.fillRect(flagX + sx, flagBaseY + waveOffset, sliceW, flagH);
+      }
+
+      // Draw the 8-piece white Infinity Symbol riding the gentle flag wave
+      INFINITY_SEGMENTS.forEach((seg, idx) => {
+        const isLit = idx < filledCount;
+        seg.blocks.forEach(([bx, by, bw, bh]) => {
+          const waveY = Math.round(Math.sin(elapsedSec * 3.2 + (bx - flagX) * 0.042) * 2.2);
+          // Subtle navy outline for unlit/lit crispness
+          flagCtx.fillStyle = isLit ? '#001d5c' : '#00287a';
+          flagCtx.fillRect(bx - 2, by + waveY - 2, bw + 4, bh + 4);
+          // Pure white fill when loaded, faint translucent blue-white slot before
+          flagCtx.fillStyle = isLit ? '#ffffff' : 'rgba(255, 255, 255, 0.16)';
+          flagCtx.fillRect(bx, by + waveY, bw, bh);
+        });
+      });
+    }
+
+    function playInstallerChunkTick(stepIdx) {
+      if (!audioCtx) return;
+      const scale = [293.66, 329.63, 369.99, 440.00, 493.88, 587.33, 659.25, 739.99];
+      const freq = scale[stepIdx % scale.length];
+      playPulseCall(freq, 0, 0.045, 0.025);
+    }
+
     function transitionToWarning() {
       machineState = 'WARNING';
       bootSplash.style.display = 'none';
       staticSplash.style.display = 'none';
       pauseOverlay.style.display = 'none';
       gameCarousel.style.display = 'none';
-      loadingBarFill.style.width = '0%';
+      lastInfinityStep = -1;
+      drawWavingMetisFlag(1, 0);
+      loadingSub.textContent = LOADING_MILESTONES[0];
       loadingWarning.style.display = 'flex';
       warningStartTime = performance.now();
       requestAnimationFrame(warningLoop);
@@ -957,18 +1054,31 @@
     function warningLoop(timestamp) {
       if (machineState !== 'WARNING') return;
       const elapsed = (timestamp - warningStartTime) / 1000;
-      const duration = 4.2; // Enough time to read the no-save / keep-browser-open notice
-      const pct = Math.min(100, Math.round((elapsed / duration) * 100));
-      loadingBarFill.style.width = `${pct}%`;
+      const stepDuration = 0.52;
+      // Step through 1..8 milestones as the 8 infinity segments fill in
+      const filledPieces = Math.min(8, Math.floor(elapsed / stepDuration) + 1);
 
-      if (elapsed >= duration) {
-        transitionToStatic();
+      drawWavingMetisFlag(filledPieces, elapsed);
+
+      if (filledPieces !== lastInfinityStep) {
+        lastInfinityStep = filledPieces;
+        loadingSub.textContent = LOADING_MILESTONES[filledPieces - 1];
+        playInstallerChunkTick(filledPieces - 1);
+      }
+
+      if (elapsed >= 4.55) {
+        transitionToStatic(false);
         return;
       }
       requestAnimationFrame(warningLoop);
     }
 
-    function transitionToStatic() {
+    /* --- BWAA BRULE TITLE SCREEN + ST. BONIFACE CATHEDRAL + YORK BOAT BRIGADE --- */
+    let bwaaIntroActive = false;
+    let jigStarted = false;
+    let jigFadeVolume = 1.0;
+
+    function transitionToStatic(skipIntro = false) {
       machineState = 'STATIC';
       bootSplash.style.display = 'none';
       loadingWarning.style.display = 'none';
@@ -976,7 +1086,23 @@
       gameCarousel.style.display = 'none';
       staticSplash.style.display = 'flex';
       staticStartTime = performance.now();
+
+      bwaaIntroActive = !skipIntro;
+      jigStarted = false;
+      jigFadeVolume = skipIntro ? 1.0 : 0.0;
+
+      if (skipIntro) {
+        startRedRiverJigLoop(1.0);
+      }
       requestAnimationFrame(staticLoop);
+    }
+
+    /* --- 360° RED RIVER FORKS PANORAMA CONTROLLER --- */
+    let panoCurrentAngle = 0;
+    let panoTargetAngle = 0;
+
+    function syncPanoramaTarget() {
+      panoTargetAngle = (currentIndex / GAME_CATALOG.length) * 360;
     }
 
     function openCarouselMenu() {
@@ -985,8 +1111,24 @@
       loadingWarning.style.display = 'none';
       pauseOverlay.style.display = 'none';
       gameCarousel.style.display = 'flex';
+      jigFadeVolume = 1.0;
+      syncPanoramaTarget();
+      panoCurrentAngle = panoTargetAngle;
       updateCarouselUI();
+      if (!jigLoopRunning) {
+        startRedRiverJigLoop(1.0);
+      }
       requestAnimationFrame(artboxLoop);
+    }
+
+    function launchSelectedGame() {
+      stopAllMenuAudio();
+      machineState = 'PLAYING';
+      gameCarousel.style.display = 'none';
+      pauseOverlay.style.display = 'none';
+      gameFrame.style.display = 'block';
+      gameFrame.src = GAME_CATALOG[currentIndex].file;
+      isPlaying = true;
     }
 
     function sendSignal(command) {
@@ -1042,6 +1184,7 @@
 
     function setCarouselIndex(newIdx, direction = 1) {
       currentIndex = ((newIdx % GAME_CATALOG.length) + GAME_CATALOG.length) % GAME_CATALOG.length;
+      syncPanoramaTarget();
       updateCarouselUI();
       triggerWipeReveal(direction);
       playCarouselTick(direction);
@@ -1093,6 +1236,7 @@
     }
 
     function restartGame() {
+      stopAllMenuAudio();
       pauseOverlay.style.display = 'none';
       isFramePaused = false;
       pausedRAFCallbacks = [];
@@ -1145,11 +1289,7 @@
         openCarouselMenu();
       } else if (machineState === 'MENU') {
         if (buttonStr === 'BUTTON_A') {
-          machineState = 'PLAYING';
-          gameCarousel.style.display = 'none';
-          gameFrame.style.display = 'block';
-          gameFrame.src = GAME_CATALOG[currentIndex].file;
-          isPlaying = true;
+          launchSelectedGame();
         } else if (buttonStr === 'BUTTON_B') {
           returnToSplash();
         }
@@ -1164,11 +1304,8 @@
       gameFrame.src = ""; 
       gameFrame.style.display = 'none';
       gameCarousel.style.display = 'none';
-      machineState = 'STATIC';
-      staticSplash.style.display = 'flex';
       isPlaying = false;
-      staticStartTime = performance.now();
-      requestAnimationFrame(staticLoop);
+      transitionToStatic(true);
     }
 
     function handleSystemMenuTrigger() {
@@ -1402,11 +1539,7 @@
       btnHomeEl.classList.remove('active-press');
     });
 
-    /* --- PIXEL ARTBOX BANNER RENDERER (SMAS STYLE) --- */
-    const artCanvas = document.getElementById('artboxCanvas');
-    const aCtx = artCanvas.getContext('2d');
-    aCtx.imageSmoothingEnabled = false;
-
+    /* --- 1860s ST. BONIFACE CATHEDRAL, RIVERBANK, YORK BOAT BRIGADE & 360° FORKS PANORAMA --- */
     function drawPineTree(ctx, x, y, scale, snowy = false) {
       const s = scale;
       ctx.fillStyle = '#3a2311';
@@ -1421,6 +1554,18 @@
         ctx.fillRect(x - 5 * s, y - 13 * s, 10 * s, 2 * s);
         ctx.fillRect(x - 2 * s, y - 19 * s, 4 * s, 2 * s);
       }
+    }
+
+    function drawOakTree(ctx, x, y, scale = 1) {
+      const s = scale;
+      ctx.fillStyle = '#3b2514';
+      ctx.fillRect(x - 3 * s, y - 4 * s, 6 * s, 10 * s);
+      ctx.fillStyle = '#2d4d32';
+      ctx.fillRect(x - 14 * s, y - 16 * s, 28 * s, 12 * s);
+      ctx.fillStyle = '#3D5948';
+      ctx.fillRect(x - 10 * s, y - 24 * s, 20 * s, 10 * s);
+      ctx.fillStyle = '#53734a';
+      ctx.fillRect(x - 8 * s, y - 22 * s, 12 * s, 4 * s);
     }
 
     function drawWesternTipi(ctx, x, baseY, scale = 1, tick = 0) {
@@ -1463,6 +1608,433 @@
       }
     }
 
+    // 1860s Saint Boniface Cathedral ("Brick face, tin twin towers")
+    function drawStBonifaceCathedral1860(ctx, x, baseY, scale = 1, sunriseGlow = 0.7) {
+      const s = scale;
+      const bodyW = Math.round(64 * s);
+      const bodyH = Math.round(48 * s);
+      const leftX = Math.round(x - bodyW / 2);
+      const topY = Math.round(baseY - bodyH);
+
+      // Main brick body
+      ctx.fillStyle = '#8f2922';
+      ctx.fillRect(leftX, topY, bodyW, bodyH);
+      ctx.fillStyle = '#6b1c17';
+      ctx.fillRect(leftX + Math.round(bodyW * 0.65), topY, Math.round(bodyW * 0.35), bodyH);
+      ctx.fillStyle = '#ad3b32';
+      for (let by = topY + 6; by < baseY - 4; by += Math.max(4, Math.round(6 * s))) {
+        ctx.fillRect(leftX + 3, by, bodyW - 6, 2);
+      }
+
+      // Steep pitched center gable
+      ctx.fillStyle = '#8f2922';
+      ctx.fillRect(Math.round(x - 16 * s), Math.round(topY - 12 * s), Math.round(32 * s), Math.round(12 * s));
+      ctx.fillRect(Math.round(x - 10 * s), Math.round(topY - 20 * s), Math.round(20 * s), Math.round(8 * s));
+      ctx.fillStyle = '#dcd7c9';
+      ctx.fillRect(Math.round(x - 16 * s), Math.round(topY - 12 * s), Math.round(32 * s), 2);
+
+      // Rose Window & Arched Portal
+      ctx.fillStyle = '#F7C844';
+      ctx.fillRect(Math.round(x - 5 * s), Math.round(topY + 8 * s), Math.round(10 * s), Math.round(10 * s));
+      ctx.fillStyle = '#3b150c';
+      ctx.fillRect(Math.round(x - 7 * s), Math.round(baseY - 18 * s), Math.round(14 * s), Math.round(18 * s));
+      ctx.fillStyle = '#dcd7c9';
+      ctx.fillRect(Math.round(x - 8 * s), Math.round(baseY - 20 * s), Math.round(16 * s), 2);
+
+      // Twin Brick Bell Towers & Gleaming Tin Spires
+      const towerW = Math.round(16 * s);
+      const towerH = Math.round(68 * s);
+      const leftTowerX = Math.round(leftX - 2 * s);
+      const rightTowerX = Math.round(leftX + bodyW - towerW + 2 * s);
+      const towerTopY = Math.round(baseY - towerH);
+
+      [leftTowerX, rightTowerX].forEach((tx, tIdx) => {
+        ctx.fillStyle = tIdx === 0 ? '#9e3129' : '#7d221c';
+        ctx.fillRect(tx, towerTopY, towerW, towerH);
+        ctx.fillStyle = '#dcd7c9';
+        ctx.fillRect(tx - 1, towerTopY, towerW + 2, Math.max(2, Math.round(3 * s)));
+        ctx.fillRect(tx - 1, towerTopY + Math.round(22 * s), towerW + 2, Math.max(2, Math.round(2 * s)));
+        ctx.fillStyle = '#1e1b18';
+        ctx.fillRect(tx + Math.round(4 * s), towerTopY + Math.round(6 * s), Math.round(8 * s), Math.round(13 * s));
+
+        const spireBaseY = towerTopY;
+        ctx.fillStyle = '#c9d6df';
+        ctx.fillRect(tx + Math.round(2 * s), spireBaseY - Math.round(12 * s), Math.round(12 * s), Math.round(12 * s));
+        ctx.fillStyle = '#e8f1f5';
+        ctx.fillRect(tx + Math.round(4 * s), spireBaseY - Math.round(26 * s), Math.round(8 * s), Math.round(14 * s));
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(tx + Math.round(6 * s), spireBaseY - Math.round(38 * s), Math.round(4 * s), Math.round(12 * s));
+
+        if (sunriseGlow > 0.25) {
+          ctx.fillStyle = '#F7C844';
+          ctx.fillRect(tx + Math.round(3 * s), spireBaseY - Math.round(22 * s), Math.max(2, Math.round(2 * s)), Math.round(16 * s));
+        }
+
+        const crossX = tx + Math.round(7 * s);
+        const crossY = spireBaseY - Math.round(46 * s);
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(crossX, crossY, Math.max(2, Math.round(2 * s)), Math.round(8 * s));
+        ctx.fillRect(crossX - Math.round(3 * s), crossY + Math.round(2 * s), Math.round(8 * s), Math.max(2, Math.round(2 * s)));
+      });
+    }
+
+    // Portage La Loche Brigade York Boat:
+    // Guide Bonami L'Espérance at the bow (left), Michel Dumas at the steering sweep (right),
+    // and 5 voyageurs in blue & HBC-striped capotes including a war-bonnet-clad Cree trader.
+    function drawPortageLaLocheYorkBoat(ctx, boatX, boatY, tick) {
+      const bx = Math.round(boatX);
+      const bobY = Math.round(boatY + Math.sin(tick * 0.1) * 1.5);
+      const oarPhase = Math.sin(tick * 0.16); // -1 to +1 rowing stroke
+
+      // 1. Shimmering Ripple Wake Trailing Behind the York Boat (to the right as it rows left)
+      const wakeFlicker = Math.floor(tick / 10) % 2;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.42)';
+      ctx.fillRect(bx + 76, bobY + 12, 34 + wakeFlicker * 6, 3);
+      ctx.fillRect(bx + 92, bobY + 18, 48 - wakeFlicker * 6, 3);
+      ctx.fillStyle = 'rgba(247, 200, 68, 0.34)';
+      ctx.fillRect(bx + 114, bobY + 15, 42, 3);
+
+      // 2. Crew of 7 Aboard the York Boat (Rowing Right -> Left)
+      // --- BOW GUIDE (Left): Bonami L'Espérance standing lookout with voyageur pole/hat ---
+      const bowX = bx - 54;
+      ctx.fillStyle = '#12AEA2'; // Blue-teal capote
+      ctx.fillRect(bowX - 4, bobY - 18, 10, 18);
+      ctx.fillStyle = '#AD1C21'; // Red Métis sash
+      ctx.fillRect(bowX - 4, bobY - 10, 10, 3);
+      ctx.fillStyle = '#dcd7c9'; // Face
+      ctx.fillRect(bowX - 3, bobY - 25, 8, 7);
+      ctx.fillStyle = '#3a2311'; // Guide's wide-brim hat
+      ctx.fillRect(bowX - 6, bobY - 28, 14, 3);
+      ctx.fillRect(bowX - 3, bobY - 31, 8, 3);
+
+      // --- 5 MIDSHIP CREW (4 Voyageurs in Blue & HBC-Stripe Capotes + 1 War-Bonnet Cree Trader) ---
+      const crewPositions = [
+        { dx: -36, type: 'HBC_WHITE' },
+        { dx: -20, type: 'BLUE_CAPOTE' },
+        { dx: -4,  type: 'CREE_BONNET' },
+        { dx: 12,  type: 'HBC_WHITE' },
+        { dx: 28,  type: 'BLUE_CAPOTE' }
+      ];
+
+      crewPositions.forEach((member, idx) => {
+        const mx = bx + member.dx;
+        const lean = Math.round(oarPhase * 2);
+
+        if (member.type === 'CREE_BONNET') {
+          // Cree Trader wearing buckskin/capote & trailing eagle-feather war bonnet
+          ctx.fillStyle = '#c9935b';
+          ctx.fillRect(mx - 4 + lean, bobY - 15, 9, 15);
+          ctx.fillStyle = '#AD1C21';
+          ctx.fillRect(mx - 4 + lean, bobY - 9, 9, 3);
+          ctx.fillStyle = '#b87444';
+          ctx.fillRect(mx - 3 + lean, bobY - 22, 7, 7);
+          // Feathered War Bonnet crown & trailing feathers down back (to the right)
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(mx - 2 + lean, bobY - 27, 7, 5);
+          ctx.fillRect(mx + 4 + lean, bobY - 23, 5, 13);
+          ctx.fillStyle = '#1e1b18'; // Black feather tips
+          ctx.fillRect(mx - 2 + lean, bobY - 28, 7, 2);
+          ctx.fillRect(mx + 7 + lean, bobY - 23, 2, 13);
+          ctx.fillStyle = '#AD1C21'; // Red brow band
+          ctx.fillRect(mx - 3 + lean, bobY - 23, 8, 2);
+        } else if (member.type === 'HBC_WHITE') {
+          // Hudson's Bay Point Blanket Capote (Cream white with green/red/yellow/indigo stripes)
+          ctx.fillStyle = '#f2efe9';
+          ctx.fillRect(mx - 4 + lean, bobY - 15, 9, 15);
+          ctx.fillStyle = '#1b4728';
+          ctx.fillRect(mx - 4 + lean, bobY - 8, 9, 2);
+          ctx.fillStyle = '#AD1C21';
+          ctx.fillRect(mx - 4 + lean, bobY - 6, 9, 2);
+          ctx.fillStyle = '#F7C844';
+          ctx.fillRect(mx - 4 + lean, bobY - 4, 9, 2);
+          ctx.fillStyle = '#dcd7c9';
+          ctx.fillRect(mx - 3 + lean, bobY - 21, 7, 6);
+          ctx.fillStyle = '#AD1C21'; // Red voyageur tuque
+          ctx.fillRect(mx - 3 + lean, bobY - 25, 8, 4);
+        } else {
+          // Classic Blue Capote with Red Sash
+          ctx.fillStyle = '#0038A8';
+          ctx.fillRect(mx - 4 + lean, bobY - 15, 9, 15);
+          ctx.fillStyle = '#AD1C21';
+          ctx.fillRect(mx - 4 + lean, bobY - 8, 9, 3);
+          ctx.fillStyle = '#dcd7c9';
+          ctx.fillRect(mx - 3 + lean, bobY - 21, 7, 6);
+          ctx.fillStyle = '#0038A8'; // Blue tuque
+          ctx.fillRect(mx - 3 + lean, bobY - 25, 8, 4);
+        }
+      });
+
+      // Cargo Bales amidships
+      ctx.fillStyle = '#826e2e';
+      ctx.fillRect(bx - 12, bobY - 8, 28, 9);
+      ctx.fillStyle = '#F7C844';
+      ctx.fillRect(bx - 4, bobY - 8, 3, 9);
+      ctx.fillRect(bx + 8, bobY - 8, 3, 9);
+
+      // --- STERN STEERSMAN (Right): Michel Dumas standing at the long steering sweep ---
+      const sternX = bx + 52;
+      ctx.fillStyle = '#0038A8'; // Blue capote
+      ctx.fillRect(sternX - 4, bobY - 19, 10, 19);
+      ctx.fillStyle = '#F7C844'; // Gold/red sash
+      ctx.fillRect(sternX - 4, bobY - 11, 10, 3);
+      ctx.fillStyle = '#dcd7c9';
+      ctx.fillRect(sternX - 3, bobY - 26, 8, 7);
+      ctx.fillStyle = '#AD1C21'; // Red tuque
+      ctx.fillRect(sternX - 3, bobY - 30, 9, 4);
+
+      // 3. Double-Ended Timber York Boat Hull (High pointed bow & stern posts)
+      ctx.fillStyle = '#6b4423';
+      ctx.fillRect(bx - 60, bobY, 120, 14);
+      ctx.fillStyle = '#8f5a2b';
+      ctx.fillRect(bx - 56, bobY + 2, 112, 5);
+      // High pointed York boat stem & stern posts
+      ctx.fillStyle = '#4a2d15';
+      ctx.fillRect(bx - 68, bobY - 8, 10, 14);
+      ctx.fillRect(bx - 72, bobY - 13, 6, 8);
+      ctx.fillRect(bx + 58, bobY - 8, 10, 14);
+      ctx.fillRect(bx + 66, bobY - 13, 6, 8);
+      // Crimson & Gold gunwale trim
+      ctx.fillStyle = '#AD1C21';
+      ctx.fillRect(bx - 58, bobY, 116, 3);
+
+      // 4. Michel Dumas's Long Steering Sweep Oar trailing off the stern
+      const sweepY = Math.round(Math.sin(tick * 0.12) * 2);
+      ctx.fillStyle = '#d9a760';
+      ctx.fillRect(sternX - 4, bobY - 12, 34, 3);
+      ctx.fillRect(sternX + 28, bobY - 10 + sweepY, 14, 5);
+
+      // 5. Animated Rowing Oars Dipping into the Red River
+      const oarTipX = Math.round(oarPhase * 7);
+      const oarDipY = oarPhase > 0 ? 18 : 13;
+      [-34, -18, -2, 14, 28].forEach((odx) => {
+        const ox = bx + odx;
+        ctx.fillStyle = '#e8c382';
+        ctx.fillRect(ox, bobY + 3, 3, oarDipY - 3);
+        ctx.fillRect(ox + oarTipX - 1, bobY + oarDipY, 5, 4);
+        // Tiny water splash when oar catches water
+        if (oarPhase > 0.35) {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(ox + oarTipX - 3, bobY + oarDipY - 1, 2, 2);
+        }
+      });
+    }
+
+    // Draws the Bwaa Brule title screen background:
+    // Sunrise behind 1860s St. Boniface Cathedral + Riverbank in front + Portage La Loche York Boat Brigade
+    function drawStBonifaceIntroScene(ctx, W, H, progress, boatCenterX, tick) {
+      const p = Math.max(0, Math.min(1, progress));
+
+      // Sky gradient bands warming from pre-dawn indigo to rose-gold sunrise
+      const skyBands = [
+        { r: 10 + p * 34, g: 12 + p * 38, b: 26 + p * 74 },
+        { r: 18 + p * 96, g: 16 + p * 54, b: 36 + p * 68 },
+        { r: 28 + p * 168, g: 20 + p * 84, b: 34 + p * 42 },
+        { r: 36 + p * 205, g: 24 + p * 138, b: 28 + p * 32 }
+      ];
+      const bandH = Math.ceil((H * 0.48) / skyBands.length);
+      skyBands.forEach((c, idx) => {
+        ctx.fillStyle = `rgb(${Math.round(c.r)}, ${Math.round(c.g)}, ${Math.round(c.b)})`;
+        ctx.fillRect(0, idx * bandH, W, bandH + 1);
+      });
+
+      // Rising Prairie Sun behind the Twin Tin Towers of St. Boniface
+      const sunX = Math.round(W * 0.5 + 34);
+      const sunY = Math.round(H * 0.54 - p * (H * 0.22));
+      if (p > 0.08) {
+        ctx.fillStyle = `rgba(247, 200, 68, ${Math.min(0.32, p * 0.35)})`;
+        ctx.fillRect(sunX - 42, sunY - 42, 84, 84);
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(sunX - 24, sunY - 24, 48, 48);
+        ctx.fillStyle = '#fff5cc';
+        ctx.fillRect(sunX - 16, sunY - 16, 32, 32);
+      }
+
+      // Eastern St. Boniface Shoreline & Trees behind the Cathedral
+      const cathedralBaseY = Math.round(H * 0.48);
+      const driftSlow = Math.round(Math.sin(tick * 0.008) * 4);
+
+      ctx.fillStyle = `rgb(${Math.round(24 + p * 44)}, ${Math.round(36 + p * 56)}, ${Math.round(22 + p * 30)})`;
+      ctx.fillRect(0, cathedralBaseY - 10, W, 16);
+
+      drawOakTree(ctx, 68 + driftSlow, cathedralBaseY - 2, 1.3);
+      drawPineTree(ctx, 126 + driftSlow, cathedralBaseY - 2, 1.2, false);
+      drawOakTree(ctx, 182 + driftSlow, cathedralBaseY - 1, 1.05);
+      drawOakTree(ctx, W - 180 + driftSlow, cathedralBaseY - 1, 1.1);
+      drawPineTree(ctx, W - 122 + driftSlow, cathedralBaseY - 2, 1.3, false);
+      drawOakTree(ctx, W - 64 + driftSlow, cathedralBaseY - 2, 1.25);
+
+      // 1860s St. Boniface Cathedral (Brick face, tin twin towers)
+      drawStBonifaceCathedral1860(ctx, Math.round(W * 0.5) + driftSlow, cathedralBaseY + 2, 1.35, p);
+
+      // Riverbank in Front of the Cathedral (Grassy upper slope + Red River clay bank)
+      const bankTopY = cathedralBaseY + 2;
+      ctx.fillStyle = `rgb(${Math.round(28 + p * 54)}, ${Math.round(44 + p * 64)}, ${Math.round(24 + p * 28)})`;
+      ctx.fillRect(0, bankTopY, W, 14);
+      // Warm Red River clay/earth embankment sloping down to the water's edge
+      ctx.fillStyle = `rgb(${Math.round(42 + p * 74)}, ${Math.round(26 + p * 44)}, ${Math.round(18 + p * 24)})`;
+      ctx.fillRect(0, bankTopY + 14, W, 12);
+      // Shore reed tufts along the St. Boniface riverbank
+      ctx.fillStyle = `rgb(${Math.round(38 + p * 72)}, ${Math.round(52 + p * 72)}, ${Math.round(24 + p * 26)})`;
+      for (let rx = 18; rx < W - 16; rx += 46) {
+        ctx.fillRect(rx + driftSlow, bankTopY + 8, 12, 6);
+      }
+
+      // Red River Waters in Front of the Bank
+      const waterY = bankTopY + 26;
+      ctx.fillStyle = `rgb(${Math.round(14 + p * 28)}, ${Math.round(30 + p * 56)}, ${Math.round(46 + p * 70)})`;
+      ctx.fillRect(0, waterY, W, H - waterY);
+
+      // Shimmering Sunrise Reflection Path across the Red River
+      const wave = Math.floor(tick / 16) % 2;
+      if (p > 0.12) {
+        ctx.fillStyle = `rgba(247, 200, 68, ${Math.min(0.42, p * 0.45)})`;
+        for (let wy = waterY + 8; wy < H - 42; wy += 16) {
+          const spread = (wy - waterY) * 0.35;
+          const shift = wave === 0 ? -6 : 6;
+          ctx.fillRect(Math.round(sunX - 24 - spread * 0.4 + shift), wy, Math.round(48 + spread * 0.8), 3);
+        }
+      }
+
+      // Portage La Loche Brigade York Boat Rowing Right -> Left down the Red River
+      if (boatCenterX !== null) {
+        drawPortageLaLocheYorkBoat(ctx, boatCenterX, waterY + 34, tick);
+      }
+
+      // Near Foreground Forks Shoreline framing the bottom edge
+      ctx.fillStyle = `rgb(${Math.round(16 + p * 30)}, ${Math.round(24 + p * 40)}, ${Math.round(14 + p * 20)})`;
+      ctx.fillRect(0, H - 38, W, 38);
+      ctx.fillStyle = `rgb(${Math.round(26 + p * 46)}, ${Math.round(38 + p * 56)}, ${Math.round(20 + p * 24)})`;
+      ctx.fillRect(0, H - 42, 165, 6);
+      ctx.fillRect(W - 155, H - 42, 155, 6);
+    }
+
+    // 360-Degree Panoramic Sweep of the 1860s Forks
+    const panoCanvas = document.getElementById('forksPanoramaCanvas');
+    const pCtx = panoCanvas.getContext('2d');
+    pCtx.imageSmoothingEnabled = false;
+
+    function drawForks360Panorama(ctx, angleDeg, tick) {
+      const W = panoCanvas.width;
+      const H = panoCanvas.height;
+      const PANO_W = 2400;
+      const normAngle = ((angleDeg % 360) + 360) % 360;
+      const camX = (normAngle / 360) * PANO_W;
+
+      ctx.fillStyle = '#182b3e';
+      ctx.fillRect(0, 0, W, Math.round(H * 0.52));
+      ctx.fillStyle = '#0f3b52';
+      ctx.fillRect(0, Math.round(H * 0.52), W, Math.round(H * 0.48));
+
+      function worldToScreenX(wx) {
+        let dx = ((wx - camX) % PANO_W + PANO_W) % PANO_W;
+        if (dx > PANO_W - 260) dx -= PANO_W;
+        return Math.round(dx);
+      }
+
+      const bankY = Math.round(H * 0.52);
+
+      ctx.fillStyle = '#364f38';
+      ctx.fillRect(0, bankY - 12, W, 18);
+      ctx.fillStyle = '#5c4b23';
+      ctx.fillRect(0, bankY + 4, W, 8);
+
+      // 1. UPPER FORT GARRY
+      const ufgX = worldToScreenX(140);
+      if (ufgX > -220 && ufgX < W + 220) {
+        ctx.fillStyle = '#9aa3b8';
+        ctx.fillRect(ufgX - 90, bankY - 34, 180, 34);
+        ctx.fillStyle = '#6e768a';
+        ctx.fillRect(ufgX - 96, bankY - 42, 24, 42);
+        ctx.fillRect(ufgX + 72, bankY - 42, 24, 42);
+        ctx.fillStyle = '#dcd7c9';
+        ctx.fillRect(ufgX - 18, bankY - 46, 36, 46);
+        ctx.fillStyle = '#1e1b18';
+        ctx.fillRect(ufgX - 8, bankY - 22, 16, 22);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(ufgX, bankY - 72, 3, 26);
+        ctx.fillStyle = '#AD1C21';
+        ctx.fillRect(ufgX + 3, bankY - 72, 20, 12);
+      }
+
+      // 2. ASSINIBOINE INFLOW
+      const assnX = worldToScreenX(440);
+      if (assnX > -220 && assnX < W + 220) {
+        ctx.fillStyle = '#144966';
+        ctx.fillRect(assnX - 55, bankY - 14, 110, 28);
+        drawOakTree(ctx, assnX - 85, bankY - 8, 1.3);
+        drawOakTree(ctx, assnX + 85, bankY - 8, 1.25);
+      }
+
+      // 3. VILLAGE AT FORT ROUGE
+      const frX = worldToScreenX(760);
+      if (frX > -220 && frX < W + 220) {
+        ctx.fillStyle = '#6b4423';
+        ctx.fillRect(frX - 68, bankY - 26, 42, 24);
+        ctx.fillRect(frX + 14, bankY - 24, 38, 22);
+        ctx.fillStyle = '#dcd7c9';
+        ctx.fillRect(frX - 72, bankY - 32, 50, 7);
+        ctx.fillRect(frX + 10, bankY - 30, 46, 7);
+        drawOakTree(ctx, frX - 12, bankY - 8, 1.15);
+      }
+
+      // 4. RED RIVER SOUTH
+      const southX = worldToScreenX(1080);
+      if (southX > -220 && southX < W + 220) {
+        ctx.fillStyle = '#144966';
+        ctx.fillRect(southX - 60, bankY - 14, 120, 28);
+        drawPineTree(ctx, southX - 88, bankY - 8, 1.3, false);
+        drawOakTree(ctx, southX + 92, bankY - 8, 1.2);
+      }
+
+      // 5. 1860s ST. BONIFACE CATHEDRAL
+      const stbX = worldToScreenX(1420);
+      if (stbX > -240 && stbX < W + 240) {
+        drawOakTree(ctx, stbX - 84, bankY - 6, 1.2);
+        drawStBonifaceCathedral1860(ctx, stbX, bankY - 2, 1.2, 0.5);
+        drawPineTree(ctx, stbX + 86, bankY - 6, 1.25, false);
+      }
+
+      // 6. RED RIVER NORTH FACING POINT DOUGLAS
+      const pdX = worldToScreenX(1820);
+      if (pdX > -240 && pdX < W + 240) {
+        ctx.fillStyle = '#144966';
+        ctx.fillRect(pdX - 95, bankY - 14, 70, 28);
+        drawOakTree(ctx, pdX - 6, bankY - 8, 1.4);
+        drawPineTree(ctx, pdX + 34, bankY - 8, 1.35, false);
+        drawOakTree(ctx, pdX + 74, bankY - 8, 1.25);
+        ctx.fillStyle = '#7a4b12';
+        ctx.fillRect(pdX + 12, bankY - 22, 30, 18);
+      }
+
+      // 7. EARLY "WINNIPEG" SETTLEMENT
+      const wpgX = worldToScreenX(2160);
+      if (wpgX > -240 && wpgX < W + 240) {
+        ctx.fillStyle = '#5c3419';
+        ctx.fillRect(wpgX - 80, bankY - 28, 36, 26);
+        ctx.fillStyle = '#826e2e';
+        ctx.fillRect(wpgX - 36, bankY - 34, 44, 32);
+        ctx.fillStyle = '#6b4423';
+        ctx.fillRect(wpgX + 16, bankY - 26, 38, 24);
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(wpgX - 24, bankY - 22, 6, 6);
+        ctx.fillRect(wpgX - 10, bankY - 22, 6, 6);
+        ctx.fillRect(wpgX + 26, bankY - 18, 6, 6);
+      }
+
+      const wave = Math.floor(tick / 18) % 2;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
+      for (let rx = 20; rx < W - 20; rx += 68) {
+        const shift = wave === 0 ? 0 : 12;
+        ctx.fillRect(rx + shift, bankY + 24, 24, 3);
+        ctx.fillRect(rx + 18 - shift, bankY + 52, 20, 3);
+      }
+    }
+
+    /* --- PIXEL ARTBOX BANNER RENDERER (SMAS STYLE) --- */
+    const artCanvas = document.getElementById('artboxCanvas');
+    const aCtx = artCanvas.getContext('2d');
+    aCtx.imageSmoothingEnabled = false;
+
     function drawArtboxScene(ctx, game, tick) {
       const W = artCanvas.width;
       const H = artCanvas.height;
@@ -1471,12 +2043,10 @@
       const cx = Math.round(W / 2);
       const cy = Math.round(H * 0.43 + bob);
 
-      // Clear stage
       ctx.fillStyle = '#090b12';
       ctx.fillRect(0, 0, W, H);
 
       if (game.artType === 'CANOE') {
-        // 1. RED RIVER RUN: One-man canoe on parallax Red River + Prairie
         ctx.fillStyle = '#2d1832';
         ctx.fillRect(0, 0, W, 56);
         ctx.fillStyle = '#732c3f';
@@ -1537,7 +2107,6 @@
         ctx.fillRect(cx - 22 + strokeX, canoeY - 4, 8, 14);
 
       } else if (game.artType === 'FIDDLE') {
-        // 2. LA GRANDE GIGUE: Métis Fiddle (with mini-sash tied to neck) leaning against a rock
         ctx.fillStyle = '#1a122b';
         ctx.fillRect(0, 0, W, 65);
         ctx.fillStyle = '#382259';
@@ -1604,7 +2173,6 @@
         ctx.restore();
 
       } else if (game.artType === 'BEADWORK') {
-        // 3. LI RASSAD DI FLEUR: Warm woodstove cabin scene with a Red River Loom beside it
         ctx.fillStyle = '#2e180c';
         ctx.fillRect(0, 0, W, 146);
         ctx.fillStyle = '#472613';
@@ -1670,7 +2238,6 @@
         ctx.fillRect(loomX + 48, bandY + 3, 12, 10);
 
       } else if (game.artType === 'DUCK') {
-        // 4. SÎSÎP: Spot-on flying Mallard animation on crisp Autumn / Fall Marsh
         ctx.fillStyle = '#2b2438';
         ctx.fillRect(0, 0, W, 46);
         ctx.fillStyle = '#753a28';
@@ -1712,8 +2279,6 @@
         ctx.fillRect(cx - 14, cy + wingY, 22, 14);
 
       } else if (game.artType === 'BUFFALO') {
-        // 5. LAND THUNDER!: Orange-Terracotta-Golden Prairie, Parallax Western Tipi,
-        //    Sashed Mounted Hunter chasing/hunting behind the Rumbling Buffalo Herd
         ctx.fillStyle = '#5c1f14';
         ctx.fillRect(0, 0, W, 38);
         ctx.fillStyle = '#a83c18';
@@ -1721,13 +2286,11 @@
         ctx.fillStyle = '#e07a22';
         ctx.fillRect(0, 74, W, 32);
 
-        // Large Golden Prairie Sun
         ctx.fillStyle = '#F7C844';
         ctx.fillRect(W - 88, 22, 28, 28);
         ctx.fillStyle = '#ffe58f';
         ctx.fillRect(W - 84, 26, 20, 20);
 
-        // Far Parallax Terracotta Ridge + Western Tipi Camp (Slow Scroll)
         const farScroll = Math.floor(tick * 0.45) % 240;
         ctx.fillStyle = '#8f3718';
         ctx.fillRect(0, 96, W, 18);
@@ -1738,13 +2301,11 @@
           drawWesternTipi(ctx, bx + 156, 102, 0.88, tick);
         }
 
-        // Golden-Terracotta Sunlit Prairie Ground (Mid & Foreground)
         ctx.fillStyle = '#d99626';
         ctx.fillRect(0, 106, W, 36);
         ctx.fillStyle = '#b8621b';
         ctx.fillRect(0, 138, W, H - 138);
 
-        // Fast Parallax Golden Grass Tufts
         const grassScroll = Math.floor(tick * 2.2) % 48;
         ctx.fillStyle = '#F7C844';
         for (let gx = -grassScroll; gx < W + 48; gx += 48) {
@@ -1755,7 +2316,6 @@
         const strideA = wave === 0 ? 0 : 4;
         const strideB = wave === 0 ? 4 : 0;
 
-        // Sashed Mounted Buffalo Hunter on Horseback (Left-Rear, chasing & hunting the herd!)
         const hx = cx - 108;
         const hy = Math.round(118 + strideB * 0.8);
         ctx.fillStyle = '#2e1a0c';
@@ -1785,7 +2345,6 @@
         ctx.fillRect(hx - 11, hy - 38, 17, 4);
         ctx.fillRect(hx - 7, hy - 42, 9, 4);
 
-        // Rumbling Herd of Buffalo Ahead of the Hunter (Center to Right, charging forward)
         drawMatrix(ctx, BUFFALO_SPRITE, PALETTE, cx - 28, 74 + strideA, 4);
         drawMatrix(ctx, BUFFALO_SPRITE, PALETTE, cx + 68, 76 + strideB, 4);
         drawMatrix(ctx, BUFFALO_SPRITE, PALETTE, cx - 44, 94 + strideB, 5);
@@ -1793,7 +2352,6 @@
         drawMatrix(ctx, BUFFALO_SPRITE, PALETTE, cx - 10, 108 + strideA, 6);
         drawMatrix(ctx, BUFFALO_SPRITE, PALETTE, cx + 86, 104 + strideB, 6);
 
-        // Kicked-Up Golden-Terracotta Prairie Dust Clouds behind hooves
         ctx.fillStyle = '#ffe58f';
         ctx.fillRect(hx - 48 - strideA * 2,  140, 18, 7);
         ctx.fillRect(cx - 56 - strideB * 2,  142, 18, 7);
@@ -1801,7 +2359,6 @@
         ctx.fillRect(cx + 72 - strideB * 2,  162, 22, 8);
 
       } else if (game.artType === 'CART') {
-        // 6. LE ROI DES TRAITEURS: Winter scene at the Red River Valley with falling snow & static cart
         ctx.fillStyle = '#102236';
         ctx.fillRect(0, 0, W, 56);
         ctx.fillStyle = '#294c6e';
@@ -1840,7 +2397,6 @@
         drawSnowfall(ctx, W, H - 76, tick, 26);
 
       } else if (game.artType === 'PORTAGE') {
-        // 7. LE GRAND PORTAGE: Voyageur carrying a cargo pack against the riverbank
         ctx.fillStyle = '#1b2b44';
         ctx.fillRect(0, 0, W, 56);
         ctx.fillStyle = '#38587a';
@@ -1883,7 +2439,6 @@
         ctx.fillRect(vx - 8, vy - 21, 14, 3);
 
       } else if (game.artType === 'GOLF') {
-        // 8. SCOTCH PÂKAHATOWÂN: Plains Links with Woodland Forest Background
         ctx.fillStyle = '#1b4242';
         ctx.fillRect(0, 0, W, 56);
         ctx.fillStyle = '#326e65';
@@ -1911,7 +2466,6 @@
         ctx.fillRect(cx - 38, 138, 9, 9);
 
       } else if (game.artType === 'HORSE') {
-        // 9. AEN ZHWAAL: Tan Buffalo Rider Horse on Muddy Spring Prairie Backdrop
         ctx.fillStyle = '#294d6e';
         ctx.fillRect(0, 0, W, 56);
         ctx.fillStyle = '#5a8fb8';
@@ -1962,7 +2516,6 @@
         ctx.fillRect(hx - 13, hy - 42, 18, 4);
 
       } else if (game.artType === 'ICE') {
-        // 10. LA GLACE ROUGE: Cornbroom & Curling Rock on clean frozen river ice with falling snow
         ctx.fillStyle = '#0d1b2a';
         ctx.fillRect(0, 0, W, 56);
         ctx.fillStyle = '#1b3b5c';
@@ -2019,7 +2572,7 @@
         drawSnowfall(ctx, W, H - 76, tick, 28);
       }
 
-      // 4. Lower Title Banner Plate (Universal Genre Subtext Only)
+      // 4. Lower Title Banner Plate
       const plateY = H - 76;
       ctx.fillStyle = 'rgba(6, 8, 16, 0.92)';
       ctx.fillRect(10, plateY, W - 20, 66);
@@ -2027,7 +2580,6 @@
       ctx.lineWidth = 2;
       ctx.strokeRect(10, plateY, W - 20, 66);
 
-      // Cartridge Number Pill
       ctx.fillStyle = game.accent;
       ctx.fillRect(18, plateY + 10, 34, 22);
       ctx.fillStyle = '#000';
@@ -2035,13 +2587,11 @@
       ctx.textAlign = 'center';
       ctx.fillText(game.badge, 35, plateY + 26);
 
-      // Main Game Title
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 20px "Courier New"';
       ctx.textAlign = 'left';
       ctx.fillText(game.title, 62, plateY + 27);
 
-      // Universal Genre / Description Subtext Only
       ctx.fillStyle = '#12AEA2';
       ctx.font = 'bold 12px "Courier New"';
       ctx.fillText(game.genre, 18, plateY + 51);
@@ -2051,15 +2601,24 @@
     function artboxLoop() {
       if (machineState !== 'MENU') return;
       carouselTick++;
+
+      let diff = ((panoTargetAngle - panoCurrentAngle + 540) % 360) - 180;
+      if (Math.abs(diff) > 0.15) {
+        panoCurrentAngle = (panoCurrentAngle + diff * 0.14 + 360) % 360;
+      } else {
+        panoCurrentAngle = panoTargetAngle;
+      }
+
+      drawForks360Panorama(pCtx, panoCurrentAngle, carouselTick);
       drawArtboxScene(aCtx, GAME_CATALOG[currentIndex], carouselTick);
       requestAnimationFrame(artboxLoop);
     }
 
     function playCarouselTick(dir) {
       if (!audioCtx) return;
-      const baseFreq = dir >= 0 ? 523.25 : 440.0;
-      playPulseCall(baseFreq, 0, 0.06, 0.08);
-      playPulseCall(baseFreq * 1.25, 0.045, 0.08, 0.09);
+      const baseFreq = dir >= 0 ? 587.33 : 440.0;
+      playPulseCall(baseFreq, 0, 0.055, 0.055);
+      playPulseCall(baseFreq * 1.25, 0.04, 0.075, 0.065);
     }
 
     function drawMatrix(context, matrix, palette, startX, startY, pixelSize, alpha = 1.0) {
@@ -2076,7 +2635,192 @@
         context.globalAlpha = 1.0;
     }
 
-    /* --- BWAA BRULE STACKED ANIMATION (STATIC SPLASH) --- */
+    /* --- 1-FOR-1 RED RIVER JIG FIDDLE ENGINE (GENTLE FADE-IN) --- */
+    let jigInterval = null;
+    let jigLoopRunning = false;
+    let jigStepIndex = 0;
+
+    function stopAllMenuAudio() {
+      if (jigInterval) {
+        clearInterval(jigInterval);
+        jigInterval = null;
+      }
+      jigLoopRunning = false;
+    }
+
+    const N = {
+      D3: 146.83, A3: 220.00,
+      D4: 293.66, E4: 329.63, Fs4: 369.99, G4: 392.00, A4: 440.00, B4: 493.88, Cs5: 554.37,
+      D5: 587.33, E5: 659.25, Fs5: 739.99, G5: 783.99, A5: 880.00, B5: 987.77
+    };
+
+    const RED_RIVER_JIG_SEQ = [
+      // A PART
+      { f: N.A5,  d: 2, drone: N.D3, grace: N.Fs5 },
+      { f: N.Fs5, d: 1, drone: null },
+      { f: N.D5,  d: 1, drone: N.A3 },
+      { f: N.Fs5, d: 2, drone: null },
+      { f: N.A5,  d: 2, drone: N.D3, grace: N.G5 },
+      { f: N.Fs5, d: 1, drone: null },
+      { f: N.E5,  d: 1, drone: N.A3 },
+      { f: N.D5,  d: 2, drone: null },
+
+      { f: N.E5,  d: 2, drone: N.A3, grace: N.Fs5 },
+      { f: N.Fs5, d: 1, drone: null },
+      { f: N.G5,  d: 1, drone: N.D3 },
+      { f: N.Fs5, d: 1, drone: null },
+      { f: N.E5,  d: 1, drone: N.A3 },
+      { f: N.D5,  d: 2, drone: N.D3 },
+      { f: N.B4,  d: 2, drone: N.A3 },
+      { f: N.A4,  d: 2, drone: N.D3 },
+
+      // A-Part Repeat
+      { f: N.A5,  d: 2, drone: N.D3, grace: N.Fs5 },
+      { f: N.Fs5, d: 1, drone: null },
+      { f: N.D5,  d: 1, drone: N.A3 },
+      { f: N.Fs5, d: 2, drone: null },
+      { f: N.A5,  d: 2, drone: N.D3 },
+      { f: N.B5,  d: 1, drone: null },
+      { f: N.A5,  d: 1, drone: N.A3 },
+      { f: N.Fs5, d: 2, drone: null },
+
+      { f: N.G5,  d: 1, drone: N.D3 },
+      { f: N.Fs5, d: 1, drone: null },
+      { f: N.E5,  d: 1, drone: N.A3 },
+      { f: N.D5,  d: 1, drone: null },
+      { f: N.Fs5, d: 2, drone: N.D3 },
+      { f: N.E5,  d: 2, drone: N.A3 },
+      { f: N.D5,  d: 4, drone: N.D3 },
+
+      // B PART
+      { f: N.D4,  d: 1, drone: N.D3 },
+      { f: N.Fs4, d: 1, drone: null },
+      { f: N.A4,  d: 2, drone: N.A3, grace: N.G4 },
+      { f: N.Fs4, d: 1, drone: null },
+      { f: N.D4,  d: 1, drone: N.D3 },
+      { f: N.Fs4, d: 2, drone: null },
+      { f: N.A4,  d: 2, drone: N.A3 },
+      { f: N.B4,  d: 1, drone: null },
+      { f: N.A4,  d: 1, drone: N.D3 },
+
+      { f: N.G4,  d: 2, drone: N.A3, grace: N.Fs4 },
+      { f: N.E4,  d: 2, drone: null },
+      { f: N.Fs4, d: 1, drone: N.D3 },
+      { f: N.G4,  d: 1, drone: null },
+      { f: N.A4,  d: 2, drone: N.A3 },
+      { f: N.Fs4, d: 2, drone: N.D3 },
+      { f: N.D4,  d: 2, drone: N.A3 },
+
+      // B-Part Crooked Turnaround
+      { f: N.D4,  d: 1, drone: N.D3 },
+      { f: N.Fs4, d: 1, drone: null },
+      { f: N.A4,  d: 2, drone: N.A3 },
+      { f: N.B4,  d: 1, drone: null },
+      { f: N.Cs5, d: 1, drone: N.D3 },
+      { f: N.D5,  d: 2, drone: N.A3, grace: N.Cs5 },
+      { f: N.B4,  d: 1, drone: null },
+      { f: N.A4,  d: 1, drone: N.D3 },
+      { f: N.Fs4, d: 2, drone: null },
+
+      { f: N.G4,  d: 1, drone: N.A3 },
+      { f: N.Fs4, d: 1, drone: null },
+      { f: N.E4,  d: 2, drone: N.D3 },
+      { f: N.Fs4, d: 2, drone: N.A3 },
+      { f: N.D4,  d: 4, drone: N.D3 }
+    ];
+
+    function playFiddleBowNote(noteObj, stepSec) {
+      if (!audioCtx || !jigLoopRunning || jigFadeVolume <= 0.005) return;
+      const now = audioCtx.currentTime;
+      const dur = noteObj.d * stepSec * 0.94;
+      const volScale = Math.max(0, Math.min(1, jigFadeVolume));
+
+      const oscMain = audioCtx.createOscillator();
+      const oscBow = audioCtx.createOscillator();
+      const mainGain = audioCtx.createGain();
+      const bowGain = audioCtx.createGain();
+
+      oscMain.type = 'triangle';
+      if (customPulseWave) oscBow.setPeriodicWave(customPulseWave);
+      else oscBow.type = 'square';
+
+      if (noteObj.grace) {
+        oscMain.frequency.setValueAtTime(noteObj.grace, now);
+        oscMain.frequency.setValueAtTime(noteObj.f, now + 0.028);
+        oscBow.frequency.setValueAtTime(noteObj.grace, now);
+        oscBow.frequency.setValueAtTime(noteObj.f, now + 0.028);
+      } else {
+        oscMain.frequency.setValueAtTime(noteObj.f, now);
+        oscBow.frequency.setValueAtTime(noteObj.f, now);
+      }
+
+      const mainVol = 0.042 * volScale;
+      const bowVol = 0.013 * volScale;
+
+      mainGain.gain.setValueAtTime(0.0001, now);
+      mainGain.gain.linearRampToValueAtTime(mainVol, now + 0.016);
+      mainGain.gain.setValueAtTime(mainVol * 0.88, now + dur * 0.72);
+      mainGain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+      bowGain.gain.setValueAtTime(0.0001, now);
+      bowGain.gain.linearRampToValueAtTime(bowVol, now + 0.014);
+      bowGain.gain.exponentialRampToValueAtTime(0.0001, now + dur * 0.85);
+
+      oscMain.connect(mainGain);
+      oscBow.connect(bowGain);
+      mainGain.connect(audioCtx.destination);
+      bowGain.connect(audioCtx.destination);
+
+      oscMain.start(now);
+      oscBow.start(now);
+      oscMain.stop(now + dur + 0.01);
+      oscBow.stop(now + dur + 0.01);
+
+      if (noteObj.drone) {
+        const droneOsc = audioCtx.createOscillator();
+        const droneGain = audioCtx.createGain();
+        droneOsc.type = 'triangle';
+        droneOsc.frequency.setValueAtTime(noteObj.drone, now);
+        droneGain.gain.setValueAtTime(0.0001, now);
+        droneGain.gain.linearRampToValueAtTime(0.024 * volScale, now + 0.015);
+        droneGain.gain.exponentialRampToValueAtTime(0.0001, now + dur * 1.15);
+        droneOsc.connect(droneGain);
+        droneGain.connect(audioCtx.destination);
+        droneOsc.start(now);
+        droneOsc.stop(now + dur * 1.15 + 0.01);
+      }
+    }
+
+    function startRedRiverJigLoop(initialVol = 1.0) {
+      if (!audioCtx || jigLoopRunning) return;
+      if (machineState !== 'STATIC' && machineState !== 'MENU') return;
+      jigLoopRunning = true;
+      jigFadeVolume = initialVol;
+      jigStepIndex = 0;
+
+      const sixteenthMs = 112;
+      let waitTicks = 0;
+
+      const tickJig = () => {
+        if (!jigLoopRunning || (machineState !== 'STATIC' && machineState !== 'MENU')) {
+          stopAllMenuAudio();
+          return;
+        }
+        if (waitTicks > 0) {
+          waitTicks--;
+          return;
+        }
+        const note = RED_RIVER_JIG_SEQ[jigStepIndex];
+        playFiddleBowNote(note, sixteenthMs / 1000);
+        waitTicks = note.d - 1;
+        jigStepIndex = (jigStepIndex + 1) % RED_RIVER_JIG_SEQ.length;
+      };
+
+      tickJig();
+      jigInterval = setInterval(tickJig, sixteenthMs);
+    }
+
+    /* --- BWAA BRULE TITLE SCREEN (1860s ST. BONIFACE SUNRISE + YORK BOAT WAKE REVEAL) --- */
     const BWAA_PALETTE = {
         '0': null,
         '1': '#540E11',
@@ -2107,44 +2851,124 @@
     const sCanvas = document.getElementById('bwaaCanvas');
     const sCtx = sCanvas.getContext('2d');
     sCtx.imageSmoothingEnabled = false;
+    let staticTick = 0;
 
     function staticLoop(timestamp) {
         if (machineState !== 'STATIC') return;
+        staticTick++;
 
         sCtx.fillStyle = '#000000';
         sCtx.fillRect(0, 0, sCanvas.width, sCanvas.height);
 
         const elapsed = (timestamp - staticStartTime) / 1000;
-        const zoomDuration = 4.0; 
-        let currentScale;
+        const blackPause = bwaaIntroActive ? 0.8 : 0.0;
+        const sunriseDuration = 3.8;
 
-        if (elapsed < zoomDuration) {
-            const t = elapsed / zoomDuration;
-            const easeOut = 1 - Math.pow(1 - t, 3);
-            currentScale = 0.5 + (1.25 - 0.5) * easeOut;
-        } else {
-            currentScale = 1.25; 
+        // Brief pause on pure black before sunrise & Red River Jig fade in
+        if (elapsed < blackPause) {
+            requestAnimationFrame(staticLoop);
+            return;
         }
 
+        const animElapsed = elapsed - blackPause;
+        const progress = bwaaIntroActive ? Math.min(1, animElapsed / sunriseDuration) : 1.0;
+
+        // Gently fade in the Red River Jig fiddle melody matching the sunrise behind the cathedral
+        if (!jigStarted) {
+            jigStarted = true;
+            startRedRiverJigLoop(bwaaIntroActive ? 0.05 : 1.0);
+        }
+        if (bwaaIntroActive) {
+            jigFadeVolume = Math.min(1.0, progress * 1.15);
+        } else {
+            jigFadeVolume = 1.0;
+        }
+
+        // Compute Portage La Loche York Boat horizontal position (rows Right -> Left after sunrise completes)
+        let boatCenterX = null;
+        let promptRevealAlpha = 1.0;
+
+        if (bwaaIntroActive) {
+            if (animElapsed < sunriseDuration) {
+                promptRevealAlpha = 0.0;
+            } else {
+                const boatTime = animElapsed - sunriseDuration;
+                const boatTraverseDur = 6.2;
+                const startX = sCanvas.width + 115;
+                const endX = -135;
+                if (boatTime <= boatTraverseDur) {
+                    boatCenterX = startX + (endX - startX) * (boatTime / boatTraverseDur);
+                }
+                // Reveal "Press A to start" in the boat's ripple wake as it passes the center Y axis
+                const centerX = sCanvas.width / 2;
+                const wakeTrailX = boatCenterX !== null ? (boatCenterX + 65) : endX;
+                if (wakeTrailX <= centerX + 90) {
+                    promptRevealAlpha = Math.max(0, Math.min(1, ((centerX + 90) - wakeTrailX) / 170));
+                } else {
+                    promptRevealAlpha = 0.0;
+                }
+            }
+        } else {
+            // Looping periodic pass of the Portage La Loche York boat when returning from menu
+            const cycle = (animElapsed % 9.5) / 6.5;
+            if (cycle <= 1.0) {
+                boatCenterX = (sCanvas.width + 115) + (-135 - (sCanvas.width + 115)) * cycle;
+            }
+            promptRevealAlpha = 1.0;
+        }
+
+        // 1. Parallax Sunrise Scene + Riverbank in front of 1860s St. Boniface Cathedral + York Boat
+        drawStBonifaceIntroScene(sCtx, sCanvas.width, sCanvas.height, progress, boatCenterX, staticTick);
+
+        // 2. Faint white atmospheric veil between the background and the Bwaa Brule text for crisp readability
+        const veilAlpha = 0.22 * progress;
+        sCtx.fillStyle = `rgba(255, 255, 255, ${veilAlpha.toFixed(3)})`;
+        sCtx.fillRect(0, 0, sCanvas.width, sCanvas.height);
+
+        // 3. Slow Fade-In of the Bwaa Brule Logo
+        const logoAlpha = bwaaIntroActive
+          ? Math.max(0, Math.min(1, (progress - 0.12) / 0.88))
+          : 1.0;
+        const logoScale = 1.18;
+
         sCtx.save();
-        sCtx.translate(sCanvas.width / 2, sCanvas.height / 2 - 25);
-        sCtx.scale(currentScale, currentScale);
+        sCtx.translate(sCanvas.width / 2, sCanvas.height * 0.29);
+        sCtx.scale(logoScale, logoScale);
 
         const pSize = 5; 
         const spriteW = BWAA_SPRITE[0].length * pSize;
         const spriteH = BWAA_SPRITE.length * pSize;
         
-        drawMatrix(sCtx, BWAA_SPRITE, BWAA_PALETTE, -spriteW/2, -spriteH/2, pSize);
+        drawMatrix(sCtx, BWAA_SPRITE, BWAA_PALETTE, -spriteW/2, -spriteH/2, pSize, logoAlpha);
         sCtx.restore();
 
-        if (elapsed >= zoomDuration) {
+        // 4. Ripple-Wake Revealed "Press A to start" Prompt on the Red River
+        if (promptRevealAlpha > 0.02) {
             const blink = Math.floor(timestamp / 500) % 2 === 0;
-            if (blink) {
-                sCtx.fillStyle = '#12AEA2'; 
-                sCtx.font = 'bold 24px "Courier New"';
-                sCtx.textAlign = 'center';
-                sCtx.fillText("PRESS A TO START", sCanvas.width / 2, sCanvas.height - 32);
-            }
+            const pulseAlpha = promptRevealAlpha * (blink ? 1.0 : 0.62);
+            sCtx.save();
+            sCtx.globalAlpha = pulseAlpha;
+            sCtx.fillStyle = 'rgba(6, 16, 28, 0.72)';
+            sCtx.fillRect(sCanvas.width / 2 - 134, sCanvas.height - 92, 268, 28);
+            sCtx.fillStyle = '#12AEA2';
+            sCtx.font = 'bold 21px "Courier New"';
+            sCtx.textAlign = 'center';
+            sCtx.fillText("PRESS A TO START", sCanvas.width / 2, sCanvas.height - 71);
+            sCtx.restore();
+        }
+
+        // 5. French Script Pixel Subtext "Saint Boniface, 1860" (No underline) at Bottom Center
+        if (logoAlpha > 0.05) {
+            sCtx.save();
+            sCtx.globalAlpha = logoAlpha;
+            sCtx.font = 'italic bold 20px Georgia, "Times New Roman", serif';
+            sCtx.textAlign = 'center';
+            // Crisp pixel drop-shadow for readability over shoreline
+            sCtx.fillStyle = '#090b12';
+            sCtx.fillText("Saint Boniface, 1860", sCanvas.width / 2 + 2, sCanvas.height - 13);
+            sCtx.fillStyle = '#F7C844';
+            sCtx.fillText("Saint Boniface, 1860", sCanvas.width / 2, sCanvas.height - 15);
+            sCtx.restore();
         }
 
         requestAnimationFrame(staticLoop);
