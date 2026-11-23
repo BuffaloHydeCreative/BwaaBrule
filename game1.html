@@ -137,7 +137,7 @@
 
     <div id="intro-screen" class="overlay">
       <h2>Red River Run</h2>
-      <p>Paddle north from The Forks past Lower Fort Garry, through the marshy islands of Lake Winnipeg's mouth, and across the deep lake to deploy your dogsled for the Boreal trail to York Factory.<br><br>UP / DOWN switches between 3 tracks to avoid long meandering banks, islands, shallow rocks, horizon tidal waves, snowdrifts, and glare ice.</p>
+      <p>Paddle north from The Forks past Lower Fort Garry, through the marshy islands of Lake Winnipeg's mouth, and across the deep lake to deploy your dogsled for the Boreal trail to York Factory.<br><br>UP / DOWN switches between 3 tracks to avoid long meandering banks, islands, shallow rocks, lake whitecaps, snowdrifts, and glare ice.</p>
       <div class="blink-text">PRESS 'A' TO START</div>
     </div>
 
@@ -849,16 +849,12 @@
     upperFortSpawned = true;
 
     nextFeatureX = VIEW_W + 90;
-    nextDeepWaveX = VIEW_W + 180;
+    nextDeepWaveX = VIEW_W + 260;
   }
 
-  // Helper: Spawn increased log jams in the island-to-shoreline path (opposite the island's speed-up chute)
+  // Spawn log jams in the island-to-shoreline path (opposite the island's speed-up chute)
   function spawnIslandShorelineLogJams(islandX, islandW, chuteSide) {
-    // When chuteSide is 0 (Top fast current), Lane 2 is the island-to-shoreline path.
-    // When chuteSide is 2 (Bottom fast current), Lane 0 is the opposite channel.
     const slowSideLane = chuteSide === 0 ? 2 : 0;
-
-    // Place 1 to 2 tangled log jams along the island-to-shoreline side so one side is speed-up, the other is slow-down
     const jamCount = islandW >= 145 ? 2 : 1;
     for (let j = 0; j < jamCount; j++) {
       const ratio = jamCount === 1 ? 0.50 : (0.32 + j * 0.38);
@@ -892,7 +888,7 @@
       sugarIslandSpawned = true;
       const w = 160;
       const taperW = 46;
-      const chuteSide = 0; // Top channel = fast current chute; Bottom (island-to-shoreline) = log jam slow-down
+      const chuteSide = 0;
       riverFeatures.push({
         x: nextFeatureX,
         w: w,
@@ -909,6 +905,7 @@
       return;
     }
 
+    const isRedRiver = (score < DIST.LOWER_FORT_END);
     const isMarshMouth = (score >= DIST.LOWER_FORT_END && score < DIST.MARSH_MOUTH_END);
     const isLakeOpen = (score >= DIST.MARSH_MOUTH_END && score < DIST.DEPLOY_END);
     const isWinter = (score >= DIST.DEPLOY_END);
@@ -919,7 +916,7 @@
     let gapAfter = 140;
     let isMarshIsland = false;
 
-    if (score < DIST.LOWER_FORT_END) {
+    if (isRedRiver) {
       chosen = lastFeatureType === 'TOP_MEANDER' ? 'BOT_MEANDER' : 'TOP_MEANDER';
       depthFactor = Math.random() < 0.55 ? 0.5 : 1.0;
       gapAfter = 175;
@@ -960,8 +957,6 @@
 
     const w = tileCount * TILE_PX;
     const taperW = Math.min(48, Math.floor(w * 0.32));
-    // For islands before winter: bias toward top channel (0) being the fast current chute so the
-    // island-to-shoreline path (Lane 2) receives the increased log-jam slow-down!
     const chuteSide = (!isWinter && chosen === 'ISLAND') ? (Math.random() < 0.72 ? 0 : 2) : -1;
 
     riverFeatures.push({
@@ -978,7 +973,7 @@
 
     // --- Spawn Hazards ---
     if (!isWinter) {
-      // 1. Increased Log Jams in the island-to-shoreline path (opposite the speed-up current chute)
+      // 1. Log Jams in the island-to-shoreline path (opposite the speed-up current chute)
       if (chosen === 'ISLAND' && chuteSide !== -1) {
         spawnIslandShorelineLogJams(nextFeatureX, w, chuteSide);
       }
@@ -997,7 +992,19 @@
         });
       }
 
-      // 3. Half-track shoreline shallow rocks (halved frequency, never on Lane 0)
+      // 3. Slightly increased center-track debris in the Red River portions (0 - 900)
+      if (isRedRiver && Math.random() < 0.42) {
+        const centerX = nextFeatureX + w + Math.floor(gapAfter * 0.46);
+        hazards.push({
+          x: centerX,
+          lane: 1,
+          type: Math.random() < 0.28 ? 'ROCK_CLUSTER' : 'LOG_JAM',
+          halfOffset: 0,
+          triggered: false
+        });
+      }
+
+      // 4. Half-track shoreline shallow rocks (halved frequency, never on Lane 0)
       if (depthFactor === 0.5 && chosen === 'BOT_MEANDER') {
         if (Math.random() < 0.35) {
           hazards.push({
@@ -1009,7 +1016,8 @@
           });
         }
       } else if (isLakeOpen) {
-        if (Math.random() < 0.45) {
+        // On Lake Winnipeg, rocks are halved and strictly restricted to Lane 1 or Lane 2 (never Lane 0!)
+        if (Math.random() < 0.42) {
           const gapRockX = nextFeatureX + w + Math.floor(gapAfter * 0.48);
           const shoalLane = Math.random() < 0.55 ? 2 : 1;
           hazards.push({
@@ -1020,7 +1028,7 @@
             triggered: false
           });
         }
-      } else if (Math.random() < 0.16) {
+      } else if (!isRedRiver && Math.random() < 0.16) {
         const obsX = nextFeatureX + w + Math.floor(gapAfter * 0.48);
         const isRock = Math.random() < 0.35;
         const obsLane = isRock ? (Math.random() < 0.5 ? 1 : 2) : Math.floor(Math.random() * 3);
@@ -1062,8 +1070,9 @@
   }
 
   function scheduleDeepLakeWaves() {
-    if (score < DIST.MARSH_MOUTH_END || score >= DIST.LAKE_MIDNIGHT_END - 40) return;
-    if (nextDeepWaveX < VIEW_W + 90) {
+    // Realistic Lake Winnipeg whitecap swells along the horizon edge (Lane 0) — spaced out naturally (not too frequent)
+    if (score < DIST.MARSH_MOUTH_END || score >= DIST.LAKE_MIDNIGHT_END - 60) return;
+    if (nextDeepWaveX < VIEW_W + 100) {
       hazards.push({
         x: nextDeepWaveX,
         lane: 0,
@@ -1071,7 +1080,8 @@
         halfOffset: 0,
         triggered: false
       });
-      nextDeepWaveX += 195 + Math.floor(Math.random() * 145);
+      // Wide, natural interval between lake whitecaps (~520 to 840px)
+      nextDeepWaveX += 520 + Math.floor(Math.random() * 320);
     }
   }
 
@@ -1345,7 +1355,6 @@
         const botY = riverTopY + laneH * 2 - 1;
         const midY = Math.round((topY + botY) / 2);
 
-        // One-sided rapid current chute (ONLY on f.chuteLane; opposite side holds the log-jam slow-down!)
         if (!isWinter && (f.chuteLane === 0 || f.chuteLane === 2)) {
           const chuteY = f.chuteLane === 0 ? riverTopY + 2 : riverTopY + laneH * 2 + 2;
           const chuteH = laneH - 4;
@@ -1410,7 +1419,7 @@
       }
     }
 
-    // 5. Hazards (Log Jams, Shallow Rock Clusters, Horizon-Overhanging Tidal Waves, Snow Drifts, Glare Ice)
+    // 5. Hazards (Log Jams, Shallow Rock Clusters, Realistic Lake Whitecap Wave, Snow Drifts, Glare Ice)
     for (let i = 0; i < hazards.length; i++) {
       const h = hazards[i];
       const hx = Math.round(h.x);
@@ -1472,42 +1481,49 @@
         ctx.fillStyle = PAL.SNOW_LIGHT;
         ctx.fillRect(hx + 6, hy, 3, 1);
       } else if (h.type === 'BIG_WAVE') {
-        const crestTopY = horizonY - 9;
-        const waveBotY = riverTopY + laneH - 1;
+        // Realistic Lake Winnipeg Whitecap Wave along the horizon edge (Lane 0):
+        // Longer (48px), lower-profile swell that builds gradually from a gentle bump on the right
+        // into a folding whitecap crest by the time it reaches the player's locked x-axis (x ~ 36)
+        const waveW = 48;
+        const waveBotY = riverTopY + laneH - 2;
+        const playerX = 36;
+        // Steepness / folding progression: 0 when far right, 1.0 as it reaches the player's x-axis
+        const foldT = Math.max(0, Math.min(1, (VIEW_W - hx) / Math.max(40, VIEW_W - playerX)));
+        const crestTopY = Math.round(horizonY - 2 - foldT * 2); // Subtle 2-4px rise above horizon edge
 
-        fillPixelPoly([
-          [hx + 2, waveBotY],
-          [hx + 10, crestTopY + 1],
-          [hx + 22, crestTopY],
-          [hx + 32, waveBotY]
-        ], env.watDeep);
-
+        // 1. Long, gradual water swell body (gentle slope on right back, steeper face on left)
         fillPixelPoly([
           [hx, waveBotY],
-          [hx + 6, crestTopY + 3],
-          [hx + 12, crestTopY],
-          [hx + 20, crestTopY],
-          [hx + 26, waveBotY]
+          [hx + Math.round(12 - foldT * 5), crestTopY + 2],
+          [hx + Math.round(20 - foldT * 4), crestTopY],
+          [hx + 34, crestTopY + 3],
+          [hx + waveW, waveBotY]
         ], env.watMid);
 
+        // 2. Turquoise curling wave face & whitecap foam
         fillPixelPoly([
-          [hx - 2, waveBotY - 2],
-          [hx + 3, crestTopY + 4],
-          [hx + 8, crestTopY - 1],
-          [hx + 16, crestTopY - 1],
-          [hx + 12, crestTopY + 5],
-          [hx + 7, waveBotY - 3]
+          [hx - 2, waveBotY - 1],
+          [hx + Math.round(9 - foldT * 4), crestTopY + 3],
+          [hx + Math.round(16 - foldT * 3), crestTopY],
+          [hx + 26, crestTopY + 2],
+          [hx + 18, waveBotY - 2]
         ], env.watFoam);
 
+        // 3. Folding whitecap crest (folds forward over the left face as foldT approaches 1)
+        const curlOverhang = Math.round(foldT * 4);
         fillPixelPoly([
-          [hx + 2, crestTopY + 5],
-          [hx + 7, crestTopY - 2],
-          [hx + 15, crestTopY - 2],
-          [hx + 11, crestTopY + 3]
+          [hx + Math.round(8 - curlOverhang), crestTopY + 3],
+          [hx + Math.round(13 - curlOverhang), crestTopY],
+          [hx + 22, crestTopY],
+          [hx + 27, crestTopY + 2],
+          [hx + 15, crestTopY + 2]
         ], PAL.WAVE_CREST);
+
+        // Trailing whitecap foam line & base wake
         ctx.fillStyle = PAL.WAVE_CREST;
-        ctx.fillRect(hx - 1, crestTopY + 5, 4, 2);
-        ctx.fillRect(hx - 3, waveBotY - 2, 30, 2);
+        ctx.fillRect(hx + 24, crestTopY + 2, 12, 1);
+        ctx.fillStyle = env.watFoam;
+        ctx.fillRect(hx - 2, waveBotY - 1, waveW + 2, 1);
       } else if (h.type === 'SNOW_DRIFT') {
         fillPixelPoly([
           [hx, hy + 8],
@@ -1591,8 +1607,29 @@
   }
 
   // ==========================================
-  // 7. COLLISIONS, DEPLOYMENT & UPDATE LOOP
+  // 7. COLLISIONS, ISLAND COMMITMENT, & UPDATE LOOP
   // ==========================================
+  // Prevent last-minute clipping into or across an island once committed to one side
+  function isCommittedToIslandFork(targetLane) {
+    const pLeft = 20;
+    const pRight = 52;
+    for (let i = 0; i < riverFeatures.length; i++) {
+      const f = riverFeatures[i];
+      if (f.type === 'ISLAND') {
+        // From the moment the canoe enters the island's upstream point until its stern clears the downstream tip
+        const forkStart = f.x + 4;
+        const forkEnd = f.x + f.w - 4;
+        if (pRight > forkStart && pLeft < forkEnd) {
+          // Block entering the island track (Lane 1) or jumping across it to the opposite channel
+          if (targetLane === 1 || (playerLane === 0 && targetLane === 2) || (playerLane === 2 && targetLane === 0)) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
   function checkCollisions() {
     if (isDeployingSled) return;
 
@@ -1602,8 +1639,9 @@
 
     for (let i = 0; i < riverFeatures.length; i++) {
       const f = riverFeatures[i];
-      const solidStart = f.x + Math.floor(f.taperW * 0.65);
-      const solidEnd = f.x + f.w - Math.floor(f.taperW * 0.65);
+      // Island collision spans its full tapered body (f.x + 8 to f.x + f.w - 8) so no nose/tail clipping occurs
+      const solidStart = f.type === 'ISLAND' ? (f.x + 8) : (f.x + Math.floor(f.taperW * 0.65));
+      const solidEnd = f.type === 'ISLAND' ? (f.x + f.w - 8) : (f.x + f.w - Math.floor(f.taperW * 0.65));
 
       if (f.type === 'ISLAND' && !isSledMode && pRight > f.x && pLeft < f.x + f.w) {
         if (playerLane === f.chuteLane) {
@@ -1636,15 +1674,18 @@
 
     for (let i = 0; i < hazards.length; i++) {
       const h = hazards[i];
-      const hitW = h.type === 'BIG_WAVE' ? 24 : 16;
-      if (!h.triggered && h.lane === playerLane && pRight > h.x + 2 && pLeft < h.x + hitW) {
+      // For BIG_WAVE (48px long), collision occurs on the folding whitecap crest face (x+4 .. x+28)
+      const hitStart = h.type === 'BIG_WAVE' ? (h.x + 4) : (h.x + 2);
+      const hitEnd = h.type === 'BIG_WAVE' ? (h.x + 28) : (h.x + 16);
+
+      if (!h.triggered && h.lane === playerLane && pRight > hitStart && pLeft < hitEnd) {
         h.triggered = true;
         if (h.type === 'ROCK_CLUSTER') {
           crashReason = "STRUCK SHALLOW ROCKS!";
           gameOver();
           return;
         } else if (h.type === 'BIG_WAVE') {
-          crashReason = "CAPSIZED IN TIDAL WAVE!";
+          crashReason = "CAPSIZED IN LAKE WHITECAP!";
           gameOver();
           return;
         } else if (h.type === 'LOG_JAM') {
@@ -1730,10 +1771,10 @@
     scheduleDeepLakeWaves();
 
     for (let i = 0; i < hazards.length; i++) {
-      const hSpeed = hazards[i].type === 'BIG_WAVE' ? currentSpeed * 1.45 : currentSpeed;
+      const hSpeed = hazards[i].type === 'BIG_WAVE' ? currentSpeed * 1.38 : currentSpeed;
       hazards[i].x -= hSpeed;
     }
-    hazards = hazards.filter(h => h.x > -40);
+    hazards = hazards.filter(h => h.x > -60);
 
     for (let i = 0; i < landmarks.length; i++) {
       landmarks[i].x -= currentSpeed * 0.38;
@@ -1750,10 +1791,14 @@
   function changeTrack(direction) {
     if (!isPlaying || isGameOver || isPaused || isDeployingSled || isIceSlip) return;
     if (direction === 'UP' && playerLane > 0) {
-      playerLane--;
+      const nextLane = playerLane - 1;
+      if (isCommittedToIslandFork(nextLane)) return;
+      playerLane = nextLane;
       playPaddleSound();
     } else if (direction === 'DOWN' && playerLane < 2) {
-      playerLane++;
+      const nextLane = playerLane + 1;
+      if (isCommittedToIslandFork(nextLane)) return;
+      playerLane = nextLane;
       playPaddleSound();
     }
   }
