@@ -169,6 +169,10 @@
   let baseSpeed = 1.05;
   let effectiveSpeed = 1.05;
 
+  // Creek pacing trackers: strictly 2–3 creeks across an entire 10-pelt level
+  let creeksSpawnedThisLevel = 0;
+  let nextCreekSpawnDist = 360;
+
   function resizeViewport() {
     const w = window.innerWidth;
     const h = window.innerHeight;
@@ -214,7 +218,7 @@
       tuft: '#b59259',
       tuftDark: '#5c4125',
       type: 'desert',
-      desc: "THE SUN-BAKED PLAINS! CROSS WINDING PRAIRIE CREEKS AT THEIR CENTER SHALLOWS AND DODGE DARTING FOXES."
+      desc: "THE SUN-BAKED PLAINS! CROSS RARE PRAIRIE CREEKS AT THEIR CENTER SHALLOWS AND DODGE DARTING FOXES."
     },
     { 
       name: "RED RIVER VALLEY", 
@@ -256,7 +260,7 @@
     }
   };
 
-  // Sculpted Top-Down Mounted Buffalo Runner (20x24 SNES shaded - distinct horse head, neck, shoulders, saddle, rider shoulders/hat, and animated legs)
+  // Sculpted Top-Down Mounted Buffalo Runner (20x24 SNES shaded)
   const PAL_PLAYER = {
     1: '#120d09', // Crisp Dark Outline
     2: '#8f5932', // Warm Bay Horse Coat
@@ -272,7 +276,7 @@
   };
 
   const sprPlayerAnim = [
-    [ // Frame 1: Extended Gallop (Front Left / Back Right reaching)
+    [ // Frame 1: Extended Gallop
       [0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,1,4,2,2,4,1,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,1,2,2,2,2,2,2,1,0,0,0,0,0,0],
@@ -295,10 +299,10 @@
       [0,0,0,0,0,1,5,1,1,5,5,1,1,5,1,0,0,0,0],
       [0,0,0,0,0,0,1,0,0,5,5,0,0,1,0,0,0,0,0],
       [0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
     ],
-    [ // Frame 2: Gathered Gallop Stride (Alternate Legs & Flowing Mane/Tail)
+    [ // Frame 2: Gathered Gallop Stride
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,1,4,2,2,4,1,0,0,0,0,0,0,0],
@@ -316,18 +320,17 @@
       [0,0,0,1,3,4,2,1,1,1,1,1,1,2,4,3,1,0,0,0],
       [0,0,0,0,1,3,2,2,2,5,5,2,2,2,3,1,0,0,0,0],
       [0,0,0,0,1,3,2,2,5,5,5,5,2,2,3,1,0,0,0],
-      [0,0,0,0,0,1,3,2,5,5,5,5,2,3,1,0,0,0,0,0],
-      [0,0,0,0,0,1,5,1,5,5,5,5,1,5,1,0,0,0,0,0],
-      [0,0,0,0,0,0,1,0,1,5,5,1,0,1,0,0,0,0,0,0],
-      [0,0,0,0,0,0,0,0,1,5,5,1,0,0,0,0,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+      [0,0,0,0,0,1,3,2,5,5,5,5,2,3,1,0,0,0,0],
+      [0,0,0,0,0,1,5,1,5,5,5,5,1,5,1,0,0,0,0],
+      [0,0,0,0,0,0,1,0,1,5,5,1,0,1,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,1,5,5,1,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
     ]
   ];
 
-  // Anatomically Sculpted Top-Down Buffalo (16x18 shaded - curved ivory horns, massive shaggy shoulder hump, tapered dark hindquarters, hooves)
-  // Strict deep brown hide & ivory horns (zero red markings)
+  // Anatomically Sculpted Top-Down Buffalo (Strict deep brown hide & ivory horns, zero red markings)
   const PAL_BUFFALO_TOP = {
     1: '#120c08', // Dark Outline
     2: '#593b27', // Shaggy Shoulder Hump (Rich Deep Brown)
@@ -356,7 +359,7 @@
     [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
   ];
 
-  // Side-Profile Buffalo for Title Screen & Cutscene (18x12 SNES Shaded - strictly deep brown hide & ivory horns, zero red markings)
+  // Side-Profile Buffalo for Title Screen & Cutscene (Strictly deep brown hide & ivory horns, zero red markings)
   const PAL_BUFFALO_SIDE = {
     1: '#120c08', // Dark Outline
     2: '#593b27', // Shaggy Hump Fur (Deep Brown)
@@ -377,7 +380,7 @@
     [0,0,1,1,0,0,0,0,1,1,0,1,1,0,0,0,0,0]
   ];
 
-  // Side-Profile Mounted Hunter for Title Screen & Cutscene (16x12 SNES Shaded)
+  // Side-Profile Mounted Hunter for Title Screen & Cutscene
   const PAL_HUNTER_SIDE = {
     1: '#120d0a', // Outline
     2: '#8f5932', // Horse Coat
@@ -568,6 +571,44 @@
     }
   }
 
+  // Clear any obstacles that might overlap or block a creek crossing corridor
+  function clearCreekCorridor(creekY, creekH, fordStart, fordEnd) {
+    const padY = 44; // Generous vertical clearance above and below the creek
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+      let obs = obstacles[i];
+      // Remove any obstacle inside the creek band or blocking the entry/exit funnel of the ford
+      if (obs.y + obs.h > creekY - padY && obs.y < creekY + creekH + padY) {
+        obstacles.splice(i, 1);
+      }
+    }
+  }
+
+  function spawnCreekFeature() {
+    let fordCenter = Math.floor(VIEW_W * (0.42 + Math.random() * 0.16));
+    let fordHalfW = 36; // 72px wide passable shallow ford
+    let bufferW = 14;   // 14px shallow gravel/wading transition buffer on each side before deep water
+    let creekY = -36;
+    let creekH = 26;
+
+    // Guarantee zero objects block the crossing or sit in the creek approaches
+    clearCreekCorridor(creekY, creekH, fordCenter - fordHalfW - bufferW, fordCenter + fordHalfW + bufferW);
+
+    terrainFeatures.push({
+      kind: 'CREEK',
+      x: 0,
+      y: creekY,
+      w: VIEW_W,
+      h: creekH,
+      fordStart: fordCenter - fordHalfW,
+      fordEnd: fordCenter + fordHalfW,
+      bufferW: bufferW
+    });
+
+    creeksSpawnedThisLevel++;
+    // Space creeks far apart so strictly 2–3 creeks occur over a full 10-pelt level (~950–1250px)
+    nextCreekSpawnDist = worldScrollDist + 950 + Math.floor(Math.random() * 350);
+  }
+
   function spawnTerrainFeature() {
     let bIdx = (level - 1) % BIOMES.length;
     let bType = BIOMES[bIdx].type;
@@ -586,7 +627,6 @@
         h: lh,
         fromLeft: fromLeft
       });
-      // Scatter natural talus rocks below the ledge so it integrates organically
       obstacles.push({
         x: fromLeft ? ledgeW - 18 : lx - 6,
         y: -12,
@@ -600,35 +640,7 @@
       });
     }
 
-    // 2. Dry Prairie & Red River Valley: Winding creeks with a shallow passable ford near center
-    if (bType === 'desert' || bType === 'grass') {
-      let fordCenter = Math.floor(VIEW_W * (0.42 + Math.random() * 0.16));
-      let fordHalfW = 34; // 68px wide passable shallow ford
-      terrainFeatures.push({
-        kind: 'CREEK',
-        x: 0,
-        y: -36,
-        w: VIEW_W,
-        h: 26,
-        fordStart: fordCenter - fordHalfW,
-        fordEnd: fordCenter + fordHalfW
-      });
-      // Place riparian shrubs & rocks along the creek banks for natural integration
-      let bankX = Math.random() > 0.5 ? Math.max(8, fordCenter - fordHalfW - 34) : Math.min(VIEW_W - 34, fordCenter + fordHalfW + 10);
-      obstacles.push({
-        x: bankX,
-        y: -52,
-        dx: 0,
-        dy: 0,
-        type: 'shrub',
-        w: 24,
-        h: 18,
-        scale: 3,
-        dead: false
-      });
-    }
-
-    // 3. Eastern Woodlands: Thick timber woods with a slalom clearing corridor
+    // 2. Eastern Woodlands: Thick timber woods with a slalom clearing corridor
     if (bType === 'forest') {
       let clearingCenter = Math.floor(VIEW_W * (0.28 + Math.random() * 0.44));
       let clearingHalfW = 42;
@@ -641,7 +653,6 @@
         clearStart: clearingCenter - clearingHalfW,
         clearEnd: clearingCenter + clearingHalfW
       });
-      // Embed solid pine trees inside the thick woodland flanks so player slaloms or slows through brush
       let leftTreeX = Math.max(4, clearingCenter - clearingHalfW - 44);
       let rightTreeX = Math.min(VIEW_W - 44, clearingCenter + clearingHalfW + 6);
       if (clearingCenter - clearingHalfW > 32) {
@@ -657,9 +668,10 @@
     let bIdx = (level - 1) % BIOMES.length;
     let bType = BIOMES[bIdx].type;
 
-    // Prevent spawning on top of active incoming terrain bands at top of screen
+    // Prevent spawning inside or near any creek crossing or active terrain feature
     for (let tf of terrainFeatures) {
-      if (tf.y < 14) return;
+      let clearance = (tf.kind === 'CREEK') ? 68 : 22;
+      if (tf.y < clearance) return;
     }
 
     // Chance to spawn a Golden Beaded Pelt in a fair, reachable spot
@@ -680,14 +692,12 @@
     let x = 14 + Math.random() * (VIEW_W - 64);
 
     if (type === 'fox') {
-      // Fox darts laterally across the wild terrain while scrolling with the ground
       let dir = Math.random() > 0.5 ? 0.65 : -0.65;
       obstacles.push({ x: x, y: -24, dx: dir, dy: 0, type: 'fox', w: 24, h: 18, scale: 3, dead: false });
     } else if (type === 'tree') {
       obstacles.push({ x: x, y: -44, dx: 0, dy: 0, type: 'tree', w: 40, h: 40, scale: 4, dead: false });
     } else if (type === 'rock') {
       obstacles.push({ x: x, y: -24, dx: 0, dy: 0, type: 'rock', w: 24, h: 18, scale: 3, dead: false });
-      // Natural cluster: companion pebble/shrub nearby
       if (Math.random() > 0.45 && x + 28 < VIEW_W - 30) {
         obstacles.push({ x: x + 24, y: -16, dx: 0, dy: 0, type: 'shrub', w: 24, h: 18, scale: 3, dead: false });
       }
@@ -703,6 +713,8 @@
     terrainFeatures = [];
     peltsCollected = 0;
     worldScrollDist = 0;
+    creeksSpawnedThisLevel = 0;
+    nextCreekSpawnDist = 420 + Math.floor(Math.random() * 180);
     player = { x: (VIEW_W / 2) - 20, y: VIEW_H - 58, dead: false, w: 40, h: 48, inCreek: false, inBrush: false };
     initGroundPatches();
     
@@ -728,7 +740,6 @@
 
   function move(dx, dy) {
     if (state !== 'PLAYING') return;
-    // Slow down lateral/vertical responsiveness slightly when wading through shallow creek or heavy brush
     let step = (player.inCreek || player.inBrush) ? 13 : 20; 
     let nx = player.x + (dx * step);
     let ny = player.y + (dy * step);
@@ -738,7 +749,7 @@
       if (tf.kind === 'LEDGE') {
         if (nx + 8 < tf.x + tf.w && nx + player.w - 8 > tf.x &&
             ny + 10 < tf.y + tf.h && ny + player.h - 6 > tf.y) {
-          return; // Blocked by rocky cliff ledge
+          return;
         }
       }
     }
@@ -767,7 +778,6 @@
     }
 
     if (state === 'PLAYING') {
-      // Evaluate terrain modifiers under player hooves
       player.inCreek = false;
       player.inBrush = false;
 
@@ -782,7 +792,6 @@
         
         if (pLeft < tf.x + tf.w && pRight > tf.x && pTop < tf.y + tf.h && pBottom > tf.y) {
           if (tf.kind === 'LEDGE') {
-            // Impassable rocky ledge pushes player back; if pinned off bottom screen, crash
             player.y = tf.y + tf.h - 10;
             if (player.y + player.h > VIEW_H + 6) {
               state = 'GAMEOVER';
@@ -790,8 +799,10 @@
               return;
             }
           } else if (tf.kind === 'CREEK') {
-            // Deep creek flanks are impassable/fatal; shallow center ford slows down horse
-            if (pCenterX < tf.fordStart || pCenterX > tf.fordEnd) {
+            // Includes generous buffer zone between the shallow ford and deep water flanks
+            const safeMin = tf.fordStart - tf.bufferW;
+            const safeMax = tf.fordEnd + tf.bufferW;
+            if (pCenterX < safeMin || pCenterX > safeMax) {
               state = 'GAMEOVER';
               stopChiptuneTrack();
               return;
@@ -799,7 +810,6 @@
               player.inCreek = true;
             }
           } else if (tf.kind === 'WOODS') {
-            // Thick woods outside the clearing slow down movement
             if (pCenterX < tf.clearStart || pCenterX > tf.clearEnd) {
               player.inBrush = true;
             }
@@ -807,11 +817,9 @@
         }
       }
 
-      // Terrain speed modifier (shallow creek or thick woods slows the horse's pace)
       effectiveSpeed = (player.inCreek || player.inBrush) ? (baseSpeed * 0.55) : baseSpeed;
       worldScrollDist += effectiveSpeed;
 
-      // Scroll ground patches seamlessly at exact effectiveSpeed
       for (let gp of groundPatches) {
         gp.y += effectiveSpeed;
         if (gp.y > VIEW_H) {
@@ -820,7 +828,6 @@
         }
       }
 
-      // Scroll terrain features at exact effectiveSpeed so everything is anchored to the earth
       for (let i = terrainFeatures.length - 1; i >= 0; i--) {
         terrainFeatures[i].y += effectiveSpeed;
         if (terrainFeatures[i].y > VIEW_H + 20) {
@@ -828,8 +835,15 @@
         }
       }
 
-      // Periodic terrain & natural object spawning tied to world distance traveled
-      const terrainInterval = 215;
+      // Rare Creek Spawning (strictly 2–3 creeks over a full playable level in Dry Prairie / Red River Valley)
+      let bIdx = (level - 1) % BIOMES.length;
+      let bType = BIOMES[bIdx].type;
+      if ((bType === 'desert' || bType === 'grass') && creeksSpawnedThisLevel < 3 && worldScrollDist >= nextCreekSpawnDist) {
+        spawnCreekFeature();
+      }
+
+      // Periodic terrain spawning for Mountains (ledges) and Forest (thick woods)
+      const terrainInterval = 225;
       if (Math.floor(worldScrollDist / terrainInterval) > Math.floor((worldScrollDist - effectiveSpeed) / terrainInterval)) {
         spawnTerrainFeature();
       }
@@ -891,7 +905,6 @@
   // PARALLAX SCENERY & WILDERNESS RENDERING
   // ==========================================
   function drawPrairieParallax(scrollOffset, isCutscene) {
-    // 1. SNES Sunset / Prairie Sky Banded Gradient
     const skyBands = ['#241438', '#541b36', '#8f2929', '#c95822', '#eb9634', '#f7c844'];
     const horizonY = Math.floor(VIEW_H * 0.56);
     const bandH = Math.ceil(horizonY / skyBands.length);
@@ -900,7 +913,6 @@
       ctx.fillRect(0, i * bandH, VIEW_W, bandH + 1);
     }
 
-    // 2. Distant Sun & Drifting Clouds (Parallax Layer 1)
     ctx.fillStyle = '#fff5b8';
     ctx.fillRect(Math.floor(VIEW_W * 0.72), Math.floor(horizonY * 0.35), 22, 22);
     ctx.fillStyle = '#f7c844';
@@ -915,7 +927,6 @@
       ctx.fillRect(cx + 6, cy - 4, 22, 4);
     }
 
-    // 3. Distant Rocky Foothills & Buttes (Parallax Layer 2)
     ctx.fillStyle = '#472836';
     for (let m = -1; m < 6; m++) {
       let mx = (m * 80) - (Math.floor(scrollOffset * 0.35) % 80);
@@ -924,7 +935,6 @@
       ctx.fillRect(mx + 22, horizonY - 38, 16, 6);
     }
 
-    // 4. Midground Rolling Prairie Hills & Pine Silhouettes (Parallax Layer 3)
     ctx.fillStyle = '#5e4318';
     ctx.fillRect(0, horizonY, VIEW_W, 18);
     ctx.fillStyle = '#382a10';
@@ -934,18 +944,15 @@
       ctx.fillRect(tx + 2, horizonY - 6, 10, 6);
     }
 
-    // 5. Foreground Wild Untamed Golden Prairie (No artificial straight road)
     const groundY = horizonY + 14;
     ctx.fillStyle = '#8a681a';
     ctx.fillRect(0, groundY, VIEW_W, VIEW_H - groundY);
 
-    // Natural Earth & Tallgrass Bands across the wild prairie
     ctx.fillStyle = '#755614';
     ctx.fillRect(0, groundY + 18, VIEW_W, 14);
     ctx.fillStyle = '#9c7821';
     ctx.fillRect(0, groundY + 42, VIEW_W, 16);
 
-    // Scrolling Wild Prairie Grass Tufts & Earth Stones
     for (let g = 0; g < 28; g++) {
       let gx = ((g * 27) - Math.floor(scrollOffset * 2.2)) % (VIEW_W + 20);
       if (gx < -20) gx += VIEW_W + 20;
@@ -955,14 +962,12 @@
       ctx.fillRect(gx + 4, gy + 2, 3, 4);
     }
 
-    // 6. Animated Herd of Deep-Brown Buffalo Chased by Mounted Hunter
     const bob = Math.floor(frame / 6) % 2 === 0 ? 0 : -2;
     const chaseY = groundY + Math.min(22, Math.floor((VIEW_H - groundY) * 0.25));
     const chaseBaseX = isCutscene 
       ? ((Math.floor(frame * 1.4) % (VIEW_W + 160)) - 130)
       : Math.floor(VIEW_W * 0.52);
 
-    // Kicking prairie dust particles
     ctx.fillStyle = '#d4d0c5';
     for (let d = 0; d < 6; d++) {
       let dx = chaseBaseX - 45 + ((d * 23 + frame * 2) % 130);
@@ -970,12 +975,10 @@
       ctx.fillRect(dx, dy, 3, 3);
     }
 
-    // Buffalo Herd (Deep brown hide & ivory horns, zero red markings)
     drawSprite(chaseBaseX + 46, chaseY + bob, sprBuffaloSide, PAL_BUFFALO_SIDE, 2);
     drawSprite(chaseBaseX + 16, chaseY + 10 - bob, sprBuffaloSide, PAL_BUFFALO_SIDE, 2);
     drawSprite(chaseBaseX + 34, chaseY + 18 + bob, sprBuffaloSide, PAL_BUFFALO_SIDE, 2);
 
-    // Mounted Hunter pursuing closely behind
     drawSprite(chaseBaseX - 42, chaseY + 6 - bob, sprHunterSide, PAL_HUNTER_SIDE, 2);
   }
 
@@ -1045,19 +1048,16 @@
       const y = Math.floor(tf.y);
 
       if (tf.kind === 'LEDGE') {
-        // Stepped 16-bit Rocky Cliff Ledge (impassable barrier)
         ctx.fillStyle = '#2c3338';
         ctx.fillRect(tf.x, y, tf.w, tf.h);
         ctx.fillStyle = '#78848c';
         ctx.fillRect(tf.x, y, tf.w, tf.h - 6);
         ctx.fillStyle = '#9aa6b0';
         ctx.fillRect(tf.x, y, tf.w, 5);
-        // Vertical cliff strata cracks
         ctx.fillStyle = '#434d54';
         for (let sx = tf.x + 8; sx < tf.x + tf.w - 6; sx += 14) {
           ctx.fillRect(sx, y + 6, 3, tf.h - 10);
         }
-        // Tapered rocky edge cap
         const capX = tf.fromLeft ? (tf.x + tf.w - 6) : tf.x;
         ctx.fillStyle = '#1c2024';
         ctx.fillRect(capX, y, 6, tf.h);
@@ -1072,15 +1072,22 @@
         ctx.fillStyle = '#0f6f9e';
         ctx.fillRect(0, y, VIEW_W, tf.h);
 
+        // Transitional Wading Buffer Zone (gradual sandy/shallow shelf before deep water)
+        const bufStart = tf.fordStart - tf.bufferW;
+        const bufTotalW = (tf.fordEnd - tf.fordStart) + (tf.bufferW * 2);
+        ctx.fillStyle = '#2088ab';
+        ctx.fillRect(bufStart, y, bufTotalW, tf.h);
+
         // Shallow passable gravel/pebble ford in the center
         const fordW = tf.fordEnd - tf.fordStart;
         ctx.fillStyle = '#38a3b8';
         ctx.fillRect(tf.fordStart, y, fordW, tf.h);
-        // Stepping cobbles & sandbar ripples in shallow ford
-        ctx.fillStyle = '#8c7d65';
-        for (let cx = tf.fordStart + 6; cx < tf.fordEnd - 8; cx += 14) {
-          ctx.fillRect(cx, y + 5, 6, 4);
-          ctx.fillRect(cx + 4, y + 15, 7, 4);
+
+        // Stepping cobbles & sandbar ripples across the shallow ford and buffer edges
+        ctx.fillStyle = '#9c8b70';
+        for (let cx = bufStart + 4; cx < bufStart + bufTotalW - 6; cx += 12) {
+          ctx.fillRect(cx, y + 5, 5, 4);
+          ctx.fillRect(cx + 3, y + 15, 6, 4);
         }
 
         // Animated water current lines & whitewater foam
@@ -1093,12 +1100,10 @@
       }
 
       if (tf.kind === 'WOODS') {
-        // Dense forest undergrowth & mossy floor on the flanks (slows movement if entered)
         ctx.fillStyle = '#142b0d';
         ctx.fillRect(0, y, tf.clearStart, tf.h);
         ctx.fillRect(tf.clearEnd, y, VIEW_W - tf.clearEnd, tf.h);
 
-        // Leafy brush texture & ferns inside thick woods
         ctx.fillStyle = '#2d591f';
         for (let bx = 4; bx < tf.clearStart - 6; bx += 12) {
           ctx.fillRect(bx, y + 6, 6, 5);
@@ -1124,11 +1129,11 @@
     let bIdx = (level - 1) % BIOMES.length;
     let b = BIOMES[bIdx];
 
-    // 1. Wild Untamed Earth & Grassland Base (Zero artificial road/path)
+    // 1. Wild Untamed Earth & Grassland Base
     ctx.fillStyle = b.bg;
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
 
-    // 2. Organic Ground Patches & Tallgrass Tufts synced to scroll speed
+    // 2. Organic Ground Patches & Tallgrass Tufts
     for (let gp of groundPatches) {
       const gx = Math.floor(gp.x);
       const gy = Math.floor(gp.y);
@@ -1149,7 +1154,7 @@
 
     ctx.translate(shakeX, shakeY);
 
-    // 3. Draw Integrated Terrain Features (Rocky Ledges, Shallow-Ford Creeks, Thick Woods)
+    // 3. Draw Integrated Terrain Features
     drawTerrainFeatures();
 
     // 4. Draw Natural Obstacles & Golden Pelts with Ground Shadows
@@ -1168,12 +1173,11 @@
       drawSprite(obs.x, obs.y, spr, pal, obs.scale, flip);
     });
 
-    // 5. Draw Sculpted Mounted Hunter & Horse (40x48px)
+    // 5. Draw Sculpted Mounted Hunter & Horse
     if (state !== 'GAMEOVER' || frame % 10 < 5) { 
       ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
       ctx.fillRect(Math.floor(player.x + 6), Math.floor(player.y + player.h - 6), player.w - 12, 6);
 
-      // Water splash ripple if wading through shallow creek ford
       if (player.inCreek) {
         ctx.fillStyle = '#d4f6fc';
         ctx.fillRect(Math.floor(player.x + 4), Math.floor(player.y + player.h - 8), player.w - 8, 3);
@@ -1184,7 +1188,7 @@
       drawSprite(player.x, player.y, animFrame, PAL_PLAYER, 2);
     }
 
-    // 6. Draw Rumbling Buffalo Herd Transition (Deep Brown Hide & Ivory Horns)
+    // 6. Draw Rumbling Buffalo Herd Transition
     if (state === 'TRANSITION') {
       buffaloes.forEach(buf => {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
