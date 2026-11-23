@@ -137,7 +137,7 @@
 
     <div id="intro-screen" class="overlay">
       <h2>Red River Run</h2>
-      <p>Paddle north from The Forks past Lower Fort Garry, through the marshy islands of Lake Winnipeg's mouth, and across the deep lake to deploy your dogsled for the Boreal trail to York Factory.<br><br>UP / DOWN switches between 3 tracks to avoid long meandering banks, islands, shallow rocks, lake whitecaps, snowdrifts, and glare ice.</p>
+      <p>Paddle north from The Forks past Seven Oaks, St. Andrews Church, Lower Fort Garry, and St. Peter's I.R., then cross Lake Winnipeg to deploy your dogsled for the Boreal trail to York Factory.<br><br>UP / DOWN switches between 3 tracks to avoid long meandering banks, islands, shallow rocks, lake whitecaps, snowdrifts, and glare ice.</p>
       <div class="blink-text">PRESS 'A' TO START</div>
     </div>
 
@@ -225,14 +225,18 @@
     ICE_MID: '#A6D5ED',
     GLARE_ICE_L: '#E4F9FF',
     GLARE_ICE_M: '#66D6F2',
-    SASH_RED: '#C42424'
+    SASH_RED: '#C42424',
+    FIRE_ORANGE: '#F26419',
+    FIRE_YELLOW: '#F6AE2D',
+    NWC_BLUE: '#234B7A',
+    HBC_COAT: '#9E2A2B'
   };
 
   // Stage Distance Milestones
   const DIST = {
     FORKS_END: 450,
     LOWER_FORT_END: 900,
-    MARSH_MOUTH_END: 1450,
+    ST_PETERS_END: 1450,
     LAKE_DAY_END: 2050,
     LAKE_MIDNIGHT_END: 2650,
     DEPLOY_END: 2770,
@@ -266,11 +270,14 @@
   let hazards = []; // 'LOG_JAM', 'ROCK_CLUSTER', 'BIG_WAVE', 'SNOW_DRIFT', 'ICE_PATCH'
   let nextFeatureX = 0;
   let nextDeepWaveX = 0;
+  let lakeWaveArmed = false;
   let lastFeatureType = 'NONE';
   let sugarIslandSpawned = false;
 
-  // Unique One-Off Landmarks
+  // Unique One-Off Landmarks & Historical Vignettes
   let upperFortSpawned = false;
+  let sevenOaksSpawned = false;
+  let stAndrewsSpawned = false;
   let lowerFortSpawned = false;
   let yorkFactorySpawned = false;
   let landmarks = [];
@@ -332,9 +339,9 @@
       watDeep = lerpColor(PAL.MAROON_DEEP, '#1A3A3A', t);
       watMid = lerpColor(PAL.MAROON_MID, '#2B5B56', t);
       watFoam = lerpColor(PAL.MAROON_FOAM, PAL.LAKE_FOAM, t);
-    } else if (score < DIST.MARSH_MOUTH_END) {
-      title = "NETLEY-LIBAU MARSH";
-      const t = (score - DIST.LOWER_FORT_END) / (DIST.MARSH_MOUTH_END - DIST.LOWER_FORT_END);
+    } else if (score < DIST.ST_PETERS_END) {
+      title = "ST. PETER'S I.R.";
+      const t = (score - DIST.LOWER_FORT_END) / (DIST.ST_PETERS_END - DIST.LOWER_FORT_END);
       gndTop = lerpColor(PAL.MARSH_LIGHT, PAL.LIGHT_PINE, t);
       gndMid = lerpColor(PAL.MARSH_MID, PAL.MID_PINE, t);
       gndDark = lerpColor(PAL.MARSH_DARK, PAL.DARK_PINE, t);
@@ -343,7 +350,7 @@
       watFoam = PAL.LAKE_FOAM;
     } else if (score < DIST.LAKE_DAY_END) {
       title = "LAKE WINNIPEG SHORE";
-      const t = (score - DIST.MARSH_MOUTH_END) / (DIST.LAKE_DAY_END - DIST.MARSH_MOUTH_END);
+      const t = (score - DIST.ST_PETERS_END) / (DIST.LAKE_DAY_END - DIST.ST_PETERS_END);
       gndTop = lerpColor(PAL.LIGHT_PINE, PAL.MID_PINE, t);
       gndMid = PAL.MID_PINE;
       gndDark = PAL.DARK_PINE;
@@ -677,7 +684,9 @@
     }
   }
 
-  // Shaded SNES Background Props
+  // ==========================================
+  // 4B. SCENERY PROPS, ST. PETER'S WIGWAMS, & HISTORICAL VIGNETTES
+  // ==========================================
   function drawShadedPine(x, y, isWinter, isSil) {
     if (isSil) {
       ctx.fillStyle = '#070E14';
@@ -723,6 +732,84 @@
     ctx.fillRect(x + 5, y, 1, 2);
     ctx.fillStyle = PAL.REED_GOLD;
     ctx.fillRect(x + 3, y + 1, 1, 2);
+  }
+
+  // Domed Birchbark Wigwam Lodge (St. Peter's I.R.)
+  function drawWigwamLodge(x, y) {
+    ctx.fillStyle = PAL.OUTLINE;
+    ctx.fillRect(x + 3, y, 8, 2);
+    ctx.fillRect(x + 1, y + 2, 12, 3);
+    ctx.fillRect(x, y + 5, 14, 5);
+
+    // Shaded birchbark dome
+    ctx.fillStyle = PAL.HIDE_DARK;
+    ctx.fillRect(x + 1, y + 2, 12, 8);
+    ctx.fillStyle = PAL.HIDE_MID;
+    ctx.fillRect(x + 2, y + 1, 9, 8);
+    ctx.fillStyle = PAL.HIDE_LIGHT;
+    ctx.fillRect(x + 3, y + 1, 5, 4);
+
+    // Bent sapling pole ribs & red sash trim
+    ctx.fillStyle = PAL.WOOD_DARK;
+    ctx.fillRect(x + 4, y + 1, 1, 9);
+    ctx.fillRect(x + 9, y + 1, 1, 9);
+    ctx.fillStyle = PAL.SASH_RED;
+    ctx.fillRect(x + 1, y + 5, 12, 1);
+
+    // Arched doorway & smoke vent
+    ctx.fillStyle = PAL.OUTLINE;
+    ctx.fillRect(x + 6, y + 6, 2, 4);
+    ctx.fillStyle = PAL.SNOW_MID;
+    ctx.fillRect(x + 6, y - 2 - (Math.floor(frame / 12) % 2), 2, 1);
+  }
+
+  // Wolf-Campfire Vignette (St. Peter's I.R. marshy light forest)
+  function drawWolfCampfire(x, y, frameCount) {
+    const flicker = Math.floor(frameCount / 5) % 3;
+
+    // Warm firelight glow on ground
+    ctx.fillStyle = 'rgba(246, 174, 45, 0.35)';
+    ctx.fillRect(x - 2, y + 4, 14, 4);
+
+    // Crossed firewood logs
+    ctx.fillStyle = PAL.WOOD_DARK;
+    ctx.fillRect(x + 1, y + 6, 8, 2);
+    ctx.fillStyle = PAL.WOOD_MID;
+    ctx.fillRect(x + 2, y + 5, 6, 2);
+
+    // Flickering flames
+    ctx.fillStyle = PAL.FIRE_ORANGE;
+    ctx.fillRect(x + 3, y + 2 + (flicker === 1 ? 1 : 0), 4, 4);
+    ctx.fillStyle = PAL.FIRE_YELLOW;
+    ctx.fillRect(x + 4, y + 1 + (flicker === 2 ? 1 : 0), 2, 4);
+    ctx.fillStyle = PAL.SNOW_LIGHT;
+    ctx.fillRect(x + 4, y + 4, 2, 1);
+    // Rising ember spark
+    ctx.fillStyle = PAL.FIRE_YELLOW;
+    ctx.fillRect(x + 4 + (flicker - 1), y - 1 - flicker, 1, 1);
+
+    // Seated Grey Timber Wolf beside the campfire facing the flames
+    const wx = x + 12;
+    const wy = y + 1;
+    ctx.fillStyle = PAL.OUTLINE;
+    ctx.fillRect(wx, wy + 1, 6, 6);
+    ctx.fillRect(wx - 1, wy - 2, 4, 4);
+    // Shaded silver-grey wolf coat
+    ctx.fillStyle = PAL.STONE_MID;
+    ctx.fillRect(wx + 1, wy + 1, 4, 5);
+    ctx.fillStyle = PAL.STONE_LIGHT;
+    ctx.fillRect(wx + 1, wy + 2, 2, 4); // Firelit chest
+    // Wolf head, muzzle facing fire, and pointed ears
+    ctx.fillStyle = PAL.STONE_MID;
+    ctx.fillRect(wx - 1, wy - 1, 4, 3);
+    ctx.fillStyle = PAL.STONE_LIGHT;
+    ctx.fillRect(wx - 2, wy, 2, 2); // Muzzle
+    ctx.fillStyle = PAL.OUTLINE;
+    ctx.fillRect(wx, wy - 3, 1, 2); // Ear
+    ctx.fillRect(wx + 2, wy - 3, 1, 2); // Ear
+    // Bushy tail
+    ctx.fillStyle = PAL.STONE_DARK;
+    ctx.fillRect(wx + 5, wy + 5, 3, 2);
   }
 
   function drawShadedTipi(x, y) {
@@ -778,7 +865,156 @@
     ctx.fillRect(x + 3, y + 2, 8, 2);
   }
 
+  // Battle of Seven Oaks Historical "Replay" Vignette (~90px wide, between Upper & Lower Fort Garry)
+  function drawBattleOfSevenOaks(x, y, frameCount) {
+    // 110-frame looping battle cycle:
+    // 0..24: Aiming & tall grass concealment | 25..42: Musket volley & white smoke | 43..60: HBC men hit & drop | 61..109: Fallen pause
+    const cycle = frameCount % 110;
+    const isFiring = (cycle >= 25 && cycle <= 44);
+    const isHit = (cycle >= 38 && cycle <= 44);
+    const isFallen = (cycle >= 43 && cycle <= 95);
+
+    // Seven Oaks grove trees & tall chartreuse grass cover on left (NWC side)
+    drawShadedPine(x - 4, y - 12, false, false);
+    drawShadedPine(x + 18, y - 13, false, false);
+
+    // --- LEFT SIDE: Mounted & Grass-Hidden NWC Men ---
+    // Mounted NWC Rider 1
+    const mx1 = x + 6;
+    const my1 = y - 1;
+    // Horse
+    ctx.fillStyle = '#3B2314';
+    ctx.fillRect(mx1, my1 + 4, 9, 4);
+    ctx.fillRect(mx1 + 7, my1 + 1, 3, 4); // Neck/head
+    ctx.fillStyle = '#1F120A';
+    ctx.fillRect(mx1 + 1, my1 + 8, 1, 3);
+    ctx.fillRect(mx1 + 7, my1 + 8, 1, 3);
+    // NWC Rider (Blue capote & red sash) aiming musket right
+    ctx.fillStyle = PAL.NWC_BLUE;
+    ctx.fillRect(mx1 + 2, my1 - 1, 4, 5);
+    ctx.fillStyle = PAL.SASH_RED;
+    ctx.fillRect(mx1 + 2, my1 + 2, 4, 1);
+    ctx.fillStyle = '#14110F';
+    ctx.fillRect(mx1 + 3, my1 - 3, 3, 2);
+    // Musket barrel
+    ctx.fillStyle = PAL.WOOD_DARK;
+    ctx.fillRect(mx1 + 5, my1 + 1, 6, 1);
+
+    // Mounted NWC Rider 2
+    const mx2 = x + 20;
+    const my2 = y;
+    ctx.fillStyle = '#5C3A21';
+    ctx.fillRect(mx2, my2 + 4, 9, 4);
+    ctx.fillRect(mx2 + 7, my2 + 1, 3, 4);
+    ctx.fillStyle = '#2B1810';
+    ctx.fillRect(mx2 + 1, my2 + 8, 1, 3);
+    ctx.fillRect(mx2 + 7, my2 + 8, 1, 3);
+    ctx.fillStyle = PAL.NWC_BLUE;
+    ctx.fillRect(mx2 + 2, my2 - 1, 4, 5);
+    ctx.fillStyle = '#14110F';
+    ctx.fillRect(mx2 + 3, my2 - 3, 3, 2);
+    ctx.fillStyle = PAL.WOOD_DARK;
+    ctx.fillRect(mx2 + 5, my2 + 1, 6, 1);
+
+    // Two NWC Men crouched & hidden in tall chartreuse marsh grass
+    const gx1 = x + 32;
+    const gx2 = x + 40;
+    ctx.fillStyle = PAL.NWC_BLUE;
+    ctx.fillRect(gx1, y + 4, 4, 4);
+    ctx.fillRect(gx2, y + 5, 4, 4);
+    ctx.fillStyle = PAL.WOOD_DARK;
+    ctx.fillRect(gx1 + 3, y + 5, 5, 1);
+    ctx.fillRect(gx2 + 3, y + 6, 5, 1);
+    // Tall chartreuse grass blades concealing them
+    ctx.fillStyle = PAL.CHARTREUSE_L;
+    ctx.fillRect(gx1 - 1, y + 4, 1, 6);
+    ctx.fillRect(gx1 + 2, y + 3, 1, 7);
+    ctx.fillRect(gx1 + 5, y + 5, 1, 5);
+    ctx.fillRect(gx2 + 1, y + 4, 1, 6);
+    ctx.fillRect(gx2 + 4, y + 4, 1, 6);
+
+    // --- MUSKET VOLLEY SMOKE & STREAKING SHOT ---
+    if (isFiring) {
+      const puffR = cycle < 33 ? 3 : 4;
+      ctx.fillStyle = PAL.SNOW_LIGHT;
+      ctx.fillRect(mx1 + 11, my1, puffR, 3);
+      ctx.fillRect(mx2 + 11, my2, puffR, 3);
+      ctx.fillRect(gx1 + 8, y + 4, puffR, 2);
+      ctx.fillRect(gx2 + 8, y + 5, puffR, 2);
+
+      // Streaking musket balls across the clearing
+      const shotProgress = Math.min(1, (cycle - 25) / 14);
+      const shotX = Math.round(gx2 + 10 + shotProgress * 26);
+      ctx.fillStyle = PAL.GOLD_LIGHT;
+      ctx.fillRect(shotX, y + 2, 3, 1);
+      ctx.fillRect(shotX - 3, y + 5, 3, 1);
+      ctx.fillRect(shotX + 2, y + 7, 3, 1);
+    }
+
+    // --- RIGHT SIDE: Footed / Standing HBC Men (All hit & drop!) ---
+    const hbcPositions = [x + 66, x + 73, x + 80, x + 87];
+    for (let i = 0; i < hbcPositions.length; i++) {
+      const hx = hbcPositions[i];
+      if (!isFallen) {
+        // Standing HBC men (dark coats/red trim, top hats)
+        ctx.fillStyle = isHit ? PAL.SNOW_LIGHT : PAL.HBC_COAT;
+        ctx.fillRect(hx, y + 3, 4, 5);
+        ctx.fillStyle = PAL.OUTLINE;
+        ctx.fillRect(hx + 1, y + 8, 1, 3);
+        ctx.fillRect(hx + 3, y + 8, 1, 3);
+        // Top hat & head
+        ctx.fillStyle = PAL.OUTLINE;
+        ctx.fillRect(hx, y, 4, 2);
+        ctx.fillStyle = '#C98E63';
+        ctx.fillRect(hx + 1, y + 2, 2, 1);
+      } else {
+        // All HBC men dropped flat in the grass
+        ctx.fillStyle = PAL.HBC_COAT;
+        ctx.fillRect(hx - 1, y + 9, 6, 2);
+        ctx.fillStyle = PAL.OUTLINE;
+        ctx.fillRect(hx + 5, y + 9, 2, 2);
+      }
+    }
+  }
+
+  // One-Off Historic Landmarks: Upper Fort Garry, St. Andrews Church, Lower Fort Garry, & York Factory
   function drawFortLandmark(x, y, type) {
+    if (type === 'ST_ANDREWS_CHURCH') {
+      // Historic St. Andrews-on-the-Red Limestone Church & White Bell Tower Spire
+      // Stone Nave
+      ctx.fillStyle = PAL.OUTLINE;
+      ctx.fillRect(x, y + 1, 28, 13);
+      ctx.fillStyle = PAL.STONE_MID;
+      ctx.fillRect(x + 1, y + 2, 26, 11);
+      ctx.fillStyle = PAL.STONE_LIGHT;
+      ctx.fillRect(x + 1, y + 2, 26, 2);
+
+      // Pitched Slate Roof
+      ctx.fillStyle = PAL.DARK_PINE;
+      ctx.fillRect(x - 1, y - 1, 30, 3);
+
+      // Arched Church Windows
+      ctx.fillStyle = PAL.GOLD_LIGHT;
+      ctx.fillRect(x + 5, y + 5, 2, 4);
+      ctx.fillRect(x + 11, y + 5, 2, 4);
+      ctx.fillRect(x + 17, y + 5, 2, 4);
+
+      // Stone & White Timber Bell Tower + Pointed Spire on right end
+      ctx.fillStyle = PAL.STONE_LIGHT;
+      ctx.fillRect(x + 22, y - 6, 6, 20);
+      ctx.fillStyle = PAL.SNOW_LIGHT;
+      ctx.fillRect(x + 23, y - 10, 4, 4);
+      // Pointed Spire & Cross
+      fillPixelPoly([
+        [x + 22, y - 10],
+        [x + 25, y - 17],
+        [x + 28, y - 10]
+      ], PAL.STONE_DARK);
+      ctx.fillStyle = PAL.GOLD_LIGHT;
+      ctx.fillRect(x + 25, y - 19, 1, 3);
+      return;
+    }
+
     if (type === 'YORK_FACTORY') {
       ctx.fillStyle = PAL.OUTLINE;
       ctx.fillRect(x - 2, y - 4, 48, 18);
@@ -807,6 +1043,7 @@
       return;
     }
 
+    // Upper Fort Garry / Lower Fort Garry Stone Walls
     ctx.fillStyle = PAL.STONE_DARK;
     ctx.fillRect(x, y + 4, 34, 10);
     ctx.fillStyle = PAL.STONE_MID;
@@ -837,22 +1074,24 @@
     hazards = [];
     landmarks = [];
     upperFortSpawned = false;
+    sevenOaksSpawned = false;
+    stAndrewsSpawned = false;
     lowerFortSpawned = false;
-    sugarIslandSpawned = false;
     yorkFactorySpawned = false;
+    lakeWaveArmed = false;
     isDeployingSled = false;
     deployProgress = 0;
     isSledMode = false;
     lastFeatureType = 'NONE';
 
+    // Spawn Upper Fort Garry ONCE at the start
     landmarks.push({ x: 34, type: 'UPPER_FORT' });
     upperFortSpawned = true;
 
     nextFeatureX = VIEW_W + 90;
-    nextDeepWaveX = VIEW_W + 260;
+    nextDeepWaveX = 99999;
   }
 
-  // Spawn log jams in the island-to-shoreline path (opposite the island's speed-up chute)
   function spawnIslandShorelineLogJams(islandX, islandW, chuteSide) {
     const slowSideLane = chuteSide === 0 ? 2 : 0;
     const jamCount = islandW >= 145 ? 2 : 1;
@@ -874,17 +1113,32 @@
       return;
     }
 
-    if (!lowerFortSpawned && score >= 620) {
+    // 1. Battle of Seven Oaks Replay ONCE in the mid-chartreuse transition (~score 240)
+    if (!sevenOaksSpawned && score >= 240) {
+      landmarks.push({ x: VIEW_W + 30, type: 'SEVEN_OAKS' });
+      sevenOaksSpawned = true;
+    }
+
+    // 2. St. Andrews Church ONCE before Lower Fort Garry (~score 475)
+    if (!stAndrewsSpawned && score >= 475) {
+      landmarks.push({ x: VIEW_W + 35, type: 'ST_ANDREWS_CHURCH' });
+      stAndrewsSpawned = true;
+    }
+
+    // 3. Lower Fort Garry ONCE after St. Andrews Church (~score 635)
+    if (!lowerFortSpawned && score >= 635) {
       landmarks.push({ x: VIEW_W + 40, type: 'LOWER_FORT' });
       lowerFortSpawned = true;
     }
 
+    // 4. York Factory on Hudson Bay ONCE at 3860 (arriving right at 4000)
     if (!yorkFactorySpawned && score >= 3860) {
       landmarks.push({ x: VIEW_W + 30, type: 'YORK_FACTORY' });
       yorkFactorySpawned = true;
     }
 
-    if (!sugarIslandSpawned && score >= 740) {
+    // 5. Sugar Island ONCE after Lower Fort Garry (~score 750)
+    if (!sugarIslandSpawned && score >= 750) {
       sugarIslandSpawned = true;
       const w = 160;
       const taperW = 46;
@@ -906,8 +1160,8 @@
     }
 
     const isRedRiver = (score < DIST.LOWER_FORT_END);
-    const isMarshMouth = (score >= DIST.LOWER_FORT_END && score < DIST.MARSH_MOUTH_END);
-    const isLakeOpen = (score >= DIST.MARSH_MOUTH_END && score < DIST.DEPLOY_END);
+    const isStPetersMarsh = (score >= DIST.LOWER_FORT_END && score < DIST.ST_PETERS_END);
+    const isLakeOpen = (score >= DIST.ST_PETERS_END && score < DIST.DEPLOY_END);
     const isWinter = (score >= DIST.DEPLOY_END);
     const isVictoryLap = (score >= 3650);
 
@@ -920,7 +1174,7 @@
       chosen = lastFeatureType === 'TOP_MEANDER' ? 'BOT_MEANDER' : 'TOP_MEANDER';
       depthFactor = Math.random() < 0.55 ? 0.5 : 1.0;
       gapAfter = 175;
-    } else if (isMarshMouth) {
+    } else if (isStPetersMarsh) {
       const pool = ['ISLAND', 'ISLAND', 'BOT_MEANDER', 'TOP_MEANDER'];
       chosen = pool[Math.floor(Math.random() * pool.length)];
       isMarshIsland = (chosen === 'ISLAND');
@@ -951,7 +1205,6 @@
     if (chosen === 'ISLAND') {
       tileCount = isMarshIsland ? (7 + Math.floor(Math.random() * 5)) : (9 + Math.floor(Math.random() * 6));
     } else {
-      // Random length from 6 up to 35 tiles
       tileCount = 6 + Math.floor(Math.random() * 30);
     }
 
@@ -971,14 +1224,11 @@
     });
     lastFeatureType = chosen;
 
-    // --- Spawn Hazards ---
     if (!isWinter) {
-      // 1. Log Jams in the island-to-shoreline path (opposite the speed-up current chute)
       if (chosen === 'ISLAND' && chuteSide !== -1) {
         spawnIslandShorelineLogJams(nextFeatureX, w, chuteSide);
       }
 
-      // 2. Log Jams accumulate naturally at the leading edge where meandering land sticks out
       if ((chosen === 'TOP_MEANDER' || chosen === 'BOT_MEANDER') && Math.random() < 0.52) {
         const jamLane = chosen === 'TOP_MEANDER'
           ? (depthFactor === 0.5 ? 0 : 1)
@@ -992,7 +1242,6 @@
         });
       }
 
-      // 3. Slightly increased center-track debris in the Red River portions (0 - 900)
       if (isRedRiver && Math.random() < 0.42) {
         const centerX = nextFeatureX + w + Math.floor(gapAfter * 0.46);
         hazards.push({
@@ -1004,7 +1253,6 @@
         });
       }
 
-      // 4. Half-track shoreline shallow rocks (halved frequency, never on Lane 0)
       if (depthFactor === 0.5 && chosen === 'BOT_MEANDER') {
         if (Math.random() < 0.35) {
           hazards.push({
@@ -1016,7 +1264,6 @@
           });
         }
       } else if (isLakeOpen) {
-        // On Lake Winnipeg, rocks are halved and strictly restricted to Lane 1 or Lane 2 (never Lane 0!)
         if (Math.random() < 0.42) {
           const gapRockX = nextFeatureX + w + Math.floor(gapAfter * 0.48);
           const shoalLane = Math.random() < 0.55 ? 2 : 1;
@@ -1041,7 +1288,6 @@
         });
       }
     } else {
-      // Frozen Winter Ice Trail Obstacles (2770+): Snow Drifts (75% slow) & Glare Ice Patches (2s speed burst)
       const obsX = nextFeatureX + w + Math.floor(gapAfter * 0.48);
       const obsLane = Math.floor(Math.random() * 3);
       if (Math.random() < 0.65) {
@@ -1070,8 +1316,16 @@
   }
 
   function scheduleDeepLakeWaves() {
-    // Realistic Lake Winnipeg whitecap swells along the horizon edge (Lane 0) — spaced out naturally (not too frequent)
-    if (score < DIST.MARSH_MOUTH_END || score >= DIST.LAKE_MIDNIGHT_END - 60) return;
+    // Wave mechanic CANNOT initiate during the first frames or within 250 distance points of starting Lake Winnipeg!
+    // Lake Winnipeg begins at ST_PETERS_END (1450), so waves only arm once score >= 1700 (1450 + 250).
+    const waveStartScore = DIST.ST_PETERS_END + 250; // 1700
+    if (score < waveStartScore || score >= DIST.LAKE_MIDNIGHT_END - 80) return;
+
+    if (!lakeWaveArmed) {
+      lakeWaveArmed = true;
+      nextDeepWaveX = VIEW_W + 180;
+    }
+
     if (nextDeepWaveX < VIEW_W + 100) {
       hazards.push({
         x: nextDeepWaveX,
@@ -1080,8 +1334,7 @@
         halfOffset: 0,
         triggered: false
       });
-      // Wide, natural interval between lake whitecaps (~520 to 840px)
-      nextDeepWaveX += 520 + Math.floor(Math.random() * 320);
+      nextDeepWaveX += 540 + Math.floor(Math.random() * 340);
     }
   }
 
@@ -1108,7 +1361,7 @@
     const hudH = 36;
     const playTop = hudH;
     const playH = VIEW_H - hudH;
-    const isLakeOpen = score >= DIST.MARSH_MOUTH_END;
+    const isLakeOpen = score >= DIST.ST_PETERS_END;
     const isWinter = isSledMode || score >= DIST.DEPLOY_END;
     const isSil = (score >= DIST.LAKE_DAY_END + 80 && score < DIST.LAKE_MIDNIGHT_END);
 
@@ -1166,16 +1419,25 @@
           drawShadedPine(baseX + 102, horizonY - 12, false, false);
           drawShieldOutcrop(baseX + 146, horizonY - 3, false, false);
         } else {
-          drawMarshReeds(baseX + 14, horizonY - 4);
-          drawShadedPine(baseX + 46, horizonY - 11, false, false);
-          drawMarshReeds(baseX + 88, horizonY - 3);
-          drawMarshReeds(baseX + 134, horizonY - 4);
+          // St. Peter's I.R. marshy light forest: wigwam lodges, wolf-campfire, marsh reeds & oaks
+          drawMarshReeds(baseX + 10, horizonY - 4);
+          drawWigwamLodge(baseX + 28, horizonY - 6);
+          drawShadedPine(baseX + 52, horizonY - 11, false, false);
+          drawWolfCampfire(baseX + 76, horizonY - 2, frame);
+          drawMarshReeds(baseX + 108, horizonY - 3);
+          drawWigwamLodge(baseX + 130, horizonY - 6);
+          drawShadedPine(baseX + 158, horizonY - 11, false, false);
         }
       }
 
+      // Unique One-Off Historic Landmarks & Battle of Seven Oaks Replay
       for (let i = 0; i < landmarks.length; i++) {
         const lm = landmarks[i];
-        drawFortLandmark(Math.round(lm.x), horizonY - 10, lm.type);
+        if (lm.type === 'SEVEN_OAKS') {
+          drawBattleOfSevenOaks(Math.round(lm.x), horizonY - 2, frame);
+        } else {
+          drawFortLandmark(Math.round(lm.x), horizonY - 10, lm.type);
+        }
       }
     } else {
       ctx.fillStyle = env.watFoam;
@@ -1481,17 +1743,12 @@
         ctx.fillStyle = PAL.SNOW_LIGHT;
         ctx.fillRect(hx + 6, hy, 3, 1);
       } else if (h.type === 'BIG_WAVE') {
-        // Realistic Lake Winnipeg Whitecap Wave along the horizon edge (Lane 0):
-        // Longer (48px), lower-profile swell that builds gradually from a gentle bump on the right
-        // into a folding whitecap crest by the time it reaches the player's locked x-axis (x ~ 36)
         const waveW = 48;
         const waveBotY = riverTopY + laneH - 2;
         const playerX = 36;
-        // Steepness / folding progression: 0 when far right, 1.0 as it reaches the player's x-axis
         const foldT = Math.max(0, Math.min(1, (VIEW_W - hx) / Math.max(40, VIEW_W - playerX)));
-        const crestTopY = Math.round(horizonY - 2 - foldT * 2); // Subtle 2-4px rise above horizon edge
+        const crestTopY = Math.round(horizonY - 2 - foldT * 2);
 
-        // 1. Long, gradual water swell body (gentle slope on right back, steeper face on left)
         fillPixelPoly([
           [hx, waveBotY],
           [hx + Math.round(12 - foldT * 5), crestTopY + 2],
@@ -1500,7 +1757,6 @@
           [hx + waveW, waveBotY]
         ], env.watMid);
 
-        // 2. Turquoise curling wave face & whitecap foam
         fillPixelPoly([
           [hx - 2, waveBotY - 1],
           [hx + Math.round(9 - foldT * 4), crestTopY + 3],
@@ -1509,7 +1765,6 @@
           [hx + 18, waveBotY - 2]
         ], env.watFoam);
 
-        // 3. Folding whitecap crest (folds forward over the left face as foldT approaches 1)
         const curlOverhang = Math.round(foldT * 4);
         fillPixelPoly([
           [hx + Math.round(8 - curlOverhang), crestTopY + 3],
@@ -1519,7 +1774,6 @@
           [hx + 15, crestTopY + 2]
         ], PAL.WAVE_CREST);
 
-        // Trailing whitecap foam line & base wake
         ctx.fillStyle = PAL.WAVE_CREST;
         ctx.fillRect(hx + 24, crestTopY + 2, 12, 1);
         ctx.fillStyle = env.watFoam;
@@ -1609,18 +1863,15 @@
   // ==========================================
   // 7. COLLISIONS, ISLAND COMMITMENT, & UPDATE LOOP
   // ==========================================
-  // Prevent last-minute clipping into or across an island once committed to one side
   function isCommittedToIslandFork(targetLane) {
     const pLeft = 20;
     const pRight = 52;
     for (let i = 0; i < riverFeatures.length; i++) {
       const f = riverFeatures[i];
       if (f.type === 'ISLAND') {
-        // From the moment the canoe enters the island's upstream point until its stern clears the downstream tip
         const forkStart = f.x + 4;
         const forkEnd = f.x + f.w - 4;
         if (pRight > forkStart && pLeft < forkEnd) {
-          // Block entering the island track (Lane 1) or jumping across it to the opposite channel
           if (targetLane === 1 || (playerLane === 0 && targetLane === 2) || (playerLane === 2 && targetLane === 0)) {
             return true;
           }
@@ -1639,7 +1890,6 @@
 
     for (let i = 0; i < riverFeatures.length; i++) {
       const f = riverFeatures[i];
-      // Island collision spans its full tapered body (f.x + 8 to f.x + f.w - 8) so no nose/tail clipping occurs
       const solidStart = f.type === 'ISLAND' ? (f.x + 8) : (f.x + Math.floor(f.taperW * 0.65));
       const solidEnd = f.type === 'ISLAND' ? (f.x + f.w - 8) : (f.x + f.w - Math.floor(f.taperW * 0.65));
 
@@ -1674,7 +1924,6 @@
 
     for (let i = 0; i < hazards.length; i++) {
       const h = hazards[i];
-      // For BIG_WAVE (48px long), collision occurs on the folding whitecap crest face (x+4 .. x+28)
       const hitStart = h.type === 'BIG_WAVE' ? (h.x + 4) : (h.x + 2);
       const hitEnd = h.type === 'BIG_WAVE' ? (h.x + 28) : (h.x + 16);
 
@@ -1745,7 +1994,9 @@
 
     bgOffset += currentSpeed;
     nextFeatureX -= currentSpeed;
-    nextDeepWaveX -= currentSpeed;
+    if (lakeWaveArmed) {
+      nextDeepWaveX -= currentSpeed;
+    }
 
     if (frame % 3 === 0) {
       score += 1;
@@ -1779,7 +2030,7 @@
     for (let i = 0; i < landmarks.length; i++) {
       landmarks[i].x -= currentSpeed * 0.38;
     }
-    landmarks = landmarks.filter(lm => lm.x > -70);
+    landmarks = landmarks.filter(lm => lm.x > -110);
 
     drawScene();
     checkCollisions();
