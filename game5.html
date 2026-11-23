@@ -149,21 +149,26 @@
   let VIEW_W = 320;
   let VIEW_H = 240;
   const HUD_HEIGHT = 22;
+  const TOTAL_ZONES = 4; // Extended to 4 sliding zones per level!
 
-  // Game states: 'TITLE', 'INTRO_CUTSCENE', 'PLAYING', 'FRAME_SLIDE', 'LEVEL_END_CUTSCENE', 'GAMEOVER'
+  // Game states: 'TITLE', 'INTRO_CUTSCENE', 'PLAYING', 'FRAME_SLIDE', 'LEVEL_END_CUTSCENE', 'LIFE_LOST', 'GAMEOVER'
   let state = 'TITLE'; 
   let level = 1;
-  let subFrame = 0; // 0 = Frame 1, 1 = Frame 2
+  let lives = 3; // 3 Global Lives: Life 1 = Bay/Blue Capote, Life 2 = Dapple Gray/Red Capote, Life 3 = Buckskin/Green Capote
+  let subFrame = 0; // 0, 1, 2, 3 (4 zones per level)
   let slideProgress = 0;
   let frame = 0;
   let isPaused = false;
   let cutsceneTimer = 0;
+  let lifeLostTimer = 0;
   
-  // Player dimensions & 4-directional state ('UP', 'DOWN', 'LEFT', 'RIGHT')
-  let player = { x: 144, y: 180, dead: false, w: 32, h: 36, dir: 'UP' };
+  // Player dimensions, 4-directional state ('UP', 'DOWN', 'LEFT', 'RIGHT'), and moving timer for idle/stand animation
+  let player = { x: 144, y: 180, dead: false, w: 32, h: 36, dir: 'UP', moveTimer: 0 };
   
-  // Two pre-built frames per level for seamless 2-frame sliding transition
+  // Four pre-built zones per level for seamless 4-frame sliding transitions
   let levelFrames = [
+    { statics: [], dynamics: [], waters: [], groundPatches: [], herd: [] },
+    { statics: [], dynamics: [], waters: [], groundPatches: [], herd: [] },
     { statics: [], dynamics: [], waters: [], groundPatches: [], herd: [] },
     { statics: [], dynamics: [], waters: [], groundPatches: [], herd: [] }
   ];
@@ -207,7 +212,7 @@
       midHills: '#4a3d42',
       groundHoriz: '#59656b',
       type: 'mountain',
-      desc: "THE WESTERN FOOTHILLS! RIDE DOWN THE GLACIAL RIDGE FROM CAMP PAST SOLID ROCK LEDGES TO REACH THE HERD."
+      desc: "THE WESTERN FOOTHILLS! RIDE 4 ZONES DOWN THE GLACIAL RIDGE PAST ROCK LEDGES AND WILDLIFE TO REACH THE HERD."
     },
     { 
       name: "UPPER MISSOURI PLAINS", 
@@ -221,7 +226,7 @@
       midHills: '#664324',
       groundHoriz: '#8c6943',
       type: 'missouri',
-      desc: "THE UPPER MISSOURI! THREAD PAST THE TIPI VILLAGE AND HOP DRIFTING LOGS ACROSS THE RIVER INTO THE OPEN PLAINS."
+      desc: "THE UPPER MISSOURI! PASS THE TIPI VILLAGE, HOP SHADED LOGS ACROSS THE MISSOURI AND TRIBUTARIES, AND REACH THE HERD."
     },
     { 
       name: "RED & ASSINIBOINE", 
@@ -235,7 +240,7 @@
       midHills: '#6e521b',
       groundHoriz: '#9c7b27',
       type: 'forks',
-      desc: "THE RIVER VALLEYS! NAVIGATE PAST VILLAGE LOG HOUSES AND CROSS THE RED AND ASSINIBOINE RIVERS ON DRIFTING LOGS."
+      desc: "THE RIVER VALLEYS! WEAVE PAST LOG CABINS AND CROSS THE RED AND ASSINIBOINE RIVERS ON DRIFTING TIMBER LOGS."
     },
     { 
       name: "EASTERN WOODLANDS", 
@@ -249,12 +254,76 @@
       midHills: '#1f3b18',
       groundHoriz: '#26471c',
       type: 'forest',
-      desc: "LAKE OF THE WOODS! HOP STAGGERED STEPPING STONES ACROSS WOODLAND CREEKS TO DRIVE THE HERD INTO THE SUNSET."
+      desc: "LAKE OF THE WOODS! SLALOM THROUGH DENSE WOODLAND STANDS AND CROSS STAGGERED CREEKS TO DRIVE THE HERD HOME."
     }
   ];
 
   // ==========================================
-  // 16-BIT SNES SHADED SPRITE MATRICES (4-DIRECTIONAL)
+  // 3 DISTINCT HUNTING PARTY RIDERS & HORSE BREEDS (FOR 3 LIVES)
+  // ==========================================
+  const HUNTING_PARTY = [
+    {
+      name: "PIERRE (BAY MUSTANG)",
+      pal: {
+        1: '#120d09', // Outline
+        2: '#8f5932', // Warm Bay Horse Coat
+        3: '#61391d', // Bay Muscle Shading
+        4: '#b37546', // Bay Highlight
+        5: '#1c1714', // Jet Black Mane/Tail/Hooves
+        6: '#0f6f9e', // Métis Blue Capote
+        7: '#084766', // Blue Capote Shading
+        8: '#ad1c21', // Crimson L'Assomption Sash
+        9: '#f7c844', // Gold Sash Trim
+        10: '#dba874', // Skin
+        11: '#2e241d'  // Dark Felt Hat
+      }
+    },
+    {
+      name: "GABRIEL (DAPPLE GRAY)",
+      pal: {
+        1: '#120d09', // Outline
+        2: '#a8b2ba', // Dapple Gray Horse Coat
+        3: '#737d85', // Gray Dapple Shading
+        4: '#dce3e8', // Silver-White Highlight
+        5: '#3d4347', // Charcoal Mane/Tail/Hooves
+        6: '#ad1c21', // Crimson Red Capote
+        7: '#751014', // Red Capote Shading
+        8: '#12aea2', // Teal Woven Sash
+        9: '#f7c844', // Gold Trim
+        10: '#c99363', // Skin
+        11: '#4a3321'  // Brown Fur Cap
+      }
+    },
+    {
+      name: "LOUIS (GOLDEN BUCKSKIN)",
+      pal: {
+        1: '#120d09', // Outline
+        2: '#d4a34a', // Golden Buckskin Coat
+        3: '#9c7227', // Buckskin Shading
+        4: '#f0c975', // Cream-Gold Highlight
+        5: '#1a1410', // Black Points (Mane/Tail/Lower Legs)
+        6: '#2e6930', // Forest Green Capote
+        7: '#1b421c', // Green Capote Shading
+        8: '#fb6604', // Blaze Orange Sash
+        9: '#f4f4f4', // White Beadwork Trim
+        10: '#d69e6b', // Skin
+        11: '#1c1714'  // Black Voyageur Hat
+      }
+    }
+  ];
+
+  function getActiveRiderPalette() {
+    let idx = Math.max(0, Math.min(2, 3 - lives));
+    return HUNTING_PARTY[idx].pal;
+  }
+
+  function getActiveRiderName() {
+    let idx = Math.max(0, Math.min(2, 3 - lives));
+    return HUNTING_PARTY[idx].name;
+  }
+
+  // ==========================================
+  // 16-BIT SNES SHADED SPRITE MATRICES (4-DIRECTIONAL + STANDING IDLE)
   // ==========================================
   const drawSprite = (x, y, matrix, palette, scale = 2, flipX = false) => {
     const rows = matrix.length;
@@ -271,23 +340,9 @@
     }
   };
 
-  const PAL_PLAYER = {
-    1: '#120d09', // Crisp Dark Outline
-    2: '#8f5932', // Warm Bay Horse Coat
-    3: '#61391d', // Horse Muscle Shading
-    4: '#b37546', // Horse Shoulder/Hip Highlight
-    5: '#1c1714', // Jet Black Mane, Tail & Hooves
-    6: '#0f6f9e', // Métis Capote Blue
-    7: '#084766', // Capote Fold Shading
-    8: '#ad1c21', // L'Assomption Sash Crimson
-    9: '#f7c844', // Sash Gold & Brass Tack
-    10: '#dba874', // Hunter Face & Hands
-    11: '#2e241d'  // Felt Hunter Hat
-  };
-
-  // Top-Down UP (Riding North) - 2 Gallop Frames (16x18)
+  // Top-Down UP (Facing North) - 2 Gallop Frames + 1 Standing Idle Frame (16x18)
   const sprPlayerUp = [
-    [
+    [ // Gallop 1
       [0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0],
       [0,0,0,0,0,1,4,2,2,4,1,0,0,0,0,0],
       [0,0,0,0,1,5,2,4,4,2,5,1,0,0,0,0],
@@ -307,7 +362,7 @@
       [0,0,0,0,0,0,1,5,5,1,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0]
     ],
-    [
+    [ // Gallop 2
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0],
       [0,0,0,0,0,1,4,2,2,4,1,0,0,0,0,0],
@@ -326,12 +381,32 @@
       [0,0,0,0,0,0,1,5,5,1,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+    ],
+    [ // Standing Idle (Square stance, subtle breathing/tail rest)
+      [0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0],
+      [0,0,0,0,0,1,4,2,2,4,1,0,0,0,0,0],
+      [0,0,0,0,1,5,2,4,4,2,5,1,0,0,0,0],
+      [0,0,0,1,3,2,5,2,2,5,2,3,1,0,0,0],
+      [0,0,0,1,3,4,5,9,9,5,4,3,1,0,0,0],
+      [0,0,0,1,3,2,1,11,11,1,2,3,1,0,0,0],
+      [0,0,0,1,2,1,11,9,9,11,1,2,1,0,0,0],
+      [0,0,0,1,2,1,6,6,6,6,1,2,1,0,0,0],
+      [0,0,0,1,2,1,6,7,10,6,1,2,1,0,0,0],
+      [0,0,0,1,3,2,6,8,9,6,2,3,1,0,0,0],
+      [0,0,0,1,3,2,7,8,8,7,2,3,1,0,0,0],
+      [0,0,0,1,3,4,1,6,6,1,4,3,1,0,0,0],
+      [0,0,0,1,3,2,2,5,5,2,2,3,1,0,0,0],
+      [0,0,0,0,1,3,2,5,5,2,3,1,0,0,0,0],
+      [0,0,0,0,1,5,1,5,5,1,5,1,0,0,0,0],
+      [0,0,0,0,0,1,0,1,1,0,1,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
     ]
   ];
 
-  // Top-Down DOWN (Riding South) - 2 Gallop Frames (16x18)
+  // Top-Down DOWN (Facing South) - 2 Gallop Frames + 1 Standing Idle Frame (16x18)
   const sprPlayerDown = [
-    [
+    [ // Gallop 1
       [0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,1,5,5,1,0,0,0,0,0,0],
       [0,0,0,0,0,1,5,1,1,5,1,0,0,0,0,0],
@@ -351,7 +426,7 @@
       [0,0,0,0,0,1,4,2,2,4,1,0,0,0,0,0],
       [0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0]
     ],
-    [
+    [ // Gallop 2
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,1,5,5,1,0,0,0,0,0,0],
@@ -370,12 +445,32 @@
       [0,0,0,0,0,1,4,2,2,4,1,0,0,0,0,0],
       [0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+    ],
+    [ // Standing Idle (Square stance)
+      [0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,1,5,5,1,0,0,0,0,0,0],
+      [0,0,0,0,1,5,1,5,5,1,5,1,0,0,0,0],
+      [0,0,0,0,1,3,2,5,5,2,3,1,0,0,0,0],
+      [0,0,0,1,3,2,2,5,5,2,2,3,1,0,0,0],
+      [0,0,0,1,3,4,1,6,6,1,4,3,1,0,0,0],
+      [0,0,0,1,2,1,7,8,8,7,1,2,1,0,0,0],
+      [0,0,0,1,2,1,6,8,9,6,1,2,1,0,0,0],
+      [0,0,0,1,2,1,6,10,10,6,1,2,1,0,0,0],
+      [0,0,0,1,2,1,11,9,9,11,1,2,1,0,0,0],
+      [0,0,0,1,2,1,11,11,11,11,1,2,1,0,0,0],
+      [0,0,0,1,3,2,1,10,10,1,2,3,1,0,0,0],
+      [0,0,0,1,3,4,5,9,9,5,4,3,1,0,0,0],
+      [0,0,0,1,3,2,5,2,2,5,2,3,1,0,0,0],
+      [0,0,0,0,1,5,2,4,4,2,5,1,0,0,0,0],
+      [0,0,0,0,0,1,4,2,2,4,1,0,0,0,0,0],
+      [0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
     ]
   ];
 
-  // Horizontal RIGHT (Galloping East, flipped for LEFT/West) - 2 Gallop Frames (18x16)
+  // Horizontal RIGHT (Flipped for LEFT) - 2 Gallop Frames + 1 Standing Idle Frame (18x16)
   const sprPlayerSideAnim = [
-    [ // Frame 1: Extended Gallop Stride
+    [ // Gallop 1: Extended Stride
       [0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,1,11,11,11,11,1,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,1,10,10,1,0,0,0,0,0,0,0],
@@ -393,7 +488,7 @@
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
     ],
-    [ // Frame 2: Gathered Gallop Stride
+    [ // Gallop 2: Gathered Stride
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,1,11,11,11,11,1,0,0,0,0,0,0],
@@ -408,6 +503,24 @@
       [0,0,0,0,1,2,3,1,1,2,3,1,0,0,0,0,0,0],
       [0,0,0,0,0,1,5,1,1,5,1,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+    ],
+    [ // Standing Idle (Four hooves planted squarely on ground, relaxed tail)
+      [0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,1,11,11,11,11,1,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,1,10,10,1,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,1,6,6,6,1,0,0,1,1,0,0,0],
+      [0,0,0,0,0,0,1,6,8,9,6,1,1,2,4,1,0,0],
+      [0,0,0,1,1,1,1,7,8,6,2,2,2,5,2,2,1,0],
+      [0,0,1,5,2,2,2,2,2,2,2,4,2,5,2,2,1,0],
+      [0,1,5,2,2,4,2,2,2,2,2,2,2,2,1,1,0,0],
+      [0,1,5,2,3,2,2,2,2,2,3,2,2,1,0,0,0,0],
+      [0,1,5,1,2,1,1,1,1,1,2,1,1,0,0,0,0,0],
+      [0,0,1,1,2,1,0,0,0,1,2,1,0,0,0,0,0,0],
+      [0,0,0,1,3,1,0,0,0,1,3,1,0,0,0,0,0,0],
+      [0,0,0,1,5,1,0,0,0,1,5,1,0,0,0,0,0,0],
+      [0,0,0,1,1,1,0,0,0,1,1,1,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
     ]
@@ -454,20 +567,16 @@
   ];
 
   // Side-Profile Mounted Hunter for Title Screen & Level-Ending Sunset Cutscenes
-  const PAL_HUNTER_SIDE = {
-    1: '#120d0a', 2: '#8f5932', 3: '#61391d', 4: '#1c1816',
-    5: '#0f6f9e', 6: '#ad1c21', 7: '#f7c844', 8: '#dba874'
-  };
   const sprHunterSide = [
     [0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0],
-    [0,0,0,0,0,1,4,4,4,1,0,0,0,0,0,0],
-    [0,0,0,0,0,0,1,8,8,1,0,0,0,0,0,0],
-    [0,0,0,0,0,1,5,5,5,1,0,1,1,0,0,0],
-    [0,0,0,0,0,1,5,6,7,5,1,2,2,1,0,0],
-    [0,0,1,1,1,1,6,6,5,2,2,2,4,2,1,0],
-    [0,1,4,2,2,2,2,2,2,2,2,2,2,2,1,0],
-    [1,4,2,2,3,2,2,2,2,2,3,2,1,1,0,0],
-    [1,4,1,2,1,3,3,3,3,3,2,1,0,0,0,0],
+    [0,0,0,0,0,1,5,5,5,1,0,0,0,0,0,0],
+    [0,0,0,0,0,0,1,10,10,1,0,0,0,0,0,0],
+    [0,0,0,0,0,1,6,6,6,1,0,1,1,0,0,0],
+    [0,0,0,0,0,1,6,8,9,6,1,2,2,1,0,0],
+    [0,0,1,1,1,1,8,8,6,2,2,2,5,2,1,0],
+    [0,1,5,2,2,2,2,2,2,2,2,2,2,2,1,0],
+    [1,5,2,2,3,2,2,2,2,2,3,2,1,1,0,0],
+    [1,5,1,2,1,3,3,3,3,3,2,1,0,0,0,0],
     [0,0,1,2,1,0,0,0,0,1,2,1,0,0,0,0],
     [0,1,3,1,0,0,0,0,0,0,1,3,1,0,0,0],
     [0,1,1,0,0,0,0,0,0,0,0,1,1,0,0,0]
@@ -494,6 +603,21 @@
     [1,2,3,1,2,3,1,2,3,1],
     [1,4,2,2,4,2,2,4,2,1],
     [1,4,4,4,4,4,4,4,4,1]
+  ];
+
+  // Level 4: Dense Woodland Pine/Birch Tree for Slalom Corridors (10x10)
+  const PAL_TREE = { 1: '#0e1f0b', 2: '#23591b', 3: '#3b822e', 4: '#173b12', 5: '#52341e' };
+  const sprTree = [
+    [0,0,0,1,1,1,1,0,0,0],
+    [0,0,1,3,3,2,2,1,0,0],
+    [0,1,3,3,2,2,4,2,1,0],
+    [1,3,2,2,2,4,4,4,2,1],
+    [1,2,2,4,4,4,4,4,4,1],
+    [0,1,4,4,4,4,4,4,1,0],
+    [0,0,1,1,5,5,1,1,0,0],
+    [0,0,0,1,5,5,1,0,0,0],
+    [0,0,0,1,5,5,1,0,0,0],
+    [0,0,1,1,1,1,1,1,0,0]
   ];
 
   // Level 2: Plains Tipi Village Barrier Sprite (14x13)
@@ -687,7 +811,7 @@
   }
 
   // ==========================================
-  // 4-LEVEL BESPOKE FROGGER DESIGN BUILDER
+  // 4-ZONE BESPOKE LEVEL GENERATOR (LOGICALLY CONNECTED ACROSS ALL 4 FRAMES)
   // ==========================================
   function generateGroundPatches(minY, maxY) {
     let patches = [];
@@ -726,6 +850,24 @@
     }
   }
 
+  function createHLogs(riverY, laneConfigs) {
+    let logs = [];
+    const laneH = 22;
+    for (let i = 0; i < laneConfigs.length; i++) {
+      let cfg = laneConfigs[i];
+      for (let c = 0; c < cfg.count; c++) {
+        logs.push({
+          x: c * (VIEW_W / cfg.count) + 14,
+          y: riverY + i * laneH + 2,
+          w: cfg.logW,
+          h: laneH - 4,
+          vx: cfg.vx
+        });
+      }
+    }
+    return logs;
+  }
+
   function buildFrameData(fIdx) {
     const bIdx = (level - 1) % BIOMES.length;
     const bType = BIOMES[bIdx].type;
@@ -733,7 +875,7 @@
     const speedScale = 1 + (cycleLoop * 0.25);
 
     const safeBottomH = (fIdx === 0) ? 46 : 14;
-    const safeTopH = (fIdx === 1) ? 54 : HUD_HEIGHT + 8;
+    const safeTopH = (fIdx === 3) ? 54 : HUD_HEIGHT + 8;
     const playTop = safeTopH;
     const playBottom = VIEW_H - safeBottomH;
     const playHeight = Math.max(90, playBottom - playTop);
@@ -744,17 +886,18 @@
     let groundPatches = generateGroundPatches(playTop, playBottom);
 
     // ---------------------------------------------------------
-    // LEVEL 1: ROCKY FOOTHILLS (Glacial Snow Camp, Downhill Sloped Steps, Solid Rocky Ledges, NO River/Creek)
+    // LEVEL 1: ROCKY FOOTHILLS (4-Zone Downhill Glacial Descent, NO Rivers/Creeks)
+    // Zone 0: Glacial Cart Camp & Upper Crags -> Zone 1: Steep Talus Switchbacks
+    // Zone 2: Lower Foothill Ledges -> Zone 3: Valley Floor & Buffalo Herd
     // ---------------------------------------------------------
     if (bType === 'mountain') {
-      // Solid impassable rocky ledges jutting from left & right mountain walls
       const numRows = 3;
       const rowH = playHeight / numRows;
 
       for (let r = 0; r < numRows; r++) {
         let ry = Math.floor(playTop + r * rowH + 6);
         let fromLeft = (r + fIdx) % 2 === 0;
-        let ledgeW = 94 + ((r * 17 + fIdx * 13) % 28);
+        let ledgeW = 92 + ((r * 17 + fIdx * 11) % 26);
         let lx = fromLeft ? 0 : (VIEW_W - ledgeW);
 
         statics.push({
@@ -766,7 +909,6 @@
           fromLeft: fromLeft
         });
 
-        // Companion boulder on the opposite side leaving a clear middle-side slalom gap
         let rockX = fromLeft ? (VIEW_W - 44) : 14;
         statics.push({
           type: 'ROCK',
@@ -776,10 +918,9 @@
           h: 18
         });
 
-        // Crossing wildlife between the rocky ledges
         let wy = Math.floor(ry + 24);
         if (wy + 20 < playBottom) {
-          let animal = (r === 0) ? 'MOOSE' : (r === 1 ? 'FOX' : 'DEER');
+          let animal = ((r + fIdx) % 3 === 0) ? 'MOOSE' : (((r + fIdx) % 3 === 1) ? 'FOX' : 'DEER');
           let dir = fromLeft ? -1 : 1;
           addWildlifeLane(dynamics, wy, animal, dir, speedScale, animal === 'MOOSE' ? 1 : 2);
         }
@@ -787,80 +928,93 @@
     }
 
     // ---------------------------------------------------------
-    // LEVEL 2: UPPER MISSOURI PLAINS
-    // Frame 0: Tipi Village Barrier on near side + Upper Missouri River (mid 2/3) with Frogger Logs
-    // Frame 1: Open Plains (Tallgrass clumps & fast plains wildlife)
+    // LEVEL 2: UPPER MISSOURI PLAINS (4-Zone Connected River & Open Plains)
+    // Zone 0: Tipi Village Barrier & Upper Missouri River (mid 2/3) with Shaded Logs
+    // Zone 1: Missouri Tributary Fork (full edge-to-edge river) & Prairie Ridges
+    // Zone 2: Wide Sun-Baked Plains & Tallgrass Stands
+    // Zone 3: Open Plains Horizon & Thundering Buffalo Herd
     // ---------------------------------------------------------
     else if (bType === 'missouri') {
       if (fIdx === 0) {
-        // Near-side Tipi Village Barrier (south of river) with a central village path opening
+        // Near-side Tipi Village Barrier (south of river) with central village gate
         const tipiY = Math.floor(playTop + playHeight * 0.62);
         statics.push({ type: 'TIPI', x: 18, y: tipiY, w: 28, h: 26 });
         statics.push({ type: 'TIPI', x: 64, y: tipiY + 4, w: 28, h: 26 });
         statics.push({ type: 'TIPI', x: VIEW_W - 92, y: tipiY + 4, w: 28, h: 26 });
         statics.push({ type: 'TIPI', x: VIEW_W - 46, y: tipiY, w: 28, h: 26 });
 
-        // Upper Missouri River situated near the mid-upper 2/3 mark (horizontal East-West flow)
+        // Upper Missouri River (full West-to-East span across viewport)
         const riverY = Math.floor(playTop + playHeight * 0.20);
-        const laneH = 22;
-        const logLanes = [
-          { y: riverY, vx: 0.95 * speedScale, logW: 64, count: 2 },
-          { y: riverY + laneH, vx: -1.15 * speedScale, logW: 56, count: 2 }
-        ];
-        let logs = [];
-        for (let ll of logLanes) {
-          for (let c = 0; c < ll.count; c++) {
-            logs.push({
-              x: c * (VIEW_W / ll.count) + 12,
-              y: ll.y + 2,
-              w: ll.logW,
-              h: laneH - 4,
-              vx: ll.vx
-            });
-          }
-        }
+        const logs = createHLogs(riverY, [
+          { vx: 0.95 * speedScale, logW: 64, count: 2 },
+          { vx: -1.15 * speedScale, logW: 56, count: 2 }
+        ]);
         waters.push({
           name: 'UPPER MISSOURI',
           orientation: 'H',
           x: 0,
           y: riverY,
           w: VIEW_W,
-          h: laneH * 2,
+          h: 44,
           mode: 'LOGS',
           platforms: logs
         });
 
-        // Plains wildlife patrolling south of the tipi village
         addWildlifeLane(dynamics, tipiY + 32, 'FOX', 1, speedScale, 2);
+      } else if (fIdx === 1) {
+        // Missouri Tributary Fork (full West-to-East span) + Prairie Boulders
+        const riverY = Math.floor(playTop + playHeight * 0.44);
+        const logs = createHLogs(riverY, [
+          { vx: -1.0 * speedScale, logW: 60, count: 2 },
+          { vx: 1.2 * speedScale, logW: 54, count: 2 }
+        ]);
+        waters.push({
+          name: 'MILK RIVER FORK',
+          orientation: 'H',
+          x: 0,
+          y: riverY,
+          w: VIEW_W,
+          h: 44,
+          mode: 'LOGS',
+          platforms: logs
+        });
+
+        statics.push({ type: 'ROCK', x: 34, y: riverY + 52, w: 30, h: 18 });
+        statics.push({ type: 'TALLGRASS', x: VIEW_W - 72, y: riverY + 52, w: 30, h: 18 });
+        statics.push({ type: 'TALLGRASS', x: 78, y: riverY - 26, w: 30, h: 18 });
+        addWildlifeLane(dynamics, riverY - 42, 'DEER', 1, speedScale, 2);
       } else {
-        // Frame 1: Open Plains transition with tallgrass clumps and swift deer/foxes/snakes
+        // Zones 2 & 3: Open Plains transition with tallgrass clumps and swift plains wildlife
         const rows = 3;
         const rStep = playHeight / rows;
         for (let r = 0; r < rows; r++) {
           let ry = Math.floor(playTop + r * rStep + 8);
-          let gx1 = 26 + ((r * 74) % (VIEW_W - 120));
+          let gx1 = 26 + (((r + fIdx) * 74) % (VIEW_W - 120));
           let gx2 = gx1 + 68;
           statics.push({ type: 'TALLGRASS', x: gx1, y: ry, w: 30, h: 18 });
           if (gx2 < VIEW_W - 36) {
             statics.push({ type: 'TALLGRASS', x: gx2, y: ry + 4, w: 30, h: 18 });
           }
 
-          let aType = (r === 0) ? 'DEER' : (r === 1 ? 'FOX' : 'SNAKE');
-          addWildlifeLane(dynamics, ry + 22, aType, (r % 2 === 0 ? 1 : -1), speedScale, 2);
+          let aType = ((r + fIdx) % 3 === 0) ? 'DEER' : (((r + fIdx) % 3 === 1) ? 'FOX' : 'SNAKE');
+          addWildlifeLane(dynamics, ry + 22, aType, ((r + fIdx) % 2 === 0 ? 1 : -1), speedScale, 2);
         }
       }
     }
 
     // ---------------------------------------------------------
-    // LEVEL 3: RED & ASSINIBOINE RIVERS
-    // Frame 0: Vertical running Red River (North-South) + Village Log Houses blocking
-    // Frame 1: Horizontal running Assiniboine River (West-East) + Village Log Houses blocking
+    // LEVEL 3: RED & ASSINIBOINE RIVERS (4-Zone Connected River System)
+    // Zone 0: Vertical Red River (runs full top-to-bottom of Zone 0) + Village Log Houses
+    // Zone 1: Vertical Red River continues seamlessly from Zone 0 -> bends into The Forks!
+    // Zone 2: Horizontal Assiniboine River (full West-to-East) + Village Log Houses
+    // Zone 3: St. Boniface / North Valley Clearing + Village Log Houses -> Horizon Herd
     // ---------------------------------------------------------
     else if (bType === 'forks') {
+      const riverW = 72;
+      const riverX = Math.floor((VIEW_W - riverW) / 2);
+
       if (fIdx === 0) {
-        // Vertical Red River running North-South right down the center (x = 124..196)
-        const riverW = 72;
-        const riverX = Math.floor((VIEW_W - riverW) / 2);
+        // Vertical Red River running full height from bottom edge to top edge of Zone 0
         const colW = 36;
         const logCols = [
           { x: riverX, vy: 0.90 * speedScale, logH: 48, count: 2 },
@@ -871,7 +1025,7 @@
           for (let c = 0; c < lc.count; c++) {
             vLogs.push({
               x: lc.x + 2,
-              y: playTop + c * (playHeight / lc.count),
+              y: c * (VIEW_H / lc.count),
               w: colW - 4,
               h: lc.logH,
               vy: lc.vy
@@ -879,116 +1033,168 @@
           }
         }
         waters.push({
-          name: 'RED RIVER',
+          name: 'RED RIVER SOUTH',
           orientation: 'V',
           x: riverX,
-          y: playTop,
+          y: 0,
           w: riverW,
-          h: playHeight,
+          h: VIEW_H,
           mode: 'LOGS',
           platforms: vLogs
         });
 
-        // Village Log Houses blocking on both West and East riverbanks
-        statics.push({ type: 'LOGHOUSE', x: 14, y: playTop + 14, w: 32, h: 26 });
+        statics.push({ type: 'LOGHOUSE', x: 16, y: playTop + 14, w: 32, h: 26 });
         statics.push({ type: 'LOGHOUSE', x: 64, y: playTop + Math.floor(playHeight * 0.52), w: 32, h: 26 });
         statics.push({ type: 'LOGHOUSE', x: VIEW_W - 96, y: playTop + 20, w: 32, h: 26 });
-        statics.push({ type: 'LOGHOUSE', x: VIEW_W - 46, y: playTop + Math.floor(playHeight * 0.56), w: 32, h: 26 });
+        statics.push({ type: 'LOGHOUSE', x: VIEW_W - 48, y: playTop + Math.floor(playHeight * 0.56), w: 32, h: 26 });
 
-        // Shore wildlife on the banks
         addWildlifeLane(dynamics, playTop + Math.floor(playHeight * 0.34), 'FOX', 1, speedScale, 1);
-        addWildlifeLane(dynamics, playTop + Math.floor(playHeight * 0.78), 'SNAKE', -1, speedScale, 1);
-      } else {
-        // Frame 1: Horizontal Assiniboine River running West-East across middle + Village Log Houses blocking
-        const riverY = Math.floor(playTop + playHeight * 0.36);
-        const laneH = 22;
-        const logLanes = [
-          { y: riverY, vx: -0.95 * speedScale, logW: 62, count: 2 },
-          { y: riverY + laneH, vx: 1.15 * speedScale, logW: 58, count: 2 }
+      } else if (fIdx === 1) {
+        // Connected Vertical Red River continuing from bottom edge of Zone 1 and meeting the West-East Forks!
+        const forksY = Math.floor(playTop + playHeight * 0.36);
+        const vHeight = VIEW_H - forksY;
+        const colW = 36;
+        let vLogs = [
+          { x: riverX + 2, y: forksY + 6, w: colW - 4, h: 44, vy: 0.85 * speedScale },
+          { x: riverX + colW + 2, y: forksY + 46, w: colW - 4, h: 42, vy: -0.95 * speedScale }
         ];
-        let hLogs = [];
-        for (let ll of logLanes) {
-          for (let c = 0; c < ll.count; c++) {
-            hLogs.push({
-              x: c * (VIEW_W / ll.count) + 18,
-              y: ll.y + 2,
-              w: ll.logW,
-              h: laneH - 4,
-              vx: ll.vx
-            });
-          }
-        }
+        waters.push({
+          name: 'RED RIVER FORKS',
+          orientation: 'V',
+          x: riverX,
+          y: forksY,
+          w: riverW,
+          h: vHeight,
+          mode: 'LOGS',
+          platforms: vLogs
+        });
+
+        // West-East river arm branching out across the full width at forksY so the river connects completely
+        const hLogs = createHLogs(forksY - 22, [
+          { vx: 1.0 * speedScale, logW: 62, count: 2 }
+        ]);
+        waters.push({
+          name: 'THE FORKS CHANNEL',
+          orientation: 'H',
+          x: 0,
+          y: forksY - 22,
+          w: VIEW_W,
+          h: 22,
+          mode: 'LOGS',
+          platforms: hLogs
+        });
+
+        statics.push({ type: 'LOGHOUSE', x: 24, y: forksY + 26, w: 32, h: 26 });
+        statics.push({ type: 'LOGHOUSE', x: VIEW_W - 58, y: forksY + 26, w: 32, h: 26 });
+        addWildlifeLane(dynamics, forksY - 42, 'DEER', -1, speedScale, 2);
+      } else if (fIdx === 2) {
+        // Horizontal Assiniboine River running full West-to-East across middle + Village Log Houses
+        const riverY = Math.floor(playTop + playHeight * 0.38);
+        const hLogs = createHLogs(riverY, [
+          { vx: -0.98 * speedScale, logW: 62, count: 2 },
+          { vx: 1.18 * speedScale, logW: 58, count: 2 }
+        ]);
         waters.push({
           name: 'ASSINIBOINE RIVER',
           orientation: 'H',
           x: 0,
           y: riverY,
           w: VIEW_W,
-          h: laneH * 2,
+          h: 44,
           mode: 'LOGS',
           platforms: hLogs
         });
 
-        // Village Log Houses blocking both South and North banks of the Assiniboine
-        statics.push({ type: 'LOGHOUSE', x: 24, y: riverY + laneH * 2 + 12, w: 32, h: 26 });
-        statics.push({ type: 'LOGHOUSE', x: VIEW_W - 64, y: riverY + laneH * 2 + 12, w: 32, h: 26 });
+        statics.push({ type: 'LOGHOUSE', x: 24, y: riverY + 52, w: 32, h: 26 });
+        statics.push({ type: 'LOGHOUSE', x: VIEW_W - 64, y: riverY + 52, w: 32, h: 26 });
         statics.push({ type: 'LOGHOUSE', x: 56, y: riverY - 32, w: 32, h: 26 });
         statics.push({ type: 'LOGHOUSE', x: VIEW_W - 92, y: riverY - 32, w: 32, h: 26 });
-
-        addWildlifeLane(dynamics, riverY + laneH * 2 + 42, 'DEER', 1, speedScale, 2);
+      } else {
+        // Zone 3: Upper Parish Settlement & Open Meadow before the Horizon Herd
+        statics.push({ type: 'LOGHOUSE', x: 22, y: playTop + 26, w: 32, h: 26 });
+        statics.push({ type: 'LOGHOUSE', x: VIEW_W - 56, y: playTop + 26, w: 32, h: 26 });
+        statics.push({ type: 'TALLGRASS', x: 88, y: playTop + 56, w: 30, h: 18 });
+        statics.push({ type: 'TALLGRASS', x: VIEW_W - 118, y: playTop + 56, w: 30, h: 18 });
+        addWildlifeLane(dynamics, playTop + 34, 'DEER', 1, speedScale, 2);
+        addWildlifeLane(dynamics, playTop + 76, 'FOX', -1, speedScale, 2);
       }
     }
 
     // ---------------------------------------------------------
-    // LEVEL 4: EASTERN WOODLANDS
-    // One flowing creek in each frame crossed via staggered stepping stones
+    // LEVEL 4: EASTERN WOODLANDS (4-Zone Woodland Slalom & Staggered Creeks)
+    // Zones 0 & 2: Thick Timber Slalom Corridors (winding pine & birch corridors)
+    // Zones 1 & 3: Flowing Woodland Creeks (full edge-to-edge) crossed via Staggered Stepping Stones
     // ---------------------------------------------------------
     else if (bType === 'forest') {
-      const creekY = Math.floor(playTop + playHeight * (fIdx === 0 ? 0.44 : 0.38));
-      const creekH = 38;
+      if (fIdx === 0 || fIdx === 2) {
+        // Winding Woodland Slalom Corridor: dense pine trees framing a curving S-shaped forest trail
+        const slalomBands = 3;
+        const bandH = playHeight / slalomBands;
+        for (let sb = 0; sb < slalomBands; sb++) {
+          let sy = Math.floor(playTop + sb * bandH + 4);
+          // Alternate opening left -> right -> center so the rider slaloms through the timber
+          let gapCenter = (sb === 0) ? 74 : (sb === 1 ? VIEW_W - 78 : Math.floor(VIEW_W / 2));
+          let gapHalf = 36;
 
-      // Staggered river-worn stepping stones forming a natural zigzag crossing across the creek
-      let stones = [];
-      const baseStoneX = (fIdx === 0) ? 74 : 112;
-      const stepOffsets = [0, 26, -12, 34, 14, 48];
-      for (let s = 0; s < stepOffsets.length; s++) {
-        let sx = baseStoneX + stepOffsets[s];
-        let sy = (s % 2 === 0) ? (creekY + 20) : (creekY + 3);
-        stones.push({
-          x: sx,
-          y: sy,
-          w: 24,
-          h: 16
+          for (let tx = 8; tx < VIEW_W - 32; tx += 36) {
+            if (Math.abs((tx + 15) - gapCenter) > gapHalf) {
+              statics.push({
+                type: 'TREE',
+                x: tx,
+                y: sy,
+                w: 30,
+                h: 30
+              });
+            }
+          }
+
+          let wy = sy + 32;
+          if (wy + 16 < playBottom) {
+            addWildlifeLane(dynamics, wy, (sb % 2 === 0 ? 'FOX' : 'SNAKE'), (sb % 2 === 0 ? 1 : -1), speedScale, 2);
+          }
+        }
+      } else {
+        // Zones 1 & 3: Flowing Woodland Creek (full West-to-East) crossed via Staggered Stepping Stones
+        const creekY = Math.floor(playTop + playHeight * (fIdx === 1 ? 0.44 : 0.38));
+        const creekH = 38;
+
+        let stones = [];
+        const baseStoneX = (fIdx === 1) ? 72 : 114;
+        const stepOffsets = [0, 26, -12, 34, 14, 48];
+        for (let s = 0; s < stepOffsets.length; s++) {
+          let sx = baseStoneX + stepOffsets[s];
+          let sy = (s % 2 === 0) ? (creekY + 20) : (creekY + 3);
+          stones.push({
+            x: sx,
+            y: sy,
+            w: 24,
+            h: 16
+          });
+        }
+
+        waters.push({
+          name: 'WOODLAND CREEK',
+          orientation: 'H',
+          x: 0,
+          y: creekY,
+          w: VIEW_W,
+          h: creekH,
+          mode: 'STONES',
+          platforms: stones
         });
-      }
 
-      waters.push({
-        name: 'WOODLAND CREEK',
-        orientation: 'H',
-        x: 0,
-        y: creekY,
-        w: VIEW_W,
-        h: creekH,
-        mode: 'STONES',
-        platforms: stones
-      });
+        // Woodland trees & boulders framing the creek banks
+        statics.push({ type: 'TREE', x: 14, y: creekY + creekH + 10, w: 30, h: 30 });
+        statics.push({ type: 'ROCK', x: VIEW_W - 46, y: creekY + creekH + 14, w: 30, h: 18 });
+        statics.push({ type: 'TREE', x: VIEW_W - 48, y: creekY - 34, w: 30, h: 30 });
 
-      // Woodland boulders, ledges & tallgrass framing the creek approaches
-      statics.push({ type: 'LEDGE', x: 0, y: creekY + creekH + 14, w: 68, h: 20, fromLeft: true });
-      statics.push({ type: 'ROCK', x: VIEW_W - 44, y: creekY + creekH + 14, w: 30, h: 18 });
-      statics.push({ type: 'TALLGRASS', x: 24, y: creekY - 24, w: 30, h: 18 });
-      statics.push({ type: 'ROCK', x: VIEW_W - 76, y: creekY - 24, w: 30, h: 18 });
-
-      // Woodland wildlife (Moose & Snakes) patrolling south and north of the creek
-      addWildlifeLane(dynamics, creekY + creekH + 38, 'MOOSE', (fIdx === 0 ? 1 : -1), speedScale, 1);
-      if (creekY - 46 > playTop) {
-        addWildlifeLane(dynamics, creekY - 44, 'SNAKE', (fIdx === 0 ? -1 : 1), speedScale, 2);
+        addWildlifeLane(dynamics, creekY + creekH + 44, 'MOOSE', (fIdx === 1 ? 1 : -1), speedScale, 1);
       }
     }
 
-    // Top Horizon Buffalo Herd on Frame 1 (End Platform Target)
+    // Top Horizon Buffalo Herd on Final Zone (Frame 3)
     let herd = [];
-    if (fIdx === 1) {
+    if (fIdx === TOTAL_ZONES - 1) {
       for (let h = 0; h < 6; h++) {
         herd.push({
           x: 24 + h * 46 + (h % 2) * 8,
@@ -1004,10 +1210,31 @@
   function initLevel() {
     subFrame = 0;
     slideProgress = 0;
-    levelFrames[0] = buildFrameData(0);
-    levelFrames[1] = buildFrameData(1);
-    player = { x: Math.floor(VIEW_W / 2) - 16, y: VIEW_H - 42, dead: false, w: 32, h: 36, dir: 'UP' };
+    for (let i = 0; i < TOTAL_ZONES; i++) {
+      levelFrames[i] = buildFrameData(i);
+    }
+    player = { x: Math.floor(VIEW_W / 2) - 16, y: VIEW_H - 42, dead: false, w: 32, h: 36, dir: 'UP', moveTimer: 0 };
     state = 'PLAYING';
+  }
+
+  function respawnCurrentZone() {
+    // Place next hunting party member cleanly at the safe entry of the current zone
+    subFrame = 0;
+    slideProgress = 0;
+    player = { x: Math.floor(VIEW_W / 2) - 16, y: VIEW_H - 42, dead: false, w: 32, h: 36, dir: 'UP', moveTimer: 0 };
+    state = 'PLAYING';
+    resumeChiptuneTrack();
+  }
+
+  function handlePlayerCrash() {
+    lives--;
+    pauseChiptuneTrack();
+    if (lives <= 0) {
+      state = 'GAMEOVER';
+    } else {
+      state = 'LIFE_LOST';
+      lifeLostTimer = 95;
+    }
   }
 
   // ==========================================
@@ -1016,25 +1243,22 @@
   function move(dx, dy) {
     if (state !== 'PLAYING') return;
 
-    // Update 4-directional facing orientation immediately on input
+    // Update 4-directional facing orientation & trigger gallop animation timer
     if (dy < 0) player.dir = 'UP';
     else if (dy > 0) player.dir = 'DOWN';
     else if (dx < 0) player.dir = 'LEFT';
     else if (dx > 0) player.dir = 'RIGHT';
+    player.moveTimer = 14; // Keeps horse galloping smoothly during movement, switches to standing pose when idle
 
     const stepX = 18;
     const stepY = 18;
     let nx = player.x + dx * stepX;
     let ny = player.y + dy * stepY;
 
-    // Keep within horizontal screen edges
     nx = Math.max(4, Math.min(VIEW_W - player.w - 4, nx));
-
-    // Prevent walking off bottom edge
     if (ny > VIEW_H - player.h - 2) ny = VIEW_H - player.h - 2;
 
-    // Check Static Blocking Objects (Rocks, Tall Grass, Ledges, Tipis, Log Houses)
-    // Neither user nor NPC can pass through rocky ledges or buildings
+    // Check Static Blocking Objects (Rocks, Tall Grass, Ledges, Trees, Tipis, Log Houses)
     const activeData = levelFrames[subFrame];
     const pLeft = nx + 6;
     const pRight = nx + player.w - 6;
@@ -1046,30 +1270,38 @@
           pRight > st.x + 2 &&
           pTop < st.y + st.h - 2 &&
           pBottom > st.y + 2) {
-        return; // Blocked by solid static barrier
+        return; // Blocked by solid static obstacle
       }
     }
 
     player.x = nx;
     player.y = ny;
 
-    // Check Top Transition / Goal Platform
-    if (subFrame === 0 && player.y <= HUD_HEIGHT + 6) {
+    // Check Top Transition across all 4 Zones -> Goal Platform at Top of Zone 4 (subFrame === 3)
+    if (subFrame < TOTAL_ZONES - 1 && player.y <= HUD_HEIGHT + 6) {
       state = 'FRAME_SLIDE';
       slideProgress = 0;
-    } else if (subFrame === 1 && player.y <= HUD_HEIGHT + 44) {
+    } else if (subFrame === TOTAL_ZONES - 1 && player.y <= HUD_HEIGHT + 44) {
       state = 'LEVEL_END_CUTSCENE';
       cutsceneTimer = 0;
     }
   }
 
   // ==========================================
-  // MAIN UPDATE LOOP (LOGS, STONES, WILDLIFE & BLOCKING)
+  // MAIN UPDATE LOOP (LOGS, STONES, WILDLIFE & LIVES)
   // ==========================================
   function update() {
     frame++;
 
     if (state === 'TITLE' || state === 'GAMEOVER') {
+      return;
+    }
+
+    if (state === 'LIFE_LOST') {
+      lifeLostTimer--;
+      if (lifeLostTimer <= 0) {
+        respawnCurrentZone();
+      }
       return;
     }
 
@@ -1079,13 +1311,14 @@
     }
 
     if (state === 'FRAME_SLIDE') {
-      const slideSteps = 32;
+      const slideSteps = 30;
       slideProgress++;
       const totalShift = VIEW_H - HUD_HEIGHT - 44;
       player.y = (HUD_HEIGHT + 6) + (slideProgress / slideSteps) * totalShift;
+      player.moveTimer = 4;
 
       if (slideProgress >= slideSteps) {
-        subFrame = 1;
+        subFrame++;
         player.y = VIEW_H - player.h - 6;
         state = 'PLAYING';
       }
@@ -1093,6 +1326,10 @@
     }
 
     if (state === 'PLAYING') {
+      if (player.moveTimer > 0) {
+        player.moveTimer--;
+      }
+
       const activeData = levelFrames[subFrame];
 
       // 1. Update River Logs & Check Water/Log/Stepping-Stone Support
@@ -1100,7 +1337,6 @@
       let pFootY = player.y + player.h - 8;
 
       for (let wZone of activeData.waters) {
-        // Scroll floating logs
         if (wZone.mode === 'LOGS') {
           for (let log of wZone.platforms) {
             if (log.vx) {
@@ -1116,7 +1352,6 @@
           }
         }
 
-        // Check if player's hooves are inside the river/creek water bounds
         if (pCenterX >= wZone.x && pCenterX <= wZone.x + wZone.w &&
             pFootY >= wZone.y && pFootY <= wZone.y + wZone.h) {
           
@@ -1130,12 +1365,9 @@
           }
 
           if (!supportedBy) {
-            // Fell into deep river/creek water off the logs or stepping stones!
-            state = 'GAMEOVER';
-            stopChiptuneTrack();
+            handlePlayerCrash();
             return;
           } else if (wZone.mode === 'LOGS') {
-            // Carry player smoothly with the floating log
             if (supportedBy.vx) player.x += supportedBy.vx;
             if (supportedBy.vy) player.y += supportedBy.vy;
             player.x = Math.max(2, Math.min(VIEW_W - player.w - 2, player.x));
@@ -1155,9 +1387,9 @@
         if (dyn.vx > 0 && dyn.x > VIEW_W + 10) dyn.x = -dyn.w - 6;
         if (dyn.vx < 0 && dyn.x < -dyn.w - 10) dyn.x = VIEW_W + 6;
 
-        // NPCs also respect solid rocky ledges (bounce back if they hit a ledge)
+        // Wildlife respects solid rocky ledges & timber trees
         for (let st of activeData.statics) {
-          if (st.type === 'LEDGE') {
+          if (st.type === 'LEDGE' || st.type === 'TREE') {
             if (dyn.x < st.x + st.w && dyn.x + dyn.w > st.x &&
                 dyn.y < st.y + st.h && dyn.y + dyn.h > st.y) {
               dyn.vx *= -1;
@@ -1166,13 +1398,11 @@
           }
         }
 
-        // Collision check with player
         if (pLeft < dyn.x + dyn.w - 3 &&
             pRight > dyn.x + 3 &&
             pTop < dyn.y + dyn.h - 2 &&
             pBottom > dyn.y + 2) {
-          state = 'GAMEOVER';
-          stopChiptuneTrack();
+          handlePlayerCrash();
           return;
         }
       }
@@ -1285,7 +1515,8 @@
     drawSprite(chaseBaseX + 10 * chaseScale, chaseY + (5 * chaseScale) - bob + drawYOffset, sprBuffaloSide, PAL_BUFFALO_SIDE, chaseScale);
     drawSprite(chaseBaseX + 20 * chaseScale, chaseY + (9 * chaseScale) + bob + drawYOffset, sprBuffaloSide, PAL_BUFFALO_SIDE, chaseScale);
 
-    drawSprite(chaseBaseX - 22 * chaseScale, chaseY + (3 * chaseScale) - bob + drawYOffset, sprHunterSide, PAL_HUNTER_SIDE, chaseScale);
+    // Draw the active Hunting Party member's horse & rider in the sunset chase!
+    drawSprite(chaseBaseX - 22 * chaseScale, chaseY + (3 * chaseScale) - bob + drawYOffset, sprHunterSide, getActiveRiderPalette(), chaseScale);
   }
 
   function drawTitleScreen() {
@@ -1331,11 +1562,11 @@
     ctx.font = "bold 11px 'Courier New', Courier, monospace";
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText("THE BUFFALO RUN", bx + 10, by + 8);
+    ctx.fillText("THE 3-RIDER HUNTING PARTY", bx + 10, by + 8);
 
     ctx.fillStyle = '#F4F4F4';
     ctx.font = "10px 'Courier New', Courier, monospace";
-    const story = "LEAVE THE GLACIAL RED RIVER CART CAMP AND RIDE DOWN THE FOOTHILLS! CROSS RIVERS ON LOGS AND STONES, DODGE WILDLIFE, AND REACH THE HERD.";
+    const story = "THREE MÉTIS RUNNERS RIDE OUT FROM THE CART CAMP! CROSS 4 ZONES PER REGION, HOP RIVER LOGS & STONES, AND DRIVE THE HERD INTO THE SUNSET.";
     const lines = wrapText(story, boxW - 20);
     for (let i = 0; i < lines.length; i++) {
       ctx.fillText(lines[i], bx + 10, by + 24 + (i * 13));
@@ -1372,7 +1603,7 @@
 
     ctx.fillStyle = '#F4F4F4';
     ctx.font = "10px 'Courier New', Courier, monospace";
-    const msg = `YOU REACHED THE HERD AND CHASED THEM INTO THE SUNSET! NEXT REGION: ${nextBiome.name}.`;
+    const msg = `${getActiveRiderName().split(' ')[0]} CHASED THE HERD INTO THE SUNSET! NEXT REGION: ${nextBiome.name}.`;
     const lines = wrapText(msg, boxW - 20);
     for (let i = 0; i < lines.length; i++) {
       ctx.fillText(lines[i], bx + 10, by + 24 + (i * 13));
@@ -1387,7 +1618,77 @@
   }
 
   // ==========================================
-  // RENDER SINGLE FRAME (WITH DOWNHILL GRADIENT, GLACIAL SNOW, RIVERS & LOGS)
+  // 16-BIT SNES SHADED LOG RENDERER (WOOD GRAIN, BARK RINGS & END CUTS)
+  // ==========================================
+  function drawShadedLog(px, py, pw, ph, orientation) {
+    // Crisp dark outline
+    ctx.fillStyle = '#170d06';
+    ctx.fillRect(px, py, pw, ph);
+
+    if (orientation === 'H') {
+      // Mid-tone bark body
+      ctx.fillStyle = '#6e4220';
+      ctx.fillRect(px + 1, py + 1, pw - 2, ph - 2);
+
+      // Upper sunlight highlight ridge
+      ctx.fillStyle = '#9e6536';
+      ctx.fillRect(px + 2, py + 2, pw - 4, 3);
+      ctx.fillStyle = '#bd7f48';
+      ctx.fillRect(px + 3, py + 2, pw - 6, 1);
+
+      // Lower water-line shadow band
+      ctx.fillStyle = '#472811';
+      ctx.fillRect(px + 2, py + ph - 4, pw - 4, 3);
+
+      // Bark grain ridges & knots along length
+      ctx.fillStyle = '#3b200c';
+      for (let gx = px + 8; gx < px + pw - 10; gx += 12) {
+        ctx.fillRect(gx, py + 6, 7, 1);
+        ctx.fillRect(gx + 3, py + 10, 6, 1);
+      }
+
+      // Left & Right Fresh-Cut Heartwood End Caps
+      ctx.fillStyle = '#d4a66a';
+      ctx.fillRect(px + 1, py + 3, 3, ph - 6);
+      ctx.fillRect(px + pw - 4, py + 3, 3, ph - 6);
+      ctx.fillStyle = '#8f5932';
+      ctx.fillRect(px + 2, py + Math.floor(ph / 2) - 1, 1, 2);
+      ctx.fillRect(px + pw - 3, py + Math.floor(ph / 2) - 1, 1, 2);
+    } else {
+      // Vertical River Log (North-South flow)
+      ctx.fillStyle = '#6e4220';
+      ctx.fillRect(px + 1, py + 1, pw - 2, ph - 2);
+
+      // Left sunlit bark ridge
+      ctx.fillStyle = '#9e6536';
+      ctx.fillRect(px + 2, py + 2, 4, ph - 4);
+      ctx.fillStyle = '#bd7f48';
+      ctx.fillRect(px + 2, py + 3, 2, ph - 6);
+
+      // Right shadow bark ridge
+      ctx.fillStyle = '#472811';
+      ctx.fillRect(px + pw - 5, py + 2, 4, ph - 4);
+
+      // Vertical bark grain grooves
+      ctx.fillStyle = '#3b200c';
+      for (let gy = py + 8; gy < py + ph - 10; gy += 11) {
+        ctx.fillRect(px + 8, gy, 1, 6);
+        ctx.fillRect(px + 14, gy + 3, 1, 6);
+        ctx.fillRect(px + 20, gy + 1, 1, 5);
+      }
+
+      // Top & Bottom Cut Heartwood End Caps
+      ctx.fillStyle = '#d4a66a';
+      ctx.fillRect(px + 4, py + 1, pw - 8, 3);
+      ctx.fillRect(px + 4, py + ph - 4, pw - 8, 3);
+      ctx.fillStyle = '#8f5932';
+      ctx.fillRect(px + Math.floor(pw / 2) - 1, py + 2, 2, 1);
+      ctx.fillRect(px + Math.floor(pw / 2) - 1, py + ph - 3, 2, 1);
+    }
+  }
+
+  // ==========================================
+  // RENDER SINGLE ZONE BOARD (0..3)
   // ==========================================
   function renderBoardFrame(fIdx, offsetY) {
     const bIdx = (level - 1) % BIOMES.length;
@@ -1401,18 +1702,17 @@
     ctx.fillStyle = b.bg;
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
 
-    // Level 1: Downhill Sloped Step Gradient across Frame 0 & Frame 1 (High glacial ridge -> lower foothill valley)
+    // Level 1: Continuous 4-Zone Downhill Sloped Step Gradient (High glacial ridge in Zone 0 -> lower valley in Zone 3)
     if (b.type === 'mountain') {
       const steps = 6;
       const stepH = Math.ceil(VIEW_H / steps);
+      const baseElevation = (3 - fIdx) * 0.04; // Decreases cleanly from Zone 0 down to Zone 3
       for (let s = 0; s < steps; s++) {
-        // Subtle 16-bit stepped elevation shading moving downhill from South (camp) to North (herd)
-        let shadeAlpha = (fIdx === 0) ? (0.16 - s * 0.025) : (0.04 - s * 0.008);
+        let shadeAlpha = baseElevation + (0.04 * (1 - s / steps));
         if (shadeAlpha > 0) {
           ctx.fillStyle = `rgba(220, 238, 250, ${shadeAlpha.toFixed(3)})`;
           ctx.fillRect(0, VIEW_H - (s + 1) * stepH, VIEW_W, stepH);
         }
-        // Horizontal contour step line accentuating downhill slope
         ctx.fillStyle = 'rgba(30, 38, 44, 0.22)';
         ctx.fillRect(0, s * stepH, VIEW_W, 2);
       }
@@ -1437,16 +1737,14 @@
       }
     }
 
-    // 3. Starting Platform (Frame 0 Bottom): Métis Red River Cart Circle Camp (with Glacial Snow on Level 1)
+    // 3. Starting Platform (Zone 0 Bottom): Métis Red River Cart Circle Camp (with Glacial Snow on Level 1)
     if (fIdx === 0) {
       const campY = VIEW_H - 46;
       if (b.type === 'mountain') {
-        // Glacial snowdrifts & frosted ground around the mountain camp
         ctx.fillStyle = '#c8dce6';
         ctx.fillRect(0, campY, VIEW_W, 46);
         ctx.fillStyle = '#eef7fc';
         ctx.fillRect(0, campY + 8, VIEW_W, 38);
-        // Pixelated snowdrift scallops along upper camp edge
         for (let sx = 0; sx < VIEW_W; sx += 16) {
           ctx.fillRect(sx + 2, campY - 3, 12, 4);
         }
@@ -1457,15 +1755,14 @@
         ctx.fillRect(0, campY, VIEW_W, 2);
       }
 
-      // Circle of Red River Carts flanking the hunter's starting camp
       drawSprite(12, campY + 6, sprRedRiverCart, PAL_CART, 2);
       drawSprite(48, campY + 18, sprRedRiverCart, PAL_CART, 2);
       drawSprite(VIEW_W - 76, campY + 18, sprRedRiverCart, PAL_CART, 2, true);
       drawSprite(VIEW_W - 40, campY + 6, sprRedRiverCart, PAL_CART, 2, true);
     }
 
-    // 4. End Platform (Frame 1 Top): Horizon Sunset Strip & Thundering Buffalo Herd
-    if (fIdx === 1) {
+    // 4. End Platform (Zone 3 Top): Horizon Sunset Strip & Thundering Buffalo Herd
+    if (fIdx === TOTAL_ZONES - 1) {
       const goalY = HUD_HEIGHT;
       ctx.fillStyle = b.skyBands[3];
       ctx.fillRect(0, goalY, VIEW_W, 8);
@@ -1482,9 +1779,8 @@
       }
     }
 
-    // 5. Rivers, Creeks, Floating Frogger Logs & Staggered Stepping Stones
+    // 5. Rivers, Creeks, Pixel-Shaded Frogger Logs & Staggered Stepping Stones
     for (let wZone of fData.waters) {
-      // Muddy/rocky riverbank border
       ctx.fillStyle = '#4a3825';
       if (wZone.orientation === 'H') {
         ctx.fillRect(wZone.x, wZone.y - 3, wZone.w, wZone.h + 6);
@@ -1492,11 +1788,9 @@
         ctx.fillRect(wZone.x - 3, wZone.y, wZone.w + 6, wZone.h);
       }
 
-      // Deep Flowing River Water (#0F6F9E)
       ctx.fillStyle = '#0F6F9E';
       ctx.fillRect(wZone.x, wZone.y, wZone.w, wZone.h);
 
-      // Animated Current Ripples
       ctx.fillStyle = '#38a3b8';
       const shift = Math.floor(frame * 0.8) % 24;
       if (wZone.orientation === 'H') {
@@ -1511,33 +1805,12 @@
         }
       }
 
-      // Draw Floating Logs or Staggered Stepping Stones
       for (let plat of wZone.platforms) {
         const px = Math.floor(plat.x);
         const py = Math.floor(plat.y);
         if (wZone.mode === 'LOGS') {
-          // 16-bit Shaded Floating Timber Log
-          ctx.fillStyle = '#1c1108';
-          ctx.fillRect(px, py, plat.w, plat.h);
-          ctx.fillStyle = '#6e4423';
-          ctx.fillRect(px + 1, py + 1, plat.w - 2, plat.h - 2);
-          ctx.fillStyle = '#996336';
-          if (wZone.orientation === 'H') {
-            ctx.fillRect(px + 2, py + 2, plat.w - 4, 4);
-            // Bark grain notches
-            ctx.fillStyle = '#472a14';
-            for (let gx = px + 8; gx < px + plat.w - 8; gx += 14) {
-              ctx.fillRect(gx, py + 7, 6, 2);
-            }
-          } else {
-            ctx.fillRect(px + 2, py + 2, 5, plat.h - 4);
-            ctx.fillStyle = '#472a14';
-            for (let gy = py + 8; gy < py + plat.h - 8; gy += 14) {
-              ctx.fillRect(px + 10, gy, 2, 6);
-            }
-          }
+          drawShadedLog(px, py, plat.w, plat.h, wZone.orientation);
         } else {
-          // Natural River-Worn Stepping Stone with Whitewater Foam Ring
           ctx.fillStyle = '#d4f6fc';
           ctx.fillRect(px - 2, py + plat.h - 2, plat.w + 4, 3);
           ctx.fillStyle = '#1c2024';
@@ -1550,7 +1823,7 @@
       }
     }
 
-    // 6. Static Blocking Objects (Rocks, Tall Grass, Ledges, Tipi Village, Log Houses)
+    // 6. Static Blocking Objects (Rocks, Tall Grass, Ledges, Trees, Tipis, Log Houses)
     for (let st of fData.statics) {
       if (st.type === 'LEDGE') {
         ctx.fillStyle = '#2c3338';
@@ -1574,6 +1847,10 @@
         ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
         ctx.fillRect(st.x + 2, st.y + st.h - 2, st.w - 4, 3);
         drawSprite(st.x, st.y, sprTallGrass, PAL_TALLGRASS, 3);
+      } else if (st.type === 'TREE') {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+        ctx.fillRect(st.x + 3, st.y + st.h - 2, st.w - 6, 4);
+        drawSprite(st.x, st.y, sprTree, PAL_TREE, 3);
       } else if (st.type === 'TIPI') {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
         ctx.fillRect(st.x + 2, st.y + st.h - 2, st.w - 4, 4);
@@ -1609,32 +1886,35 @@
     const b = BIOMES[bIdx];
 
     if (state === 'FRAME_SLIDE') {
-      const slideSteps = 32;
+      const slideSteps = 30;
       const progress = slideProgress / slideSteps;
       const slideH = VIEW_H - HUD_HEIGHT;
-      const offset0 = Math.floor(progress * slideH);
-      const offset1 = offset0 - slideH;
+      const offsetCurr = Math.floor(progress * slideH);
+      const offsetNext = offsetCurr - slideH;
 
-      renderBoardFrame(0, offset0);
-      renderBoardFrame(1, offset1);
+      renderBoardFrame(subFrame, offsetCurr);
+      renderBoardFrame(subFrame + 1, offsetNext);
     } else {
       renderBoardFrame(subFrame, 0);
     }
 
-    // Draw Sculpted 4-Directional Mounted Hunter & Horse
-    if (state !== 'GAMEOVER' || frame % 10 < 5) { 
+    // Draw Sculpted 4-Directional Mounted Hunter & Horse (Galloping when moving, Standing idle when stationary!)
+    if (state !== 'GAMEOVER' && (state !== 'LIFE_LOST' || frame % 6 < 3)) { 
       ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
       ctx.fillRect(Math.floor(player.x + 5), Math.floor(player.y + player.h - 4), player.w - 10, 5);
 
-      let animIdx = Math.floor(frame / 7) % 2;
+      const isMoving = player.moveTimer > 0;
+      const poseIdx = isMoving ? (Math.floor(frame / 6) % 2) : 2; // Index 2 = Standing Idle frame in all 4 directions!
+      const activePal = getActiveRiderPalette();
+
       if (player.dir === 'UP') {
-        drawSprite(player.x, player.y, sprPlayerUp[animIdx], PAL_PLAYER, 2, false);
+        drawSprite(player.x, player.y, sprPlayerUp[poseIdx], activePal, 2, false);
       } else if (player.dir === 'DOWN') {
-        drawSprite(player.x, player.y, sprPlayerDown[animIdx], PAL_PLAYER, 2, false);
+        drawSprite(player.x, player.y, sprPlayerDown[poseIdx], activePal, 2, false);
       } else if (player.dir === 'RIGHT') {
-        drawSprite(player.x - 2, player.y + 2, sprPlayerSideAnim[animIdx], PAL_PLAYER, 2, false);
+        drawSprite(player.x - 2, player.y + 2, sprPlayerSideAnim[poseIdx], activePal, 2, false);
       } else if (player.dir === 'LEFT') {
-        drawSprite(player.x - 2, player.y + 2, sprPlayerSideAnim[animIdx], PAL_PLAYER, 2, true);
+        drawSprite(player.x - 2, player.y + 2, sprPlayerSideAnim[poseIdx], activePal, 2, true);
       }
     }
 
@@ -1645,34 +1925,54 @@
     ctx.fillRect(0, HUD_HEIGHT - 2, VIEW_W, 2);
 
     ctx.fillStyle = '#F7C844';
-    ctx.font = "bold 11px 'Courier New', Courier, monospace";
+    ctx.font = "bold 10px 'Courier New', Courier, monospace";
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
     ctx.fillText(b.name, 6, HUD_HEIGHT / 2);
 
     ctx.fillStyle = '#12AEA2';
     ctx.textAlign = 'right';
-    ctx.fillText(`STAGE:${level}  ZONE:${subFrame + 1}/2`, VIEW_W - 6, HUD_HEIGHT / 2);
+    ctx.fillText(`RIDERS:${lives}  STG:${level}  ZN:${subFrame + 1}/${TOTAL_ZONES}`, VIEW_W - 6, HUD_HEIGHT / 2);
+
+    // Next Hunting Party Member Banner on Life Lost
+    if (state === 'LIFE_LOST') {
+      const boxW = 246;
+      const boxH = 58;
+      const bx = Math.floor((VIEW_W - boxW) / 2);
+      const by = Math.floor((VIEW_H - boxH) / 2);
+
+      drawSNESWindow(bx, by, boxW, boxH);
+
+      ctx.fillStyle = '#FB6604';
+      ctx.font = "bold 13px 'Courier New', Courier, monospace";
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText("RIDER DOWN!", VIEW_W / 2, by + 10);
+
+      ctx.fillStyle = '#F7C844';
+      ctx.font = "bold 10px 'Courier New', Courier, monospace";
+      ctx.fillText(`NEXT UP: ${getActiveRiderName()}`, VIEW_W / 2, by + 32);
+    }
 
     // Game Over Box
     if (state === 'GAMEOVER') {
-      const boxW = 220;
-      const boxH = 74;
+      const boxW = 230;
+      const boxH = 78;
       const bx = Math.floor((VIEW_W - boxW) / 2);
       const by = Math.floor((VIEW_H - boxH) / 2);
 
       drawSNESWindow(bx, by, boxW, boxH);
 
       ctx.fillStyle = '#AD1C21';
-      ctx.font = "bold 18px 'Courier New', Courier, monospace";
+      ctx.font = "bold 17px 'Courier New', Courier, monospace";
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
-      ctx.fillText("TRAIL ENDED!", VIEW_W / 2, by + 12);
+      ctx.fillText("HUNTING PARTY HALTED", VIEW_W / 2, by + 12);
 
       if (Math.floor(Date.now() / 480) % 2 === 0) {
         ctx.fillStyle = '#12AEA2';
         ctx.font = "bold 11px 'Courier New', Courier, monospace";
-        ctx.fillText("PRESS 'A' TO RESTART", VIEW_W / 2, by + 44);
+        ctx.fillText("PRESS 'A' TO RIDE AGAIN", VIEW_W / 2, by + 46);
       }
     }
   }
@@ -1739,12 +2039,14 @@
         startChiptuneTrack();
       } else if (state === 'INTRO_CUTSCENE') {
         level = 1;
+        lives = 3;
         initLevel();
       } else if (state === 'LEVEL_END_CUTSCENE') {
         level++;
         initLevel();
       } else if (state === 'GAMEOVER') {
         level = 1;
+        lives = 3;
         stopChiptuneTrack();
         initLevel();
         startChiptuneTrack();
@@ -1755,6 +2057,7 @@
       btnBLast = now;
       if (state === 'INTRO_CUTSCENE') {
         level = 1;
+        lives = 3;
         initLevel();
       } else if (state === 'LEVEL_END_CUTSCENE') {
         level++;
