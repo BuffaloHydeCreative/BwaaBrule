@@ -134,9 +134,11 @@
         FG_ROCK_BASE: '#2c2921', FG_ROCK_LIGHT: '#4a422e',
         BIRCH_BARK: '#EAECEE', BIRCH_MARKS: '#17202A',
         LEAF_1: '#E67E22', LEAF_2: '#D35400', LEAF_3: '#BA4A00',
-        FOREST_FLOOR: '#4a3520', FOREST_DEEP: '#24180d',
-        PINE_DARK: '#0E2A1E', PINE_MID: '#1E4634', PINE_LIGHT: '#3D5948',
-        SNOW_WHITE: '#EAECEE', SNOW_SHADE: '#BFC9CA',
+        FOREST_FLOOR: '#1b1624', FOREST_DEEP: '#0e0b14',
+        PINE_DARK: '#081814', PINE_MID: '#102B24', PINE_LIGHT: '#1E463B',
+        BUSH_DARK: '#12221c', BUSH_MID: '#1e382e', BUSH_LEAF: '#4a2c16',
+        SNOW_WHITE: '#D5D8DC', SNOW_SHADE: '#85929E',
+        MOON_LIGHT: '#F4F6F7', MOON_CRATER: '#AEB6BF',
         GUN_BARREL: '#2a2a2a', GUN_IRON: '#525252', GUN_WOOD: '#4a2c16',
         BLACK: '#000000', WHITE: '#FFFFFF', SUN: '#F7C844',
         CRIMSON: '#AD1C21', BORDEAUX: '#540E11', TEAL: '#12AEA2'
@@ -149,14 +151,14 @@
             title: 'AEN PCHI LAAK',
             subtitle: 'FALL MARSH WATERFOWL',
             desc: 'Hunt Mallards, Canada Geese & Woodducks on the autumn pond edge.',
-            targets: 'MALLARD (100)  •  GOOSE (50)  •  WOODDUCK (200)'
+            targets: 'MALLARD (100) • GOOSE (50) • WOODDUCK (200)'
         },
         {
             id: 'WOODS',
             title: 'LI BWAA',
-            subtitle: 'AUTUMN WOODLAND & FOREST',
-            desc: 'Track quick Snowshoe Hares, bouncy Prairie Chickens & elusive Red Foxes.',
-            targets: 'HARE (100)  •  PRAIRIE CHICKEN (50)  •  RED FOX (200)'
+            subtitle: 'NOCTURNAL WOODLAND & FOREST',
+            desc: 'Track Snowshoe Hares, Spruce Grouse, Red Foxes & Tree Porcupines.',
+            targets: 'HARE (100) • GROUSE (50) • FOX (200) • PORCUPINE (300)'
         }
     ];
     let selectedLevelIdx = 0;
@@ -166,7 +168,9 @@
     let grassBlades = [];
     let horizonShrubs = [];
     let forestTrees = [];
-    let snowPatches = [];
+    let forestBlinds = []; // 4 multi-depth cover blinds (Bushes, Spruce Pine, Birch)
+    let nightPatches = [];
+    let nightStars = [];
 
     function rebuildEnvironment() {
         grassBlades = [];
@@ -189,24 +193,72 @@
             });
         }
 
-        // Woodland trees for Li Bwaa
+        // Background treeline for Li Bwaa
         forestTrees = [];
-        for (let i = 0; i < VIEW_W + 24; i += 22) {
+        for (let i = 0; i < VIEW_W + 24; i += 20) {
             forestTrees.push({
                 x: i,
-                h: (42 + ((i * 17) % 28)) * hScale,
-                isBirch: (i % 44 === 0)
+                h: (44 + ((i * 17) % 30)) * hScale,
+                isBirch: (i % 40 === 0)
             });
         }
 
-        // Early frost / snow patches on forest floor
-        snowPatches = [];
-        for (let i = 0; i < 18; i++) {
-            snowPatches.push({
+        // 4 Layered Cover Blinds across the Woodland Run
+        // depth: 1 = mid-back (blocks row 3), 2 = mid-front (blocks rows 3-4), 3 = foreground blind (blocks rows 3-5)
+        const horizonY = Math.floor(VIEW_H * 0.5);
+        forestBlinds = [
+            {
+                type: 'SPRUCE',
+                depth: 2,
+                x: Math.floor(VIEW_W * 0.16),
+                w: Math.max(26, Math.round(VIEW_W * 0.13)),
+                topY: Math.floor(VIEW_H * 0.24),
+                bottomY: Math.floor(VIEW_H * 0.80)
+            },
+            {
+                type: 'BUSH',
+                depth: 1,
+                x: Math.floor(VIEW_W * 0.38),
+                w: Math.max(30, Math.round(VIEW_W * 0.14)),
+                topY: Math.floor(VIEW_H * 0.52),
+                bottomY: Math.floor(VIEW_H * 0.70)
+            },
+            {
+                type: 'BIRCH',
+                depth: 3,
+                x: Math.floor(VIEW_W * 0.60),
+                w: Math.max(28, Math.round(VIEW_W * 0.14)),
+                topY: Math.floor(VIEW_H * 0.16),
+                bottomY: Math.floor(VIEW_H * 0.94)
+            },
+            {
+                type: 'BUSH',
+                depth: 2,
+                x: Math.floor(VIEW_W * 0.81),
+                w: Math.max(28, Math.round(VIEW_W * 0.14)),
+                topY: Math.floor(VIEW_H * 0.56),
+                bottomY: Math.floor(VIEW_H * 0.84)
+            }
+        ];
+
+        // Nocturnal forest floor moss & frost patches
+        nightPatches = [];
+        for (let i = 0; i < 16; i++) {
+            nightPatches.push({
                 x: ((i * 53) % Math.max(40, VIEW_W - 20)),
                 yRatio: 0.54 + ((i * 19) % 38) / 100,
-                w: 14 + (i % 4) * 6,
+                w: 14 + (i % 4) * 5,
                 h: 3 + (i % 2) * 2
+            });
+        }
+
+        // Faint twilight stars
+        nightStars = [];
+        for (let i = 0; i < 22; i++) {
+            nightStars.push({
+                x: (i * 37 + 11) % VIEW_W,
+                y: (i * 23 + 7) % Math.max(20, horizonY - 12),
+                twinkle: i % 3
             });
         }
     }
@@ -237,15 +289,22 @@
     let chiptuneIsPlaying = false;
     let currentChiptuneStep = 0;
 
-    const BPM = 110;
-    const noteLength = 60 / BPM / 4;
+    const BPM = 116;
+    const noteLength = 60 / BPM / 4; // 16th-note clock resolution
 
     const NOTES = {
-        'C2': 65.41,  'D2': 73.42,  'E2': 82.41,  'F2': 87.31,
-        'F#2': 92.50, 'G2': 98.00,  'C3': 130.81,
-        'C5': 523.25, 'D5': 587.33, 'E5': 659.25, 'G5': 783.99
+        // Deep Pow Wow Drum & Sub-Bass
+        'E1': 41.20,  'A1': 55.00,  'C2': 65.41,  'D2': 73.42,
+        'E2': 82.41,  'F2': 87.31,  'F#2': 92.50, 'G2': 98.00,
+        'A2': 110.00, 'B2': 123.47, 'C3': 130.81,
+        // Male Lead Register (Lower-Mid Baritone/Tenor Vocals)
+        'A3': 220.00, 'C4': 261.63, 'D4': 293.66, 'E4': 329.63,
+        // Female Chorus Harmony & Marsh Lead Register
+        'C5': 523.25, 'D5': 587.33, 'E5': 659.25, 'G5': 783.99,
+        'A5': 880.00, 'B5': 987.77
     };
 
+    // Track A: Pond Level ("Marsh Creep Alouette")
     const alouetteLead = [
         'C5', null, 'D5', null, 'E5', null, 'C5', null,
         'D5', null, 'C5', null, 'D5', 'E5', 'C5', null,
@@ -259,6 +318,56 @@
         'F#2', null, 'G2', null, 'C2', null, 'C2', null,
         'G2', null, 'F2', null, 'E2', 'D2', 'C2', null
     ];
+
+    // Track B: Woodland Level ("Northern Woodland Pow Wow" — 64-Step Verse + Chorus)
+    // Classic Pow Wow Drum: Steady heartbeat pulse with traditional double-stroke honor beats on chorus
+    const powWowDrumPattern = [
+        // Verse (Steps 0-31): Steady, deep rawhide heartbeat
+        'E2', null, 'E2', null, 'E2', null, 'E2', null,
+        'E2', null, 'E2', null, 'E2', null, 'E2', null,
+        'E2', null, 'E2', null, 'E2', null, 'E2', null,
+        'E2', null, 'E2', null, 'A2', 'E2', 'E2', null,
+        // Chorus (Steps 32-63): Driving honor-beat double strikes
+        'A2', 'E2', 'E2', null, 'A2', 'E2', 'E2', null,
+        'A2', 'E2', 'E2', null, 'B2', 'A2', 'E2', null,
+        'A2', 'E2', 'E2', null, 'A2', 'E2', 'E2', null,
+        'B2', 'A2', 'G2', 'E2', 'E2', 'E2', 'E2', null
+    ];
+
+    // Male Lead Vocals (Full 64 steps: low-register Northern plains vocal cadence)
+    const powWowMaleLead = [
+        // Verse Call (Steps 0-31)
+        'E4', 'E4', 'D4', 'C4', 'A3', null, 'A3', null,
+        'C4', 'D4', 'E4', 'D4', 'C4', 'A3', null, null,
+        'E4', 'E4', 'G4', 'E4', 'D4', 'C4', 'A3', null,
+        'C4', 'A3', 'G3', 'A3', 'A3', null, null, null,
+        // Chorus Lead (Steps 32-63)
+        'A4', 'A4', 'G4', 'E4', 'G4', 'E4', 'D4', 'C4',
+        'E4', 'E4', 'D4', 'C4', 'A3', null, 'A3', null,
+        'A4', 'G4', 'E4', 'D4', 'E4', 'D4', 'C4', 'A3',
+        'C4', 'D4', 'C4', 'A3', 'A3', null, null, null
+    ];
+
+    // Female Pitched Chorus Harmonies (Steps 32-63 only — high octave 3rd/5th vocal harmonies)
+    const powWowFemaleHarmony = [
+        // Silent during Verse (Steps 0-31)
+        null, null, null, null, null, null, null, null,
+        null, null, null, null, null, null, null, null,
+        null, null, null, null, null, null, null, null,
+        null, null, null, null, null, null, null, null,
+        // Soaring Female Chorus Harmonies (Steps 32-63)
+        'E5', 'E5', 'D5', 'C5', 'D5', 'C5', 'B4', 'A4',
+        'C5', 'C5', 'B4', 'A4', 'E5', null, 'E5', null,
+        'E5', 'D5', 'C5', 'B4', 'C5', 'B4', 'A4', 'E4',
+        'A5', 'G5', 'E5', 'C5', 'E5', null, null, null
+    ];
+
+    // Ensure B4 and G3/G4/A4 are mapped for the vocal lines
+    NOTES['G3'] = 196.00;
+    NOTES['G4'] = 392.00;
+    NOTES['A4'] = 440.00;
+    NOTES['B4'] = 493.88;
+    NOTES['E4'] = 329.63;
 
     function initChiptuneAudio() {
         if (!chiptuneAudioCtx) {
@@ -279,6 +388,25 @@
         gainNode.connect(chiptuneAudioCtx.destination);
         osc.start();
         osc.stop(chiptuneAudioCtx.currentTime + duration);
+    }
+
+    // Specialized Pow Wow Rawhide Drum Strike (Pitch-dropping sub-triangle + warm membrane thud)
+    function playPowWowDrum(freq, volume) {
+        if (!freq || !chiptuneAudioCtx || isPaused) return;
+        const now = chiptuneAudioCtx.currentTime;
+        const osc = chiptuneAudioCtx.createOscillator();
+        const gain = chiptuneAudioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq * 1.45, now);
+        osc.frequency.exponentialRampToValueAtTime(freq * 0.72, now + noteLength * 2.2);
+
+        gain.gain.setValueAtTime(volume, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + noteLength * 2.4);
+
+        osc.connect(gain);
+        gain.connect(chiptuneAudioCtx.destination);
+        osc.start(now);
+        osc.stop(now + noteLength * 2.4);
     }
 
     function playMenuBlip(f1, f2) {
@@ -302,6 +430,21 @@
         osc.stop(chiptuneAudioCtx.currentTime + 0.3);
     }
 
+    function playBlockedShotSound() {
+        if (!chiptuneAudioCtx) return;
+        const osc = chiptuneAudioCtx.createOscillator();
+        const gain = chiptuneAudioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(185, chiptuneAudioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(55, chiptuneAudioCtx.currentTime + 0.14);
+        gain.gain.setValueAtTime(0.65, chiptuneAudioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, chiptuneAudioCtx.currentTime + 0.14);
+        osc.connect(gain);
+        gain.connect(chiptuneAudioCtx.destination);
+        osc.start();
+        osc.stop(chiptuneAudioCtx.currentTime + 0.14);
+    }
+
     function playMisfireSound() {
         if (!chiptuneAudioCtx) return;
         const osc = chiptuneAudioCtx.createOscillator();
@@ -319,15 +462,43 @@
 
     function sequenceTrack() {
         if (isPaused) return;
-        const leadNote = alouetteLead[currentChiptuneStep];
-        const bassNote = duckHuntBass[currentChiptuneStep];
-        if (leadNote && NOTES[leadNote]) playTone(NOTES[leadNote], 'square', noteLength * 0.7, 0.05);
-        if (bassNote && NOTES[bassNote]) playTone(NOTES[bassNote], 'triangle', noteLength * 1.4, 0.45);
-        currentChiptuneStep = (currentChiptuneStep + 1) % 32;
+
+        if (activeLevel === 'WOODS') {
+            const step64 = currentChiptuneStep % 64;
+            const drumNote = powWowDrumPattern[step64];
+            const maleNote = powWowMaleLead[step64];
+            const femaleNote = powWowFemaleHarmony[step64];
+
+            // 1. Pow Wow Drum Heartbeat
+            if (drumNote && NOTES[drumNote]) {
+                const isAccent = (step64 % 8 === 0);
+                playPowWowDrum(NOTES[drumNote], isAccent ? 0.55 : 0.42);
+            }
+
+            // 2. Male Lead Vocal (Warm sawtooth/triangle blend)
+            if (maleNote && NOTES[maleNote]) {
+                playTone(NOTES[maleNote], 'sawtooth', noteLength * 1.4, 0.065);
+            }
+
+            // 3. Female Pitched Chorus Harmonies (Bright high square/triangle vocal harmonies)
+            if (femaleNote && NOTES[femaleNote]) {
+                playTone(NOTES[femaleNote], 'square', noteLength * 1.5, 0.048);
+            }
+
+            currentChiptuneStep = (currentChiptuneStep + 1) % 64;
+        } else {
+            const step32 = currentChiptuneStep % 32;
+            const leadNote = alouetteLead[step32];
+            const bassNote = duckHuntBass[step32];
+            if (leadNote && NOTES[leadNote]) playTone(NOTES[leadNote], 'square', noteLength * 0.7, 0.05);
+            if (bassNote && NOTES[bassNote]) playTone(NOTES[bassNote], 'triangle', noteLength * 1.4, 0.45);
+            currentChiptuneStep = (currentChiptuneStep + 1) % 32;
+        }
     }
 
     function startChiptuneTrack() {
         initChiptuneAudio();
+        currentChiptuneStep = 0;
         if (!chiptuneIsPlaying) {
             chiptuneIsPlaying = true;
             chiptuneInterval = setInterval(sequenceTrack, noteLength * 1000);
@@ -418,59 +589,63 @@
     ];
 
     // --- High Detail Sprites: LI BWAA (Woodland Small Fur Game) ---
-    // Snowshoe Hare - 1: White Winter Coat, 2: Soft Grey Shading, 3: Black Ear Tips, 4: Dark Eye/Nose
+    // Larger Snowshoe Hare (18x10) - 1: White Winter Coat, 2: Soft Grey Shading, 3: Black Ear Tips, 4: Dark Eye/Nose
     const sprHare = [
         [ // Tucked Hop Frame 1
-            [0,0,0,0,0,0,0,3,3,0,3,3,0,0],
-            [0,0,0,0,0,0,0,1,1,0,1,1,0,0],
-            [0,0,0,0,0,0,0,1,1,1,1,1,0,0],
-            [0,0,0,1,1,1,1,1,1,1,4,1,1,0],
-            [0,1,1,1,1,1,1,1,1,1,1,1,4,0],
-            [1,1,2,1,1,1,1,1,1,1,1,1,0,0],
-            [0,1,2,2,1,1,1,2,1,1,0,0,0,0],
-            [0,0,1,1,0,0,1,1,1,1,0,0,0,0]
+            [0,0,0,0,0,0,0,0,0,3,3,0,3,3,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,1,1,0,1,1,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,1,1,1,1,1,0,0,0,0],
+            [0,0,0,0,0,1,1,1,1,1,1,1,1,4,1,1,0,0],
+            [0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,4,0],
+            [1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1,0,0],
+            [1,1,1,2,2,2,1,1,1,2,1,1,1,1,0,0,0,0],
+            [0,1,1,1,2,1,1,1,1,1,1,1,1,0,0,0,0,0],
+            [0,0,1,1,1,0,0,0,1,1,1,1,0,0,0,0,0,0],
+            [0,1,1,1,0,0,0,1,1,1,1,1,0,0,0,0,0,0]
         ],
         [ // Extended Bounding Leap Frame 2
-            [0,0,0,0,0,0,0,0,3,3,0,3,3,0],
-            [0,0,0,0,0,0,0,0,1,1,0,1,1,0],
-            [0,0,0,0,0,0,0,0,1,1,1,1,1,4],
-            [0,0,1,1,1,1,1,1,1,1,4,1,1,0],
-            [1,1,1,1,2,1,1,1,1,1,1,1,0,0],
-            [0,1,2,1,1,0,0,0,1,1,1,1,1,0],
-            [1,1,0,0,0,0,0,0,0,0,1,1,0,0],
-            [0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+            [0,0,0,0,0,0,0,0,0,0,3,3,0,3,3,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,1,1,0,1,1,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,0,0,0],
+            [0,0,0,0,1,1,1,1,1,1,1,1,1,4,1,1,4,0],
+            [0,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,0,0],
+            [1,1,1,2,2,1,1,1,1,1,1,1,1,1,1,0,0,0],
+            [1,1,2,1,1,0,0,0,0,1,1,1,1,1,1,1,0,0],
+            [1,1,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
         ]
     ];
 
-    // Prairie Chicken - 1: Barred Brown Body, 2: Dark Tail/Pinnae, 3: Golden-Orange Air Sac/Comb, 4: Cream Belly Bars
-    const sprPrairieChicken = [
+    // Spruce Grouse (Gray-Red) - 1: Slate-Charcoal Grey, 2: Deep Russet-Red Wing/Tail, 3: Crimson Eye-Comb, 4: Crisp White Belly Bars
+    const sprSpruceGrouse = [
         [ // Strut / Bob 1
-            [0,0,0,0,0,0,0,0,2,2,0,0,0,0],
             [0,0,0,0,0,0,0,0,1,3,1,0,0,0],
-            [0,0,2,0,0,0,0,1,1,1,1,3,3,0],
-            [0,2,2,1,1,1,1,1,3,3,1,1,0,0],
-            [2,2,1,4,1,4,1,1,3,3,1,0,0,0],
-            [0,1,4,1,4,1,4,1,1,1,0,0,0,0],
-            [0,0,1,4,1,4,1,1,0,0,0,0,0,0],
-            [0,0,0,3,0,3,0,0,0,0,0,0,0,0],
-            [0,0,3,3,0,3,3,0,0,0,0,0,0,0]
+            [0,0,0,0,0,0,0,1,1,1,1,2,0,0],
+            [0,0,2,0,0,0,1,1,1,1,1,2,2,0],
+            [0,2,2,1,1,2,2,2,1,1,1,0,0,0],
+            [2,2,1,4,1,2,2,2,1,4,1,0,0,0],
+            [0,1,4,1,4,1,2,1,4,1,0,0,0,0],
+            [0,0,1,4,1,4,1,4,1,0,0,0,0,0],
+            [0,0,0,2,0,2,0,0,0,0,0,0,0,0],
+            [0,0,2,2,0,2,2,0,0,0,0,0,0,0]
         ],
         [ // Bounce / Flutter 2
-            [0,0,0,0,0,0,0,2,2,0,0,0,0,0],
             [0,0,0,0,0,0,0,1,3,1,0,0,0,0],
-            [0,2,0,0,0,0,1,1,1,1,3,3,0,0],
-            [2,2,1,1,4,4,1,3,3,1,1,0,0,0],
-            [2,1,4,1,4,1,1,3,3,1,0,0,0,0],
-            [0,1,4,1,4,1,1,1,0,0,0,0,0,0],
+            [0,0,0,0,0,0,1,1,1,1,2,0,0,0],
+            [0,2,0,0,0,1,1,1,1,1,2,2,0,0],
+            [2,2,1,1,2,2,2,1,1,1,0,0,0,0],
+            [2,1,4,1,2,2,2,1,4,1,0,0,0,0],
+            [0,1,4,1,4,1,4,1,0,0,0,0,0,0],
             [0,0,1,1,1,1,0,0,0,0,0,0,0,0],
-            [0,0,0,3,0,3,0,0,0,0,0,0,0,0],
+            [0,0,0,2,0,2,0,0,0,0,0,0,0,0],
             [0,0,0,0,0,0,0,0,0,0,0,0,0,0]
         ]
     ];
 
     // Red Fox - 1: Vibrant Russet Fur, 2: White Tail Tip & Chest, 3: Black Ear Tips & Paws, 4: Deep Amber Shading
     const sprRedFox = [
-        [ // Prowl Step 1
+        [
             [0,0,0,0,0,0,0,0,0,0,0,3,0,3,0,0],
             [0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0],
             [2,2,0,0,0,0,0,0,0,0,1,1,1,1,1,3],
@@ -480,7 +655,7 @@
             [0,0,0,0,0,1,1,0,0,1,1,0,0,0,0,0],
             [0,0,0,0,3,3,0,0,0,0,3,3,0,0,0,0]
         ],
-        [ // Prowl Step 2
+        [
             [0,0,0,0,0,0,0,0,0,0,0,3,0,3,0,0],
             [0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0],
             [0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,3],
@@ -492,13 +667,38 @@
         ]
     ];
 
+    // Dark-Shaded Tree Porcupine (Rare Upper-Branch Target)
+    // 1: Dark Charcoal Body, 2: Ash-Silver Quill Tips, 3: Deep Shadow Underbelly
+    const sprPorcupine = [
+        [ // Quill Shuffle 1
+            [0,0,0,2,0,2,0,2,0,2,0,0,0,0],
+            [0,0,2,1,2,1,2,1,2,1,2,0,0,0],
+            [0,2,1,1,1,1,1,1,1,1,1,1,0,0],
+            [2,1,1,1,1,1,1,1,1,1,1,1,1,0],
+            [1,1,3,3,1,1,1,1,1,1,1,1,1,1],
+            [3,3,3,1,1,3,3,3,1,1,3,3,0,0],
+            [0,0,3,3,0,0,0,0,3,3,0,0,0,0]
+        ],
+        [ // Quill Shuffle 2
+            [0,0,2,0,2,0,2,0,2,0,2,0,0,0],
+            [0,0,2,1,2,1,2,1,2,1,2,0,0,0],
+            [0,2,1,1,1,1,1,1,1,1,1,1,0,0],
+            [2,1,1,1,1,1,1,1,1,1,1,1,1,0],
+            [1,1,3,3,1,1,1,1,1,1,1,1,1,1],
+            [3,3,3,1,1,3,3,3,1,1,3,3,0,0],
+            [0,0,0,3,3,0,0,3,3,0,0,0,0,0]
+        ]
+    ];
+
     // Game State Machine: 'TITLE', 'SELECT', 'PLAYING', 'GAMEOVER'
     let state = 'TITLE';
     let isPaused = false;
     let timeLeft = 300;
     let lastTime = 0;
     let score = 0;
-    let stats = { c1: 0, c2: 0, c3: 0 };
+    let stats = { c1: 0, c2: 0, c3: 0, c4: 0 };
+    let porcupinesSpawned = 0;
+    let porcupineTriggerTimes = [];
     let isLoaded = true;
     let gunDropY = 0;
     let crosshair = { x: 2, y: 2 };
@@ -527,6 +727,16 @@
         ['#1A0405', '#2C0709', '#3A090B', '#540E11', '#7B241C', '#922B21'].map(hexToRgb)
     ];
 
+    // Nocturnal Dark-Teal to Midnight-Purple Twilight Sky Palettes (Li Bwaa)
+    const nocturnalPalettes = [
+        // Start (0:00 elapsed): Dark Twilight Teal
+        ['#06141A', '#0A2229', '#0F323C', '#14424E', '#1A525E', '#226370'].map(hexToRgb),
+        // Mid (2:30 elapsed): Deep Dusk Teal-Indigo Transition
+        ['#0B0A18', '#121329', '#191D3A', '#1E2A48', '#243754', '#2B445E'].map(hexToRgb),
+        // End (5:00 elapsed): Midnight Purple
+        ['#0B0514', '#140924', '#1E0E36', '#281347', '#331957', '#3E1F68'].map(hexToRgb)
+    ];
+
     function drawSprite(x, y, matrix, paletteMap, scale) {
         for(let r=0; r<matrix.length; r++) {
             for(let c=0; c<matrix[r].length; c++) {
@@ -539,6 +749,30 @@
         }
     }
 
+    function spawnPorcupine() {
+        let ent = {
+            id: Math.random(),
+            slot: 'c4',
+            pts: 300,
+            y: 1 + Math.floor(Math.random() * 2), // Upper tree branch rows (1 or 2)
+            speed: 0.014, // Slow climbing across back tree branches
+            scale: 2,
+            depth: 0, // Back canopy branch layer (behind mid/front blinds, visible in branches)
+            bobAmp: 0.5,
+            bobFreq: 0.08,
+            dead: false,
+            hitDelay: 0,
+            dropY: 0,
+            animFrame: 0,
+            colorMap: { 1: '#1C1A24', 2: '#6E7485', 3: '#0B0910' },
+            spriteFrames: sprPorcupine
+        };
+        let fromLeft = Math.random() > 0.5;
+        ent.x = fromLeft ? -1 : 6;
+        ent.dir = fromLeft ? 1 : -1;
+        entities.push(ent);
+    }
+
     function spawnTarget() {
         let rand = Math.random();
         let ent = { id: Math.random(), dead: false, hitDelay: 0, dropY: 0, animFrame: 0 };
@@ -546,40 +780,43 @@
         if (activeLevel === 'POND') {
             if (rand < 0.15) {
                 ent.slot = 'c3'; ent.pts = 200; ent.y = Math.random() > 0.5 ? 4 : 5;
-                ent.speed = 0.02; ent.scale = 2; ent.bobAmp = 1.5; ent.bobFreq = 0.15;
+                ent.speed = 0.02; ent.scale = 2; ent.depth = 1; ent.bobAmp = 1.5; ent.bobFreq = 0.15;
                 ent.colorMap = {1: '#751A1E', 2: '#1E8449', 3: '#F39C12', 4: '#FFFFFF', 6: '#D4AC0D'};
                 ent.spriteFrames = sprWoodduck;
             } else if (rand < 0.6) {
                 ent.slot = 'c1'; ent.pts = 100; ent.y = Math.floor(Math.random() * 3);
-                ent.speed = 0.08; ent.scale = 2; ent.bobAmp = 1.5; ent.bobFreq = 0.15;
+                ent.speed = 0.08; ent.scale = 2; ent.depth = 1; ent.bobAmp = 1.5; ent.bobFreq = 0.15;
                 ent.colorMap = {1: '#111111', 2: '#1E8449', 3: '#F39C12', 4: '#FFFFFF', 5: '#444444'};
                 ent.spriteFrames = sprDuck;
             } else {
                 ent.slot = 'c2'; ent.pts = 50; ent.y = Math.floor(Math.random() * 4);
-                ent.speed = 0.04; ent.scale = 2; ent.bobAmp = 1.5; ent.bobFreq = 0.15;
+                ent.speed = 0.04; ent.scale = 2; ent.depth = 1; ent.bobAmp = 1.5; ent.bobFreq = 0.15;
                 ent.colorMap = {1: '#5c3a21', 2: '#000000', 3: '#FFFFFF', 4: '#3a2010'};
                 ent.spriteFrames = sprGoose;
             }
         } else {
-            // LI BWAA — Small Fur Game on Forest Floor (rows 3, 4, 5)
-            if (rand < 0.20) {
-                // Red Fox (elusive, high score)
+            // LI BWAA — Slower woodland small fur game weaving between layered blinds
+            if (rand < 0.22) {
+                // Red Fox (elusive, slowed slightly for blind timing)
                 ent.slot = 'c3'; ent.pts = 200; ent.y = 3 + Math.floor(Math.random() * 3);
-                ent.speed = 0.055; ent.scale = 2; ent.bobAmp = 1.0; ent.bobFreq = 0.18;
+                ent.speed = 0.040; ent.scale = 2; ent.depth = (ent.y === 3) ? 1 : 2;
+                ent.bobAmp = 1.0; ent.bobFreq = 0.16;
                 ent.colorMap = {1: '#D35400', 2: '#EAECEE', 3: '#111111', 4: '#922B21'};
                 ent.spriteFrames = sprRedFox;
             } else if (rand < 0.60) {
-                // Snowshoe Hare (quick)
+                // Snowshoe Hare (larger sprite, quick but tuned down slightly for cover)
                 ent.slot = 'c1'; ent.pts = 100; ent.y = 3 + Math.floor(Math.random() * 3);
-                ent.speed = 0.085; ent.scale = 2; ent.bobAmp = 2.5; ent.bobFreq = 0.25;
+                ent.speed = 0.062; ent.scale = 2; ent.depth = (ent.y === 5) ? 3 : 2;
+                ent.bobAmp = 2.0; ent.bobFreq = 0.22;
                 ent.colorMap = {1: '#F2F4F4', 2: '#BDC3C7', 3: '#111111', 4: '#2C3E50'};
                 ent.spriteFrames = sprHare;
             } else {
-                // Prairie Chicken (bouncy)
+                // Spruce Grouse (gray-red plumage, controlled hop so no awkward clipping)
                 ent.slot = 'c2'; ent.pts = 50; ent.y = 3 + Math.floor(Math.random() * 3);
-                ent.speed = 0.035; ent.scale = 2; ent.bobAmp = 4.0; ent.bobFreq = 0.22;
-                ent.colorMap = {1: '#7E5109', 2: '#2C1B0E', 3: '#F39C12', 4: '#D4D0C5'};
-                ent.spriteFrames = sprPrairieChicken;
+                ent.speed = 0.025; ent.scale = 2; ent.depth = (ent.y === 3) ? 1 : 2;
+                ent.bobAmp = 2.2; ent.bobFreq = 0.18;
+                ent.colorMap = {1: '#5D6D7E', 2: '#8E281C', 3: '#E74C3C', 4: '#EAECEE'};
+                ent.spriteFrames = sprSpruceGrouse;
             }
         }
 
@@ -596,6 +833,15 @@
         let currentSec = Math.floor(Date.now() / 1000);
         if (currentSec > lastTime) {
             timeLeft--; lastTime = currentSec; updateUI();
+
+            // Guaranteed rare Porcupine spawn 1–2 times per 5-minute woodland hunt
+            if (activeLevel === 'WOODS' && porcupinesSpawned < porcupineTriggerTimes.length) {
+                if (timeLeft <= porcupineTriggerTimes[porcupinesSpawned]) {
+                    porcupinesSpawned++;
+                    spawnPorcupine();
+                }
+            }
+
             if (timeLeft <= 0) endGame();
         }
 
@@ -626,7 +872,7 @@
         }
     }
 
-    // --- POND-IN-THE-FALL PARALLAX BACKGROUND (Shared by Title Screen & Aen Pchi Laak) ---
+    // --- POND-IN-THE-FALL PARALLAX BACKGROUND ---
     function drawPondFallBackdrop(progress, parallaxShift) {
         const horizonY = Math.floor(VIEW_H * 0.5);
         const skyBandH = Math.ceil(horizonY / 6);
@@ -640,25 +886,21 @@
             ctx.fillRect(0, i * skyBandH, VIEW_W, skyBandH + 1);
         }
 
-        // Setting Sun
         let sunX = Math.floor(VIEW_W * 0.5);
         let sunY = (progress * (horizonY + 10)) - 10;
         ctx.fillStyle = C.SUN;
         ctx.fillRect(sunX - 8, sunY + 2, 16, 12);
         ctx.fillRect(sunX - 6, sunY, 12, 16);
 
-        // Far Parallax Horizon Shrubs
         horizonShrubs.forEach(s => {
             let sx = ((s.x + parallaxShift * 0.35) % VIEW_W + VIEW_W) % VIEW_W;
             ctx.fillStyle = C.DISTANT_SHRUB; ctx.fillRect(sx, horizonY - s.h, s.w, s.h);
             ctx.fillStyle = C.SHRUB_HIGHLIGHT; ctx.fillRect(sx + 1, horizonY - s.h + 1, Math.max(1, s.w - 2), 2);
         });
 
-        // Autumn Pond Water
         ctx.fillStyle = C.WATER;
         ctx.fillRect(0, horizonY, VIEW_W, VIEW_H - horizonY);
 
-        // Mid-layer Parallax Water Ripples
         ctx.fillStyle = C.WATER_DARK;
         const rippleRows = Math.floor((VIEW_H - horizonY) / 8);
         for (let i = 0; i < rippleRows; i++) {
@@ -672,42 +914,71 @@
         }
     }
 
-    // --- WOODLAND & FOREST BACKDROP (Li Bwaa) ---
+    // --- NOCTURNAL WOODLAND & FOREST BACKDROP (Li Bwaa) ---
     function drawWoodlandBackdrop(progress) {
         const horizonY = Math.floor(VIEW_H * 0.5);
         const skyBandH = Math.ceil(horizonY / 6);
 
+        // 1. Dark Teal -> Midnight Purple Nocturnal Twilight Sky
         let startIdx = progress < 0.5 ? 0 : 1;
         let endIdx = progress < 0.5 ? 1 : 2;
         let t = progress < 0.5 ? progress * 2 : (progress - 0.5) * 2;
 
         for (let i = 0; i < 6; i++) {
-            ctx.fillStyle = lerpColor(skyPalettes[startIdx][i], skyPalettes[endIdx][i], t);
+            ctx.fillStyle = lerpColor(nocturnalPalettes[startIdx][i], nocturnalPalettes[endIdx][i], t);
             ctx.fillRect(0, i * skyBandH, VIEW_W, skyBandH + 1);
         }
 
-        // Low Autumn Sun filtering through forest canopy
-        let sunX = Math.floor(VIEW_W * 0.32);
-        let sunY = (progress * (horizonY + 10)) - 10;
-        ctx.fillStyle = C.SUN;
-        ctx.fillRect(sunX - 8, sunY + 2, 16, 12);
-        ctx.fillRect(sunX - 6, sunY, 12, 16);
+        // Faint twinkling twilight stars
+        nightStars.forEach(st => {
+            if ((Math.floor(frame / 30) + st.twinkle) % 3 !== 0) {
+                ctx.fillStyle = 'rgba(234, 236, 238, 0.35)';
+                ctx.fillRect(st.x, st.y, 1, 1);
+            }
+        });
 
-        // Background Treeline (Conifers & Autumn Birch Silhouettes)
+        // 2. Moon Sweeping Horizontally Across the Night Sky over the 5-Minute Hunt
+        const moonX = Math.floor(14 + progress * (VIEW_W - 28));
+        const moonArc = Math.sin(progress * Math.PI) * Math.round(VIEW_H * 0.06);
+        const moonY = Math.floor(horizonY * 0.36 - moonArc);
+
+        // Soft nocturnal moon aura
+        ctx.fillStyle = 'rgba(213, 216, 220, 0.12)';
+        ctx.fillRect(moonX - 11, moonY - 11, 22, 22);
+        // Pixel Moon Disc
+        ctx.fillStyle = C.MOON_LIGHT;
+        ctx.fillRect(moonX - 6, moonY - 8, 12, 16);
+        ctx.fillRect(moonX - 8, moonY - 6, 16, 12);
+        // Moon Craters
+        ctx.fillStyle = C.MOON_CRATER;
+        ctx.fillRect(moonX - 4, moonY - 3, 3, 3);
+        ctx.fillRect(moonX + 2, moonY + 1, 4, 3);
+        ctx.fillRect(moonX - 1, moonY + 4, 2, 2);
+
+        // 3. Drifting Foggy Night Sky Overlay Bands
+        const fogShift1 = (frame * 0.14) % (VIEW_W + 90);
+        const fogShift2 = (frame * 0.09) % (VIEW_W + 110);
+        ctx.fillStyle = 'rgba(180, 200, 215, 0.09)';
+        ctx.fillRect(fogShift1 - 90, Math.floor(horizonY * 0.25), 90, 7);
+        ctx.fillRect((fogShift1 + 110) % (VIEW_W + 90) - 90, Math.floor(horizonY * 0.62), 110, 9);
+        ctx.fillStyle = 'rgba(165, 150, 205, 0.08)';
+        ctx.fillRect(VIEW_W - fogShift2, Math.floor(horizonY * 0.44), 100, 8);
+        ctx.fillRect(VIEW_W - ((fogShift2 + 120) % (VIEW_W + 110)), Math.floor(horizonY * 0.82), 120, 10);
+
+        // 4. Distant Nocturnal Treeline Silhouettes (Back Branch Layer where Porcupines climb)
         forestTrees.forEach(tr => {
             if (tr.isBirch) {
-                ctx.fillStyle = C.BIRCH_BARK;
+                ctx.fillStyle = '#808B96';
                 ctx.fillRect(tr.x + 6, horizonY - tr.h, 5, tr.h);
-                ctx.fillStyle = C.BIRCH_MARKS;
+                ctx.fillStyle = '#17202A';
                 ctx.fillRect(tr.x + 6, horizonY - tr.h + 8, 3, 2);
                 ctx.fillRect(tr.x + 8, horizonY - tr.h + 18, 3, 2);
-                ctx.fillStyle = C.LEAF_1;
+                ctx.fillStyle = '#3D2616';
                 ctx.fillRect(tr.x, horizonY - tr.h - 8, 17, 14);
-                ctx.fillStyle = C.LEAF_2;
+                ctx.fillStyle = '#27170D';
                 ctx.fillRect(tr.x + 3, horizonY - tr.h - 12, 11, 8);
             } else {
-                // Tiered pixel pine/spruce tree
-                ctx.fillStyle = C.FOREST_DEEP;
+                ctx.fillStyle = '#070D0B';
                 ctx.fillRect(tr.x + 7, horizonY - 8, 4, 8);
                 ctx.fillStyle = C.PINE_DARK;
                 ctx.fillRect(tr.x + 1, horizonY - 18, 16, 11);
@@ -719,7 +990,7 @@
             }
         });
 
-        // Forest Floor (Earthy humus, fallen autumn leaves & early frost patches)
+        // 5. Nocturnal Forest Floor
         ctx.fillStyle = C.FOREST_FLOOR;
         ctx.fillRect(0, horizonY, VIEW_W, VIEW_H - horizonY);
 
@@ -728,12 +999,84 @@
             ctx.fillRect(0, y, VIEW_W, 2);
         }
 
-        // Scattered fallen leaf litter & frost patches
-        snowPatches.forEach((sp, idx) => {
+        // Moonlit frost & dark leaf litter patches
+        nightPatches.forEach((sp, idx) => {
             let py = Math.floor(VIEW_H * sp.yRatio);
-            ctx.fillStyle = (idx % 3 === 0) ? C.SNOW_WHITE : ((idx % 2 === 0) ? C.LEAF_2 : C.LEAF_1);
+            ctx.fillStyle = (idx % 3 === 0) ? 'rgba(213, 216, 220, 0.25)' : '#2d1c14';
             ctx.fillRect(sp.x, py, sp.w, sp.h);
         });
+    }
+
+    // --- LAYERED WOODLAND COVER BLINDS (Bushes, Spruce Pine, Birch) ---
+    function drawWoodlandBlind(blind) {
+        const x = blind.x;
+        const w = blind.w;
+        const topY = blind.topY;
+        const botY = blind.bottomY;
+        const h = botY - topY;
+
+        if (blind.type === 'SPRUCE') {
+            const trunkW = Math.max(4, Math.floor(w * 0.22));
+            const cx = x + Math.floor(w / 2);
+            // Trunk
+            ctx.fillStyle = '#0D0907';
+            ctx.fillRect(cx - Math.floor(trunkW / 2), botY - Math.floor(h * 0.2), trunkW, Math.floor(h * 0.2));
+
+            // 4 Stepped Nocturnal Spruce Tiers
+            const tiers = 4;
+            const tierH = Math.floor((h * 0.85) / tiers);
+            for (let t = 0; t < tiers; t++) {
+                const ratio = (t + 1) / tiers;
+                const tw = Math.max(8, Math.floor(w * ratio));
+                const ty = topY + t * tierH;
+                ctx.fillStyle = C.PINE_DARK;
+                ctx.fillRect(cx - Math.floor(tw / 2), ty, tw, tierH + 3);
+                ctx.fillStyle = C.PINE_MID;
+                ctx.fillRect(cx - Math.floor(tw / 2) + 2, ty + 1, Math.max(4, tw - 4), Math.max(3, tierH - 2));
+                // Subtle moonlight rim on left edge
+                ctx.fillStyle = C.PINE_LIGHT;
+                ctx.fillRect(cx - Math.floor(tw / 2) + 1, ty + 1, 2, Math.max(2, tierH - 1));
+            }
+        } else if (blind.type === 'BIRCH') {
+            const trunkW = Math.max(8, Math.floor(w * 0.34));
+            const cx = x + Math.floor(w / 2);
+            const trunkX = cx - Math.floor(trunkW / 2);
+
+            // Moonlit Silver-White Birch Trunk
+            ctx.fillStyle = '#BFC9CA';
+            ctx.fillRect(trunkX, topY + 12, trunkW, h - 12);
+            ctx.fillStyle = '#85929E';
+            ctx.fillRect(trunkX + trunkW - 3, topY + 12, 3, h - 12);
+
+            // Classic Black Bark Markings
+            ctx.fillStyle = '#17202A';
+            for (let by = topY + 18; by < botY - 6; by += 12) {
+                ctx.fillRect(trunkX, by, Math.floor(trunkW * 0.6), 2);
+                ctx.fillRect(trunkX + Math.floor(trunkW * 0.4), by + 6, Math.floor(trunkW * 0.6), 2);
+            }
+
+            // Block-Shaded Nocturnal Autumn Birch Canopy
+            ctx.fillStyle = '#4A2311';
+            ctx.fillRect(x, topY + 6, w, 24);
+            ctx.fillStyle = '#6E351A';
+            ctx.fillRect(x + 3, topY, w - 6, 20);
+            ctx.fillStyle = '#934822';
+            ctx.fillRect(x + 5, topY + 2, Math.floor(w * 0.5), 10);
+        } else if (blind.type === 'BUSH') {
+            // Stepped Pixel Woodland Shrub / Underbrush Blind
+            ctx.fillStyle = C.BUSH_DARK;
+            ctx.fillRect(x, topY + Math.floor(h * 0.25), w, Math.floor(h * 0.75));
+            ctx.fillRect(x + 4, topY, w - 8, Math.floor(h * 0.4));
+
+            ctx.fillStyle = C.BUSH_MID;
+            ctx.fillRect(x + 2, topY + Math.floor(h * 0.2), w - 6, Math.floor(h * 0.55));
+            ctx.fillRect(x + 6, topY + 2, w - 12, Math.floor(h * 0.3));
+
+            // Moonlit autumn leaf clusters on bush
+            ctx.fillStyle = '#5C3317';
+            ctx.fillRect(x + 4, topY + 4, 5, 4);
+            ctx.fillRect(x + Math.floor(w * 0.55), topY + Math.floor(h * 0.35), 6, 4);
+        }
     }
 
     function drawBackground() {
@@ -747,6 +1090,16 @@
 
     function drawForeground(parallaxShift = 0) {
         const hScale = VIEW_H / 240;
+
+        if (activeLevel === 'WOODS' && state === 'PLAYING') {
+            // Nocturnal woodland edge reeds & dark forest floor grass
+            grassBlades.forEach(g => {
+                ctx.fillStyle = '#1E2D27'; ctx.fillRect(g.x, VIEW_H - Math.round(g.h1 * 0.7), 4, Math.round(g.h1 * 0.7));
+                ctx.fillStyle = '#121C18'; ctx.fillRect(g.x + 1, VIEW_H - Math.round(g.h2 * 0.7), 3, Math.round(g.h2 * 0.7));
+                ctx.fillStyle = '#090E0C'; ctx.fillRect(g.x + 2, VIEW_H - Math.round(g.h3 * 0.7), 2, Math.round(g.h3 * 0.7));
+            });
+            return;
+        }
 
         grassBlades.forEach(g => {
             let gx = ((g.x + parallaxShift) % VIEW_W + VIEW_W) % VIEW_W;
@@ -795,7 +1148,6 @@
 
     // --- STYLIZED PIXEL BLOCK SHADED & GRADIENT WORDMARK ("SÎSÎP") ---
     function drawPixelWordmark(cx, cy) {
-        // 5-row chunky pixel glyphs for S - Î - S - Î - P
         const glyphs = {
             S: [
                 [1,1,1,1],
@@ -805,7 +1157,7 @@
                 [1,1,1,1]
             ],
             I_CIRC: [
-                [0,1,1,0], // Circumflex caret ^
+                [0,1,1,0],
                 [1,0,0,1],
                 [0,1,1,0],
                 [0,1,1,0],
@@ -829,7 +1181,6 @@
         const startX = Math.floor(cx - totalW / 2);
         const startY = Math.floor(cy - totalH / 2);
 
-        // Row-by-row Sunset Gold-to-Crimson gradient palette
         const rowGradient = ['#FCF3CF', '#F7C844', '#F39C12', '#E67E22', '#AD1C21'];
 
         word.forEach((mat, idx) => {
@@ -840,19 +1191,15 @@
                         const bx = lx + c * px;
                         const by = startY + r * px;
 
-                        // Deep Night Bordeaux 3D extruded block shadow
                         ctx.fillStyle = C.BORDEAUX;
                         ctx.fillRect(bx + 2, by + 2, px, px);
 
-                        // Crisp black pixel outline
                         ctx.fillStyle = C.BLACK;
                         ctx.fillRect(bx - 1, by - 1, px + 2, px + 2);
 
-                        // Gradient block face
                         ctx.fillStyle = rowGradient[r];
                         ctx.fillRect(bx, by, px, px);
 
-                        // Top-edge specular pixel highlight
                         if (r === 0 || !mat[r - 1][c]) {
                             ctx.fillStyle = C.WHITE;
                             ctx.fillRect(bx, by, px, 1);
@@ -867,7 +1214,6 @@
         const parallaxOffset = -(frame * 0.45);
         drawPondFallBackdrop(0.28, parallaxOffset);
 
-        // Ambient flying mallard & goose across the title pond
         const duckFrame = (frame % 20 < 10) ? 0 : 1;
         const duckX = ((frame * 0.85) % (VIEW_W + 60)) - 30;
         const duckY = Math.floor(VIEW_H * 0.24) + Math.floor(Math.sin(frame * 0.12) * 2);
@@ -875,11 +1221,9 @@
 
         drawForeground(parallaxOffset);
 
-        // Stylized Block Shaded & Gradient Wordmark
         const titleY = Math.floor(VIEW_H * 0.34);
         drawPixelWordmark(VIEW_W / 2, titleY);
 
-        // Subtitle Banner
         ctx.textAlign = 'center';
         ctx.font = 'bold 10px "Courier New", monospace';
         ctx.fillStyle = C.BLACK;
@@ -887,7 +1231,6 @@
         ctx.fillStyle = C.SUN;
         ctx.fillText('ARCADE HUNTING SIMULATOR', VIEW_W / 2, titleY + 25);
 
-        // Blinking Start Prompt
         if (Math.floor(frame / 25) % 2 === 0) {
             ctx.font = 'bold 12px "Courier New", monospace';
             ctx.fillStyle = C.BLACK;
@@ -903,7 +1246,6 @@
         drawPondFallBackdrop(0.35, parallaxOffset);
         drawForeground(parallaxOffset);
 
-        // Dark translucent overlay panel
         ctx.fillStyle = 'rgba(0, 0, 0, 0.82)';
         ctx.fillRect(0, 0, VIEW_W, VIEW_H);
 
@@ -920,7 +1262,6 @@
             const isSel = (idx === selectedLevelIdx);
             const cardY = Math.floor(VIEW_H * 0.21) + idx * (cardH + 10);
 
-            // Card background & border
             ctx.fillStyle = isSel ? 'rgba(18, 174, 162, 0.20)' : 'rgba(20, 20, 20, 0.85)';
             ctx.fillRect(cardX, cardY, cardW, cardH);
 
@@ -928,25 +1269,21 @@
             ctx.lineWidth = isSel ? 2 : 1;
             ctx.strokeRect(cardX, cardY, cardW, cardH);
 
-            // Title & Cursor
             ctx.textAlign = 'left';
             ctx.font = 'bold 13px "Courier New", monospace';
             ctx.fillStyle = isSel ? C.SUN : '#AAAAAA';
             const prefix = isSel ? '► ' : '  ';
             ctx.fillText(prefix + lvl.title, cardX + 8, cardY + 16);
 
-            // Subtitle
             ctx.font = 'bold 9px "Courier New", monospace';
             ctx.fillStyle = isSel ? C.TEAL : '#777777';
             ctx.fillText('  ' + lvl.subtitle, cardX + 8, cardY + 29);
 
-            // Target roster summary
-            ctx.font = '8px "Courier New", monospace';
+            ctx.font = '7px "Courier New", monospace';
             ctx.fillStyle = isSel ? C.WHITE : '#888888';
             ctx.fillText('  ' + lvl.targets, cardX + 8, cardY + 42);
         });
 
-        // Footer controls hint
         ctx.textAlign = 'center';
         ctx.font = '10px "Courier New", monospace';
         ctx.fillStyle = '#D4D0C5';
@@ -997,6 +1334,36 @@
         return { x: targetX, y: targetY };
     }
 
+    function drawEntity(b) {
+        let matrix = b.spriteFrames[b.animFrame];
+        // Strictly positive upward hop for bouncy ground game so they never clip downward into lower ground layers
+        let rawSine = Math.sin(frame * b.bobFreq);
+        let bobY = b.dead ? 0 : (activeLevel === 'WOODS' && b.y >= 3 ? -Math.floor(Math.abs(rawSine) * b.bobAmp) : Math.floor(rawSine * b.bobAmp));
+
+        let drawX = b.x * TILE_W + (TILE_W / 2) - (matrix[0].length * (b.scale / 2));
+        let drawY = b.dead ? b.dropY : (b.y * TILE_H + (TILE_H / 2) - (matrix.length * (b.scale / 2)) + bobY);
+
+        ctx.save();
+        if (b.dir === -1) {
+            ctx.translate(drawX + matrix[0].length * b.scale, drawY);
+            ctx.scale(-1, 1);
+            drawSprite(0, 0, matrix, b.colorMap, b.scale);
+        } else {
+            drawSprite(drawX, drawY, matrix, b.colorMap, b.scale);
+        }
+        ctx.restore();
+
+        if (b.dead && b.hitDelay > 0) {
+            ctx.fillStyle = b.colorMap[1] || C.WHITE;
+            let p = 20 - b.hitDelay;
+            let cx = drawX + (matrix[0].length * b.scale) / 2;
+            let cy = drawY + (matrix.length * b.scale) / 2;
+
+            ctx.fillRect(cx - p - 4, cy - p - 4, 4, 2); ctx.fillRect(cx + p + 2, cy - p - 2, 2, 2);
+            ctx.fillRect(cx - p - 2, cy + p + 2, 2, 2); ctx.fillRect(cx + p + 4, cy + p + 4, 4, 2);
+        }
+    }
+
     function draw() {
         if (state === 'TITLE') {
             drawTitleScreen();
@@ -1009,32 +1376,31 @@
 
         drawBackground();
 
-        entities.forEach(b => {
-            let matrix = b.spriteFrames[b.animFrame];
-            let bobY = b.dead ? 0 : Math.floor(Math.sin(frame * b.bobFreq) * b.bobAmp);
-            let drawX = b.x * TILE_W + (TILE_W / 2) - (matrix[0].length * (b.scale / 2));
-            let drawY = b.dead ? b.dropY : (b.y * TILE_H + (TILE_H / 2) - (matrix.length * (b.scale / 2)) + bobY);
+        if (activeLevel === 'WOODS') {
+            // Depth-sorted rendering so animals cleanly pass behind or in front of woodland cover blinds
+            // Layer 0: Back tree-canopy porcupines
+            entities.filter(b => b.depth === 0).forEach(drawEntity);
 
-            ctx.save();
-            if (b.dir === -1) {
-                ctx.translate(drawX + matrix[0].length * b.scale, drawY);
-                ctx.scale(-1, 1);
-                drawSprite(0, 0, matrix, b.colorMap, b.scale);
-            } else {
-                drawSprite(drawX, drawY, matrix, b.colorMap, b.scale);
-            }
-            ctx.restore();
+            // Depth 1 Blinds (Mid-back bush)
+            forestBlinds.filter(bl => bl.depth === 1).forEach(drawWoodlandBlind);
 
-            if (b.dead && b.hitDelay > 0) {
-                ctx.fillStyle = b.colorMap[1] || C.WHITE;
-                let p = 20 - b.hitDelay;
-                let cx = drawX + (matrix[0].length * b.scale) / 2;
-                let cy = drawY + (matrix.length * b.scale) / 2;
+            // Layer 1: Animals in back run (row 3)
+            entities.filter(b => b.depth === 1).forEach(drawEntity);
 
-                ctx.fillRect(cx - p - 4, cy - p - 4, 4, 2); ctx.fillRect(cx + p + 2, cy - p - 2, 2, 2);
-                ctx.fillRect(cx - p - 2, cy + p + 2, 2, 2); ctx.fillRect(cx + p + 4, cy + p + 4, 4, 2);
-            }
-        });
+            // Depth 2 Blinds (Mid-front spruce & bush)
+            forestBlinds.filter(bl => bl.depth === 2).forEach(drawWoodlandBlind);
+
+            // Layer 2: Animals in mid-front run (rows 4-5)
+            entities.filter(b => b.depth === 2).forEach(drawEntity);
+
+            // Depth 3 Blinds (Foreground birch trunk & canopy)
+            forestBlinds.filter(bl => bl.depth === 3).forEach(drawWoodlandBlind);
+
+            // Layer 3: Foreground hares darting in front of all blinds
+            entities.filter(b => b.depth === 3).forEach(drawEntity);
+        } else {
+            entities.forEach(drawEntity);
+        }
 
         drawForeground(0);
 
@@ -1044,7 +1410,8 @@
 
             let cx = Math.floor((crosshair.x * TILE_W) + (TILE_W / 2));
             let cy = Math.floor((crosshair.y * TILE_H) + (TILE_H / 2));
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.10)';
+            // Higher contrast nocturnal sight dot on dark forest backdrop, subtle 10% on pond
+            ctx.fillStyle = activeLevel === 'WOODS' ? 'rgba(247, 200, 68, 0.35)' : 'rgba(0, 0, 0, 0.10)';
             ctx.fillRect(cx - 1, cy - 4, 2, 8);
             ctx.fillRect(cx - 4, cy - 1, 8, 2);
         }
@@ -1079,8 +1446,21 @@
         if (activeLevel === 'POND') {
             document.getElementById('totals-display').innerText = `D:${stats.c1} G:${stats.c2} W:${stats.c3}`;
         } else {
-            document.getElementById('totals-display').innerText = `H:${stats.c1} P:${stats.c2} F:${stats.c3}`;
+            document.getElementById('totals-display').innerText = `H:${stats.c1} G:${stats.c2} F:${stats.c3} P:${stats.c4}`;
         }
+    }
+
+    // Check if a woodland blind blocks the shot at (aimX, aimY) for a target at depth
+    function isShotBlockedByBlind(aimX, aimY, targetDepth) {
+        if (activeLevel !== 'WOODS') return false;
+        for (let bl of forestBlinds) {
+            if (bl.depth >= targetDepth) {
+                if (aimX >= bl.x && aimX <= bl.x + bl.w && aimY >= bl.topY && aimY <= bl.bottomY) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     function fireGun() {
@@ -1093,24 +1473,51 @@
 
         isLoaded = false;
         flashEffect = 15;
-        playShootSound();
         updateUI();
+
+        const aimX = (crosshair.x * TILE_W) + (TILE_W / 2);
+        const aimY = (crosshair.y * TILE_H) + (TILE_H / 2);
+        let anyHit = false;
+        let blockedByCover = false;
 
         entities.forEach(b => {
             if (!b.dead && Math.round(b.x) === crosshair.x && b.y === crosshair.y) {
-                b.dead = true;
-                b.hitDelay = 20;
-                b.dropY = b.y * TILE_H;
-                score += b.pts;
-                stats[b.slot]++;
-                popups.push({
-                    text: `+${b.pts}`,
-                    x: b.x * TILE_W + (TILE_W * 0.25),
-                    y: b.y * TILE_H + (TILE_H * 0.5),
-                    life: 1.0
-                });
+                if (isShotBlockedByBlind(aimX, aimY, b.depth)) {
+                    blockedByCover = true;
+                } else {
+                    anyHit = true;
+                    b.dead = true;
+                    b.hitDelay = 20;
+                    b.dropY = b.y * TILE_H;
+                    score += b.pts;
+                    stats[b.slot]++;
+                    popups.push({
+                        text: `+${b.pts}`,
+                        x: b.x * TILE_W + (TILE_W * 0.25),
+                        y: b.y * TILE_H + (TILE_H * 0.5),
+                        life: 1.0
+                    });
+                }
             }
         });
+
+        // Also check if player shot directly into a blind even with no target behind it
+        if (!anyHit && activeLevel === 'WOODS' && isShotBlockedByBlind(aimX, aimY, 0)) {
+            blockedByCover = true;
+        }
+
+        if (blockedByCover && !anyHit) {
+            playBlockedShotSound();
+            popups.push({
+                text: 'BLOCKED!',
+                x: Math.max(8, Math.min(VIEW_W - 64, aimX - 24)),
+                y: aimY,
+                life: 0.9
+            });
+        } else {
+            playShootSound();
+        }
+
         updateUI();
     }
 
@@ -1137,8 +1544,25 @@
         state = 'PLAYING';
         isPaused = false;
         score = 0; timeLeft = 300; lastTime = Math.floor(Date.now() / 1000);
-        stats = { c1: 0, c2: 0, c3: 0 };
+        stats = { c1: 0, c2: 0, c3: 0, c4: 0 };
         isLoaded = true; gunDropY = 0; entities = []; popups = []; crosshair = { x: 2, y: 2 }; flashEffect = 0;
+
+        // Schedule 1 or 2 rare porcupine appearances during the 5-minute woodland hunt
+        porcupinesSpawned = 0;
+        if (activeLevel === 'WOODS') {
+            const count = Math.random() > 0.45 ? 2 : 1;
+            if (count === 1) {
+                porcupineTriggerTimes = [90 + Math.floor(Math.random() * 140)];
+            } else {
+                porcupineTriggerTimes = [
+                    185 + Math.floor(Math.random() * 75),
+                    55 + Math.floor(Math.random() * 85)
+                ];
+            }
+        } else {
+            porcupineTriggerTimes = [];
+        }
+
         gameOverScreen.style.display = 'none';
         hudTop.style.display = 'flex';
 
@@ -1153,7 +1577,7 @@
         if (activeLevel === 'POND') {
             document.getElementById('final-stats').innerHTML = `Ducks: ${stats.c1}<br>Geese: ${stats.c2}<br>Woodducks: ${stats.c3}<br><br><b>TOTAL SCORE: ${score}</b>`;
         } else {
-            document.getElementById('final-stats').innerHTML = `Snowshoe Hares: ${stats.c1}<br>Prairie Chickens: ${stats.c2}<br>Red Foxes: ${stats.c3}<br><br><b>TOTAL SCORE: ${score}</b>`;
+            document.getElementById('final-stats').innerHTML = `Snowshoe Hares: ${stats.c1}<br>Spruce Grouse: ${stats.c2}<br>Red Foxes: ${stats.c3}<br>Porcupines: ${stats.c4}<br><br><b>TOTAL SCORE: ${score}</b>`;
         }
         gameOverScreen.style.display = 'flex';
     }
@@ -1196,7 +1620,6 @@
     function handleDirSignal(dir, isPulse) {
         if (isPaused) return;
 
-        // Menu navigation on Level Select screen
         if (state === 'SELECT') {
             if (dir === 'UP' || dir === 'DOWN') {
                 selectedLevelIdx = (selectedLevelIdx + 1) % LEVELS.length;
