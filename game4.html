@@ -167,7 +167,6 @@
     let activeLevel = 'POND';
 
     // Exact 12x12 Grid-Aligned Woodland Blinds (Cols 0..11, Rows 0..11)
-    // All blinds sit at depth 3 (in front of depth-2 ground animals) so Spruce, Birch & Blueberry Bushes all block shots & cover animals cleanly
     const WOODLAND_BLIND_MATRIX = [
         { type: 'SPRUCE', depth: 3, colStart: 1, colEnd: 2, rowStart: 2, rowEnd: 7 },
         { type: 'BUSH',   depth: 3, colStart: 4, colEnd: 5, rowStart: 5, rowEnd: 6 },
@@ -225,7 +224,6 @@
             });
         }
 
-        // Exact 12x12 tile alignment for all woodland blinds
         forestBlinds = WOODLAND_BLIND_MATRIX.map(spec => ({
             type: spec.type,
             depth: spec.depth,
@@ -769,7 +767,7 @@
             climbSpeed: 0.012,
             dir: 1,
             scale: 2,
-            depth: 4, // Front of Birch trunk so it is visible and 100% hittable
+            depth: 4,
             dead: false,
             hitDelay: 0,
             dropY: 0,
@@ -782,38 +780,30 @@
 
     function spawnTarget() {
         const activeCount = entities.filter(e => !e.dead).length;
-        // Calm hunt pacing: max 2 simultaneous targets in both Pond and Woods
         if (activeCount >= 2) return;
 
         let rand = Math.random();
         let ent = { id: Math.random(), kind: 'RUNNER', dead: false, hitDelay: 0, dropY: 0, animFrame: 0 };
 
         if (activeLevel === 'POND') {
-            // Exact integer 12x12 grid rows (Rows 1..10) — zero between-row spawns
             if (rand < 0.22) {
-                // Woodduck floating on exact water rows 7, 8, 9, 10
                 ent.slot = 'c3'; ent.pts = 200; ent.y = 7 + Math.floor(Math.random() * 4);
                 ent.speed = 0.018; ent.scale = 2; ent.depth = 1;
                 ent.colorMap = {1: '#751A1E', 2: '#1E8449', 3: '#F39C12', 4: '#FFFFFF', 6: '#D4AC0D'};
                 ent.spriteFrames = sprWoodduck;
             } else if (rand < 0.62) {
-                // Mallard Duck flying on exact sky rows 1, 2, 3, 4
                 ent.slot = 'c1'; ent.pts = 100; ent.y = 1 + Math.floor(Math.random() * 4);
                 ent.speed = 0.044; ent.scale = 2; ent.depth = 1;
                 ent.colorMap = {1: '#111111', 2: '#1E8449', 3: '#F39C12', 4: '#FFFFFF', 5: '#444444'};
                 ent.spriteFrames = sprDuck;
             } else {
-                // Canada Goose flying on exact sky/horizon rows 1, 2, 3, 4, 5
                 ent.slot = 'c2'; ent.pts = 50; ent.y = 1 + Math.floor(Math.random() * 5);
                 ent.speed = 0.028; ent.scale = 2; ent.depth = 1;
                 ent.colorMap = {1: '#5c3a21', 2: '#000000', 3: '#FFFFFF', 4: '#3a2010'};
                 ent.spriteFrames = sprGoose;
             }
         } else {
-            // LI BWAA — Woodland fur game strictly on exact integer ground rows (Rows 5..10)
-            // All ground runners sit at depth 2 so they pass BEHIND all depth-3 blinds (Spruce, Birch & Blueberry Bushes)
             if (rand < 0.16) {
-                // Red Fox (2:1 horizontal sprite) on exact integer rows 6, 7, 8, 9
                 ent.kind = 'FOX';
                 ent.slot = 'c3'; ent.pts = 200; ent.y = 6 + Math.floor(Math.random() * 4);
                 ent.speed = 0.036; ent.scale = 2; ent.depth = 2;
@@ -822,7 +812,6 @@
                 ent.colorMap = {1: '#D35400', 2: '#EAECEE', 3: '#111111', 4: '#922B21'};
                 ent.spriteFrames = sprRedFox;
             } else if (rand < 0.58) {
-                // Snowshoe Hare on exact integer rows 7, 8, 9, 10
                 ent.kind = 'HARE';
                 ent.slot = 'c1'; ent.pts = 100; ent.y = 7 + Math.floor(Math.random() * 4);
                 ent.speed = 0.046; ent.scale = 2; ent.depth = 2;
@@ -830,7 +819,6 @@
                 ent.colorMap = {1: '#F2F4F4', 2: '#BDC3C7', 3: '#111111', 4: '#2C3E50'};
                 ent.spriteFrames = sprHare;
             } else {
-                // Spruce Grouse on exact integer rows 5, 6, 7, 8, 9 (bumps between exact integer rows)
                 ent.kind = 'GROUSE';
                 ent.slot = 'c2'; ent.pts = 50;
                 ent.baseY = 6 + Math.floor(Math.random() * 4);
@@ -867,7 +855,6 @@
             if (timeLeft <= 0) endGame();
         }
 
-        // Smoothly interpolate gun aim point toward active 12x12 crosshair tile center
         const targetAimX = (crosshair.x + 0.5) * TILE_W;
         const targetAimY = (crosshair.y + 0.5) * TILE_H;
         gunAim.x += (targetAimX - gunAim.x) * 0.42;
@@ -878,7 +865,6 @@
         else if (isLoaded && gunDropY > 0) gunDropY -= Math.max(3, Math.round(VIEW_H * 0.028));
         gunDropY = Math.max(0, Math.min(maxDrop, gunDropY));
 
-        // Calm, unhurried spawn cadence on both levels (~14.5s in Woods, ~13s in Pond)
         if (activeLevel === 'WOODS') {
             if (frame === 140 || frame % 880 === 0) spawnTarget();
         } else {
@@ -912,7 +898,6 @@
                     }
                 }
             } else if (b.kind === 'HARE') {
-                // Rhythmic hop cadence strictly locked to exact integer row b.y
                 b.hopTimer = (b.hopTimer + 1) % 42;
                 if (b.hopTimer < 14) {
                     b.animFrame = 0;
@@ -926,7 +911,6 @@
                 }
                 if ((b.dir === 1 && b.x > GRID_W + 0.9) || (b.dir === -1 && b.x < -1.9)) entities.splice(i, 1);
             } else if (b.kind === 'GROUSE') {
-                // Spruce Grouse bumps cleanly between exact integer rows baseY and baseY - 1
                 b.bumpTimer--;
                 if (b.bumpTimer <= 0) {
                     b.isBumpedUp = !b.isBumpedUp;
@@ -937,7 +921,6 @@
                 b.animFrame = (frame % 22 < 11) ? 0 : 1;
                 if ((b.dir === 1 && b.x > GRID_W + 0.9) || (b.dir === -1 && b.x < -1.9)) entities.splice(i, 1);
             } else if (b.kind === 'FOX') {
-                // Red Fox pauses behind cover blinds before continuing
                 if (b.pauseTimer > 0) {
                     b.pauseTimer--;
                     b.animFrame = 0;
@@ -958,7 +941,6 @@
                 }
                 if ((b.dir === 1 && b.x > GRID_W + 1.2) || (b.dir === -1 && b.x < -2.2)) entities.splice(i, 1);
             } else {
-                // Pond Waterfowl locked to exact integer row b.y
                 b.x += b.speed * b.dir;
                 b.animFrame = (frame % 24 < 12) ? 0 : 1;
                 if ((b.dir === 1 && b.x > GRID_W + 0.9) || (b.dir === -1 && b.x < -1.9)) entities.splice(i, 1);
@@ -1560,7 +1542,6 @@
         return { x: tipX, y: tipY };
     }
 
-    // Unified screen-space bounding box anchored dead-center on exact 12x12 integer grid rows
     function getEntityBounds(b) {
         const matrix = b.spriteFrames[b.animFrame];
         const w = matrix[0].length * b.scale;
@@ -1616,11 +1597,8 @@
         drawBackground();
 
         if (activeLevel === 'WOODS') {
-            // Depth 2: All ground animals (Hare, Spruce Grouse, Red Fox) pass BEHIND all Depth 3 blinds
             entities.filter(b => b.depth <= 2).forEach(drawEntity);
-            // Depth 3: Spruce Pine, Birch Tree & 2x2 Blueberry Bush Blinds
             forestBlinds.filter(bl => bl.depth === 3).forEach(drawWoodlandBlind);
-            // Depth 4: Climbing Porcupine on front of Birch trunk
             entities.filter(b => b.depth >= 4).forEach(drawEntity);
         } else {
             entities.forEach(drawEntity);
@@ -1632,7 +1610,6 @@
             let muzzlePos = drawFirstPersonGun();
             if (flashEffect > 0) drawMuzzleFlash(muzzlePos.x, muzzlePos.y);
 
-            // 12x12 Fine-Aiming Crosshair + subtle tile corner brackets
             const tileLeft = Math.floor(crosshair.x * TILE_W);
             const tileTop = Math.floor(crosshair.y * TILE_H);
             const cx = Math.floor(tileLeft + TILE_W / 2);
@@ -1681,7 +1658,6 @@
         }
     }
 
-    // Only block a shot if a cover blind is strictly in front of the target (blind.depth > targetDepth)
     function isShotBlockedByBlind(aimX, aimY, targetDepth, isPorcupine) {
         if (activeLevel !== 'WOODS' || isPorcupine) return false;
         for (let bl of forestBlinds) {
@@ -1719,7 +1695,6 @@
             const { drawX, drawY, w } = getEntityBounds(b);
             const activeRow = Math.round(b.y);
 
-            // Exact 12x12 row match + full horizontal sprite-to-tile intersection
             const rowMatches = (activeRow === crosshair.y);
             const colOverlaps = (drawX + w >= tileLeft) && (drawX <= tileRight);
 
@@ -1825,12 +1800,12 @@
         gameOverScreen.style.display = 'flex';
     }
 
-    // --- ARCADE CABINET postMessage BRIDGE ---
+    // --- ARCADE CABINET postMessage BRIDGE (Tactile Single-Step + DAS/ARR Auto-Repeat) ---
     const dpadState = {
-        UP:    { active: false, timer: null, expiry: null },
-        DOWN:  { active: false, timer: null, expiry: null },
-        LEFT:  { active: false, timer: null, expiry: null },
-        RIGHT: { active: false, timer: null, expiry: null }
+        UP:    { active: false, lastStepAt: 0, dasTimer: null, arrTimer: null, expiry: null },
+        DOWN:  { active: false, lastStepAt: 0, dasTimer: null, arrTimer: null, expiry: null },
+        LEFT:  { active: false, lastStepAt: 0, dasTimer: null, arrTimer: null, expiry: null },
+        RIGHT: { active: false, lastStepAt: 0, dasTimer: null, arrTimer: null, expiry: null }
     };
 
     const dirVectors = {
@@ -1845,13 +1820,17 @@
     let lastMenuNavTime = 0;
     const BTN_DEBOUNCE_MS = 110;
     const MENU_DEBOUNCE_MS = 160;
-    const HOLD_WINDOW_MS = 145;
+    const TAP_COOLDOWN_MS = 135;   // Prevents burst pulses from double-jumping 1 tile on a single tap
+    const HOLD_DAS_MS = 260;       // Intentional hold delay before auto-repeat kicks in
+    const HOLD_ARR_MS = 150;       // Controlled glide rate while holding a direction
+    const HOLD_EXPIRY_MS = 175;    // Release timeout for parent joystick stream
 
     function releaseDir(dir) {
         const entry = dpadState[dir];
         if (!entry) return;
         entry.active = false;
-        if (entry.timer) { clearInterval(entry.timer); entry.timer = null; }
+        if (entry.dasTimer) { clearTimeout(entry.dasTimer); entry.dasTimer = null; }
+        if (entry.arrTimer) { clearInterval(entry.arrTimer); entry.arrTimer = null; }
         if (entry.expiry) { clearTimeout(entry.expiry); entry.expiry = null; }
     }
 
@@ -1883,21 +1862,34 @@
         if (state !== 'PLAYING') return;
         const entry = dpadState[dir];
         const [dx, dy] = dirVectors[dir];
+        const now = Date.now();
 
         if (!entry.active) {
             entry.active = true;
-            moveCrosshair(dx, dy);
-            entry.timer = setInterval(() => {
+            // Execute exactly 1 crisp tile step on initial press/pulse if outside tap cooldown
+            if (now - entry.lastStepAt >= TAP_COOLDOWN_MS) {
+                moveCrosshair(dx, dy);
+                entry.lastStepAt = now;
+            }
+
+            // Start DAS delay; only begin auto-repeating if the player intentionally holds the stick
+            entry.dasTimer = setTimeout(() => {
                 if (!isPaused && state === 'PLAYING' && entry.active) {
                     moveCrosshair(dx, dy);
+                    entry.lastStepAt = Date.now();
+                    entry.arrTimer = setInterval(() => {
+                        if (!isPaused && state === 'PLAYING' && entry.active) {
+                            moveCrosshair(dx, dy);
+                            entry.lastStepAt = Date.now();
+                        }
+                    }, HOLD_ARR_MS);
                 }
-            }, HOLD_WINDOW_MS);
-        } else if (isPulse) {
-            moveCrosshair(dx, dy);
+            }, HOLD_DAS_MS);
         }
 
+        // Keep hold alive while stream pulses continue without double-stepping during the tap window
         if (entry.expiry) clearTimeout(entry.expiry);
-        entry.expiry = setTimeout(() => releaseDir(dir), HOLD_WINDOW_MS);
+        entry.expiry = setTimeout(() => releaseDir(dir), HOLD_EXPIRY_MS);
     }
 
     window.addEventListener('message', function(event) {
