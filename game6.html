@@ -3,464 +3,66 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>Le Roi des Traiteurs — Red River FurTrade Freetrade</title>
+<title>Le Roi des Traiteurs — 1850 Red River Freetrade</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
 <style>
-  :root {
-    --font-pixel: 'Press Start 2P', 'Courier New', monospace;
-  }
-
   * {
     box-sizing: border-box;
+    margin: 0;
+    padding: 0;
     user-select: none;
     -webkit-tap-highlight-color: transparent;
   }
-
-  body {
-    font-family: var(--font-pixel);
-    background: transparent;
-    color: #f4f1de;
+  html, body, #game-container {
+    width: 100vw;
+    height: 100vh;
     margin: 0;
     padding: 0;
-    height: 100vh;
-    width: 100vw;
-    display: flex;
-    justify-content: center;
-    align-items: center;
     overflow: hidden;
+    background: #0f1324;
+    font-family: 'Press Start 2P', 'Courier New', monospace;
   }
-
-  #game-container {
-    width: 100%;
-    height: 100%;
-    max-width: 520px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    padding: 8px;
-    gap: 6px;
-  }
-
-  /* Persistent Arcade HUD */
-  #header {
-    flex: 0 0 auto;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    color: #ffcd75;
-    font-size: 8px;
-    border-bottom: 2px solid #3b5dc9;
-    padding-bottom: 4px;
-    text-transform: uppercase;
-    text-shadow: 1px 1px 0 #000;
-  }
-  .header-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 4px;
-  }
-
-  /* 240x240 Cover & Freetrade Checkpoint Viewport */
-  #weir-wrapper {
-    flex: 0 0 auto;
-    width: 100%;
-    aspect-ratio: 1 / 1;
-    max-height: calc(100vh - 54px);
-    margin: 0 auto;
-    border: 4px solid #f4f4f4;
-    border-radius: 6px;
-    position: relative;
-    background: #1a1c2c;
-    overflow: hidden;
-    box-shadow: 0 6px 0 rgba(0, 0, 0, 0.55);
-  }
-
-  canvas#gameCanvas {
+  canvas {
     width: 100%;
     height: 100%;
     display: block;
     image-rendering: pixelated;
     image-rendering: crisp-edges;
   }
-
-  /* 480x336 GBC/SNES Settlement Map View */
-  #map-view {
-    display: none;
-    flex-direction: column;
-    gap: 6px;
-    width: 100%;
-  }
-
-  #screenWrapper {
-    position: relative;
-    width: 100%;
-    border: 4px solid #f4f4f4;
-    border-radius: 6px;
-    overflow: hidden;
-    background: #0f1324;
-    box-shadow: 0 6px 0 rgba(0, 0, 0, 0.55);
-  }
-
-  canvas#mapCanvas {
-    image-rendering: -moz-crisp-edges;
-    image-rendering: -webkit-crisp-edges;
-    image-rendering: pixelated;
-    image-rendering: crisp-edges;
-    width: 100%;
-    height: auto;
-    display: block;
-    cursor: pointer;
-  }
-
-  /* Classic SNES / GBC RPG Window Frame for 6 Checkpoints */
-  .rpg-window {
-    background-color: #1a1c2c;
-    border: 3px solid #f4f4f4;
-    box-shadow:
-      inset 0 0 0 2px #3b5dc9,
-      inset 0 0 0 4px #1a1c2c,
-      0 5px 0 rgba(0, 0, 0, 0.55);
-    border-radius: 6px;
-    padding: 7px;
-  }
-
-  .cycle-row {
-    display: flex;
-    align-items: stretch;
-    gap: 5px;
-  }
-
-  .checkpoint-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 4px;
-    flex: 1;
-  }
-
-  .checkpoint-box {
-    font-family: var(--font-pixel);
-    background: #29366f;
-    color: #f4f4f4;
-    border: 2px solid #7f8ec9;
-    box-shadow: 0 2px 0 #0f1324;
-    border-radius: 4px;
-    padding: 4px 3px;
-    min-height: 36px;
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    transition: transform 0.06s ease, background-color 0.1s ease, border-color 0.1s ease;
-  }
-
-  .checkpoint-box:hover {
-    background: #3b5dc9;
-    border-color: #f4f4f4;
-  }
-
-  .checkpoint-box.active {
-    background: #ffcd75;
-    color: #1a1c2c;
-    border-color: #ffffff;
-    box-shadow: 0 2px 0 #7a4b12;
-    transform: translateY(-1px);
-  }
-
-  .cp-num {
-    font-size: 6px;
-    opacity: 0.85;
-    margin-bottom: 2px;
-  }
-
-  .cp-name {
-    font-size: 6.5px;
-    line-height: 1.25;
-  }
-
-  .cp-mini-bar {
-    width: 82%;
-    height: 3px;
-    background: #0f1324;
-    margin-top: 3px;
-    border-radius: 1px;
-    overflow: hidden;
-  }
-
-  .cp-mini-fill {
-    height: 100%;
-    width: 0%;
-    background: #73eff7;
-  }
-
-  .cycle-btn {
-    font-family: var(--font-pixel);
-    background: #232a4d;
-    color: #73eff7;
-    border: 2px solid #41a6f6;
-    box-shadow: 0 2px 0 #0f1324;
-    border-radius: 4px;
-    font-size: 9px;
-    padding: 0 6px;
-    cursor: pointer;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .cycle-btn:hover {
-    background: #3b5dc9;
-    color: #ffffff;
-  }
-
-  .cycle-btn:active {
-    transform: translateY(1px);
-  }
-
-  /* Classic RPG Double-Sided Text Box Overlay (Briefing & Game Over) */
-  .overlay {
-    position: absolute;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(15, 19, 36, 0.92);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    color: #f4f4f4;
-    text-align: center;
-    padding: 12px;
-    z-index: 10;
-  }
-
-  .rpg-dialog-box {
-    width: 100%;
-    min-height: 186px;
-    background-color: #1a1c2c;
-    border: 3px solid #f4f4f4;
-    box-shadow:
-      inset 0 0 0 2px #3b5dc9,
-      inset 0 0 0 4px #1a1c2c,
-      0 4px 0 #090b14;
-    border-radius: 4px;
-    padding: 12px 11px 10px 11px;
-    text-align: left;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-  }
-
-  .dialog-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    color: #ffcd75;
-    font-size: 8.5px;
-    border-bottom: 1px solid #3b5dc9;
-    padding-bottom: 5px;
-    margin-bottom: 8px;
-    text-transform: uppercase;
-  }
-
-  .dialog-page-tag {
-    color: #73eff7;
-    font-size: 7.5px;
-  }
-
-  .dialog-body {
-    color: #f4f1de;
-    font-size: 7.8px;
-    line-height: 1.72;
-    margin: 0;
-    flex: 1;
-  }
-
-  .dialog-body.instructions {
-    color: #e6f7ff;
-    font-size: 7.5px;
-    line-height: 1.72;
-  }
-
-  .dialog-footer {
-    border-top: 1px dashed #7f8ec9;
-    padding-top: 7px;
-    margin-top: 8px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 7.5px;
-  }
-
-  .flip-hint {
-    color: #73eff7;
-    cursor: pointer;
-  }
-
-  .start-hint {
-    color: #ffcd75;
-    cursor: pointer;
-    animation: blink 1s infinite;
-  }
-
-  .rank-headline {
-    color: #ffcd75;
-    margin: 0 0 8px 0;
-    font-size: 13px;
-    text-transform: uppercase;
-    line-height: 1.45;
-    text-shadow: 2px 2px 0 #090b14;
-  }
-
-  .gameover-sub {
-    color: #ff6b6b;
-    font-size: 7.5px;
-    margin: 0 0 10px 0;
-    text-transform: uppercase;
-  }
-
-  p {
-    font-size: 8px;
-    line-height: 1.7;
-    margin: 0 0 12px 0;
-  }
-
-  .blink-text {
-    font-size: 8px;
-    color: #ffcd75;
-    text-align: center;
-    animation: blink 1s infinite;
-  }
-
-  @keyframes blink { 50% { opacity: 0; } }
 </style>
 </head>
 <body>
 <div id="game-container">
-  <!-- Persistent Arcade Header -->
-  <div id="header">
-    <div class="header-row">
-      <span id="time-display">TIME:5:00</span>
-      <span id="rank-display" style="color: #ff6b6b;">SCARCE &amp; STARVATION</span>
-      <span id="hbc-display" style="color: #f4f4f4;">BUSTS:0/3</span>
-    </div>
-    <div class="header-row">
-      <span id="loc-display" style="color: #73eff7;">LE ROI DES TRAITEURS</span>
-      <span id="goods-display" style="color: #ffcd75;">PELTS:0 ROBES:0</span>
-    </div>
-  </div>
-
-  <!-- 1. Cover Screen, Double-Sided RPG Briefing Box, Freetrade Checkpoint Scenes & Game Over (240x240) -->
-  <div id="weir-wrapper">
-    <canvas id="gameCanvas" width="240" height="240"></canvas>
-
-    <!-- Double-Sided RPG Text Box Overlay (Toggled via B-Button) -->
-    <div id="briefing-screen" class="overlay" style="display: none;">
-      <div class="rpg-dialog-box">
-        <div>
-          <div class="dialog-header">
-            <span id="dialog-heading">THE FREETRADERS</span>
-            <span id="dialog-page" class="dialog-page-tag">[B] 1/2</span>
-          </div>
-
-          <!-- Side 1: Expanded Historical Lore -->
-          <div id="dialog-side-1" class="dialog-body">
-            In the 1850 Red River Settlement, fearless Michif freetraders rose up to challenge the Hudson's Bay Company monopoly. Rolling wooden Red River carts from parish to parish, they traded directly with prairie hunters for prized pelts and warm buffalo robes—earning their boldest leader the title Le Roi des Traiteurs.
-          </div>
-
-          <!-- Side 2: Simple, Non-Technical Instructions -->
-          <div id="dialog-side-2" class="dialog-body instructions" style="display: none;">
-            Cycle the parishes on the settlement map with the D-Pad and press A to visit.<br><br>
-            Set your Red River Cart on the road and trade discreetly, but be careful—your cart can only hold so much weight! Haul your load before winter sets in or an HBC Officer seizes your trade.
-          </div>
-        </div>
-
-        <div class="dialog-footer">
-          <span id="flip-label" class="flip-hint" onclick="toggleBriefingSide()">[B] INSTRUCTIONS</span>
-          <span class="start-hint" onclick="handleActionA()">[A] RIDE OUT</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Game Over Menu -->
-    <div id="gameover-screen" class="overlay" style="display: none;">
-      <div id="gameover-sub" class="gameover-sub">WINTER HAS ARRIVED</div>
-      <h2 id="gameover-rank" class="rank-headline">SCARCE &amp; STARVATION</h2>
-      <p id="final-stats"></p>
-      <div class="blink-text">PRESS 'A' TO PLAY AGAIN</div>
-    </div>
-  </div>
-
-  <!-- 2. 1850 Red River Settlement GBC/SNES Pixel Map (480x336) + 6-Checkpoint Cycle Window -->
-  <div id="map-view">
-    <div id="screenWrapper">
-      <canvas id="mapCanvas" width="480" height="336"></canvas>
-    </div>
-
-    <div class="rpg-window">
-      <div class="cycle-row">
-        <button
-          type="button"
-          onclick="cycleCheckpoint(-1)"
-          class="cycle-btn"
-          aria-label="Previous Checkpoint"
-        >◄</button>
-
-        <div id="checkpointGrid" class="checkpoint-grid"></div>
-
-        <button
-          type="button"
-          onclick="cycleCheckpoint(1)"
-          class="cycle-btn"
-          aria-label="Next Checkpoint"
-        >►</button>
-      </div>
-    </div>
-  </div>
+  <canvas id="gameCanvas"></canvas>
 </div>
 
 <script>
   // =========================================================================
-  // DOM & CANVAS REFERENCES
+  // FULL-SCREEN VIEWPORT & DYNAMIC CANVAS SCALING
   // =========================================================================
-  const weirWrapper = document.getElementById('weir-wrapper');
-  const mapView = document.getElementById('map-view');
-
   const cvs = document.getElementById('gameCanvas');
   const ctx = cvs.getContext('2d');
-  ctx.imageSmoothingEnabled = false;
 
-  const MAP_WIDTH = 480;
-  const MAP_HEIGHT = 336;
-  const mapCanvas = document.getElementById('mapCanvas');
-  const mapCtx = mapCanvas.getContext('2d');
-  mapCtx.imageSmoothingEnabled = false;
+  let VIEW_W = 320;
+  let VIEW_H = 380;
 
-  const terrainCanvas = document.createElement('canvas');
-  terrainCanvas.width = MAP_WIDTH;
-  terrainCanvas.height = MAP_HEIGHT;
-  const tCtx = terrainCanvas.getContext('2d');
-  tCtx.imageSmoothingEnabled = false;
+  function resizeViewport() {
+    const container = document.getElementById('game-container');
+    const rect = container.getBoundingClientRect();
+    const w = Math.max(1, rect.width);
+    const h = Math.max(1, rect.height);
+    const aspect = h / w;
 
-  const briefingScreen = document.getElementById('briefing-screen');
-  const dialogHeading = document.getElementById('dialog-heading');
-  const dialogPage = document.getElementById('dialog-page');
-  const dialogSide1 = document.getElementById('dialog-side-1');
-  const dialogSide2 = document.getElementById('dialog-side-2');
-  const flipLabel = document.getElementById('flip-label');
-
-  const gameoverScreen = document.getElementById('gameover-screen');
-  const gameoverSub = document.getElementById('gameover-sub');
-  const gameoverRank = document.getElementById('gameover-rank');
-
-  const timeDisplay = document.getElementById('time-display');
-  const rankDisplay = document.getElementById('rank-display');
-  const hbcDisplay = document.getElementById('hbc-display');
-  const locDisplay = document.getElementById('loc-display');
-  const goodsDisplay = document.getElementById('goods-display');
+    VIEW_W = 320;
+    VIEW_H = Math.max(240, Math.min(640, Math.round(VIEW_W * aspect)));
+    cvs.width = VIEW_W;
+    cvs.height = VIEW_H;
+    ctx.imageSmoothingEnabled = false;
+  }
+  window.addEventListener('resize', resizeViewport);
+  resizeViewport();
 
   // =========================================================================
   // UNIFIED GBC / SNES ALTTP COLOR PALETTE + DYNAMIC SEASONAL THEME ENGINE
@@ -495,7 +97,6 @@
     stoneDark: '#3b3e4a',
     stoneMid: '#686f80',
     stoneLight: '#9ba3b5',
-    // Tyndall Limestone palette for Upper Fort Garry
     limestoneDark: '#8a816c',
     limestoneMid: '#cfc6b0',
     limestoneLight: '#ebe4d3',
@@ -651,10 +252,10 @@
   let lastBakedSeasonBucket = -1;
 
   const snowFlakes = [];
-  for (let i = 0; i < 65; i++) {
+  for (let i = 0; i < 80; i++) {
     snowFlakes.push({
       x: (i * 37) % 480,
-      y: (i * 53) % 336,
+      y: (i * 53) % 640,
       speedY: 0.45 + (i % 4) * 0.2,
       driftPhase: i * 0.7
     });
@@ -736,6 +337,7 @@
     if (bgmTimer) clearInterval(bgmTimer);
     bgmStep = 0;
     bgmTimer = setInterval(() => {
+      if (isPaused) return;
       playTone(melodyNotes[bgmStep], 'square', 0.18, 0.032);
       if (bassNotes[bgmStep]) playTone(bassNotes[bgmStep], 'triangle', 0.28, 0.12);
       bgmStep = (bgmStep + 1) % melodyNotes.length;
@@ -749,6 +351,14 @@
   // =========================================================================
   // 1850 RED RIVER SETTLEMENT GEOGRAPHIC DATA (480 x 336)
   // =========================================================================
+  const MAP_WIDTH = 480;
+  const MAP_HEIGHT = 336;
+  const terrainCanvas = document.createElement('canvas');
+  terrainCanvas.width = MAP_WIDTH;
+  terrainCanvas.height = MAP_HEIGHT;
+  const tCtx = terrainCanvas.getContext('2d');
+  tCtx.imageSmoothingEnabled = false;
+
   const ASSINIBOINE_POINTS = [
     [34, 141], [54, 147], [78, 152], [102, 150], [126, 156],
     [152, 164], [176, 166], [202, 162], [226, 165], [244, 174],
@@ -809,26 +419,20 @@
     return min + Math.random() * (max - min);
   }
 
-  // Checkpoint-Specific Modifiers:
-  // 01 Upper Fort Garry: Higher HBC Officers, all 4 small game hunters (cree, saulteaux, voyageur, kilt), higher HBC deal, low/no buffalo hunter
-  // 02 St. Boniface: Lower HBC Officers, 50/50 small game (cree, voyageur), higher Player deal, lower buffalo hunter
-  // 03 St. Vital: Lower HBC Officers, 50/50 small game (cree, voyageur), higher Player deal, higher buffalo hunter ratio with overall spawn rate halved
-  // 04 Kildonan: Average-to-high HBC Officers, Saulteaux & Kilt small game hunters, higher HBC deal, low buffalo hunter
-  // 05 St. James: Average-to-high HBC Officers, Kilt small game hunter, higher HBC deal, high buffalo hunter
-  // 06 St. Francois-Xavier: Low HBC Officers, Cree small game hunter, higher Player deal, high buffalo hunter, Warden of the Plains every 2 min (120s), rare Spirited White Horse
   const CHECKPOINTS = [
     {
       id: 'upper_fort_garry',
       name: 'UPPER FORT GARRY',
+      shortName: 'FORT GARRY',
       x: 334, y: 162,
       hbcIconX: 348, hbcIconY: 150,
       flow: 'WE',
       entrySide: 'NORTH',
       smallGameSkins: ['cree', 'saulteaux', 'voyageur', 'kilt'],
       smallGameRange: [16, 24],
-      buffaloRange: [150, 210], // Low to no buffalo hunter spawn
-      hbcRange: [38, 52],       // Higher HBC Officer spawn
-      hbcDealChance: 0.78,      // Higher HBC deal rate
+      buffaloRange: [150, 210],
+      hbcRange: [38, 52],
+      hbcDealChance: 0.78,
       status: 'UNSET',
       cartX: 112, cartY: 64,
       setProgress: 0,
@@ -845,15 +449,16 @@
     {
       id: 'st_boniface',
       name: 'ST. BONIFACE',
+      shortName: 'ST. BONIFACE',
       x: 365, y: 184,
       hbcIconX: 379, hbcIconY: 172,
       flow: 'NS',
       entrySide: 'EAST',
-      smallGameSkins: ['cree', 'voyageur'], // 50/50 small game hunter
+      smallGameSkins: ['cree', 'voyageur'],
       smallGameRange: [16, 24],
-      buffaloRange: [68, 88],   // Lower buffalo hunter spawn
-      hbcRange: [105, 135],     // Lower HBC Officer spawn
-      hbcDealChance: 0.25,      // Higher Player deal (75% player)
+      buffaloRange: [68, 88],
+      hbcRange: [105, 135],
+      hbcDealChance: 0.25,
       status: 'UNSET',
       cartX: 186, cartY: 146,
       setProgress: 0,
@@ -870,15 +475,16 @@
     {
       id: 'st_vital',
       name: 'ST. VITAL',
+      shortName: 'ST. VITAL',
       x: 318, y: 266,
       hbcIconX: 300, hbcIconY: 254,
       flow: 'NS',
       entrySide: 'WEST',
-      smallGameSkins: ['cree', 'voyageur'], // 50/50 small game hunter
-      smallGameRange: [44, 58], // Overall spawn rate halved, Buffalo favored over Small Game
-      buffaloRange: [34, 46],   // Higher buffalo hunter ratio within halved overall spawn rate
-      hbcRange: [140, 175],     // Lower HBC Officer spawn (halved overall rate)
-      hbcDealChance: 0.25,      // Higher Player deal (75% player)
+      smallGameSkins: ['cree', 'voyageur'],
+      smallGameRange: [44, 58],
+      buffaloRange: [34, 46],
+      hbcRange: [140, 175],
+      hbcDealChance: 0.25,
       status: 'UNSET',
       cartX: 54, cartY: 146,
       setProgress: 0,
@@ -895,15 +501,16 @@
     {
       id: 'kildonan',
       name: 'KILDONAN',
+      shortName: 'KILDONAN',
       x: 382, y: 92,
       hbcIconX: 396, hbcIconY: 80,
       flow: 'NS',
       entrySide: 'EAST',
-      smallGameSkins: ['saulteaux', 'kilt'], // Saulteaux & Scottish Kilt small game hunters
+      smallGameSkins: ['saulteaux', 'kilt'],
       smallGameRange: [16, 24],
-      buffaloRange: [85, 115],  // Low buffalo hunter spawn
-      hbcRange: [48, 64],       // Average to high HBC Officer spawn
-      hbcDealChance: 0.75,      // Higher HBC deal
+      buffaloRange: [85, 115],
+      hbcRange: [48, 64],
+      hbcDealChance: 0.75,
       status: 'UNSET',
       cartX: 186, cartY: 146,
       setProgress: 0,
@@ -920,15 +527,16 @@
     {
       id: 'st_james',
       name: 'ST. JAMES',
+      shortName: 'ST. JAMES',
       x: 196, y: 150,
       hbcIconX: 210, hbcIconY: 136,
       flow: 'WE',
       entrySide: 'NORTH',
-      smallGameSkins: ['kilt'], // Kilt-wearing small game hunter
+      smallGameSkins: ['kilt'],
       smallGameRange: [16, 24],
-      buffaloRange: [24, 32],   // High buffalo hunter spawn
-      hbcRange: [48, 64],       // Average to high HBC Officer spawn
-      hbcDealChance: 0.75,      // Higher HBC deal
+      buffaloRange: [24, 32],
+      hbcRange: [48, 64],
+      hbcDealChance: 0.75,
       status: 'UNSET',
       cartX: 120, cartY: 64,
       setProgress: 0,
@@ -945,15 +553,16 @@
     {
       id: 'st_francois_xavier',
       name: 'ST. FRANCOIS-XAVIER',
+      shortName: 'ST. F-X',
       x: 52, y: 135,
       hbcIconX: 66, hbcIconY: 121,
       flow: 'WE',
       entrySide: 'NORTH',
-      smallGameSkins: ['cree'], // Cree small game hunter
+      smallGameSkins: ['cree'],
       smallGameRange: [16, 24],
-      buffaloRange: [24, 32],   // High buffalo hunter spawn
-      hbcRange: [110, 140],     // Low regular HBC Officer spawn
-      hbcDealChance: 0.20,      // Higher Player deal (80% player)
+      buffaloRange: [24, 32],
+      hbcRange: [110, 140],
+      hbcDealChance: 0.20,
       status: 'UNSET',
       cartX: 120, cartY: 64,
       setProgress: 0,
@@ -966,7 +575,6 @@
       hbcTimer: 75 + Math.random() * 20,
       hbcActiveTimer: 0,
       hbcTriggeredPass: false,
-      // Warden of the Plains (once every 2 minutes = 120s)
       wardenTimer: 55,
       wardenActiveTimer: 0,
       wardenTriggeredPass: false
@@ -983,7 +591,7 @@
   const cursor = { x: 334, y: 162, targetX: 334, targetY: 162 };
 
   // =========================================================================
-  // 16-BIT PIXEL ART MATRICES (All 4 Small-Game Skins + Warden + White Horse)
+  // 16-BIT PIXEL ART MATRICES
   // =========================================================================
   const sprCoverCart = [
     [0,0,0,0,0,7,7,8,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
@@ -1007,7 +615,6 @@
     [0,0,0,0,0,0,0,0,5,5,5,5,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
   ];
 
-  // User Player: Métis Freetrader (14x15)
   const sprFreetrader = [
     [0,0,0,0,1,1,1,1,1,1,0,0,0,0],
     [0,0,1,1,1,1,1,1,1,1,1,1,0,0],
@@ -1026,7 +633,6 @@
     [0,0,0,5,5,5,0,0,5,5,5,0,0,0]
   ];
 
-  // NPC 1: Buffalo Hunter (16x15)
   const sprBuffaloHunter = [
     [0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0],
     [0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0],
@@ -1045,7 +651,6 @@
     [0,0,0,0,1,1,1,0,0,1,1,1,0,0,0,0]
   ];
 
-  // NPC 2A: Indigenous Cree Hunter (Fringed Buckskin & Bow & Arrow) (16x15)
   const sprCreeHunter = [
     [0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0],
     [0,0,0,0,1,1,1,1,1,1,1,0,0,5,0,0],
@@ -1064,7 +669,6 @@
     [0,0,0,0,4,4,4,0,4,4,4,0,0,0,0,0]
   ];
 
-  // NPC 2B: 3-Stripe Capote Wearing Voyageur (16x15)
   const sprVoyageur = [
     [0,0,0,0,0,4,4,4,4,0,0,0,0,0,0,0],
     [0,0,0,0,4,4,4,4,4,4,0,0,0,0,0,0],
@@ -1083,9 +687,6 @@
     [0,0,0,1,1,1,0,0,1,1,1,0,0,0,0,0]
   ];
 
-  // NPC 2C: Saulteaux Small Game Hunter (Floral-Beaded Bandolier, Feathered Headband & Spear) (16x15)
-  // 1: Dark Hair/Leggings, 2: Skin, 3: Deep Indigo/Charcoal Capote, 4: Crimson & Gold Floral Bandolier,
-  // 5: White/Gold Eagle Feather, 6: Wooden Hunting Spear
   const sprSaulteauxHunter = [
     [0,0,0,5,0,1,1,1,1,1,0,0,0,0,6,0],
     [0,0,0,0,5,4,4,4,4,4,1,0,0,0,6,0],
@@ -1104,9 +705,6 @@
     [0,0,0,1,1,1,0,0,1,1,1,0,0,0,0,0]
   ];
 
-  // NPC 2D: Scottish Kilt Small Game Hunter (Tam o' Shanter Bonnet, Tartan Kilt & Fowling Piece) (16x15)
-  // 1: Dark Bonnet/Boots, 2: Skin, 3: Earth-Brown Jacket, 4: Red Tartan Kilt & Pom-Pom,
-  // 5: Green & Gold Tartan Check, 6: White Wool Hose, 7: Fowling Gun
   const sprKiltHunter = [
     [0,0,0,0,0,0,4,4,0,0,0,0,0,0,0,0],
     [0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0],
@@ -1125,7 +723,6 @@
     [0,0,0,0,1,1,1,0,0,1,1,1,0,0,0,0]
   ];
 
-  // NPC 3: Standard HBC Officer (Tall Black Top Hat & Scarlet Red Coat) (14x16)
   const sprHbcOfficer = [
     [0,0,0,0,1,1,1,1,1,1,0,0,0,0],
     [0,0,0,0,1,1,1,1,1,1,0,0,0,0],
@@ -1145,7 +742,6 @@
     [0,0,0,1,1,1,0,0,1,1,1,0,0,0]
   ];
 
-  // Special Wildcard NPC: Warden of the Plains (Gold-Sashed & Plumed Top Hat HBC Commander) (14x17)
   const sprWardenPlains = [
     [0,0,0,6,6,0,0,0,0,0,0,0,0,0],
     [0,0,0,0,1,1,1,1,1,1,0,0,0,0],
@@ -1166,9 +762,6 @@
     [0,0,0,1,1,1,0,0,1,1,1,0,0,0]
   ];
 
-  // Rare Spirited White Horse for St. Francois-Xavier (20x16, naturally facing right)
-  // 1: Pure Snow-White Coat, 2: Silver-Grey Shading, 3: Flowing Cream/Silver Mane & Tail,
-  // 4: Dark Expressive Eye/Hooves, 5: Soft Pink/Grey Muzzle
   const sprWhiteHorse = [
     [0,0,0,0,0,0,0,0,0,0,0,0,0,3,3,1,0,0,0,0],
     [0,0,0,0,0,0,0,0,0,0,0,0,3,3,1,1,1,0,0,0],
@@ -1185,7 +778,6 @@
     [0,4,0,0,0,4,0,0,0,0,4,0,0,0,4,0,0,0,0,0]
   ];
 
-  // Ambient Underwater Fish
   const sprWhitefishNorth = [
     [0,0,0,0,1,0,0,0,0],
     [0,0,0,1,2,1,0,0,0],
@@ -1264,12 +856,28 @@
     }
   }
 
+  function drawPixelText(txt, x, y, size, color, align = 'left', shadow = true) {
+    ctx.font = `${size}px "Press Start 2P", monospace`;
+    ctx.textAlign = align;
+    if (shadow) {
+      ctx.fillStyle = PALETTE.black;
+      ctx.fillText(txt, x + 1, y + 1);
+    }
+    ctx.fillStyle = color;
+    ctx.fillText(txt, x, y);
+  }
+
+  function drawWrappedLines(lines, x, startY, lineHeight, size, color, align = 'left') {
+    for (let i = 0; i < lines.length; i++) {
+      drawPixelText(lines[i], x, startY + i * lineHeight, size, color, align, true);
+    }
+  }
+
   // =========================================================================
   // DIRT-ROAD-ONLY VALIDATION (CHECKPOINT-SPECIFIC ROADS)
   // =========================================================================
   function isOnDirtRoad(cp, x, y) {
     if (cp.id === 'upper_fort_garry') {
-      // Upper Fort Garry: Red River left bank is at x=178, so E-W roads run x: 12..172
       if (x >= 12 && x <= 172 && y >= 56 && y <= 72) return true;
       if (x >= 112 && x <= 128 && y >= 14 && y <= 58) return true;
       if (x >= 12 && x <= 172 && y >= 164 && y <= 180) return true;
@@ -1277,7 +885,6 @@
     }
 
     if (cp.flow === 'NS') {
-      // West bank N-S road (in St. Boniface, Assiniboine enters at y=136..182, so West road runs y: 16..132 & 184..228)
       if (cp.id === 'st_boniface') {
         if (x >= 46 && x <= 62 && ((y >= 16 && y <= 132) || (y >= 184 && y <= 228))) return true;
       } else {
@@ -1286,12 +893,10 @@
       if (x >= 46 && x <= 72 && y >= 112 && y <= 128) return true;
       if (cp.entrySide === 'WEST' && x >= 6 && x <= 46 && y >= 112 && y <= 128) return true;
 
-      // East bank N-S road
       if (x >= 178 && x <= 194 && y >= 16 && y <= 228) return true;
       if (x >= 168 && x <= 194 && y >= 112 && y <= 128) return true;
       if (cp.entrySide === 'EAST' && x >= 194 && x <= 234 && y >= 112 && y <= 128) return true;
 
-      // St. Boniface: West-East road on the north side of the Cathedral (y: 2..15, x: 168..236)
       if (cp.id === 'st_boniface' && x >= 168 && x <= 236 && y >= 2 && y <= 16) return true;
 
       return false;
@@ -1304,7 +909,7 @@
   }
 
   // =========================================================================
-  // BASELINE RANK STANDING SYSTEM (PELT & ROBE TRACKING)
+  // BASELINE RANK STANDING SYSTEM & REPUTATION RATIO (x:y:z)
   // =========================================================================
   function getBaselineTradeStanding() {
     return totalFurs + (totalRobes * 2);
@@ -1329,10 +934,14 @@
   let frameTick = 0;
   let timeLeft = 300;
   let lastSecondTimestamp = 0;
+  let isPaused = false;
 
   let totalFurs = 0;
   let totalRobes = 0;
-  let hbcBrokenCount = 0;
+
+  let hbcDealsLost = 0;     // x = small game deals lost to HBC
+  let buffaloRedirects = 0; // y = times a buffalo hunter re-directed an HBC officer
+  let hbcBrokenCount = 0;   // z = Red River Carts busted by HBC officer
 
   let activeCheckpointIndex = 0;
   let player = { x: 54, y: 120, dir: 'right', moving: false };
@@ -1341,48 +950,43 @@
   let riverFish = [];
   let floatingPopups = [];
 
-  // Rare Spirited White Horse state (once every gameplay at St. Francois-Xavier)
   let whiteHorseTriggeredThisRun = false;
   let whiteHorse = null;
+
+  // --- POSTMESSAGE JOYSTICK HOLD & BUTTON DEBOUNCE STATE ---
+  const dpadExpiry = { UP: 0, DOWN: 0, LEFT: 0, RIGHT: 0 };
+  const DPAD_HOLD_WINDOW_MS = 145;
+  let lastBtnATime = 0;
+  let lastBtnBTime = 0;
+  const BTN_DEBOUNCE_MS = 110;
+  let weirStepCooldown = 0;
+
+  function isDpadHeld(dir) {
+    return performance.now() < dpadExpiry[dir];
+  }
+
+  function clearAllInputs() {
+    dpadExpiry.UP = 0;
+    dpadExpiry.DOWN = 0;
+    dpadExpiry.LEFT = 0;
+    dpadExpiry.RIGHT = 0;
+    weirStepCooldown = 0;
+  }
 
   function setViewMode(mode) {
     gameState = mode;
     if (mode === 'MAP') {
-      weirWrapper.style.display = 'none';
-      mapView.style.display = 'flex';
       const bucket = Math.floor((300 - timeLeft) / 5);
       if (bucket !== lastBakedSeasonBucket) {
         bakeStaticMap();
       }
-      updateCheckpointBoxesUI();
-    } else {
-      mapView.style.display = 'none';
-      weirWrapper.style.display = 'block';
-    }
-    updateHUD();
-  }
-
-  function setBriefingSide(side) {
-    briefingSide = side;
-    if (side === 1) {
-      dialogHeading.textContent = 'THE FREETRADERS';
-      dialogPage.textContent = '[B] 1/2';
-      dialogSide1.style.display = 'block';
-      dialogSide2.style.display = 'none';
-      flipLabel.textContent = '[B] HOW TO PLAY';
-    } else {
-      dialogHeading.textContent = 'HOW TO PLAY';
-      dialogPage.textContent = '[B] 2/2';
-      dialogSide1.style.display = 'none';
-      dialogSide2.style.display = 'block';
-      flipLabel.textContent = '[B] HISTORY';
     }
   }
 
   function toggleBriefingSide() {
     if (gameState !== 'BRIEFING') return;
     sfxCursor();
-    setBriefingSide(briefingSide === 1 ? 2 : 1);
+    briefingSide = briefingSide === 1 ? 2 : 1;
   }
 
   function getCartWeight(cp) {
@@ -1390,7 +994,6 @@
   }
 
   function getCheckpointHbcPresence(cp, idx) {
-    // Returns 'warden' if Warden of the Plains is active/in frame, 'hbc' if regular HBC officer, or null
     if (gameState === 'WEIR' && activeCheckpointIndex === idx) {
       if (sceneNPCs.some(n => n.role === 'warden')) return 'warden';
       if (sceneNPCs.some(n => n.role === 'hbc')) return 'hbc';
@@ -1418,7 +1021,7 @@
       cp.hbcActiveTimer = 0;
       cp.hbcTriggeredPass = false;
       if (cp.id === 'st_francois_xavier') {
-        cp.wardenTimer = 55; // First appearance ~4:05, then every 120s (2 minutes)
+        cp.wardenTimer = 55;
         cp.wardenActiveTimer = 0;
         cp.wardenTriggeredPass = false;
       }
@@ -1436,7 +1039,18 @@
   function updateSimulation(now) {
     const dt = Math.min(0.1, (now - lastFrameTime) / 1000);
     lastFrameTime = now;
+    if (isPaused) return;
+
     frameTick++;
+    if (weirStepCooldown > 0) weirStepCooldown = Math.max(0, weirStepCooldown - dt);
+
+    // Smooth continuous walking when joystick is held in WEIR scene
+    if (gameState === 'WEIR' && weirStepCooldown <= 0) {
+      if (isDpadHeld('UP'))         { moveWeirPlayer('UP');    weirStepCooldown = 0.11; }
+      else if (isDpadHeld('DOWN'))  { moveWeirPlayer('DOWN');  weirStepCooldown = 0.11; }
+      else if (isDpadHeld('LEFT'))  { moveWeirPlayer('LEFT');  weirStepCooldown = 0.11; }
+      else if (isDpadHeld('RIGHT')) { moveWeirPlayer('RIGHT'); weirStepCooldown = 0.11; }
+    }
 
     if (gameState !== 'MAP' && gameState !== 'WEIR') return;
 
@@ -1455,7 +1069,6 @@
       }
     }
 
-    // Update all 6 checkpoints independently in real time
     for (let idx = 0; idx < CHECKPOINTS.length; idx++) {
       const cp = CHECKPOINTS[idx];
       const isViewingThis = (gameState === 'WEIR' && activeCheckpointIndex === idx);
@@ -1485,7 +1098,6 @@
           cp.isWorking = false;
           hbcBrokenCount++;
           sfxBust();
-          updateHUD();
 
           if (hbcBrokenCount >= 3) {
             triggerGameOver(true);
@@ -1507,11 +1119,9 @@
         }
       }
 
-      // St. Francois-Xavier: Warden of the Plains (once every 2 minutes = 120s)
       if (cp.id === 'st_francois_xavier') {
         if (cp.wardenActiveTimer > 0) {
           cp.wardenActiveTimer -= dt;
-          // Offscreen wildcard check: 50/50 turns a blind eye to player's cart!
           if (!isViewingThis && cp.status === 'ACTIVE' && !cp.wardenTriggeredPass && cp.wardenActiveTimer <= 8.0) {
             cp.wardenTriggeredPass = true;
             if (Math.random() >= 0.5) {
@@ -1527,7 +1137,7 @@
 
         cp.wardenTimer -= dt;
         if (cp.wardenTimer <= 0) {
-          cp.wardenTimer = 120.0; // Strictly once every 2 minutes
+          cp.wardenTimer = 120.0;
           if (isViewingThis) {
             spawnCheckpointNPC(cp, 'warden');
           } else {
@@ -1537,7 +1147,7 @@
         }
       }
 
-      // 1) SmallGameHunter (Checkpoint-specific skin pool & HBC deal odds)
+      // 1) SmallGameHunter
       cp.smallGameTimer -= dt;
       if (cp.smallGameTimer <= 0) {
         cp.smallGameTimer = rollRange(cp.smallGameRange);
@@ -1548,14 +1158,14 @@
         } else if (cp.status === 'ACTIVE') {
           const hasAuthority = (cp.hbcActiveTimer > 0 || cp.wardenActiveTimer > 0);
           if (hasAuthority && Math.random() < cp.hbcDealChance) {
-            // Traded fur to HBC Officer offscreen
+            hbcDealsLost++;
           } else {
             applyOffscreenNpcTrade(cp, variant);
           }
         }
       }
 
-      // 2) BuffaloHunter (Checkpoint-specific spawn interval)
+      // 2) BuffaloHunter
       cp.buffaloTimer -= dt;
       if (cp.buffaloTimer <= 0) {
         cp.buffaloTimer = rollRange(cp.buffaloRange);
@@ -1565,11 +1175,12 @@
           if (cp.hbcActiveTimer > 0) {
             cp.hbcActiveTimer = 0;
             cp.hbcTriggeredPass = false;
+            buffaloRedirects++;
           }
           if (cp.wardenActiveTimer > 0 && Math.random() < 0.5) {
-            // 50/50 Warden gets spooked by Buffalo Hunter offscreen
             cp.wardenActiveTimer = 0;
             cp.wardenTriggeredPass = false;
+            buffaloRedirects++;
           }
           if (cp.status === 'ACTIVE') {
             applyOffscreenNpcTrade(cp, 'buffalo');
@@ -1577,7 +1188,7 @@
         }
       }
 
-      // 3) Regular HBC Officer (Checkpoint-specific spawn interval)
+      // 3) Regular HBC Officer
       cp.hbcTimer -= dt;
       if (cp.hbcTimer <= 0) {
         cp.hbcTimer = rollRange(cp.hbcRange);
@@ -1595,8 +1206,6 @@
       updateSceneNPCs(cp, dt);
       updateSceneFish(cp);
       updateWhiteHorse(cp, dt);
-    } else if (gameState === 'MAP' && frameTick % 12 === 0) {
-      updateCheckpointBoxesUI();
     }
 
     for (let i = floatingPopups.length - 1; i >= 0; i--) {
@@ -1604,8 +1213,6 @@
       floatingPopups[i].life -= dt;
       if (floatingPopups[i].life <= 0) floatingPopups.splice(i, 1);
     }
-
-    updateHUD();
   }
 
   function applyOffscreenNpcTrade(cp, role) {
@@ -1648,7 +1255,6 @@
       x: 248,
       y: 34,
       dir: 'left',
-      phase: 'enter',
       timer: 0,
       waypoints: [
         { x: 196, y: 28 },
@@ -1683,7 +1289,6 @@
     if (dist <= 2) {
       whiteHorse.x = target.x;
       whiteHorse.y = target.y;
-      // Spirited pause in the middle of the field to toss its mane
       if (whiteHorse.wpIndex === 2) {
         whiteHorse.timer = 1.3;
         sfxHorseWhinny();
@@ -1706,7 +1311,6 @@
     const gallop = Math.floor(frameTick / 7) % 2 === 0 ? 0 : -2;
     const flip = whiteHorse.dir === 'left';
 
-    // Ground shadow in prairie grass
     ctx.fillStyle = 'rgba(15, 19, 36, 0.35)';
     ctx.fillRect(Math.round(whiteHorse.x - 8), Math.round(whiteHorse.y - 1), 16, 3);
 
@@ -1720,26 +1324,20 @@
   }
 
   // =========================================================================
-  // STRICT DIRT-ROAD & STEPPING-STONE NPC ROUTING (NEVER CROSSES OPEN WATER)
+  // STRICT DIRT-ROAD & STEPPING-STONE NPC ROUTING
   // =========================================================================
   function buildExitWaypointsFrom(cp, x, y, avoidX = null, avoidY = null) {
     if (cp.flow === 'NS') {
       const pts = [];
       let bankX;
       if (x > 58 && x < 182) {
-        if (avoidX !== null) {
-          bankX = avoidX < x ? 186 : 54;
-        } else {
-          bankX = x < 120 ? 54 : 186;
-        }
+        if (avoidX !== null) bankX = avoidX < x ? 186 : 54;
+        else bankX = x < 120 ? 54 : 186;
         pts.push({ x: bankX, y: 120 });
       } else {
         bankX = x < 120 ? 54 : 186;
-        if (Math.abs(x - bankX) > 3) {
-          pts.push({ x: bankX, y });
-        }
+        if (Math.abs(x - bankX) > 3) pts.push({ x: bankX, y });
       }
-      // In St. Boniface, West bank has Assiniboine at y=136..182, so West bank exits North (-14)
       let exitY;
       if (cp.id === 'st_boniface' && bankX === 54) {
         exitY = -14;
@@ -1752,19 +1350,13 @@
       const pts = [];
       let bankY;
       if (y > 68 && y < 168) {
-        if (avoidY !== null) {
-          bankY = avoidY < y ? 172 : 64;
-        } else {
-          bankY = y < 120 ? 64 : 172;
-        }
+        if (avoidY !== null) bankY = avoidY < y ? 172 : 64;
+        else bankY = y < 120 ? 64 : 172;
         pts.push({ x: 120, y: bankY });
       } else {
         bankY = y < 120 ? 64 : 172;
-        if (Math.abs(y - bankY) > 3) {
-          pts.push({ x, y: bankY });
-        }
+        if (Math.abs(y - bankY) > 3) pts.push({ x, y: bankY });
       }
-      // In Upper Fort Garry, Red River is on the right edge (x>=174), so exit West (-14) or North gate
       if (cp.id === 'upper_fort_garry') {
         pts.push({ x: -14, y: bankY });
       } else {
@@ -1849,14 +1441,10 @@
     let startY = 0;
 
     if (cp.flow === 'NS') {
-      // In St. Boniface, West side has Assiniboine at y=136..182, so West spawns/exits from North (y=-10)
       const startOnWest = fromSideA;
       startX = startOnWest ? 54 : 186;
-      if (cp.id === 'st_boniface' && startOnWest) {
-        startY = -10;
-      } else {
-        startY = Math.random() < 0.5 ? -10 : 250;
-      }
+      if (cp.id === 'st_boniface' && startOnWest) startY = -10;
+      else startY = Math.random() < 0.5 ? -10 : 250;
 
       const crossRiver = Math.random() < 0.45;
       if (crossRiver) {
@@ -1879,14 +1467,10 @@
         ];
       }
     } else {
-      // In Upper Fort Garry, Red River is on the right edge (x >= 174), so spawn/exit from West (-10)
       const startOnNorth = fromSideA;
       startY = startOnNorth ? 64 : 172;
-      if (cp.id === 'upper_fort_garry') {
-        startX = -10;
-      } else {
-        startX = Math.random() < 0.5 ? -10 : 250;
-      }
+      if (cp.id === 'upper_fort_garry') startX = -10;
+      else startX = Math.random() < 0.5 ? -10 : 250;
 
       const crossRiver = Math.random() < 0.45;
       if (crossRiver) {
@@ -1928,9 +1512,6 @@
       hbcPreference: undefined
     };
 
-    // Priority Rule 1: If HBC Officer or Warden was already in frame first, when BuffaloHunter appears:
-    // - Regular HBC Officer always gets spooked
-    // - Warden of the Plains has a 50/50 chance to get spooked or stand his ground!
     if (role === 'buffalo') {
       sceneNPCs.forEach(existing => {
         if (isOfficerRole(existing.role) && !existing.spooked && !existing.scaredByBuffalo) {
@@ -1945,14 +1526,13 @@
           existing.pauseTimer = 0.25;
           existing.waypoints = buildExitWaypointsFrom(cp, existing.x, existing.y, startX, startY);
           existing.wpIndex = 0;
+          buffaloRedirects++;
           sfxScareHbc();
           addPopup('!', existing.x - 2, existing.y - 20, PALETTE.roofRed);
         }
       });
     }
 
-    // Priority Rule 2: If BuffaloHunter is already on screen when HBC Officer / Warden appears:
-    // BuffaloHunter prioritizes going toward them to scare them!
     if (isOfficerRole(role)) {
       const existingBuffalo = sceneNPCs.find(existing => existing.role === 'buffalo' && !existing.chasingHbc);
       if (existingBuffalo) {
@@ -1975,9 +1555,7 @@
       } else {
         const npcOnWest = npc.x < 120;
         const startBankX = npcOnWest ? 54 : 186;
-        if (Math.abs(npc.x - startBankX) > 3) {
-          pts.push({ x: startBankX, y: npc.y });
-        }
+        if (Math.abs(npc.x - startBankX) > 3) pts.push({ x: startBankX, y: npc.y });
         if (npcOnWest !== cartOnWest) {
           pts.push({ x: startBankX, y: 120 });
           pts.push({ x: cartBankX, y: 120 });
@@ -2007,9 +1585,7 @@
       } else {
         const npcOnNorth = npc.y < 120;
         const startBankY = npcOnNorth ? 64 : 172;
-        if (Math.abs(npc.y - startBankY) > 3) {
-          pts.push({ x: npc.x, y: startBankY });
-        }
+        if (Math.abs(npc.y - startBankY) > 3) pts.push({ x: npc.x, y: startBankY });
         if (npcOnNorth !== cartOnNorth) {
           pts.push({ x: 120, y: startBankY });
           pts.push({ x: 120, y: cartBankY });
@@ -2040,7 +1616,6 @@
         continue;
       }
 
-      // PRIORITY 1: Buffalo Hunter chasing & scaring HBC Officer / Warden along walkable paths
       if (npc.role === 'buffalo' && npc.chasingHbc) {
         const hbc = npc.chasingHbc;
         const stillHere = sceneNPCs.includes(hbc) && !hbc.scaredByBuffalo && !hbc.spooked;
@@ -2051,7 +1626,6 @@
           moveActorWalkablyToward(cp, npc, hbc.x, hbc.y, 0.58);
           if (Math.hypot(npc.x - hbc.x, npc.y - hbc.y) <= 13) {
             if (hbc.role === 'warden' && Math.random() < 0.5) {
-              // 50/50 Warden refuses to be spooked!
               npc.chasingHbc = null;
               npc.pauseTimer = 0.4;
               npc.routedToCart = false;
@@ -2068,6 +1642,7 @@
               npc.chasingHbc = null;
               npc.pauseTimer = 0.4;
               npc.routedToCart = false;
+              buffaloRedirects++;
 
               sfxScareHbc();
               addPopup('SCARED!', hbc.x - 16, hbc.y - 20, PALETTE.compassGold);
@@ -2077,7 +1652,6 @@
         }
       }
 
-      // PRIORITY 2: SmallGameHunter & HBC Officer / Warden "Discussion" Trade (checkpoint-specific deal odds!)
       if (isSmallGameRole(npc.role) && !npc.hasInteracted) {
         const availableHbc = sceneNPCs.find(
           other => isOfficerRole(other.role) && !other.spooked && !other.scaredByBuffalo
@@ -2085,9 +1659,7 @@
 
         if (availableHbc && npc.hbcPreference === undefined) {
           npc.hbcPreference = Math.random() < cp.hbcDealChance;
-          if (npc.hbcPreference) {
-            npc.discussingWithHbc = availableHbc;
-          }
+          if (npc.hbcPreference) npc.discussingWithHbc = availableHbc;
         }
 
         if (npc.discussingWithHbc) {
@@ -2107,6 +1679,7 @@
               targetHbc.pauseTimer = Math.max(targetHbc.pauseTimer, 1.05);
               npc.waypoints = buildExitWaypointsFrom(cp, npc.x, npc.y);
               npc.wpIndex = 0;
+              hbcDealsLost++;
 
               sfxTrade();
               addPopup('HBC DEAL', npc.x - 18, npc.y - 20, PALETTE.wallWhite);
@@ -2116,7 +1689,6 @@
         }
       }
 
-      // PRIORITY 3: Standard Path to Player's Active Red River Cart
       if (cp.status === 'ACTIVE' && !npc.hasInteracted && !npc.routedToCart && !npc.spooked) {
         npc.routedToCart = true;
         npc.waypoints = buildCartApproachWaypoints(cp, npc);
@@ -2181,7 +1753,6 @@
         sfxBust();
       }
     } else if (npc.role === 'warden') {
-      // Warden of the Plains: 50/50 turns a blind eye to the freetrader!
       if (Math.random() < 0.5) {
         sfxCursor();
         addPopup('BLIND EYE', cp.cartX - 20, cp.cartY - 18, PALETTE.teal);
@@ -2197,8 +1768,6 @@
       sfxHbcAlert();
       addPopup('HBC RAID!', cp.cartX - 22, cp.cartY - 18, PALETTE.roofRed);
     }
-
-    updateCheckpointBoxesUI();
   }
 
   // =========================================================================
@@ -2250,26 +1819,33 @@
     floatingPopups.push({ text, x: Math.max(12, Math.min(182, x)), y, color, life: 1.4 });
   }
 
-  function updateHUD() {
+  // =========================================================================
+  // FULL-BLEED CANVAS HUD BAR (ANCHORED TO y = 0)
+  // =========================================================================
+  function drawTopArcadeHUD() {
+    const hudH = 26;
+    ctx.fillStyle = 'rgba(15, 19, 36, 0.94)';
+    ctx.fillRect(0, 0, VIEW_W, hudH);
+    ctx.fillStyle = PALETTE.roofBlue;
+    ctx.fillRect(0, hudH - 2, VIEW_W, 2);
+
     const mins = Math.floor(timeLeft / 60);
     const secs = timeLeft % 60;
     const rankInfo = getTraderRankInfo();
+    const locTxt = (gameState === 'MAP' || gameState === 'WEIR')
+      ? CHECKPOINTS[activeCheckpointIndex].name
+      : 'LE ROI DES TRAITEURS';
 
-    timeDisplay.innerText = `TIME:${mins}:${secs.toString().padStart(2, '0')}`;
-    rankDisplay.innerText = rankInfo.title;
-    rankDisplay.style.color = rankInfo.color;
-    hbcDisplay.innerText = `BUSTS:${hbcBrokenCount}/3`;
-    goodsDisplay.innerText = `PELTS:${totalFurs} ROBES:${totalRobes}`;
+    drawPixelText(`TIME:${mins}:${secs.toString().padStart(2, '0')}`, 6, 10, 6, PALETTE.compassGold, 'left', true);
+    drawPixelText(rankInfo.title, Math.floor(VIEW_W / 2), 10, 6, rankInfo.color, 'center', true);
+    drawPixelText(`BUSTS:${hbcBrokenCount}/3`, VIEW_W - 6, 10, 6, PALETTE.wallWhite, 'right', true);
 
-    if (gameState === 'MAP' || gameState === 'WEIR') {
-      locDisplay.innerText = CHECKPOINTS[activeCheckpointIndex].name;
-    } else {
-      locDisplay.innerText = 'LE ROI DES TRAITEURS';
-    }
+    drawPixelText(locTxt, 6, 21, 6, PALETTE.teal, 'left', true);
+    drawPixelText(`PELTS:${totalFurs} ROBES:${totalRobes}`, VIEW_W - 6, 21, 6, PALETTE.compassGold, 'right', true);
   }
 
   // =========================================================================
-  // 1850 RED RIVER SETTLEMENT MINIMAP (480 x 336 SEASONAL GBC/SNES RENDERER)
+  // 1850 RED RIVER SETTLEMENT MINIMAP (480 x 336 BAKED BUFFER + FULLSCREEN FIT)
   // =========================================================================
   function fillPoly(context, pts, color) {
     context.fillStyle = color;
@@ -2425,11 +2001,6 @@
     }
 
     drawLandmarkSprites(tCtx, pal, season);
-
-    tCtx.strokeStyle = pal.parishBorder;
-    tCtx.lineWidth = 2;
-    tCtx.strokeRect(3, 3, MAP_WIDTH - 6, MAP_HEIGHT - 6);
-    tCtx.strokeRect(6, 6, MAP_WIDTH - 12, MAP_HEIGHT - 12);
   }
 
   function drawMapSeasonalTree(context, x, y, season, variant) {
@@ -2503,7 +2074,6 @@
   function drawLandmarkSprites(context, pal, season) {
     const isSnow = season.stage === 4;
 
-    // Upper Fort Garry (Tyndall Limestone Fort on minimap)
     const fx = 331, fy = 158;
     context.fillStyle = pal.limestoneDark;
     context.fillRect(fx - 5, fy - 4, 10, 8);
@@ -2590,165 +2160,149 @@
     return inside;
   }
 
-  function drawAnimatedWaterEffects(pal, tick, season) {
+  function renderFullScreenMapView() {
+    const pal = PALETTE;
+    const season = getSeasonalTheme();
+    const topHudH = 26;
+    const bottomHudH = 56;
+    const availH = Math.max(120, VIEW_H - topHudH - bottomHudH);
+
+    // Fill outer background seamlessly with current seasonal prairie edge
+    ctx.fillStyle = season.outerBg;
+    ctx.fillRect(0, topHudH, VIEW_W, availH);
+
+    // Cover-fit the 480x336 settlement map cleanly without letterboxing or distortion
+    const scale = Math.max(VIEW_W / MAP_WIDTH, availH / MAP_HEIGHT);
+    const drawW = MAP_WIDTH * scale;
+    const drawH = MAP_HEIGHT * scale;
+
+    // Camera gently tracks active checkpoint horizontally while keeping full settlement framed
+    const activeCp = CHECKPOINTS[activeCheckpointIndex];
+    const desiredCenterX = activeCp.x * scale;
+    let offsetX = (VIEW_W * 0.5) - desiredCenterX;
+    offsetX = Math.min(0, Math.max(VIEW_W - drawW, offsetX));
+    const offsetY = topHudH + Math.floor((availH - drawH) * 0.5);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, topHudH, VIEW_W, availH);
+    ctx.clip();
+
+    ctx.translate(Math.round(offsetX), Math.round(offsetY));
+    ctx.scale(scale, scale);
+
+    // 1. Baked Seasonal Settlement Terrain
+    ctx.drawImage(terrainCanvas, 0, 0);
+
+    // 2. Animated River Sparkles or Drifting Ice Chunks
     if (season.hasIceChunks) {
       for (let i = 0; i < ASSINIBOINE_POINTS.length - 1; i += 2) {
         const [x1, y1] = ASSINIBOINE_POINTS[i];
         const [x2, y2] = ASSINIBOINE_POINTS[i + 1];
-        const t = ((tick * 0.012) + i * 0.41) % 1;
+        const t = ((frameTick * 0.012) + i * 0.41) % 1;
         const wx = Math.round(x1 + (x2 - x1) * t);
         const wy = Math.round(y1 + (y2 - y1) * t);
-        mapCtx.fillStyle = '#a8d8f0';
-        mapCtx.fillRect(wx - 2, wy - 1, 4, 3);
-        mapCtx.fillStyle = '#ffffff';
-        mapCtx.fillRect(wx - 1, wy - 1, 3, 2);
+        ctx.fillStyle = '#a8d8f0';
+        ctx.fillRect(wx - 2, wy - 1, 4, 3);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(wx - 1, wy - 1, 3, 2);
       }
-
       for (let i = 0; i < RED_RIVER_POINTS.length - 1; i += 2) {
         const [x1, y1] = RED_RIVER_POINTS[i];
         const [x2, y2] = RED_RIVER_POINTS[i + 1];
-        const t = ((tick * 0.012) + i * 0.31) % 1;
+        const t = ((frameTick * 0.012) + i * 0.31) % 1;
         const wx = Math.round(x1 + (x2 - x1) * t);
         const wy = Math.round(y1 + (y2 - y1) * t);
-        mapCtx.fillStyle = '#a8d8f0';
-        mapCtx.fillRect(wx - 2, wy - 1, 5, 3);
-        mapCtx.fillStyle = '#ffffff';
-        mapCtx.fillRect(wx - 1, wy - 1, 3, 2);
+        ctx.fillStyle = '#a8d8f0';
+        ctx.fillRect(wx - 2, wy - 1, 5, 3);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(wx - 1, wy - 1, 3, 2);
       }
-      return;
+    } else {
+      ctx.fillStyle = pal.waterFoam;
+      for (let i = 0; i < ASSINIBOINE_POINTS.length - 1; i++) {
+        const [x1, y1] = ASSINIBOINE_POINTS[i];
+        const [x2, y2] = ASSINIBOINE_POINTS[i + 1];
+        const t = ((frameTick * 0.025) + i * 0.37) % 1;
+        ctx.fillRect(Math.round(x1 + (x2 - x1) * t), Math.round(y1 + (y2 - y1) * t), 2, 1);
+      }
+      for (let i = 0; i < RED_RIVER_POINTS.length - 1; i++) {
+        const [x1, y1] = RED_RIVER_POINTS[i];
+        const [x2, y2] = RED_RIVER_POINTS[i + 1];
+        const t = ((frameTick * 0.025) + i * 0.29) % 1;
+        ctx.fillRect(Math.round(x1 + (x2 - x1) * t) - 1, Math.round(y1 + (y2 - y1) * t), 3, 1);
+      }
     }
 
-    mapCtx.fillStyle = pal.waterFoam;
-    for (let i = 0; i < ASSINIBOINE_POINTS.length - 1; i++) {
-      const [x1, y1] = ASSINIBOINE_POINTS[i];
-      const [x2, y2] = ASSINIBOINE_POINTS[i + 1];
-      const t = ((tick * 0.025) + i * 0.37) % 1;
-      const wx = Math.round(x1 + (x2 - x1) * t);
-      const wy = Math.round(y1 + (y2 - y1) * t);
-      mapCtx.fillRect(wx, wy, 2, 1);
-    }
-
-    for (let i = 0; i < RED_RIVER_POINTS.length - 1; i++) {
-      const [x1, y1] = RED_RIVER_POINTS[i];
-      const [x2, y2] = RED_RIVER_POINTS[i + 1];
-      const t = ((tick * 0.025) + i * 0.29) % 1;
-      const wx = Math.round(x1 + (x2 - x1) * t);
-      const wy = Math.round(y1 + (y2 - y1) * t);
-      mapCtx.fillRect(wx - 1, wy, 3, 1);
-    }
-  }
-
-  function drawMapSeasonalSnow(tick, season) {
-    if (season.stage !== 4) return;
-    const activeFlakes = Math.floor(snowFlakes.length * season.snowAmount);
-    mapCtx.fillStyle = '#ffffff';
-    for (let i = 0; i < activeFlakes; i++) {
-      const sf = snowFlakes[i];
-      const sy = Math.round((sf.y + tick * sf.speedY) % MAP_HEIGHT);
-      const sx = Math.round((sf.x + Math.sin(tick * 0.03 + sf.driftPhase) * 6 + MAP_WIDTH) % MAP_WIDTH);
-      mapCtx.fillRect(sx, sy, (i % 4 === 0) ? 2 : 1, (i % 4 === 0) ? 2 : 1);
-    }
-  }
-
-  function drawClouds(pal) {
+    // 3. Drifting Clouds
     clouds.forEach(c => {
       c.x += c.speed;
       if (c.x > MAP_WIDTH + 30) c.x = -40;
       const cx = Math.round(c.x);
       const cy = Math.round(c.y);
 
-      mapCtx.fillStyle = 'rgba(0, 0, 0, 0.16)';
-      mapCtx.fillRect(cx + 3, cy + 12, c.w - 4, 4);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.16)';
+      ctx.fillRect(cx + 3, cy + 12, c.w - 4, 4);
 
-      mapCtx.fillStyle = pal.wallWhite;
-      mapCtx.globalAlpha = 0.72;
-      mapCtx.fillRect(cx + 4, cy, c.w - 8, 6);
-      mapCtx.fillRect(cx, cy + 2, c.w, 4);
-      mapCtx.globalAlpha = 1.0;
+      ctx.fillStyle = pal.wallWhite;
+      ctx.globalAlpha = 0.72;
+      ctx.fillRect(cx + 4, cy, c.w - 8, 6);
+      ctx.fillRect(cx, cy + 2, c.w, 4);
+      ctx.globalAlpha = 1.0;
     });
-  }
 
-  function drawMapHbcOfficerIcon(x, y, tick, isWarden = false) {
-    const bob = Math.floor(tick / 12) % 2 === 0 ? 0 : -1;
-    const iy = y + bob;
-
-    mapCtx.fillStyle = isWarden ? PALETTE.compassGold : PALETTE.black;
-    mapCtx.fillRect(x - 4, iy - 7, 8, 13);
-
-    if (isWarden) {
-      mapCtx.fillStyle = PALETTE.black;
-      mapCtx.fillRect(x - 3, iy - 6, 6, 11);
-      // White/Gold Plume on Warden's top hat
-      mapCtx.fillStyle = '#ffffff';
-      mapCtx.fillRect(x - 3, iy - 8, 2, 2);
+    // 4. Early Winter Snowfall on Minimap
+    if (season.stage === 4) {
+      const activeFlakes = Math.floor(65 * season.snowAmount);
+      ctx.fillStyle = '#ffffff';
+      for (let i = 0; i < activeFlakes; i++) {
+        const sf = snowFlakes[i];
+        const sy = Math.round((sf.y + frameTick * sf.speedY) % MAP_HEIGHT);
+        const sx = Math.round((sf.x + Math.sin(frameTick * 0.03 + sf.driftPhase) * 6 + MAP_WIDTH) % MAP_WIDTH);
+        ctx.fillRect(sx, sy, (i % 4 === 0) ? 2 : 1, (i % 4 === 0) ? 2 : 1);
+      }
     }
 
-    mapCtx.fillStyle = '#0f1324';
-    mapCtx.fillRect(x - 2, iy - 6, 4, 3);
-    mapCtx.fillRect(x - 3, iy - 3, 6, 1);
-    mapCtx.fillStyle = PALETTE.compassGold;
-    mapCtx.fillRect(x - 2, iy - 4, 4, 1);
-
-    mapCtx.fillStyle = '#F2C699';
-    mapCtx.fillRect(x - 2, iy - 2, 4, 2);
-
-    mapCtx.fillStyle = PALETTE.roofRed;
-    mapCtx.fillRect(x - 3, iy, 6, 4);
-    mapCtx.fillStyle = PALETTE.compassGold;
-    if (isWarden) {
-      // Gold diagonal sash for Warden of the Plains
-      mapCtx.fillRect(x - 2, iy, 2, 1);
-      mapCtx.fillRect(x - 1, iy + 1, 2, 1);
-      mapCtx.fillRect(x, iy + 2, 2, 1);
-    } else {
-      mapCtx.fillRect(x, iy + 1, 1, 2);
-    }
-
-    mapCtx.fillStyle = PALETTE.wallWhite;
-    mapCtx.fillRect(x - 2, iy + 4, 4, 2);
-  }
-
-  function drawInteractiveMapOverlay(pal, tick) {
-    const pulse = Math.floor(tick / 18) % 2;
-
+    // 5. Checkpoint Nodes, HBC/Warden Icons, Cart Gauges & Capote-Blue Target Reticle
+    const pulse = Math.floor(frameTick / 18) % 2;
     CHECKPOINTS.forEach((cp, idx) => {
       const isSelected = idx === activeCheckpointIndex;
-      mapCtx.strokeStyle = isSelected
+      ctx.strokeStyle = isSelected
         ? (pulse === 0 ? pal.roofBlue : pal.capoteBlueBright)
         : pal.wallWhite;
-      mapCtx.lineWidth = 1;
-      mapCtx.strokeRect(cp.x - 6, cp.y - 6, 12, 12);
+      ctx.lineWidth = 1;
+      ctx.strokeRect(cp.x - 6, cp.y - 6, 12, 12);
 
       const presence = getCheckpointHbcPresence(cp, idx);
       if (presence) {
-        drawMapHbcOfficerIcon(cp.hbcIconX, cp.hbcIconY, tick, presence === 'warden');
+        drawMapHbcOfficerIcon(cp.hbcIconX, cp.hbcIconY, frameTick, presence === 'warden');
       }
 
       if (cp.status !== 'UNSET') {
         const bx = cp.x - 11;
         const by = cp.y - 13;
-        mapCtx.fillStyle = pal.black;
-        mapCtx.fillRect(bx, by, 22, 4);
+        ctx.fillStyle = pal.black;
+        ctx.fillRect(bx, by, 22, 4);
 
         if (cp.status === 'SETTING') {
           const pct = Math.min(1, cp.setProgress / SET_TIME_REQUIRED);
-          mapCtx.fillStyle = pal.teal;
-          mapCtx.fillRect(bx + 1, by + 1, Math.round(20 * pct), 2);
+          ctx.fillStyle = pal.teal;
+          ctx.fillRect(bx + 1, by + 1, Math.round(20 * pct), 2);
         } else if (cp.status === 'HBC_RAID') {
           const remPct = Math.max(0, cp.raidTimer / HBC_RAID_DURATION);
-          mapCtx.fillStyle = Math.floor(tick / 5) % 2 === 0 ? pal.roofRed : pal.compassGold;
-          mapCtx.fillRect(bx + 1, by + 1, Math.max(2, Math.round(20 * remPct)), 2);
+          ctx.fillStyle = Math.floor(frameTick / 5) % 2 === 0 ? pal.roofRed : pal.compassGold;
+          ctx.fillRect(bx + 1, by + 1, Math.max(2, Math.round(20 * remPct)), 2);
         } else if (cp.status === 'BUSTED') {
-          mapCtx.fillStyle = pal.roofRed;
-          mapCtx.fillRect(bx + 1, by + 1, 20, 2);
+          ctx.fillStyle = pal.roofRed;
+          ctx.fillRect(bx + 1, by + 1, 20, 2);
         } else if (cp.status === 'ACTIVE') {
           const wt = getCartWeight(cp);
           const pct = Math.min(1, wt / CART_CAPACITY);
           const isOver = wt > CART_CAPACITY;
-          mapCtx.fillStyle = isOver && Math.floor(tick / 8) % 2 === 0
+          ctx.fillStyle = isOver && Math.floor(frameTick / 8) % 2 === 0
             ? pal.roofRed
             : (wt >= CART_CAPACITY ? pal.compassGold : pal.teal);
-          mapCtx.fillRect(bx + 1, by + 1, Math.max(2, Math.round(20 * pct)), 2);
+          ctx.fillRect(bx + 1, by + 1, Math.max(2, Math.round(20 * pct)), 2);
         }
       }
     });
@@ -2760,202 +2314,194 @@
     const cy = Math.round(cursor.y);
     const bracketOffset = pulse === 0 ? 8 : 10;
 
-    mapCtx.fillStyle = pulse === 0 ? pal.roofBlue : pal.capoteBlueBright;
-    mapCtx.fillRect(cx - bracketOffset, cy - bracketOffset, 4, 2);
-    mapCtx.fillRect(cx - bracketOffset, cy - bracketOffset, 2, 4);
+    ctx.fillStyle = pulse === 0 ? pal.roofBlue : pal.capoteBlueBright;
+    ctx.fillRect(cx - bracketOffset, cy - bracketOffset, 4, 2);
+    ctx.fillRect(cx - bracketOffset, cy - bracketOffset, 2, 4);
 
-    mapCtx.fillRect(cx + bracketOffset - 4, cy - bracketOffset, 4, 2);
-    mapCtx.fillRect(cx + bracketOffset - 2, cy - bracketOffset, 2, 4);
+    ctx.fillRect(cx + bracketOffset - 4, cy - bracketOffset, 4, 2);
+    ctx.fillRect(cx + bracketOffset - 2, cy - bracketOffset, 2, 4);
 
-    mapCtx.fillRect(cx - bracketOffset, cy + bracketOffset - 2, 4, 2);
-    mapCtx.fillRect(cx - bracketOffset, cy + bracketOffset - 4, 2, 4);
+    ctx.fillRect(cx - bracketOffset, cy + bracketOffset - 2, 4, 2);
+    ctx.fillRect(cx - bracketOffset, cy + bracketOffset - 4, 2, 4);
 
-    mapCtx.fillRect(cx + bracketOffset - 4, cy + bracketOffset - 2, 4, 2);
-    mapCtx.fillRect(cx + bracketOffset - 2, cy + bracketOffset - 4, 2, 4);
+    ctx.fillRect(cx + bracketOffset - 4, cy + bracketOffset - 2, 4, 2);
+    ctx.fillRect(cx + bracketOffset - 2, cy + bracketOffset - 4, 2, 4);
+
+    ctx.restore();
+
+    // 6. Bottom-Anchored 6-Parish RPG Selection Strip (VIEW_H - bottomHudH)
+    drawBottomCheckpointStrip(VIEW_H - bottomHudH, bottomHudH);
   }
 
-  function renderMapCanvas() {
-    const pal = PALETTE;
-    const season = getSeasonalTheme();
+  function drawMapHbcOfficerIcon(x, y, tick, isWarden = false) {
+    const bob = Math.floor(tick / 12) % 2 === 0 ? 0 : -1;
+    const iy = y + bob;
 
-    mapCtx.clearRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
-    mapCtx.drawImage(terrainCanvas, 0, 0);
+    ctx.fillStyle = isWarden ? PALETTE.compassGold : PALETTE.black;
+    ctx.fillRect(x - 4, iy - 7, 8, 13);
 
-    drawAnimatedWaterEffects(pal, frameTick, season);
-    drawClouds(pal);
-    drawMapSeasonalSnow(frameTick, season);
-    drawInteractiveMapOverlay(pal, frameTick);
+    if (isWarden) {
+      ctx.fillStyle = PALETTE.black;
+      ctx.fillRect(x - 3, iy - 6, 6, 11);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(x - 3, iy - 8, 2, 2);
+    }
+
+    ctx.fillStyle = '#0f1324';
+    ctx.fillRect(x - 2, iy - 6, 4, 3);
+    ctx.fillRect(x - 3, iy - 3, 6, 1);
+    ctx.fillStyle = PALETTE.compassGold;
+    ctx.fillRect(x - 2, iy - 4, 4, 1);
+
+    ctx.fillStyle = '#F2C699';
+    ctx.fillRect(x - 2, iy - 2, 4, 2);
+
+    ctx.fillStyle = PALETTE.roofRed;
+    ctx.fillRect(x - 3, iy, 6, 4);
+    ctx.fillStyle = PALETTE.compassGold;
+    if (isWarden) {
+      ctx.fillRect(x - 2, iy, 2, 1);
+      ctx.fillRect(x - 1, iy + 1, 2, 1);
+      ctx.fillRect(x, iy + 2, 2, 1);
+    } else {
+      ctx.fillRect(x, iy + 1, 1, 2);
+    }
+
+    ctx.fillStyle = PALETTE.wallWhite;
+    ctx.fillRect(x - 2, iy + 4, 4, 2);
   }
 
-  // =========================================================================
-  // 6-CHECKPOINT RPG SELECTION WINDOW BUILDER & SYNC
-  // =========================================================================
-  function buildCheckpointBoxes() {
-    const grid = document.getElementById('checkpointGrid');
-    grid.innerHTML = '';
+  function drawBottomCheckpointStrip(stripY, stripH) {
+    ctx.fillStyle = '#1a1c2c';
+    ctx.fillRect(0, stripY, VIEW_W, stripH);
+    ctx.fillStyle = PALETTE.wallWhite;
+    ctx.fillRect(0, stripY, VIEW_W, 2);
+    ctx.fillStyle = PALETTE.roofBlue;
+    ctx.fillRect(0, stripY + 2, VIEW_W, 2);
+
+    const cols = 3;
+    const rows = 2;
+    const padX = 4;
+    const padY = 6;
+    const gapX = 3;
+    const gapY = 3;
+    const cellW = Math.floor((VIEW_W - padX * 2 - gapX * (cols - 1)) / cols);
+    const cellH = Math.floor((stripH - padY - 3 - gapY * (rows - 1)) / rows);
 
     CHECKPOINTS.forEach((cp, idx) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.id = `cp-box-${idx}`;
-      btn.className = 'checkpoint-box';
-      btn.onclick = () => {
-        if (activeCheckpointIndex === idx) enterSelectedCheckpoint();
-        else setCheckpoint(idx);
-      };
+      const col = idx % cols;
+      const row = Math.floor(idx / cols);
+      const bx = padX + col * (cellW + gapX);
+      const by = stripY + padY + row * (cellH + gapY);
+      const isAct = (idx === activeCheckpointIndex);
 
-      const numSpan = document.createElement('span');
-      numSpan.className = 'cp-num';
-      numSpan.textContent = `0${idx + 1}`;
+      ctx.fillStyle = isAct ? PALETTE.compassGold : '#29366f';
+      ctx.fillRect(bx, by, cellW, cellH);
+      ctx.strokeStyle = isAct ? '#ffffff' : '#7f8ec9';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(bx + 0.5, by + 0.5, cellW - 1, cellH - 1);
 
-      const nameSpan = document.createElement('span');
-      nameSpan.className = 'cp-name';
-      nameSpan.textContent = cp.name;
+      drawPixelText(
+        `0${idx + 1} ${cp.shortName}`,
+        bx + Math.floor(cellW / 2),
+        by + 11,
+        5,
+        isAct ? '#1a1c2c' : '#f4f4f4',
+        'center',
+        false
+      );
 
-      const barWrap = document.createElement('div');
-      barWrap.className = 'cp-mini-bar';
-      barWrap.id = `cp-bar-${idx}`;
-      barWrap.style.visibility = 'hidden';
+      // Compact capacity/status meter inside each parish cell
+      if (cp.status !== 'UNSET') {
+        const barW = cellW - 10;
+        const barX = bx + 5;
+        const barY = by + cellH - 5;
+        ctx.fillStyle = '#0f1324';
+        ctx.fillRect(barX, barY, barW, 3);
 
-      const barFill = document.createElement('div');
-      barFill.className = 'cp-mini-fill';
-      barFill.id = `cp-fill-${idx}`;
-
-      barWrap.appendChild(barFill);
-      btn.appendChild(numSpan);
-      btn.appendChild(nameSpan);
-      btn.appendChild(barWrap);
-      grid.appendChild(btn);
-    });
-  }
-
-  function setCheckpoint(index) {
-    activeCheckpointIndex = ((index % CHECKPOINTS.length) + CHECKPOINTS.length) % CHECKPOINTS.length;
-    const cp = CHECKPOINTS[activeCheckpointIndex];
-    cursor.targetX = cp.x;
-    cursor.targetY = cp.y;
-    sfxCursor();
-    updateCheckpointBoxesUI();
-    updateHUD();
-  }
-
-  function cycleCheckpoint(step = 1) {
-    setCheckpoint(activeCheckpointIndex + step);
-  }
-
-  function updateCheckpointBoxesUI() {
-    CHECKPOINTS.forEach((cp, idx) => {
-      const el = document.getElementById(`cp-box-${idx}`);
-      if (el) el.classList.toggle('active', idx === activeCheckpointIndex);
-
-      const barWrap = document.getElementById(`cp-bar-${idx}`);
-      const barFill = document.getElementById(`cp-fill-${idx}`);
-      if (!barWrap || !barFill) return;
-
-      if (cp.status === 'UNSET') {
-        barWrap.style.visibility = 'hidden';
-      } else {
-        barWrap.style.visibility = 'visible';
+        let fillRatio = 0;
+        let fillCol = PALETTE.teal;
         if (cp.status === 'SETTING') {
-          barFill.style.width = `${Math.round((cp.setProgress / SET_TIME_REQUIRED) * 100)}%`;
-          barFill.style.background = PALETTE.teal;
+          fillRatio = cp.setProgress / SET_TIME_REQUIRED;
+          fillCol = PALETTE.teal;
         } else if (cp.status === 'HBC_RAID') {
-          barFill.style.width = `${Math.max(10, Math.round((cp.raidTimer / HBC_RAID_DURATION) * 100))}%`;
-          barFill.style.background = PALETTE.roofRed;
+          fillRatio = cp.raidTimer / HBC_RAID_DURATION;
+          fillCol = PALETTE.roofRed;
         } else if (cp.status === 'BUSTED') {
-          barFill.style.width = '100%';
-          barFill.style.background = '#555';
+          fillRatio = 1;
+          fillCol = '#555555';
         } else if (cp.status === 'ACTIVE') {
           const wt = getCartWeight(cp);
-          const pct = Math.min(100, Math.round((wt / CART_CAPACITY) * 100));
-          barFill.style.width = `${Math.max(8, pct)}%`;
-          barFill.style.background = wt > CART_CAPACITY
-            ? PALETTE.roofRed
-            : (wt >= CART_CAPACITY ? '#38984c' : '#3b5dc9');
+          fillRatio = Math.min(1, wt / CART_CAPACITY);
+          fillCol = wt > CART_CAPACITY ? PALETTE.roofRed : (wt >= CART_CAPACITY ? '#38984c' : '#3b5dc9');
         }
+        ctx.fillStyle = fillCol;
+        ctx.fillRect(barX, barY, Math.max(2, Math.round(barW * fillRatio)), 3);
       }
     });
   }
 
-  mapCanvas.addEventListener('click', (e) => {
-    if (gameState !== 'MAP') return;
-    const rect = mapCanvas.getBoundingClientRect();
-    const scaleX = MAP_WIDTH / rect.width;
-    const scaleY = MAP_HEIGHT / rect.height;
-    const clickX = (e.clientX - rect.left) * scaleX;
-    const clickY = (e.clientY - rect.top) * scaleY;
-
-    let clickedIdx = -1;
-    let minDist = 30;
-    CHECKPOINTS.forEach((cp, idx) => {
-      const d = Math.hypot(clickX - cp.x, clickY - cp.y);
-      if (d < minDist) {
-        minDist = d;
-        clickedIdx = idx;
-      }
-    });
-
-    if (clickedIdx !== -1) {
-      if (clickedIdx === activeCheckpointIndex) enterSelectedCheckpoint();
-      else setCheckpoint(clickedIdx);
-    } else {
-      cycleCheckpoint(1);
-    }
-  });
-
   // =========================================================================
-  // COVER SCREEN ("LE ROI DES TRAITEURS" — STATIONARY CART + SWAYING GRASS)
+  // COVER SCREEN ("LE ROI DES TRAITEURS") & DOUBLE-SIDED CANVAS BRIEFING
   // =========================================================================
   function drawTitleScreen() {
+    const horizonY = Math.max(88, Math.floor(VIEW_H * 0.36));
     ctx.fillStyle = '#0f1324';
-    ctx.fillRect(0, 0, 240, 240);
+    ctx.fillRect(0, 0, VIEW_W, horizonY);
 
+    // Distant woodland silhouette
     const treeShift = Math.floor(frameTick * 0.05) % 24;
     ctx.fillStyle = PALETTE.woodlandDark;
-    ctx.fillRect(0, 92, 240, 40);
+    ctx.fillRect(0, horizonY - 4, VIEW_W, 40);
     ctx.fillStyle = PALETTE.woodlandBase;
-    for (let tx = -24; tx < 264; tx += 24) {
-      ctx.fillRect(tx - treeShift + 4, 86, 16, 14);
-      ctx.fillRect(tx - treeShift + 7, 82, 10, 6);
+    for (let tx = -24; tx < VIEW_W + 24; tx += 24) {
+      ctx.fillRect(tx - treeShift + 4, horizonY - 10, 16, 14);
+      ctx.fillRect(tx - treeShift + 7, horizonY - 14, 10, 6);
     }
 
+    // Prairie meadow
+    const meadowY = horizonY + 28;
     ctx.fillStyle = PALETTE.prairieBase;
-    ctx.fillRect(0, 124, 240, 56);
+    ctx.fillRect(0, meadowY, VIEW_W, 60);
     ctx.fillStyle = PALETTE.prairieLight;
-    for (let gx = 10; gx < 236; gx += 26) {
-      ctx.fillRect(gx, 130, 4, 2);
+    for (let gx = 10; gx < VIEW_W - 6; gx += 26) {
+      ctx.fillRect(gx, meadowY + 6, 4, 2);
     }
 
+    // Dirt trail where the Red River Cart rests
+    const roadY = meadowY + 30;
     ctx.fillStyle = PALETTE.roadDark;
-    ctx.fillRect(0, 152, 240, 24);
+    ctx.fillRect(0, roadY, VIEW_W, 24);
     ctx.fillStyle = PALETTE.road;
-    ctx.fillRect(0, 154, 240, 20);
+    ctx.fillRect(0, roadY + 2, VIEW_W, 20);
 
+    // Sand bank & full-bleed river water stretching to bottom of viewport
+    const riverY = roadY + 24;
     ctx.fillStyle = PALETTE.sandBank;
-    ctx.fillRect(0, 176, 240, 4);
+    ctx.fillRect(0, riverY, VIEW_W, 4);
     ctx.fillStyle = PALETTE.waterBank;
-    ctx.fillRect(0, 180, 240, 2);
+    ctx.fillRect(0, riverY + 4, VIEW_W, 2);
     ctx.fillStyle = PALETTE.waterDeep;
-    ctx.fillRect(0, 182, 240, 58);
+    ctx.fillRect(0, riverY + 6, VIEW_W, Math.max(10, VIEW_H - (riverY + 6)));
 
     ctx.fillStyle = PALETTE.waterMid;
-    for (let y = 188; y < 236; y += 11) {
+    for (let y = riverY + 12; y < VIEW_H - 4; y += 11) {
       const shift = Math.floor(Math.sin(frameTick * 0.04 + y) * 10);
-      ctx.fillRect(18 + shift, y, 64, 2);
-      ctx.fillRect(128 - shift, y + 4, 76, 2);
+      ctx.fillRect(24 + shift, y, 76, 2);
+      ctx.fillRect(168 - shift, y + 4, 92, 2);
     }
 
-    drawRoiDesTraiteursTitle();
+    drawRoiDesTraiteursTitle(Math.max(14, Math.floor(horizonY * 0.16)));
 
-    ctx.fillStyle = PALETTE.teal;
-    ctx.font = 'bold 9px Courier New';
-    ctx.fillText('RED RIVER FURTRADE', 70, 74);
+    const subY = Math.max(72, Math.floor(horizonY * 0.16) + 60);
+    drawPixelText('1850 RED RIVER FREETRADE', Math.floor(VIEW_W / 2), subY, 7, PALETTE.teal, 'center', true);
 
-    drawSwayingCoverGrass(52, 154, 9, PALETTE.woodlandBase);
-    drawSwayingCoverGrass(162, 154, 8, PALETTE.woodlandBase);
+    // Stationary Red River Cart with lowered shafts & stacked pixel furs
+    const cartX = Math.floor(VIEW_W / 2) - 54;
+    const cartY = roadY - 42;
 
-    const cartX = 66;
-    const cartY = 108;
+    drawSwayingCoverGrass(cartX - 14, roadY + 2, 9, PALETTE.woodlandBase);
+    drawSwayingCoverGrass(cartX + 94, roadY + 2, 8, PALETTE.woodlandBase);
 
     ctx.fillStyle = 'rgba(15, 19, 36, 0.45)';
     ctx.fillRect(cartX + 14, cartY + 55, 92, 4);
@@ -2971,19 +2517,14 @@
       8: PALETTE.road
     }, 3);
 
-    drawSwayingCoverGrass(58, 168, 7, PALETTE.prairieLight);
-    drawSwayingCoverGrass(116, 170, 6, PALETTE.prairieGold);
-    drawSwayingCoverGrass(172, 168, 8, PALETTE.prairieLight);
+    drawSwayingCoverGrass(cartX - 8, roadY + 16, 7, PALETTE.prairieLight);
+    drawSwayingCoverGrass(cartX + 48, roadY + 18, 6, PALETTE.prairieGold);
+    drawSwayingCoverGrass(cartX + 104, roadY + 16, 8, PALETTE.prairieLight);
 
     if (Math.floor(frameTick / 25) % 2 === 0) {
-      ctx.fillStyle = PALETTE.compassGold;
-      ctx.font = 'bold 12px Courier New';
-      ctx.fillText("PRESS 'A' TO START", 54, 204);
+      drawPixelText("PRESS 'A' TO START", Math.floor(VIEW_W / 2), Math.min(VIEW_H - 28, riverY + 28), 9, PALETTE.compassGold, 'center', true);
     }
-
-    ctx.fillStyle = PALETTE.wallWhite;
-    ctx.font = '9px Courier New';
-    ctx.fillText('FURTRADE FREETRADERS', 65, 224);
+    drawPixelText('MICHIF FREETRADERS vs HBC', Math.floor(VIEW_W / 2), VIEW_H - 12, 6, PALETTE.wallWhite, 'center', true);
   }
 
   function drawSwayingCoverGrass(baseX, baseY, bladeCount, color) {
@@ -2997,7 +2538,7 @@
     }
   }
 
-  function drawRoiDesTraiteursTitle() {
+  function drawRoiDesTraiteursTitle(topY) {
     const GLYPHS = {
       'L': [[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[1,1,1,1,1]],
       'E': [[1,1,1,1,1],[1,0,0,0,0],[1,0,0,0,0],[1,1,1,1,0],[1,0,0,0,0],[1,0,0,0,0],[1,1,1,1,1]],
@@ -3014,19 +2555,19 @@
     const line1 = 'LE ROI DES';
     const s1 = 3;
     const step1 = 18;
+    const startX1 = Math.floor((VIEW_W - (line1.length * step1 - 3)) / 2);
     for (let i = 0; i < line1.length; i++) {
       const ch = line1[i];
       if (ch === ' ') continue;
       const g = GLYPHS[ch];
-      const gx = 31 + i * step1;
-      const gy = 14;
+      const gx = startX1 + i * step1;
       for (let r = 0; r < 7; r++) {
         for (let c = 0; c < 5; c++) {
           if (g[r][c]) {
             ctx.fillStyle = '#040D09';
-            ctx.fillRect(gx + c * s1 + 1, gy + r * s1 + 1, s1, s1);
+            ctx.fillRect(gx + c * s1 + 1, topY + r * s1 + 1, s1, s1);
             ctx.fillStyle = r < 2 ? '#FFF3B0' : (r < 5 ? PALETTE.compassGold : '#C9961A');
-            ctx.fillRect(gx + c * s1, gy + r * s1, s1, s1);
+            ctx.fillRect(gx + c * s1, topY + r * s1, s1, s1);
           }
         }
       }
@@ -3035,30 +2576,158 @@
     const line2 = 'TRAITEURS';
     const s2 = 4;
     const step2 = 23;
+    const startX2 = Math.floor((VIEW_W - (line2.length * step2 - 3)) / 2);
+    const y2 = topY + 24;
     for (let i = 0; i < line2.length; i++) {
       const ch = line2[i];
       const g = GLYPHS[ch];
-      const gx = 18 + i * step2;
-      const gy = 38;
+      const gx = startX2 + i * step2;
       for (let r = 0; r < 7; r++) {
         for (let c = 0; c < 5; c++) {
           if (g[r][c]) {
             ctx.fillStyle = '#040D09';
-            ctx.fillRect(gx + c * s2 + 2, gy + r * s2 + 2, s2, s2);
+            ctx.fillRect(gx + c * s2 + 2, y2 + r * s2 + 2, s2, s2);
             ctx.fillStyle = r < 2 ? '#FFF3B0' : (r < 5 ? PALETTE.compassGold : '#C9961A');
-            ctx.fillRect(gx + c * s2, gy + r * s2, s2, s2);
+            ctx.fillRect(gx + c * s2, y2 + r * s2, s2, s2);
           }
         }
       }
     }
   }
 
+  function drawBriefingOverlay() {
+    drawTitleScreen();
+    ctx.fillStyle = 'rgba(15, 19, 36, 0.88)';
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+
+    const boxW = VIEW_W - 24;
+    const boxH = 216;
+    const bx = 12;
+    const by = Math.floor((VIEW_H - boxH) / 2);
+
+    ctx.fillStyle = '#1a1c2c';
+    ctx.fillRect(bx, by, boxW, boxH);
+    ctx.strokeStyle = PALETTE.wallWhite;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(bx, by, boxW, boxH);
+    ctx.strokeStyle = PALETTE.roofBlue;
+    ctx.strokeRect(bx + 3, by + 3, boxW - 6, boxH - 6);
+
+    const headTxt = briefingSide === 1 ? 'THE FREETRADERS' : 'HOW TO PLAY';
+    const pageTxt = briefingSide === 1 ? '[B] 1/2' : '[B] 2/2';
+    drawPixelText(headTxt, bx + 12, by + 22, 8, PALETTE.compassGold, 'left', true);
+    drawPixelText(pageTxt, bx + boxW - 12, by + 22, 7, PALETTE.teal, 'right', true);
+
+    ctx.fillStyle = PALETTE.roofBlue;
+    ctx.fillRect(bx + 10, by + 28, boxW - 20, 1);
+
+    if (briefingSide === 1) {
+      drawWrappedLines([
+        'IN THE 1850 RED RIVER SETTLEMENT,',
+        'FEARLESS MICHIF FREETRADERS',
+        'CHALLENGED THE HBC MONOPOLY.',
+        '',
+        'ROLLING WOODEN CARTS FROM',
+        'PARISH TO PARISH, THEY TRADED',
+        'DIRECTLY WITH PRAIRIE HUNTERS',
+        'FOR PELTS & BUFFALO ROBES—',
+        'EARNING THEIR BOLDEST LEADER',
+        'THE TITLE LE ROI DES TRAITEURS.'
+      ], bx + 12, by + 46, 13, 6.5, '#f4f1de', 'left');
+    } else {
+      drawWrappedLines([
+        'CYCLE THE PARISHES ON THE',
+        'SETTLEMENT MAP WITH THE D-PAD',
+        'AND PRESS A TO VISIT.',
+        '',
+        'SET YOUR RED RIVER CART ON',
+        'THE ROAD AND TRADE DISCREETLY,',
+        'BUT WATCH YOUR LOAD BAR!',
+        'HAUL BEFORE WINTER SETS IN OR',
+        'AN HBC OFFICER SEIZES YOUR',
+        'TRADE.'
+      ], bx + 12, by + 46, 13, 6.5, '#e6f7ff', 'left');
+    }
+
+    ctx.fillStyle = '#7f8ec9';
+    ctx.fillRect(bx + 10, by + boxH - 28, boxW - 20, 1);
+
+    const flipTxt = briefingSide === 1 ? '[B] HOW TO PLAY' : '[B] HISTORY';
+    drawPixelText(flipTxt, bx + 12, by + boxH - 12, 6.5, PALETTE.teal, 'left', true);
+    if (Math.floor(frameTick / 22) % 2 === 0) {
+      drawPixelText('[A] RIDE OUT', bx + boxW - 12, by + boxH - 12, 6.5, PALETTE.compassGold, 'right', true);
+    }
+  }
+
+  function drawGameOverOverlay() {
+    const season = getSeasonalTheme();
+    ctx.fillStyle = season.outerBg;
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+
+    const boxW = VIEW_W - 24;
+    const boxH = 216;
+    const bx = 12;
+    const by = Math.floor((VIEW_H - boxH) / 2);
+
+    ctx.fillStyle = '#1a1c2c';
+    ctx.fillRect(bx, by, boxW, boxH);
+    ctx.strokeStyle = PALETTE.wallWhite;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(bx, by, boxW, boxH);
+    ctx.strokeStyle = PALETTE.roofBlue;
+    ctx.strokeRect(bx + 3, by + 3, boxW - 6, boxH - 6);
+
+    const rankInfo = getTraderRankInfo();
+    const subTxt = hbcBrokenCount >= 3 ? 'HBC SEIZED YOUR TRADE!' : 'WINTER HAS ARRIVED';
+    const cx = Math.floor(VIEW_W / 2);
+
+    drawPixelText(subTxt, cx, by + 28, 7, '#ff6b6b', 'center', true);
+    drawPixelText(rankInfo.title, cx, by + 54, 10, rankInfo.color, 'center', true);
+
+    ctx.fillStyle = PALETTE.roofBlue;
+    ctx.fillRect(bx + 14, by + 66, boxW - 28, 1);
+
+    drawPixelText(`BUFFALO ROBES: ${totalRobes}`, cx, by + 90, 7.5, '#f4f1de', 'center', true);
+    drawPixelText(`SMALL GAME PELTS: ${totalFurs}`, cx, by + 110, 7.5, '#f4f1de', 'center', true);
+
+    drawPixelText(
+      `REPUTATION: ${hbcDealsLost}:${buffaloRedirects}:${hbcBrokenCount}`,
+      cx,
+      by + 138,
+      8,
+      PALETTE.teal,
+      'center',
+      true
+    );
+    drawPixelText('(LOST : REDIRECTS : BUSTS)', cx, by + 153, 5.5, '#a7b4e0', 'center', true);
+
+    if (Math.floor(frameTick / 22) % 2 === 0) {
+      drawPixelText("PRESS 'A' TO PLAY AGAIN", cx, by + boxH - 18, 7, PALETTE.compassGold, 'center', true);
+    }
+  }
+
   // =========================================================================
-  // SEASONAL & CHECKPOINT-SPECIFIC 16-BIT GBC/SNES SCENES
+  // SEASONAL & CHECKPOINT-SPECIFIC 16-BIT SCENES (SCALED TO FILL VIEWPORT)
   // =========================================================================
   function drawWeirScene() {
     const cp = CHECKPOINTS[activeCheckpointIndex];
     const season = getSeasonalTheme();
+    const topHudH = 26;
+    const availH = Math.max(180, VIEW_H - topHudH);
+
+    // Fill outer vertical bands seamlessly with seasonal terrain so there are zero black bars
+    ctx.fillStyle = season.grassBase;
+    ctx.fillRect(0, topHudH, VIEW_W, availH);
+
+    const scale = Math.min(VIEW_W / 240, availH / 240);
+    const sceneW = 240 * scale;
+    const sceneH = 240 * scale;
+    const offsetX = Math.floor((VIEW_W - sceneW) * 0.5);
+    const offsetY = topHudH + Math.floor((availH - sceneH) * 0.5);
+
+    ctx.save();
+    ctx.translate(offsetX, offsetY);
+    ctx.scale(scale, scale);
 
     if (cp.flow === 'WE') {
       drawAssiniboineCheckpointScene(cp, season);
@@ -3066,7 +2735,6 @@
       drawRedRiverCheckpointScene(cp, season);
     }
 
-    // Rare Spirited White Horse at St. Francois-Xavier (once every gameplay)
     if (cp.id === 'st_francois_xavier' && whiteHorse) {
       drawSpiritedWhiteHorse();
     }
@@ -3082,18 +2750,18 @@
       }
     }
 
-    ctx.font = 'bold 9px Courier New';
+    ctx.font = 'bold 8px "Press Start 2P", monospace';
+    ctx.textAlign = 'left';
     floatingPopups.forEach(p => {
       ctx.fillStyle = PALETTE.black;
       ctx.fillText(p.text, p.x + 1, p.y + 1);
       ctx.fillStyle = p.color;
       ctx.fillText(p.text, p.x, p.y);
     });
+
+    ctx.restore();
   }
 
-  // -------------------------------------------------------------------------
-  // A. RED RIVER CHECKPOINTS (St. Boniface, St. Vital, Kildonan — North-Up Flow)
-  // -------------------------------------------------------------------------
   function drawRedRiverCheckpointScene(cp, season) {
     const waterLeft = 76 - season.waterLevelOffset;
     const waterRight = 164 + season.waterLevelOffset;
@@ -3102,7 +2770,6 @@
     ctx.fillStyle = season.waterDeep;
     ctx.fillRect(waterLeft, 0, waterWidth, 240);
 
-    // St. Boniface: Assiniboine River / Forks joining from the Left (West) Bank!
     const hasWestForks = (cp.id === 'st_boniface');
     const forkTop = 140 - Math.round(season.waterLevelOffset * 0.6);
     const forkBottom = 180 + Math.round(season.waterLevelOffset * 0.6);
@@ -3118,7 +2785,6 @@
       ctx.fillRect(px, py, 6, 4);
     }
 
-    // Submerged Underwater Fish swimming NORTH-UP in Red River
     riverFish.forEach(f => {
       if (f.isSturgeon) {
         drawMatrix(sprSturgeonNorth, f.x - 5, f.y, {
@@ -3131,14 +2797,12 @@
       }
     });
 
-    // Translucent Water Surface Layer
     ctx.fillStyle = season.waterSurfaceRgba;
     ctx.fillRect(waterLeft, 0, waterWidth, 240);
     if (hasWestForks) {
       ctx.fillRect(0, forkTop, waterLeft + 4, forkBottom - forkTop);
     }
 
-    // Animated NORTH-UP Current Streaks & Foam Ripples in Red River
     ctx.fillStyle = season.waterMid;
     for (let col = 0; col < 5; col++) {
       const rx = waterLeft + 8 + ((col * 16) % Math.max(12, waterWidth - 12));
@@ -3152,7 +2816,6 @@
       ctx.fillRect(fx, fy, 2, 5);
     }
 
-    // Assiniboine West-to-East current streaks at St. Boniface Forks
     if (hasWestForks) {
       ctx.fillStyle = season.waterMid;
       for (let r = 0; r < 2; r++) {
@@ -3207,7 +2870,6 @@
   function drawRedRiverRichShores(cp, season, waterLeft, waterRight, hasWestForks, forkTop, forkBottom) {
     ctx.fillStyle = season.grassBase;
     if (hasWestForks) {
-      // West bank split into Point Douglas / Upper Fort Garry peninsula (above forkTop) & South-West bank (below forkBottom)
       ctx.fillRect(0, 0, 72, forkTop - 4);
       ctx.fillRect(0, forkBottom + 4, 72, 240 - (forkBottom + 4));
     } else {
@@ -3230,13 +2892,9 @@
       ctx.fillRect(196, 168, 36, 18);
     }
 
-    // Cultivated Farm Plots
     ctx.fillStyle = season.cultivated;
-    if (!hasWestForks) {
-      ctx.fillRect(6, 152, 42, 64);
-    } else {
-      ctx.fillRect(6, 190, 42, 42);
-    }
+    if (!hasWestForks) ctx.fillRect(6, 152, 42, 64);
+    else ctx.fillRect(6, 190, 42, 42);
     ctx.fillRect(184, 152, 46, 64);
     ctx.fillStyle = season.cultivatedLight;
     if (!hasWestForks) {
@@ -3244,11 +2902,8 @@
     } else {
       for (let py = 196; py < 228; py += 8) ctx.fillRect(10, py, 34, 2);
     }
-    for (let py = 158; py < 212; py += 8) {
-      ctx.fillRect(188, py, 38, 2);
-    }
+    for (let py = 158; py < 212; py += 8) ctx.fillRect(188, py, 38, 2);
 
-    // Meadow Grass & Seasonal Leaf/Frost Tufts
     for (let y = 10; y < 232; y += 14) {
       for (let x = 8; x < 66; x += 18) {
         if (hasWestForks && y >= forkTop - 6 && y <= forkBottom + 6) continue;
@@ -3272,7 +2927,6 @@
       }
     }
 
-    // Dirt Roads
     ctx.fillStyle = season.roadDark;
     if (hasWestForks) {
       ctx.fillRect(46, 0, 16, forkTop - 6);
@@ -3295,7 +2949,6 @@
     ctx.fillRect(48, 114, 28, 12);
     ctx.fillRect(164, 114, 28, 12);
 
-    // St. Boniface: West-East Dirt Road on the North Side of the Cathedral (y: 2..14, x: 168..240)
     if (cp.id === 'st_boniface') {
       ctx.fillStyle = season.roadDark;
       ctx.fillRect(168, 2, 72, 13);
@@ -3315,22 +2968,18 @@
       ctx.fillRect(0, 114, 46, 12);
     }
 
-    // Sandbanks & Shorelines
     ctx.fillStyle = season.sandBank;
     if (hasWestForks) {
       if (waterLeft > 70) {
         ctx.fillRect(70, 0, waterLeft - 70, forkTop);
         ctx.fillRect(70, forkBottom, waterLeft - 70, 240 - forkBottom);
       }
-      // North & South banks of the Assiniboine on the West side
       ctx.fillRect(0, forkTop - 4, waterLeft, 4);
       ctx.fillRect(0, forkBottom, waterLeft, 4);
     } else if (waterLeft > 70) {
       ctx.fillRect(70, 0, waterLeft - 70, 240);
     }
-    if (waterRight < 170) {
-      ctx.fillRect(waterRight, 0, 170 - waterRight, 240);
-    }
+    if (waterRight < 170) ctx.fillRect(waterRight, 0, 170 - waterRight, 240);
 
     ctx.fillStyle = PALETTE.waterBank;
     if (hasWestForks) {
@@ -3343,17 +2992,13 @@
     }
     ctx.fillRect(waterRight - 2, 0, 2, 240);
 
-    if (!hasWestForks) {
-      drawHorizontalFence(8, 149, 36);
-    }
+    if (!hasWestForks) drawHorizontalFence(8, 149, 36);
     drawHorizontalFence(186, 149, 42);
 
     if (cp.id === 'st_boniface') {
-      // St. Boniface Cathedral positioned just south of the new North W-E road (y=18)
       drawDetailedStBoniface(196, 18, season);
       drawDetailedSeasonalTree(198, 84, season, 0);
       drawDetailedSeasonalTree(202, 198, season, 1);
-      // Trees on opposite West bank (Point Douglas peninsula & South-West bank)
       drawDetailedSeasonalTree(12, 24, season, 2);
       drawDetailedSeasonalTree(16, 82, season, 3);
       drawDetailedSeasonalTree(14, 196, season, 4);
@@ -3374,23 +3019,17 @@
     }
   }
 
-  // -------------------------------------------------------------------------
-  // B. ASSINIBOINE RIVER CHECKPOINTS (Upper Fort Garry, St. James, St. Francois-Xavier)
-  // -------------------------------------------------------------------------
   function drawAssiniboineCheckpointScene(cp, season) {
     const isUFG = (cp.id === 'upper_fort_garry');
     const waterTop = 84 - season.waterLevelOffset;
     const waterBottom = 156 + season.waterLevelOffset;
     const waterHeight = waterBottom - waterTop;
-
-    // In Upper Fort Garry, the Red River & The Forks confluence occupy the right side (x: 182..240, y: 0..240)!
     const assiniRight = isUFG ? 184 : 240;
 
     ctx.fillStyle = season.waterDeep;
     ctx.fillRect(0, waterTop, assiniRight, waterHeight);
 
     if (isUFG) {
-      // Red River channel on the right-hand side of Upper Fort Garry
       const redLeft = 182 - Math.round(season.waterLevelOffset * 0.4);
       ctx.fillRect(redLeft, 0, 240 - redLeft, 240);
     }
@@ -3402,7 +3041,6 @@
       ctx.fillRect(px, py, 6, 4);
     }
 
-    // Submerged Underwater Fish
     riverFish.forEach(f => {
       if (f.isSturgeon) {
         drawMatrix(sprSturgeonHoriz, f.x, f.y - 5, {
@@ -3415,7 +3053,6 @@
       }
     });
 
-    // Translucent Water Surface Layer
     ctx.fillStyle = season.waterSurfaceRgba;
     ctx.fillRect(0, waterTop, assiniRight, waterHeight);
     if (isUFG) {
@@ -3423,7 +3060,6 @@
       ctx.fillRect(redLeft, 0, 240 - redLeft, 240);
     }
 
-    // Assiniboine West-to-East Current Streaks
     ctx.fillStyle = season.waterMid;
     for (let row = 0; row < 4; row++) {
       const ry = waterTop + 8 + ((row * 16) % Math.max(12, waterHeight - 10));
@@ -3437,7 +3073,6 @@
       ctx.fillRect(fx, fy, 5, 2);
     }
 
-    // Red River North-Up Current Streaks on the right-hand side of Upper Fort Garry
     if (isUFG) {
       const redLeft = 182 - Math.round(season.waterLevelOffset * 0.4);
       ctx.fillStyle = season.waterMid;
@@ -3454,7 +3089,6 @@
       }
     }
 
-    // Floating Ice Chunks
     if (season.hasIceChunks) {
       for (let ic = 0; ic < 6; ic++) {
         const ix = (frameTick * 0.9 + ic * 43) % assiniRight;
@@ -3468,7 +3102,6 @@
       }
     }
 
-    // Early Winter Shelf Freeze
     if (season.stage === 4) {
       const shelfH = Math.round((waterHeight * 0.42) * season.freezeRatio);
       for (let x = 0; x < assiniRight; x += 6) {
@@ -3549,7 +3182,6 @@
       }
     }
 
-    // East-West Portage Dirt Roads
     const roadRight = isUFG ? (landWidth - 2) : 240;
     ctx.fillStyle = season.roadDark;
     ctx.fillRect(0, 56, roadRight, 16);
@@ -3561,15 +3193,9 @@
     ctx.fillRect(0, 166, roadRight, 12);
     ctx.fillRect(114, 0, 12, 58);
 
-    // Sandbanks & Shorelines
     ctx.fillStyle = season.sandBank;
-    if (waterTop > 78) {
-      ctx.fillRect(0, 78, landWidth, waterTop - 78);
-    }
-    if (waterBottom < 162) {
-      ctx.fillRect(0, waterBottom, landWidth, 162 - waterBottom);
-    }
-    // Left Bank of the Red River on the right side of Upper Fort Garry
+    if (waterTop > 78) ctx.fillRect(0, 78, landWidth, waterTop - 78);
+    if (waterBottom < 162) ctx.fillRect(0, waterBottom, landWidth, 162 - waterBottom);
     if (isUFG) {
       ctx.fillRect(landWidth, 0, 4, waterTop + 2);
       ctx.fillRect(landWidth, waterBottom - 2, 4, 240 - (waterBottom - 2));
@@ -3587,7 +3213,6 @@
     drawHorizontalFence(14, 186, 80);
 
     if (isUFG) {
-      // Upper Fort Garry rendered in bright Tyndall Limestone!
       drawDetailedUpperFortGarry(16, 6, season);
       drawDetailedSeasonalTree(146, 16, season, 0);
       drawDetailedSeasonalTree(136, 192, season, 2);
@@ -3606,9 +3231,6 @@
     }
   }
 
-  // =========================================================================
-  // 16-BIT SEASONAL TREES & ARCHITECTURAL SPRITES
-  // =========================================================================
   function drawDetailedSeasonalTree(x, y, season, variant) {
     ctx.fillStyle = 'rgba(15, 19, 36, 0.35)';
     ctx.fillRect(x + 2, y + 18, 18, 5);
@@ -3707,20 +3329,15 @@
     }
   }
 
-  // Upper Fort Garry: Warm Creamy Tyndall Limestone Palette (#ebe4d3 / #cfc6b0 / #8a816c)
   function drawDetailedUpperFortGarry(x, y, season) {
     const isSnow = season.stage === 4;
-    // Outer limestone shadow base
     ctx.fillStyle = PALETTE.limestoneDark;
     ctx.fillRect(x, y + 8, 86, 38);
-    // Main warm Tyndall limestone curtain wall
     ctx.fillStyle = PALETTE.limestoneMid;
     ctx.fillRect(x + 2, y + 10, 82, 34);
-    // Sunlit cream limestone top parapet
     ctx.fillStyle = isSnow ? '#f4f8fc' : PALETTE.limestoneLight;
     ctx.fillRect(x + 2, y + 10, 82, 9);
 
-    // Subtle limestone ashlar block courses & fossil-mottled highlights
     ctx.fillStyle = PALETTE.limestoneDark;
     ctx.fillRect(x + 2, y + 20, 82, 1);
     ctx.fillRect(x + 2, y + 31, 82, 1);
@@ -3733,7 +3350,6 @@
     ctx.fillRect(x + 16, y + 23, 5, 3);
     ctx.fillRect(x + 62, y + 24, 5, 3);
 
-    // Corner limestone bastions
     ctx.fillStyle = PALETTE.limestoneDark;
     ctx.fillRect(x - 3, y + 4, 16, 42);
     ctx.fillRect(x + 73, y + 4, 16, 42);
@@ -3744,7 +3360,6 @@
     ctx.fillRect(x - 1, y + 6, 12, 8);
     ctx.fillRect(x + 75, y + 6, 12, 8);
 
-    // Timber Gatehouse & HBC Flag
     ctx.fillStyle = PALETTE.woodDark;
     ctx.fillRect(x + 33, y + 22, 20, 24);
     ctx.fillStyle = PALETTE.woodLight;
@@ -4109,20 +3724,40 @@
   function renderLoop(now) {
     updateSimulation(now);
 
+    ctx.clearRect(0, 0, VIEW_W, VIEW_H);
+
     if (gameState === 'TITLE') {
       drawTitleScreen();
+    } else if (gameState === 'BRIEFING') {
+      drawBriefingOverlay();
     } else if (gameState === 'MAP') {
-      renderMapCanvas();
+      renderFullScreenMapView();
+      drawTopArcadeHUD();
     } else if (gameState === 'WEIR') {
       drawWeirScene();
+      drawTopArcadeHUD();
+    } else if (gameState === 'GAMEOVER') {
+      drawGameOverOverlay();
     }
 
     requestAnimationFrame(renderLoop);
   }
 
   // =========================================================================
-  // CONTROLS & INPUT BRIDGE (Cabinet postMessage + Keyboard)
+  // CONTROLS & INPUT BRIDGE (EXCLUSIVE POSTMESSAGE LISTENER)
   // =========================================================================
+  function setCheckpoint(index) {
+    activeCheckpointIndex = ((index % CHECKPOINTS.length) + CHECKPOINTS.length) % CHECKPOINTS.length;
+    const cp = CHECKPOINTS[activeCheckpointIndex];
+    cursor.targetX = cp.x;
+    cursor.targetY = cp.y;
+    sfxCursor();
+  }
+
+  function cycleCheckpoint(step = 1) {
+    setCheckpoint(activeCheckpointIndex + step);
+  }
+
   function enterSelectedCheckpoint() {
     const cp = CHECKPOINTS[activeCheckpointIndex];
     if (cp.flow === 'WE') {
@@ -4148,7 +3783,6 @@
         cp.wardenActiveTimer = 0;
         cp.wardenTriggeredPass = false;
       }
-      // Trigger the rare Spirited White Horse once per gameplay when visiting St. Francois-Xavier
       maybeSpawnSpiritedWhiteHorse(cp);
     }
 
@@ -4157,18 +3791,21 @@
   }
 
   function handleActionA() {
+    const now = performance.now();
+    if (now - lastBtnATime < BTN_DEBOUNCE_MS) return;
+    lastBtnATime = now;
+    if (isPaused) return;
+
     initAudio();
 
     if (gameState === 'TITLE') {
-      setBriefingSide(1);
-      briefingScreen.style.display = 'flex';
+      briefingSide = 1;
       setViewMode('BRIEFING');
       sfxCursor();
       return;
     }
 
     if (gameState === 'BRIEFING') {
-      briefingScreen.style.display = 'none';
       startFreetradeSession();
       return;
     }
@@ -4182,16 +3819,13 @@
       const cp = CHECKPOINTS[activeCheckpointIndex];
 
       if (cp.status === 'UNSET') {
-        if (!isOnDirtRoad(cp, player.x, player.y)) {
-          return;
-        }
+        if (!isOnDirtRoad(cp, player.x, player.y)) return;
         cp.cartX = player.x;
         cp.cartY = player.y;
         cp.status = 'SETTING';
         cp.setProgress = 0;
         cp.isWorking = true;
         sfxWorkTick();
-        updateCheckpointBoxesUI();
         return;
       }
 
@@ -4224,20 +3858,16 @@
         } else {
           sfxStep();
         }
-        updateCheckpointBoxesUI();
-        updateHUD();
       } else if (cp.status === 'BUSTED') {
         cp.status = 'UNSET';
         cp.furs = 0;
         cp.robes = 0;
         sfxStep();
-        updateCheckpointBoxesUI();
       }
       return;
     }
 
     if (gameState === 'GAMEOVER') {
-      gameoverScreen.style.display = 'none';
       timeLeft = 300;
       bakeStaticMap();
       setViewMode('TITLE');
@@ -4245,6 +3875,11 @@
   }
 
   function handleActionB() {
+    const now = performance.now();
+    if (now - lastBtnBTime < BTN_DEBOUNCE_MS) return;
+    lastBtnBTime = now;
+    if (isPaused) return;
+
     initAudio();
 
     if (gameState === 'BRIEFING') {
@@ -4262,7 +3897,6 @@
 
   function canPlayerStandAt(cp, nx, ny) {
     if (cp.id === 'upper_fort_garry') {
-      // Red River occupies x >= 178 on right-hand side of Upper Fort Garry
       if (nx >= 12 && nx <= 172 && ny >= 52 && ny <= 78) return true;
       if (nx >= 110 && nx <= 130 && ny >= 14 && ny <= 54) return true;
       if (nx >= 112 && nx <= 128 && ny >= 78 && ny <= 162) return true;
@@ -4272,9 +3906,7 @@
 
     if (cp.flow === 'NS') {
       if (cp.id === 'st_boniface') {
-        // West bank has Assiniboine River entering at y: 136..184
         if (nx >= 8 && nx <= 72 && ((ny >= 18 && ny <= 132) || (ny >= 186 && ny <= 228))) return true;
-        // East bank including the West-East road north of the Cathedral (y: 4..16)
         if (nx >= 168 && nx <= 232 && ny >= 4 && ny <= 16) return true;
         if (nx >= 168 && nx <= 232 && ny >= 58 && ny <= 228) return true;
         if (nx >= 72 && nx <= 168 && ny >= 112 && ny <= 128) return true;
@@ -4295,42 +3927,52 @@
     }
   }
 
-  function handleDpad(dir) {
+  function moveWeirPlayer(dir) {
+    const cp = CHECKPOINTS[activeCheckpointIndex];
+    const step = 10;
+    let nx = player.x;
+    let ny = player.y;
+
+    if (dir === 'UP') { ny -= step; player.dir = 'up'; }
+    else if (dir === 'DOWN') { ny += step; player.dir = 'down'; }
+    else if (dir === 'LEFT') { nx -= step; player.dir = 'left'; }
+    else if (dir === 'RIGHT') { nx += step; player.dir = 'right'; }
+
+    if (cp.flow === 'WE' && dir === 'UP' && ny <= 22 && nx >= 108 && nx <= 132) {
+      handleActionB();
+      return;
+    }
+    if (cp.flow === 'NS' && cp.entrySide === 'EAST' && dir === 'RIGHT' && nx >= 230 && ny >= 108 && ny <= 132) {
+      handleActionB();
+      return;
+    }
+    if (cp.flow === 'NS' && cp.entrySide === 'WEST' && dir === 'LEFT' && nx <= 10 && ny >= 108 && ny <= 132) {
+      handleActionB();
+      return;
+    }
+
+    if (canPlayerStandAt(cp, nx, ny)) {
+      player.x = nx;
+      player.y = ny;
+      sfxStep();
+    }
+  }
+
+  function handleDpadPulse(dir) {
+    if (isPaused) return;
+    const now = performance.now();
+    const wasHeld = now < dpadExpiry[dir];
+    dpadExpiry[dir] = now + DPAD_HOLD_WINDOW_MS;
+
     if (gameState === 'MAP') {
       if (dir === 'RIGHT' || dir === 'DOWN') cycleCheckpoint(1);
       else if (dir === 'LEFT' || dir === 'UP') cycleCheckpoint(-1);
       return;
     }
 
-    if (gameState === 'WEIR') {
-      const cp = CHECKPOINTS[activeCheckpointIndex];
-      const step = 10;
-      let nx = player.x;
-      let ny = player.y;
-
-      if (dir === 'UP') { ny -= step; player.dir = 'up'; }
-      else if (dir === 'DOWN') { ny += step; player.dir = 'down'; }
-      else if (dir === 'LEFT') { nx -= step; player.dir = 'left'; }
-      else if (dir === 'RIGHT') { nx += step; player.dir = 'right'; }
-
-      if (cp.flow === 'WE' && dir === 'UP' && ny <= 22 && nx >= 108 && nx <= 132) {
-        handleActionB();
-        return;
-      }
-      if (cp.flow === 'NS' && cp.entrySide === 'EAST' && dir === 'RIGHT' && nx >= 230 && ny >= 108 && ny <= 132) {
-        handleActionB();
-        return;
-      }
-      if (cp.flow === 'NS' && cp.entrySide === 'WEST' && dir === 'LEFT' && nx <= 10 && ny >= 108 && ny <= 132) {
-        handleActionB();
-        return;
-      }
-
-      if (canPlayerStandAt(cp, nx, ny)) {
-        player.x = nx;
-        player.y = ny;
-        sfxStep();
-      }
+    if (gameState === 'WEIR' && !wasHeld) {
+      moveWeirPlayer(dir);
+      weirStepCooldown = 0.14;
     }
   }
 
@@ -4338,6 +3980,8 @@
     resetAllCheckpoints();
     totalFurs = 0;
     totalRobes = 0;
+    hbcDealsLost = 0;
+    buffaloRedirects = 0;
     hbcBrokenCount = 0;
     timeLeft = 300;
     lastSecondTimestamp = Math.floor(performance.now() / 1000);
@@ -4349,54 +3993,41 @@
 
   function triggerGameOver(byHbcMonopoly = false) {
     stopBGM();
-    const rankInfo = getTraderRankInfo();
-
-    gameoverSub.innerText = byHbcMonopoly ? 'HBC SEIZED YOUR TRADE!' : 'WINTER HAS ARRIVED';
-    gameoverRank.innerText = rankInfo.title;
-    gameoverRank.style.color = rankInfo.color;
-
-    document.getElementById('final-stats').innerHTML =
-      `BUFFALO ROBES: ${totalRobes}<br>` +
-      `SMALL GAME PELTS: ${totalFurs}<br>` +
-      `HBC BROKEN CARTS: ${hbcBrokenCount}/3`;
-
-    gameoverScreen.style.display = 'flex';
     setViewMode('GAMEOVER');
   }
 
-  // Arcade Cabinet postMessage Listener
+  // =========================================================================
+  // EXCLUSIVE POSTMESSAGE JOYSTICK & BUTTON BRIDGE
+  // =========================================================================
   window.addEventListener('message', function(event) {
     const cmd = event.data;
-    if (cmd === 'BUTTON_A') handleActionA();
-    else if (cmd === 'BUTTON_B') handleActionB();
-    else if (cmd === 'DPAD_UP') handleDpad('UP');
-    else if (cmd === 'DPAD_DOWN') handleDpad('DOWN');
-    else if (cmd === 'DPAD_LEFT') handleDpad('LEFT');
-    else if (cmd === 'DPAD_RIGHT') handleDpad('RIGHT');
-  });
-
-  // Keyboard Fallbacks
-  window.addEventListener('keydown', function(e) {
-    if (e.key === 'ArrowUp') { handleDpad('UP'); e.preventDefault(); }
-    else if (e.key === 'ArrowDown') { handleDpad('DOWN'); e.preventDefault(); }
-    else if (e.key === 'ArrowLeft') { handleDpad('LEFT'); e.preventDefault(); }
-    else if (e.key === 'ArrowRight') { handleDpad('RIGHT'); e.preventDefault(); }
-    else if (e.key === 'a' || e.key === 'A' || e.key === 'Enter' || e.key === ' ' || e.key === 'z') {
-      handleActionA();
-      e.preventDefault();
-    } else if (e.key === 'b' || e.key === 'B' || e.key === 'Shift' || e.key === 'x') {
-      handleActionB();
-      e.preventDefault();
-    } else if (gameState === 'MAP' && ['1', '2', '3', '4', '5', '6'].includes(e.key)) {
-      setCheckpoint(parseInt(e.key, 10) - 1);
+    if (cmd === 'PAUSE') {
+      isPaused = true;
+      clearAllInputs();
+      return;
     }
+    if (cmd === 'RESUME') {
+      isPaused = false;
+      clearAllInputs();
+      lastFrameTime = performance.now();
+      return;
+    }
+
+    if (cmd === 'DPAD_UP' || cmd === 'DPAD_UP_PRESS')          handleDpadPulse('UP');
+    else if (cmd === 'DPAD_DOWN' || cmd === 'DPAD_DOWN_PRESS')  handleDpadPulse('DOWN');
+    else if (cmd === 'DPAD_LEFT' || cmd === 'DPAD_LEFT_PRESS')  handleDpadPulse('LEFT');
+    else if (cmd === 'DPAD_RIGHT' || cmd === 'DPAD_RIGHT_PRESS') handleDpadPulse('RIGHT');
+    else if (cmd === 'DPAD_UP_RELEASE')    dpadExpiry.UP = 0;
+    else if (cmd === 'DPAD_DOWN_RELEASE')  dpadExpiry.DOWN = 0;
+    else if (cmd === 'DPAD_LEFT_RELEASE')  dpadExpiry.LEFT = 0;
+    else if (cmd === 'DPAD_RIGHT_RELEASE') dpadExpiry.RIGHT = 0;
+    else if (cmd === 'BUTTON_A') handleActionA();
+    else if (cmd === 'BUTTON_B') handleActionB();
   });
 
   // Boot Initialization
   bakeStaticMap();
-  buildCheckpointBoxes();
   setCheckpoint(0);
-  updateHUD();
   requestAnimationFrame(renderLoop);
 </script>
 </body>
