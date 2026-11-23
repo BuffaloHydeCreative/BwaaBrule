@@ -91,7 +91,7 @@
     line-height: 1.5;
     margin: 0 0 22px 0;
     color: #E8E2D2;
-    max-width: 440px;
+    max-width: 450px;
     text-shadow: 1px 1px 0 #000;
   }
 
@@ -137,7 +137,7 @@
 
     <div id="intro-screen" class="overlay">
       <h2>Red River Run</h2>
-      <p>Paddle north from The Forks past Lower Fort Garry, around Sugar Island, and along the rocky shoreline of Lake Winnipeg into the Boreal winter.<br><br>Use UP / DOWN to switch river tracks around meandering banks, islands, and shallow rock clusters.</p>
+      <p>Paddle north from The Forks past Lower Fort Garry, around Sugar Island, and along Lake Winnipeg into the frozen Boreal blizzard to reach York Factory on Hudson Bay.<br><br>UP / DOWN shifts between 3 river tracks around meandering banks, island chutes, log jams, and shallow rocks.</p>
       <div class="blink-text">PRESS 'A' TO START</div>
     </div>
 
@@ -190,20 +190,20 @@
     GOLD_DARK: '#A8741A',
     CHARTREUSE_L: '#BCE254',
     CHARTREUSE_D: '#7EA626',
-    MAROON_DEEP: '#36090C',
-    MAROON_MID: '#591418',
-    MAROON_FOAM: '#B87A68',
-    LAKE_DEEP: '#08364F',
-    LAKE_MID: '#105A7E',
-    LAKE_FOAM: '#38C8BC',
-    INDIGO_DEEP: '#071422',
-    INDIGO_MID: '#112942',
+    MAROON_DEEP: '#3A0B0E',
+    MAROON_MID: '#5E171C',
+    MAROON_FOAM: '#C48A78',
+    LAKE_DEEP: '#0A3E59',
+    LAKE_MID: '#16688F',
+    LAKE_FOAM: '#48D8CC',
+    INDIGO_DEEP: '#081726',
+    INDIGO_MID: '#14304D',
     NIGHT_SKY_T: '#0D0B1E',
     NIGHT_SKY_B: '#231942',
     DAY_SKY_T: '#87B5C9',
     DAY_SKY_B: '#E6DFCE',
-    HIDE_LIGHT: '#EFE8D5',
-    HIDE_MID: '#C8BCA2',
+    HIDE_LIGHT: '#F2ECDC',
+    HIDE_MID: '#CBBFA4',
     HIDE_DARK: '#8F8268',
     WOOD_LIGHT: '#C88446',
     WOOD_MID: '#8C5022',
@@ -214,14 +214,14 @@
     STONE_MID: '#7A7E7A',
     STONE_DARK: '#424644',
     SNOW_LIGHT: '#FFFFFF',
-    SNOW_MID: '#CFE4F2',
-    SNOW_DARK: '#8FB2CC',
-    ICE_DEEP: '#72A8C8',
-    ICE_MID: '#9FD0EA',
+    SNOW_MID: '#D4E7F5',
+    SNOW_DARK: '#93B6CF',
+    ICE_DEEP: '#7BAEC9',
+    ICE_MID: '#A6D5ED',
     SASH_RED: '#C42424'
   };
 
-  let isPlaying = false, isGameOver = false, isPaused = false;
+  let isPlaying = false, isGameOver = false, isPaused = false, isVictory = false;
   let score = 0, frame = 0, speed = 1.35;
   let bgOffset = 0;
 
@@ -230,11 +230,12 @@
   let playerVisualY = 0;
   let shakeTimer = 0;
   let slowTimer = 0;
+  let boostTimer = 0;
   let crashReason = "RUN AGROUND!";
 
-  // Tapered River Meanders & Islands
-  let riverFeatures = []; // { x, w, taperW, type: 'TOP_MEANDER'|'BOT_MEANDER'|'ISLAND'|'SUGAR_ISLAND', label? }
-  let hazards = [];       // Infrequent { x, lane, type: 'LOG'|'ROCK_CLUSTER', triggered }
+  // Tapered River Meanders (0.5 or 1.0 track depth), Islands & One-Sided Currents
+  let riverFeatures = [];
+  let hazards = []; // 'LOG_JAM' (rumble) & 'ROCK_CLUSTER' (fatal)
   let nextFeatureX = 0;
   let lastFeatureType = 'NONE';
   let sugarIslandSpawned = false;
@@ -242,7 +243,23 @@
   // Unique One-Off Landmarks
   let upperFortSpawned = false;
   let lowerFortSpawned = false;
+  let yorkFactorySpawned = false;
   let landmarks = [];
+
+  // Parallax Snow / Blizzard Particles
+  let snowParticles = [];
+  function initSnow() {
+    snowParticles = [];
+    for (let i = 0; i < 190; i++) {
+      snowParticles.push({
+        x: Math.random() * 480,
+        y: Math.random() * 160,
+        layer: i % 3, // 0: distant slow, 1: mid, 2: foreground fast streak
+        phase: Math.random() * Math.PI * 2
+      });
+    }
+  }
+  initSnow();
 
   // ==========================================
   // 3. COLOR INTERPOLATION HELPERS
@@ -310,18 +327,30 @@
     } else if (score < 1250) {
       title = "MIDNIGHT LAKE";
       const t = (score - 1000) / 250;
-      skyTop = lerpColor(PAL.NIGHT_SKY_T, PAL.DAY_SKY_T, t);
-      skyBot = lerpColor(PAL.NIGHT_SKY_B, PAL.DAY_SKY_B, t);
+      skyTop = lerpColor(PAL.NIGHT_SKY_T, '#7C9EB2', t);
+      skyBot = lerpColor(PAL.NIGHT_SKY_B, '#D6E2E8', t);
       gndTop = lerpColor('#14262E', PAL.SNOW_LIGHT, t);
       gndMid = lerpColor('#0B161C', PAL.SNOW_MID, t);
       gndDark = lerpColor('#060D12', PAL.SNOW_DARK, t);
       watDeep = lerpColor(PAL.INDIGO_DEEP, PAL.ICE_DEEP, t);
       watMid = lerpColor(PAL.INDIGO_MID, PAL.ICE_MID, t);
       watFoam = lerpColor('#277DA1', PAL.SNOW_LIGHT, t);
+    } else if (score < 2100) {
+      title = score >= 1700 ? "BOREAL BLIZZARD" : "BOREAL WINTER TRAIL";
+      const blizT = Math.min(1, Math.max(0, (score - 1400) / 500));
+      skyTop = lerpColor('#7C9EB2', '#B8C8D4', blizT);
+      skyBot = lerpColor('#D6E2E8', '#E4EDF2', blizT);
+      gndTop = PAL.SNOW_LIGHT;
+      gndMid = PAL.SNOW_MID;
+      gndDark = PAL.SNOW_DARK;
+      watDeep = PAL.ICE_DEEP;
+      watMid = PAL.ICE_MID;
+      watFoam = PAL.SNOW_LIGHT;
     } else {
-      title = "BOREAL WINTER TRAIL";
-      skyTop = PAL.DAY_SKY_T;
-      skyBot = PAL.DAY_SKY_B;
+      title = "HUDSON BAY - YORK FACTORY";
+      const t = Math.min(1, (score - 2100) / 200);
+      skyTop = lerpColor('#B8C8D4', '#6BA3C4', t);
+      skyBot = lerpColor('#E4EDF2', '#F2E8D5', t);
       gndTop = PAL.SNOW_LIGHT;
       gndMid = PAL.SNOW_MID;
       gndDark = PAL.SNOW_DARK;
@@ -334,7 +363,7 @@
   }
 
   // ==========================================
-  // 4. SNES SHADED SPRITE & SCENERY ART
+  // 4. ENLARGED (~1.65x) SNES SHADED SPRITES
   // ==========================================
   function drawCanoeAndHunter(x, y, frameCount) {
     const isWinter = score >= 1250;
@@ -346,112 +375,136 @@
     const bob = Math.sin(frameCount * 0.14) * 1;
     const py = Math.round(y + bob);
 
-    // Water shadow under hull
+    // Enlarged Birchbark Canoe (~44px wide, 16px tall)
+    // Water hull shadow
     ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
-    ctx.fillRect(x + 2, py + 11, 24, 2);
+    ctx.fillRect(x + 4, py + 14, 36, 2);
 
-    // Birchbark Canoe Hull (Shaded 3-tone)
+    // Outer dark outline
     ctx.fillStyle = PAL.OUTLINE;
-    ctx.fillRect(x + 1, py + 6, 26, 5);
-    ctx.fillRect(x, py + 5, 2, 3);
-    ctx.fillRect(x + 26, py + 5, 2, 3);
+    ctx.fillRect(x + 3, py + 7, 38, 7);
+    ctx.fillRect(x + 1, py + 5, 4, 4);
+    ctx.fillRect(x + 39, py + 5, 4, 4);
+    ctx.fillRect(x, py + 4, 2, 2);
+    ctx.fillRect(x + 42, py + 4, 2, 2);
 
-    // Upper rim highlight
+    // Upper gunwale highlight
     ctx.fillStyle = PAL.HIDE_LIGHT;
-    ctx.fillRect(x + 2, py + 6, 24, 1);
-    ctx.fillRect(x + 1, py + 5, 2, 1);
-    ctx.fillRect(x + 25, py + 5, 2, 1);
+    ctx.fillRect(x + 4, py + 7, 36, 2);
+    ctx.fillRect(x + 2, py + 5, 3, 2);
+    ctx.fillRect(x + 39, py + 5, 3, 2);
+    ctx.fillRect(x + 1, py + 4, 2, 1);
+    ctx.fillRect(x + 41, py + 4, 2, 1);
 
-    // Mid birchbark body
+    // Mid birchbark hull
     ctx.fillStyle = PAL.HIDE_MID;
-    ctx.fillRect(x + 2, py + 7, 24, 2);
+    ctx.fillRect(x + 4, py + 9, 36, 3);
+    ctx.fillRect(x + 2, py + 7, 2, 2);
+    ctx.fillRect(x + 40, py + 7, 2, 2);
 
-    // Lower hull shadow
+    // Lower hull shading
     ctx.fillStyle = PAL.HIDE_DARK;
-    ctx.fillRect(x + 4, py + 9, 20, 1);
+    ctx.fillRect(x + 6, py + 12, 32, 2);
 
-    // Decorative gunwale stitching
+    // Traditional birchbark stitch markings & bow motif
     ctx.fillStyle = PAL.SASH_RED;
-    ctx.fillRect(x + 5, py + 7, 2, 1);
-    ctx.fillRect(x + 21, py + 7, 2, 1);
+    ctx.fillRect(x + 7, py + 9, 3, 1);
+    ctx.fillRect(x + 34, py + 9, 3, 1);
+    ctx.fillStyle = PAL.WOOD_DARK;
+    ctx.fillRect(x + 12, py + 8, 1, 4);
+    ctx.fillRect(x + 31, py + 8, 1, 4);
 
-    // Cargo bundle in bow
-    ctx.fillStyle = PAL.WOOD_MID;
-    ctx.fillRect(x + 17, py + 4, 5, 2);
-    ctx.fillStyle = PAL.WOOD_LIGHT;
-    ctx.fillRect(x + 18, py + 4, 3, 1);
-
-    // Cree Trapper (Fringed buckskin jacket, steady head/neck)
-    const hx = x + 9;
-    const hy = py - 2;
-
+    // Fur trade pack & supplies in bow
     ctx.fillStyle = PAL.OUTLINE;
-    ctx.fillRect(hx, hy + 3, 6, 4);
+    ctx.fillRect(x + 26, py + 3, 8, 4);
+    ctx.fillStyle = PAL.WOOD_MID;
+    ctx.fillRect(x + 27, py + 4, 6, 3);
+    ctx.fillStyle = PAL.WOOD_LIGHT;
+    ctx.fillRect(x + 28, py + 4, 4, 1);
+
+    // Cree Trapper (Enlarged, fringed buckskin jacket, steady head/neck)
+    const hx = x + 14;
+    const hy = py - 5;
+
+    // Buckskin torso
+    ctx.fillStyle = PAL.OUTLINE;
+    ctx.fillRect(hx, hy + 5, 9, 7);
     ctx.fillStyle = PAL.HIDE_MID;
-    ctx.fillRect(hx + 1, hy + 3, 4, 3);
+    ctx.fillRect(hx + 1, hy + 6, 7, 5);
     ctx.fillStyle = PAL.HIDE_LIGHT;
-    ctx.fillRect(hx + 1, hy + 3, 2, 2);
-    // Fringe pixels
+    ctx.fillRect(hx + 1, hy + 6, 4, 3);
+
+    // Jacket fringe details
     ctx.fillStyle = PAL.HIDE_LIGHT;
-    ctx.fillRect(hx + 1, hy + 6, 1, 1);
-    ctx.fillRect(hx + 3, hy + 6, 1, 1);
-    ctx.fillRect(hx + 5, hy + 6, 1, 1);
+    ctx.fillRect(hx + 1, hy + 11, 1, 1);
+    ctx.fillRect(hx + 3, hy + 11, 1, 1);
+    ctx.fillRect(hx + 5, hy + 11, 1, 1);
+    ctx.fillRect(hx + 7, hy + 11, 1, 1);
+
     // Red sash belt
     ctx.fillStyle = PAL.SASH_RED;
-    ctx.fillRect(hx + 1, hy + 5, 4, 1);
+    ctx.fillRect(hx + 1, hy + 9, 7, 2);
 
-    // Head & Dark Hair (Steady, never bends at neck)
+    // Head & Dark Hair (Steady, straight posture)
     ctx.fillStyle = PAL.OUTLINE;
-    ctx.fillRect(hx + 1, hy - 1, 4, 4);
-    ctx.fillStyle = '#C98E63';
-    ctx.fillRect(hx + 3, hy, 2, 2);
-    ctx.fillStyle = '#14110F';
-    ctx.fillRect(hx + 1, hy - 1, 3, 3);
-    ctx.fillRect(hx, hy + 1, 2, 2);
+    ctx.fillRect(hx + 2, hy - 1, 6, 6);
+    ctx.fillStyle = '#C98E63'; // Face
+    ctx.fillRect(hx + 5, hy + 1, 2, 3);
+    ctx.fillStyle = '#14110F'; // Hair
+    ctx.fillRect(hx + 2, hy - 1, 5, 2);
+    ctx.fillRect(hx + 1, hy + 1, 4, 4);
 
     // Animated Paddling Cycle (Solid, straight wooden paddle)
     const strokePhase = Math.floor(frameCount / 7) % 4;
-    let handFrontX = hx + 5, handFrontY = hy + 4;
-    let handBackX = hx + 2, handBackY = hy + 3;
-    let bladeX = hx + 8, bladeY = py + 10;
+    let handFrontX = hx + 7, handFrontY = hy + 7;
+    let handBackX = hx + 3, handBackY = hy + 5;
+    let bladeX = hx + 11, bladeY = py + 14;
 
     if (strokePhase === 0) {
-      handFrontX = hx + 6; handFrontY = hy + 4;
-      handBackX = hx + 3; handBackY = hy + 2;
-      bladeX = hx + 8; bladeY = py + 10;
+      handFrontX = hx + 8; handFrontY = hy + 7;
+      handBackX = hx + 4; handBackY = hy + 4;
+      bladeX = hx + 12; bladeY = py + 14;
     } else if (strokePhase === 1) {
-      handFrontX = hx + 4; handFrontY = hy + 4;
-      handBackX = hx + 2; handBackY = hy + 2;
-      bladeX = hx + 4; bladeY = py + 11;
+      handFrontX = hx + 6; handFrontY = hy + 7;
+      handBackX = hx + 3; handBackY = hy + 4;
+      bladeX = hx + 6; bladeY = py + 15;
     } else if (strokePhase === 2) {
-      handFrontX = hx + 2; handFrontY = hy + 4;
-      handBackX = hx + 0; handBackY = hy + 2;
-      bladeX = hx - 1; bladeY = py + 10;
+      handFrontX = hx + 3; handFrontY = hy + 7;
+      handBackX = hx + 0; handBackY = hy + 4;
+      bladeX = hx - 2; bladeY = py + 14;
     } else {
-      handFrontX = hx + 4; handFrontY = hy + 3;
-      handBackX = hx + 1; handBackY = hy + 2;
-      bladeX = hx + 3; bladeY = py + 8;
+      handFrontX = hx + 5; handFrontY = hy + 6;
+      handBackX = hx + 2; handBackY = hy + 4;
+      bladeX = hx + 4; bladeY = py + 11;
     }
 
+    // Buckskin sleeves
     ctx.fillStyle = PAL.HIDE_LIGHT;
-    ctx.fillRect(handBackX, handBackY, 2, 2);
-    ctx.fillRect(handFrontX, handFrontY, 2, 2);
+    ctx.fillRect(handBackX, handBackY, 3, 2);
+    ctx.fillRect(handFrontX, handFrontY, 3, 2);
 
-    // Solid Straight Wooden Paddle
+    // Solid Straight Wooden Paddle (Grip to broad blade)
     const topX = handBackX;
-    const topY = handBackY - 2;
-    const steps = 8;
+    const topY = handBackY - 3;
+    const steps = 11;
     for (let s = 0; s <= steps; s++) {
       const t = s / steps;
       const sx = Math.round(topX + (bladeX - topX) * t);
       const sy = Math.round(topY + (bladeY - topY) * t);
-      ctx.fillStyle = s >= 6 ? PAL.WOOD_LIGHT : PAL.WOOD_MID;
-      ctx.fillRect(sx, sy, s >= 6 ? 2 : 1, 1);
+      if (s >= 8) {
+        ctx.fillStyle = PAL.WOOD_DARK;
+        ctx.fillRect(sx - 1, sy, 3, 2);
+        ctx.fillStyle = PAL.WOOD_LIGHT;
+        ctx.fillRect(sx, sy, 2, 1);
+      } else {
+        ctx.fillStyle = PAL.WOOD_MID;
+        ctx.fillRect(sx, sy, 1, 1);
+      }
     }
 
     if (strokePhase !== 3) {
       ctx.fillStyle = PAL.SNOW_LIGHT;
-      ctx.fillRect(bladeX - 1, py + 10, 3, 1);
+      ctx.fillRect(bladeX - 2, py + 14, 5, 1);
     }
   }
 
@@ -459,50 +512,54 @@
     const py = Math.round(y);
     const runStep = Math.floor(frameCount / 5) % 2;
 
+    // Two Huskies pulling ahead (scaled up to match enlarged sled)
     for (let d = 0; d < 2; d++) {
-      const dx = x + 22 + d * 11;
-      const dy = py + 4 + (d === runStep ? 0 : 1);
+      const dx = x + 28 + d * 13;
+      const dy = py + 5 + (d === runStep ? 0 : 1);
       ctx.fillStyle = PAL.WOOD_LIGHT;
-      ctx.fillRect(x + 17, py + 7, dx - (x + 17), 1);
+      ctx.fillRect(x + 22, py + 9, dx - (x + 22), 1);
 
       ctx.fillStyle = PAL.STONE_DARK;
-      ctx.fillRect(dx, dy, 7, 4);
+      ctx.fillRect(dx, dy, 9, 5);
       ctx.fillStyle = PAL.SNOW_LIGHT;
-      ctx.fillRect(dx + 1, dy + 1, 5, 2);
+      ctx.fillRect(dx + 1, dy + 1, 7, 3);
       ctx.fillStyle = PAL.STONE_DARK;
-      ctx.fillRect(dx + 6, dy - 2, 3, 3);
+      ctx.fillRect(dx + 7, dy - 3, 4, 4);
       ctx.fillStyle = PAL.SNOW_LIGHT;
-      ctx.fillRect(dx + 7, dy - 1, 2, 2);
+      ctx.fillRect(dx + 8, dy - 2, 3, 2);
       ctx.fillStyle = PAL.STONE_MID;
-      ctx.fillRect(dx - 2, dy - 1, 2, 2);
+      ctx.fillRect(dx - 2, dy - 1, 2, 3);
 
       ctx.fillStyle = PAL.SNOW_LIGHT;
       if (runStep === 0) {
-        ctx.fillRect(dx, dy + 4, 1, 2);
-        ctx.fillRect(dx + 6, dy + 4, 1, 2);
+        ctx.fillRect(dx, dy + 5, 2, 3);
+        ctx.fillRect(dx + 7, dy + 5, 2, 3);
       } else {
-        ctx.fillRect(dx + 2, dy + 4, 1, 2);
-        ctx.fillRect(dx + 4, dy + 4, 1, 2);
+        ctx.fillRect(dx + 2, dy + 5, 2, 3);
+        ctx.fillRect(dx + 5, dy + 5, 2, 3);
       }
     }
 
+    // Enlarged Wooden Toboggan Sled
     ctx.fillStyle = PAL.WOOD_DARK;
-    ctx.fillRect(x + 2, py + 9, 16, 2);
-    ctx.fillRect(x + 16, py + 6, 2, 4);
+    ctx.fillRect(x + 2, py + 12, 21, 2);
+    ctx.fillRect(x + 21, py + 7, 3, 6);
     ctx.fillStyle = PAL.WOOD_LIGHT;
-    ctx.fillRect(x + 3, py + 8, 13, 1);
+    ctx.fillRect(x + 3, py + 10, 18, 2);
 
+    // Fur cargo pack on sled
     ctx.fillStyle = PAL.HIDE_DARK;
-    ctx.fillRect(x + 8, py + 4, 7, 4);
+    ctx.fillRect(x + 10, py + 5, 9, 5);
     ctx.fillStyle = PAL.HIDE_LIGHT;
-    ctx.fillRect(x + 9, py + 4, 5, 2);
+    ctx.fillRect(x + 11, py + 5, 7, 3);
 
+    // Hunter standing on sled runners
     ctx.fillStyle = PAL.HIDE_MID;
-    ctx.fillRect(x + 2, py + 1, 4, 7);
+    ctx.fillRect(x + 2, py + 1, 6, 9);
     ctx.fillStyle = PAL.SASH_RED;
-    ctx.fillRect(x + 2, py + 4, 4, 1);
+    ctx.fillRect(x + 2, py + 5, 6, 2);
     ctx.fillStyle = '#14110F';
-    ctx.fillRect(x + 2, py - 2, 4, 3);
+    ctx.fillRect(x + 2, py - 3, 5, 4);
   }
 
   // Shaded SNES Background Props
@@ -591,8 +648,42 @@
     ctx.fillRect(x + 3, y + 2, 8, 2);
   }
 
-  // One-Off Historic Fort Landmark
-  function drawFortLandmark(x, y) {
+  // One-Off Historic Fort Landmark (Upper Fort Garry, Lower Fort Garry, & Thawing York Factory)
+  function drawFortLandmark(x, y, type) {
+    const isYork = type === 'YORK_FACTORY';
+    if (isYork) {
+      // Historic Octagonal / Two-Story HBC Depot at York Factory on Hudson Bay (Thawing snow & timber)
+      ctx.fillStyle = PAL.OUTLINE;
+      ctx.fillRect(x - 2, y - 4, 48, 18);
+      ctx.fillStyle = PAL.HIDE_MID;
+      ctx.fillRect(x, y - 2, 44, 15);
+      ctx.fillStyle = PAL.HIDE_LIGHT;
+      ctx.fillRect(x + 1, y - 2, 42, 4);
+      // Thawing snow roof with red trim
+      ctx.fillStyle = PAL.MAROON_MID;
+      ctx.fillRect(x - 3, y - 5, 50, 3);
+      ctx.fillStyle = PAL.SNOW_LIGHT;
+      ctx.fillRect(x - 1, y - 6, 22, 2); // Partial thaw snow patches on roof
+      ctx.fillRect(x + 28, y - 6, 16, 2);
+      // Cupola lookout tower
+      ctx.fillStyle = PAL.HIDE_LIGHT;
+      ctx.fillRect(x + 18, y - 10, 8, 5);
+      ctx.fillStyle = PAL.SASH_RED;
+      ctx.fillRect(x + 22, y - 15, 6, 3);
+      ctx.fillStyle = PAL.WOOD_DARK;
+      ctx.fillRect(x + 21, y - 15, 1, 6);
+      // Windows & main depot doors
+      ctx.fillStyle = PAL.INDIGO_DEEP;
+      for (let wx = 4; wx <= 36; wx += 8) {
+        ctx.fillRect(x + wx, y + 1, 3, 3);
+        ctx.fillRect(x + wx, y + 7, 3, 3);
+      }
+      ctx.fillStyle = PAL.WOOD_DARK;
+      ctx.fillRect(x + 19, y + 6, 6, 7);
+      return;
+    }
+
+    // Stone Fort (Upper Fort Garry / Lower Fort Garry)
     ctx.fillStyle = PAL.STONE_DARK;
     ctx.fillRect(x, y + 4, 34, 10);
     ctx.fillStyle = PAL.STONE_MID;
@@ -616,7 +707,7 @@
   }
 
   // ==========================================
-  // 5. NATURAL TAPERED MEANDERS, ISLANDS & CLUSTERS
+  // 5. 0.5 / 1.0 TRACK MEANDERS, ISLAND CHUTES & LOG JAMS
   // ==========================================
   function resetWorld() {
     riverFeatures = [];
@@ -625,91 +716,132 @@
     upperFortSpawned = false;
     lowerFortSpawned = false;
     sugarIslandSpawned = false;
+    yorkFactorySpawned = false;
     lastFeatureType = 'NONE';
 
     // Spawn Upper Fort Garry ONCE at the start
     landmarks.push({ x: 34, type: 'UPPER_FORT' });
     upperFortSpawned = true;
 
-    // Give a long, peaceful opening stretch down the Red River from The Forks
-    nextFeatureX = VIEW_W + 90;
+    nextFeatureX = VIEW_W + 85;
   }
 
   function scheduleNextRiverFeature() {
-    // Trigger Lower Fort Garry ONCE around score 360-400
+    // Trigger Lower Fort Garry ONCE around score 360
     if (!lowerFortSpawned && score >= 360) {
       landmarks.push({ x: VIEW_W + 40, type: 'LOWER_FORT' });
       lowerFortSpawned = true;
     }
 
-    // Trigger Sugar Island ONCE after Lower Fort Garry (around score 430-480)
+    // Trigger York Factory on Hudson Bay ONCE at 2380 (arriving right at 2500!)
+    if (!yorkFactorySpawned && score >= 2380) {
+      landmarks.push({ x: VIEW_W + 30, type: 'YORK_FACTORY' });
+      yorkFactorySpawned = true;
+    }
+
+    // Trigger Sugar Island ONCE after Lower Fort Garry (around score 435)
     if (!sugarIslandSpawned && score >= 435) {
       sugarIslandSpawned = true;
-      const w = 150;
-      const taperW = 42;
+      const w = 156;
+      const taperW = 44;
+      const chuteSide = Math.random() < 0.5 ? 0 : 2; // Current chute on ONLY ONE side
       riverFeatures.push({
         x: nextFeatureX,
         w: w,
         taperW: taperW,
         type: 'ISLAND',
+        depthFactor: 1.0,
+        chuteLane: chuteSide,
         isSugarIsland: true
       });
       lastFeatureType = 'ISLAND';
-      nextFeatureX += w + 140; // Generous open water after Sugar Island
+      nextFeatureX += w + 145;
       return;
     }
 
-    const isLakeShore = score >= 550; // Open Lake on Top (Lane 0), Shoreline on Bottom (Lane 2)
-    let chosen = 'NONE';
-    let gapAfter = 130;
+    const isLakeShore = score >= 550;
+    const isWinter = score >= 1250;
+    const isVictoryLap = score >= 2100;
+
+    let chosen = 'TOP_MEANDER';
+    let depthFactor = 1.0; // 0.5 = half-track shelf, 1.0 = full track meander
+    let gapAfter = 140;
 
     if (score < 250) {
-      // 0-250 (The Forks to Lower Fort Garry): Easy paddle, just a couple of wide, gentle river bends
-      const pool = ['TOP_MEANDER', 'BOT_MEANDER'];
-      chosen = lastFeatureType === 'TOP_MEANDER' ? 'BOT_MEANDER' : pool[Math.floor(Math.random() * pool.length)];
-      gapAfter = 175;
+      // Gentle start: mix of 0.5-track subtle bends and 1.0-track bends
+      chosen = lastFeatureType === 'TOP_MEANDER' ? 'BOT_MEANDER' : 'TOP_MEANDER';
+      depthFactor = Math.random() < 0.55 ? 0.5 : 1.0;
+      gapAfter = 165;
     } else if (score < 550) {
-      // 250-550 (Lower Fort Garry to Lake Mouth): Gentle bends + Sugar Island
-      const pool = ['TOP_MEANDER', 'BOT_MEANDER'];
-      chosen = lastFeatureType === 'BOT_MEANDER' ? 'TOP_MEANDER' : pool[Math.floor(Math.random() * pool.length)];
+      chosen = lastFeatureType === 'BOT_MEANDER' ? 'TOP_MEANDER' : 'BOT_MEANDER';
+      depthFactor = Math.random() < 0.5 ? 0.5 : 1.0;
+      gapAfter = 150;
+    } else if (isVictoryLap) {
+      // 2100-2500: Scenic dog-sled victory lap through frozen pines & shield rock to York Factory
+      chosen = Math.random() < 0.65 ? 'BOT_MEANDER' : 'ISLAND';
+      depthFactor = chosen === 'ISLAND' ? 1.0 : 0.5;
       gapAfter = 155;
     } else {
-      // 550+ (Lake Winnipeg Shoreline & Boreal Ice):
-      // Top side (Lane 0) is OPEN LAKE (never blocked by northern bank meanders!).
-      // Bottom side (Lane 2) is the rocky/snowy shoreline with points/meanders, plus occasional islands in Lane 1.
+      // 550-2100 (Lake Winnipeg Shoreline, Midnight Lake & Boreal Blizzard):
+      // Top side (Lane 0) stays open lake/ice; Bottom side (Lane 2) has 0.5 & 1.0 shoreline points + islands
       const pool = ['BOT_MEANDER', 'BOT_MEANDER', 'ISLAND'];
       chosen = pool[Math.floor(Math.random() * pool.length)];
       if (lastFeatureType === 'ISLAND' && chosen === 'ISLAND') chosen = 'BOT_MEANDER';
-      gapAfter = 140;
+      depthFactor = chosen === 'ISLAND' ? 1.0 : (Math.random() < 0.52 ? 0.5 : 1.0);
+      gapAfter = Math.max(105, 140 - Math.floor((score - 550) * 0.02));
     }
 
-    // Long, natural tapered meander dimensions
-    const w = 140 + Math.floor(Math.random() * 55); // Long 140-195px bend
-    const taperW = 44; // Smooth 44px triangular entry & exit taper
+    const w = 145 + Math.floor(Math.random() * 55);
+    const taperW = 46;
+    // Every island has a current chute on ONLY ONE side (0 = Top, 2 = Bottom), stopped in winter
+    const chuteSide = chosen === 'ISLAND' ? (Math.random() < 0.5 ? 0 : 2) : -1;
 
     riverFeatures.push({
       x: nextFeatureX,
       w: w,
       taperW: taperW,
       type: chosen,
+      depthFactor: depthFactor,
+      chuteLane: chuteSide,
       isSugarIsland: false
     });
     lastFeatureType = chosen;
 
-    // Infrequent off-chance obstacles (floating log or shallow rock cluster) in open water gaps
-    // Always leaves at least 2 open tracks when spawning in open water, or 1 guaranteed open track
-    if (Math.random() < 0.36) {
-      const obsX = nextFeatureX + w + Math.floor(gapAfter * 0.48);
-      // Pick 1 of the 3 lanes; since the gap is open water, the other 2 lanes are completely clear!
-      const obsLane = isLakeShore
-        ? (Math.random() < 0.65 ? 2 : 1) // Rock clusters hug shallower shoreline/mid-water on Lake Winnipeg
-        : Math.floor(Math.random() * 3);
+    // 1. Log Jams accumulate naturally at the leading edge where meandering land sticks out (non-winter)
+    if (!isWinter && (chosen === 'TOP_MEANDER' || chosen === 'BOT_MEANDER') && Math.random() < 0.48) {
+      const jamLane = chosen === 'TOP_MEANDER'
+        ? (depthFactor === 0.5 ? 0 : 1)
+        : (depthFactor === 0.5 ? 2 : 1);
+      hazards.push({
+        x: nextFeatureX + Math.floor(taperW * 0.55),
+        lane: jamLane,
+        type: 'LOG_JAM',
+        triggered: false
+      });
+    }
 
-      const isRockCluster = Math.random() < 0.42;
+    // 2. When shoreline is 0.5 track, shallow rock clusters are much more likely in the other half
+    // to prevent hugging the half-shoreline!
+    if (depthFactor === 0.5 && (chosen === 'TOP_MEANDER' || chosen === 'BOT_MEANDER')) {
+      const shelfLane = chosen === 'TOP_MEANDER' ? 0 : 2;
+      if (Math.random() < 0.68) {
+        hazards.push({
+          x: nextFeatureX + Math.floor(w * 0.48),
+          lane: shelfLane,
+          type: 'ROCK_CLUSTER',
+          halfOffset: chosen === 'TOP_MEANDER' ? 1 : -1, // Sits in the outer water half of that lane
+          triggered: false
+        });
+      }
+    } else if (Math.random() < 0.24) {
+      // Infrequent off-chance rock cluster or log jam in open water gaps (always leaving 2 open lanes)
+      const obsX = nextFeatureX + w + Math.floor(gapAfter * 0.48);
+      const obsLane = isLakeShore ? (Math.random() < 0.65 ? 2 : 1) : Math.floor(Math.random() * 3);
       hazards.push({
         x: obsX,
         lane: obsLane,
-        type: isRockCluster ? 'ROCK_CLUSTER' : 'LOG',
+        type: (!isWinter && Math.random() < 0.45) ? 'LOG_JAM' : 'ROCK_CLUSTER',
+        halfOffset: 0,
         triggered: false
       });
     }
@@ -717,7 +849,6 @@
     nextFeatureX += w + gapAfter;
   }
 
-  // Helper: Draw a filled polygon from integer pixel points
   function fillPixelPoly(pts, color) {
     ctx.fillStyle = color;
     ctx.beginPath();
@@ -742,15 +873,17 @@
     const playTop = hudH;
     const playH = VIEW_H - hudH;
     const isLakeShore = score >= 550;
+    const isWinter = score >= 1250;
+    const isSil = (score >= 820 && score < 1200);
 
-    // On Lake Winnipeg (550+), the top horizon is open water meeting sky, while the bottom has the rocky shoreline
     const horizonY = playTop + Math.floor(playH * 0.20);
     const riverTopY = isLakeShore ? horizonY : horizonY + 12;
     const bottomShoreH = isLakeShore ? 10 : 0;
     const riverH = VIEW_H - riverTopY - bottomShoreH;
     const laneH = Math.floor(riverH / 3);
 
-    const targetPlayerY = riverTopY + playerLane * laneH + Math.floor((laneH - 12) / 2);
+    // Center enlarged 16px-tall canoe/sled cleanly within each track
+    const targetPlayerY = riverTopY + playerLane * laneH + Math.floor((laneH - 15) / 2);
     if (playerVisualY === 0) playerVisualY = targetPlayerY;
     playerVisualY += (targetPlayerY - playerVisualY) * 0.24;
 
@@ -775,10 +908,7 @@
       ctx.fillRect(Math.round(cx - cloudOff + 24), playTop + 2, 14, 2);
     }
 
-    const isSil = (score >= 820 && score < 1200);
-    const isWinter = (score >= 1250);
-
-    // 2. Riverbank Horizon (0-550) OR Open Lake Horizon (550+)
+    // 2. Riverbank Horizon (0-550) OR Open Lake / Hudson Bay Horizon (550+)
     if (!isLakeShore) {
       ctx.fillStyle = env.gndTop;
       ctx.fillRect(0, horizonY, VIEW_W, 4);
@@ -787,7 +917,6 @@
       ctx.fillStyle = env.gndDark;
       ctx.fillRect(0, horizonY + 8, VIEW_W, 4);
 
-      // Repeating Parallax Scenery along the North/West Bank
       const propSpacing = 190;
       const propOff = (bgOffset * 0.38) % propSpacing;
       for (let px = -propSpacing; px < VIEW_W + propSpacing; px += propSpacing) {
@@ -804,42 +933,87 @@
         }
       }
 
-      // Unique One-Off Historic Landmarks (Upper & Lower Fort Garry)
+      // Unique One-Off Historic Forts (Upper & Lower Fort Garry)
       for (let i = 0; i < landmarks.length; i++) {
         const lm = landmarks[i];
-        drawFortLandmark(Math.round(lm.x), horizonY - 10);
+        drawFortLandmark(Math.round(lm.x), horizonY - 10, lm.type);
       }
     } else {
-      // Distant open Lake Winnipeg horizon line with subtle whitecaps
+      // Open Lake Winnipeg / Frozen Hudson Bay Horizon
       ctx.fillStyle = env.watFoam;
       ctx.fillRect(0, horizonY, VIEW_W, 1);
-      const waveOff = (bgOffset * 0.25) % 60;
-      for (let wx = -60; wx < VIEW_W + 60; wx += 60) {
-        ctx.fillRect(Math.round(wx - waveOff + 12), horizonY + 3, 10, 1);
+
+      // In Boreal Winter (1250+), render frozen northern pines & shield rocks along the far river bank
+      if (isWinter) {
+        ctx.fillStyle = env.gndTop;
+        ctx.fillRect(0, horizonY, VIEW_W, 3);
+        ctx.fillStyle = env.gndMid;
+        ctx.fillRect(0, horizonY + 3, VIEW_W, 3);
+
+        const propSpacing = 170;
+        const propOff = (bgOffset * 0.38) % propSpacing;
+        for (let px = -propSpacing; px < VIEW_W + propSpacing; px += propSpacing) {
+          const baseX = Math.round(px - propOff);
+          drawShadedPine(baseX + 16, horizonY - 11, true, false);
+          drawShieldOutcrop(baseX + 66, horizonY - 3, true, false);
+          drawShadedPine(baseX + 118, horizonY - 12, true, false);
+        }
+
+        // Thawing York Factory on Hudson Bay (2380-2500+)
+        for (let i = 0; i < landmarks.length; i++) {
+          const lm = landmarks[i];
+          if (lm.type === 'YORK_FACTORY') {
+            drawFortLandmark(Math.round(lm.x), horizonY - 11, lm.type);
+          }
+        }
+      } else if (!isWinter) {
+        const waveOff = (bgOffset * 0.25) % 60;
+        for (let wx = -60; wx < VIEW_W + 60; wx += 60) {
+          ctx.fillRect(Math.round(wx - waveOff + 12), horizonY + 3, 10, 1);
+        }
       }
     }
 
-    // 3. Main River / Lake Water Body
+    // 3. Unified Water / Frozen Ice Body (No artificial track color stripes!)
     ctx.fillStyle = env.watDeep;
     ctx.fillRect(0, riverTopY, VIEW_W, VIEW_H - riverTopY);
 
-    // Subtle middle channel depth shading
+    // Faded gradient shoreline shading along top and bottom water edges
     ctx.fillStyle = env.watMid;
-    ctx.fillRect(0, riverTopY + laneH, VIEW_W, laneH);
-
-    // Gentle animated water current lines
+    ctx.fillRect(0, riverTopY, VIEW_W, 6);
+    ctx.fillRect(0, VIEW_H - bottomShoreH - 6, VIEW_W, 6);
     ctx.fillStyle = env.watFoam;
-    const rippleCount = Math.ceil(VIEW_W / 44) + 1;
-    for (let i = 0; i < rippleCount; i++) {
-      const rx1 = Math.round(((bgOffset * 0.45) + i * 44) % VIEW_W);
-      const rx2 = Math.round(((bgOffset * 0.55) + i * 50 + 20) % VIEW_W);
-      const rx3 = Math.round(((bgOffset * 0.40) + i * 40 + 10) % VIEW_W);
-      ctx.fillRect(rx1, riverTopY + Math.floor(laneH * 0.5), 11, 1);
-      ctx.fillRect(rx2, riverTopY + laneH + Math.floor(laneH * 0.5), 13, 1);
-      ctx.fillRect(rx3, riverTopY + laneH * 2 + Math.floor(laneH * 0.5), 10, 1);
+    ctx.fillRect(0, riverTopY, VIEW_W, 1);
+
+    // Natural Organic River Current Flow (Stopped when frozen at 1250+)
+    if (!isWinter) {
+      const flowCount = Math.ceil(VIEW_W / 32) + 2;
+      for (let i = 0; i < flowCount; i++) {
+        // Layered flowing current ribbons with subtle vertical wave drift
+        const spdMult = 0.52 + (i % 3) * 0.08;
+        const fx = Math.round(((bgOffset * spdMult) + i * 34) % (VIEW_W + 40)) - 20;
+        const baseBandY = riverTopY + 5 + ((i * 19) % Math.max(12, riverH - 10));
+        const waveY = Math.round(Math.sin((fx + bgOffset * 0.2) * 0.045) * 2);
+
+        ctx.fillStyle = env.watMid;
+        ctx.fillRect(fx - 3, baseBandY + waveY, 22, 2);
+        ctx.fillStyle = env.watFoam;
+        ctx.fillRect(fx, baseBandY + waveY, 9, 1);
+      }
+    } else {
+      // Subtle frozen ice pressure cracks / snowdrifts (static relative to ice)
+      ctx.fillStyle = PAL.SNOW_LIGHT;
+      const crackSpacing = 85;
+      const crackOff = bgOffset % crackSpacing;
+      for (let cx = -crackSpacing; cx < VIEW_W + crackSpacing; cx += crackSpacing) {
+        const ix = Math.round(cx - crackOff);
+        ctx.fillRect(ix + 14, riverTopY + Math.floor(laneH * 0.6), 12, 1);
+        ctx.fillRect(ix + 26, riverTopY + Math.floor(laneH * 0.6) + 1, 7, 1);
+        ctx.fillRect(ix + 48, riverTopY + Math.floor(laneH * 2.2), 14, 1);
+      }
     }
 
-    // Continuous Bottom Shoreline Strip on Lake Winnipeg (550+)
+    // Continuous Bottom Shoreline Strip on Lake Winnipeg / Boreal Shore (550+)
     if (isLakeShore) {
       const sy = VIEW_H - bottomShoreH;
       ctx.fillStyle = env.watFoam;
@@ -852,20 +1026,19 @@
       ctx.fillRect(0, sy + 7, VIEW_W, 3);
     }
 
-    // 4. Tapered Meandering Riverbanks & Forked Islands (Triangle-In / Triangle-Out)
+    // 4. Tapered Meandering Riverbanks (0.5 & 1.0 Track), Forked Islands & One-Sided Chutes
     for (let i = 0; i < riverFeatures.length; i++) {
       const f = riverFeatures[i];
       const x0 = f.x;
       const x1 = f.x + f.taperW;
       const x2 = f.x + f.w - f.taperW;
       const x3 = f.x + f.w;
+      const reachH = Math.round(laneH * f.depthFactor);
 
       if (f.type === 'TOP_MEANDER') {
-        // Tapered bank encroaching smoothly into Top Track (Lane 0) and tapering back out
         const topY = riverTopY;
-        const botY = riverTopY + laneH + 1;
+        const botY = riverTopY + reachH;
 
-        // Outer shoreline foam polygon
         fillPixelPoly([
           [x0 - 3, topY],
           [x1, botY + 2],
@@ -873,7 +1046,6 @@
           [x3 + 3, topY]
         ], env.watFoam);
 
-        // Sandy/muddy bank edge polygon
         fillPixelPoly([
           [x0, topY],
           [x1 + 2, botY],
@@ -881,33 +1053,29 @@
           [x3, topY]
         ], isWinter ? PAL.SNOW_DARK : PAL.SAND_MID);
 
-        // Main vegetated bank body polygon
         fillPixelPoly([
           [x0 + 5, topY],
-          [x1 + 5, botY - 3],
-          [x2 - 5, botY - 3],
+          [x1 + 5, botY - 2],
+          [x2 - 5, botY - 2],
           [x3 - 5, topY]
         ], env.gndMid);
 
-        // Upper grass/snow highlight ridge
-        fillPixelPoly([
-          [x0 + 10, topY],
-          [x1 + 9, botY - 6],
-          [x2 - 9, botY - 6],
-          [x3 - 10, topY]
-        ], env.gndTop);
-
-        // Trees along the point
-        drawShadedPine(Math.round(x1 + 8), topY - 4, isWinter, isSil);
-        drawShadedPine(Math.round(x2 - 20), topY - 4, isWinter, isSil);
+        if (f.depthFactor >= 1.0) {
+          fillPixelPoly([
+            [x0 + 10, topY],
+            [x1 + 9, botY - 5],
+            [x2 - 9, botY - 5],
+            [x3 - 10, topY]
+          ], env.gndTop);
+          drawShadedPine(Math.round(x1 + 8), topY - 4, isWinter, isSil);
+          drawShadedPine(Math.round(x2 - 20), topY - 4, isWinter, isSil);
+        }
       }
 
       if (f.type === 'BOT_MEANDER') {
-        // Tapered shoreline point encroaching smoothly into Bottom Track (Lane 2)
         const baseY = VIEW_H - bottomShoreH;
-        const peakY = riverTopY + laneH * 2 - 1;
+        const peakY = baseY - reachH;
 
-        // Outer shoreline foam polygon
         fillPixelPoly([
           [x0 - 3, baseY],
           [x1, peakY - 2],
@@ -915,7 +1083,6 @@
           [x3 + 3, baseY]
         ], env.watFoam);
 
-        // Sandy/rocky shoal edge polygon
         fillPixelPoly([
           [x0, baseY],
           [x1 + 2, peakY],
@@ -923,36 +1090,48 @@
           [x3, baseY]
         ], isWinter ? PAL.SNOW_DARK : (isLakeShore ? PAL.STONE_MID : PAL.SAND_MID));
 
-        // Main vegetated/rocky point body
         fillPixelPoly([
           [x0 + 5, baseY],
-          [x1 + 5, peakY + 3],
-          [x2 - 5, peakY + 3],
+          [x1 + 5, peakY + 2],
+          [x2 - 5, peakY + 2],
           [x3 - 5, baseY]
         ], env.gndMid);
 
-        // Top highlight crown
-        fillPixelPoly([
-          [x0 + 10, baseY],
-          [x1 + 9, peakY + 6],
-          [x2 - 9, peakY + 6],
-          [x3 - 10, baseY]
-        ], env.gndTop);
-
-        if (isLakeShore) {
-          drawShieldOutcrop(Math.round(x1 + 6), peakY + 2, isWinter, isSil);
-          drawShadedPine(Math.round(x2 - 18), peakY - 5, isWinter, isSil);
-        } else {
-          drawShadedPine(Math.round(x1 + 8), peakY - 5, isWinter, isSil);
-          drawShadedPine(Math.round(x2 - 20), peakY - 5, isWinter, isSil);
+        if (f.depthFactor >= 1.0) {
+          fillPixelPoly([
+            [x0 + 10, baseY],
+            [x1 + 9, peakY + 5],
+            [x2 - 9, peakY + 5],
+            [x3 - 10, baseY]
+          ], env.gndTop);
+          if (isLakeShore) {
+            drawShieldOutcrop(Math.round(x1 + 6), peakY + 2, isWinter, isSil);
+            drawShadedPine(Math.round(x2 - 18), peakY - 5, isWinter, isSil);
+          } else {
+            drawShadedPine(Math.round(x1 + 8), peakY - 5, isWinter, isSil);
+            drawShadedPine(Math.round(x2 - 20), peakY - 5, isWinter, isSil);
+          }
         }
       }
 
       if (f.type === 'ISLAND') {
-        // Tapered diamond/hexagonal island splitting Lane 1 into Upper and Lower Forks
         const topY = riverTopY + laneH + 1;
         const botY = riverTopY + laneH * 2 - 1;
         const midY = Math.round((topY + botY) / 2);
+
+        // One-sided rapid current chute (ONLY on f.chuteLane, active before winter freeze)
+        if (!isWinter && (f.chuteLane === 0 || f.chuteLane === 2)) {
+          const chuteY = f.chuteLane === 0 ? riverTopY + 2 : riverTopY + laneH * 2 + 2;
+          const chuteH = laneH - 4;
+          ctx.fillStyle = env.watMid;
+          ctx.fillRect(Math.round(x0), chuteY, f.w, chuteH);
+          ctx.fillStyle = env.watFoam;
+          for (let cx = x0 + 6; cx < x3 - 12; cx += 22) {
+            const animX = Math.round(cx - ((bgOffset * 0.9) % 22));
+            ctx.fillRect(animX, chuteY + 3, 12, 1);
+            ctx.fillRect(animX + 5, chuteY + chuteH - 4, 10, 1);
+          }
+        }
 
         // Whitewater foam diamond/hex around island
         fillPixelPoly([
@@ -964,7 +1143,7 @@
           [x1, botY + 2]
         ], env.watFoam);
 
-        // Outer sandbar / gravel beach polygon
+        // Outer sandbar / gravel beach
         fillPixelPoly([
           [x0, midY],
           [x1 + 2, topY],
@@ -994,7 +1173,6 @@
           [x1 + 8, botY - 6]
         ], env.gndTop);
 
-        // Trees & rocks crowning the island (extra lush if Sugar Island)
         drawShadedPine(Math.round(x1 + 6), topY - 7, isWinter, isSil);
         drawShadedPine(Math.round((x1 + x2) / 2 - 6), topY - 8, isWinter, isSil);
         if (f.isSugarIsland) {
@@ -1004,32 +1182,41 @@
       }
     }
 
-    // 5. Infrequent Off-Chance Obstacles (Floating Logs & Shallow Rock Clusters)
+    // 5. Log Jams (Along Meander Points) & Shallow Rock Clusters
     for (let i = 0; i < hazards.length; i++) {
       const h = hazards[i];
       const hx = Math.round(h.x);
-      const hy = riverTopY + h.lane * laneH + Math.floor((laneH - 9) / 2);
+      const halfShift = (h.halfOffset || 0) * Math.floor(laneH * 0.28);
+      const hy = riverTopY + h.lane * laneH + Math.floor((laneH - 9) / 2) + halfShift;
 
-      if (h.type === 'LOG') {
-        // Floating timber log (Rumbles canoe hull, non-fatal)
-        ctx.fillStyle = PAL.OUTLINE;
-        ctx.fillRect(hx, hy + 2, 16, 5);
-        ctx.fillStyle = PAL.WOOD_DARK;
-        ctx.fillRect(hx + 1, hy + 4, 14, 2);
-        ctx.fillStyle = PAL.WOOD_MID;
-        ctx.fillRect(hx + 1, hy + 3, 14, 2);
-        ctx.fillStyle = PAL.WOOD_LIGHT;
-        ctx.fillRect(hx + 2, hy + 2, 12, 1);
+      if (h.type === 'LOG_JAM') {
+        // Multi-log tangled debris jam (causes unstable canoe rumble, non-fatal)
         ctx.fillStyle = env.watFoam;
-        ctx.fillRect(hx - 1, hy + 7, 17, 1);
+        ctx.fillRect(hx - 2, hy + 7, 22, 2);
+
+        // Backangled log
+        ctx.fillStyle = PAL.OUTLINE;
+        ctx.fillRect(hx + 2, hy, 15, 4);
+        ctx.fillStyle = PAL.WOOD_DARK;
+        ctx.fillRect(hx + 3, hy + 1, 13, 2);
+        ctx.fillStyle = PAL.WOOD_LIGHT;
+        ctx.fillRect(hx + 3, hy + 1, 11, 1);
+
+        // Front main timber log
+        ctx.fillStyle = PAL.OUTLINE;
+        ctx.fillRect(hx, hy + 3, 18, 5);
+        ctx.fillStyle = PAL.WOOD_DARK;
+        ctx.fillRect(hx + 1, hy + 5, 16, 2);
+        ctx.fillStyle = PAL.WOOD_MID;
+        ctx.fillRect(hx + 1, hy + 4, 16, 2);
+        ctx.fillStyle = PAL.WOOD_LIGHT;
+        ctx.fillRect(hx + 2, hy + 3, 14, 1);
       } else {
-        // Shallow Rock Cluster: Several smaller submerged/emerging cobbles around ONE larger outsticking boulder
-        // Foam ring around the cluster
+        // Shallow Rock Cluster: Several smaller cobbles around ONE larger outsticking boulder
         ctx.fillStyle = PAL.SNOW_LIGHT;
         ctx.fillRect(hx - 2, hy + 6, 20, 3);
         ctx.fillRect(hx + 2, hy + 4, 12, 5);
 
-        // Left smaller satellite rock
         ctx.fillStyle = PAL.OUTLINE;
         ctx.fillRect(hx - 1, hy + 4, 5, 4);
         ctx.fillStyle = PAL.STONE_MID;
@@ -1037,7 +1224,6 @@
         ctx.fillStyle = PAL.STONE_LIGHT;
         ctx.fillRect(hx, hy + 4, 2, 1);
 
-        // Right smaller satellite rock
         ctx.fillStyle = PAL.OUTLINE;
         ctx.fillRect(hx + 12, hy + 5, 5, 4);
         ctx.fillStyle = PAL.STONE_DARK;
@@ -1045,7 +1231,6 @@
         ctx.fillStyle = PAL.STONE_MID;
         ctx.fillRect(hx + 13, hy + 5, 2, 1);
 
-        // Front low cobble
         ctx.fillStyle = PAL.OUTLINE;
         ctx.fillRect(hx + 3, hy + 6, 5, 3);
         ctx.fillStyle = PAL.STONE_MID;
@@ -1062,37 +1247,98 @@
         ctx.fillStyle = PAL.STONE_LIGHT;
         ctx.fillRect(hx + 5, hy, 5, 2);
         ctx.fillStyle = PAL.SNOW_LIGHT;
-        ctx.fillRect(hx + 6, hy, 3, 1); // Dry sunlit peak highlight
+        ctx.fillRect(hx + 6, hy, 3, 1);
       }
     }
 
-    // 6. Player Canoe / Dog Sled Sprite
-    drawCanoeAndHunter(18, playerVisualY, frame);
+    // 6. Enlarged Player Canoe / Dog Sled Sprite
+    drawCanoeAndHunter(16, playerVisualY, frame);
+
+    // 7. Progressive Parallax Blizzard Overlay (1200 -> 1500 -> 1700 -> 2000, clearing at 2100)
+    if (score >= 1200 && score < 2100) {
+      let intensity = 0; // 0 to 1
+      if (score < 1500) {
+        intensity = ((score - 1200) / 300) * 0.25; // Light parallax snowfall
+      } else if (score < 1700) {
+        intensity = 0.25 + ((score - 1500) / 200) * 0.35; // Picking up
+      } else {
+        intensity = 0.60 + Math.min(1, (score - 1700) / 300) * 0.40; // Full blizzard (0.60 -> 1.0)
+      }
+
+      // Brief agile visibility gusts during peak blizzard (1700-2000)
+      const gustBreak = score >= 1700 ? (Math.sin(frame * 0.045) * 0.5 + 0.5) : 0; // 0..1
+      const effectiveWhiteout = Math.max(0, intensity - gustBreak * 0.36);
+
+      // Whiteout atmospheric veil
+      if (effectiveWhiteout > 0.22) {
+        const veilAlpha = Math.min(0.62, (effectiveWhiteout - 0.22) * 0.78);
+        ctx.fillStyle = `rgba(225, 238, 246, ${veilAlpha.toFixed(3)})`;
+        ctx.fillRect(0, playTop, VIEW_W, playH);
+      }
+
+      // Parallax snow flakes & driving blizzard streaks
+      const activeCount = Math.floor(35 + intensity * (snowParticles.length - 35));
+      for (let i = 0; i < activeCount; i++) {
+        const p = snowParticles[i];
+        const windVx = (1.1 + p.layer * 1.4) * (0.6 + intensity * 2.2);
+        const fallVy = (0.45 + p.layer * 0.35) * (0.8 + intensity * 0.9);
+
+        p.x -= windVx;
+        p.y += fallVy;
+        if (p.x < -12) p.x = VIEW_W + 8;
+        if (p.y > VIEW_H) {
+          p.y = playTop - 2;
+          p.x = Math.random() * (VIEW_W + 20);
+        }
+
+        const sx = Math.round(p.x);
+        const sy = Math.round(p.y);
+        ctx.fillStyle = p.layer === 0 ? PAL.SNOW_MID : PAL.SNOW_LIGHT;
+        if (intensity > 0.52 && p.layer >= 1) {
+          // Diagonal driving blizzard streak
+          ctx.fillRect(sx, sy, 4 + p.layer * 2, 1);
+          ctx.fillRect(sx - 2, sy + 1, 3, 1);
+        } else {
+          ctx.fillRect(sx, sy, p.layer === 2 ? 2 : 1, p.layer === 2 ? 2 : 1);
+        }
+      }
+    }
 
     ctx.restore();
   }
 
   // ==========================================
-  // 7. TAPERED COLLISIONS & UPDATE LOOP
+  // 7. COLLISIONS, ONE-SIDED CHUTES & UPDATE LOOP
   // ==========================================
   function checkCollisions() {
-    const pLeft = 21;
-    const pRight = 39;
+    // Enlarged canoe hitbox (~44px sprite -> solid keel 20..52)
+    const pLeft = 20;
+    const pRight = 52;
 
-    // 1. Check Tapered Riverbanks & Forked Islands (Fatal only inside the solid inner trapezoid)
+    let inFastChute = false;
+
+    // 1. Check Tapered Riverbanks (0.5 & 1.0) & Forked Islands
     for (let i = 0; i < riverFeatures.length; i++) {
       const f = riverFeatures[i];
-      // Tapered entry/exit gives generous visual & physical lead-in before solid bank
       const solidStart = f.x + Math.floor(f.taperW * 0.65);
       const solidEnd = f.x + f.w - Math.floor(f.taperW * 0.65);
 
+      // Check if riding inside an island's one-sided fast current chute
+      if (f.type === 'ISLAND' && score < 1250 && pRight > f.x && pLeft < f.x + f.w) {
+        if (playerLane === f.chuteLane) {
+          inFastChute = true;
+        }
+      }
+
       if (pRight > solidStart && pLeft < solidEnd) {
-        if (playerLane === 0 && f.type === 'TOP_MEANDER') {
+        // Full 1.0-track meanders block the entire outer lane;
+        // 0.5-track meanders leave the outer half passable unless a shallow rock cluster sits in it!
+        if (playerLane === 0 && f.type === 'TOP_MEANDER' && f.depthFactor >= 1.0) {
           crashReason = "RUN AGROUND ON BANK!";
           gameOver();
           return;
         }
-        if (playerLane === 2 && f.type === 'BOT_MEANDER') {
+        if (playerLane === 2 && f.type === 'BOT_MEANDER' && f.depthFactor >= 1.0) {
           crashReason = "RUN AGROUND ON SHORE!";
           gameOver();
           return;
@@ -1105,18 +1351,22 @@
       }
     }
 
-    // 2. Check Infrequent Floating Logs (Rumble) & Shallow Rock Clusters (Fatal)
+    if (inFastChute) {
+      boostTimer = 10;
+    }
+
+    // 2. Check Log Jams (Unstable Rumble) & Shallow Rock Clusters (Fatal)
     for (let i = 0; i < hazards.length; i++) {
       const h = hazards[i];
-      if (!h.triggered && h.lane === playerLane && pRight > h.x + 2 && pLeft < h.x + 13) {
+      if (!h.triggered && h.lane === playerLane && pRight > h.x + 2 && pLeft < h.x + 15) {
         h.triggered = true;
         if (h.type === 'ROCK_CLUSTER') {
           crashReason = "STRUCK SHALLOW ROCKS!";
           gameOver();
           return;
-        } else if (h.type === 'LOG') {
-          shakeTimer = 26;
-          slowTimer = 32;
+        } else if (h.type === 'LOG_JAM') {
+          shakeTimer = 28;
+          slowTimer = 34;
           playRumbleSound();
         }
       }
@@ -1126,23 +1376,35 @@
   function update() {
     if (!isPlaying || isPaused) return;
 
-    const currentSpeed = slowTimer > 0 ? speed * 0.68 : speed;
-    if (slowTimer > 0) slowTimer--;
+    let currentSpeed = speed;
+    if (slowTimer > 0) {
+      currentSpeed = speed * 0.66;
+      slowTimer--;
+    } else if (boostTimer > 0) {
+      currentSpeed = speed * 1.32; // Riding the island's fast current chute
+      boostTimer--;
+    }
     if (shakeTimer > 0) shakeTimer--;
 
     bgOffset += currentSpeed;
     nextFeatureX -= currentSpeed;
 
     // Steady distance progression
-    if (frame % 4 === 0) {
+    if (frame % 3 === 0) {
       score += 1;
       scoreDisplay.innerText = 'DIST: ' + score;
     }
 
-    // Gentle, balanced speed curve suitable for a one-life scenic voyage
-    speed = Math.min(2.75, speed + 0.00018);
+    // Reach York Factory on Hudson Bay at 2500!
+    if (score >= 2500 && !isVictory) {
+      victoryComplete();
+      return;
+    }
 
-    // Scroll river features & spawn new ones far apart
+    // Subtle, natural difficulty curve across the voyage
+    speed = Math.min(2.65, speed + 0.00014);
+
+    // Scroll river features
     for (let i = 0; i < riverFeatures.length; i++) {
       riverFeatures[i].x -= currentSpeed;
     }
@@ -1162,7 +1424,7 @@
     for (let i = 0; i < landmarks.length; i++) {
       landmarks[i].x -= currentSpeed * 0.38;
     }
-    landmarks = landmarks.filter(lm => lm.x > -60);
+    landmarks = landmarks.filter(lm => lm.x > -70);
 
     drawScene();
     checkCollisions();
@@ -1171,7 +1433,7 @@
     requestAnimationFrame(update);
   }
 
-  // Persistent 3-Track Selection (Stays in chosen track)
+  // Persistent 3-Track Selection (Stays on selected track)
   function changeTrack(direction) {
     if (!isPlaying || isGameOver || isPaused) return;
     if (direction === 'UP' && playerLane > 0) {
@@ -1240,7 +1502,7 @@
   }
 
   function sequenceTrack() {
-    if (isPaused || isGameOver) return;
+    if (isPaused || isGameOver || isVictory) return;
     const leadNote = wilyLead[currentStepAudio];
     const bassNote = powWowDrum[currentStepAudio];
 
@@ -1262,6 +1524,7 @@
 
     isPlaying = true;
     isGameOver = false;
+    isVictory = false;
     isPaused = false;
     score = 0;
     frame = 0;
@@ -1271,11 +1534,14 @@
     playerVisualY = 0;
     shakeTimer = 0;
     slowTimer = 0;
+    boostTimer = 0;
 
     resetWorld();
+    initSnow();
 
     introScreen.style.display = 'none';
     msg.style.display = 'none';
+    msg.style.background = '#4A0C10';
 
     if (!audioTimer) {
       currentStepAudio = 0;
@@ -1289,7 +1555,24 @@
     isPlaying = false;
     isGameOver = true;
     playTone(110, 'sawtooth', 0.35, 0.25);
+    msg.style.background = '#4A0C10';
     msg.innerHTML = `${crashReason}<br><br>PRESS 'A' TO RESTART`;
+    msg.style.display = 'block';
+
+    if (audioTimer) {
+      clearInterval(audioTimer);
+      audioTimer = null;
+    }
+  }
+
+  function victoryComplete() {
+    isPlaying = false;
+    isVictory = true;
+    drawScene();
+    playTone(587.33, 'square', 0.14, 0.12);
+    setTimeout(() => playTone(783.99, 'square', 0.28, 0.14), 140);
+    msg.style.background = '#123324';
+    msg.innerHTML = `ARRIVED AT YORK FACTORY!<br>HUDSON BAY REACHED (DIST: 2500)<br><br>PRESS 'A' TO RUN AGAIN`;
     msg.style.display = 'block';
 
     if (audioTimer) {
@@ -1316,7 +1599,7 @@
     if (cmd === 'RESUME') {
       isPaused = false;
       if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-      if (isPlaying && !isGameOver) requestAnimationFrame(update);
+      if (isPlaying && !isGameOver && !isVictory) requestAnimationFrame(update);
       return;
     }
 
