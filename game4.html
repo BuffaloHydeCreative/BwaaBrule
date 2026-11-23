@@ -99,7 +99,7 @@
         </div>
         <div class="header-row">
             <span>GUN: <span id="ammo-display" class="ammo-status loaded">LOADED</span></span>
-            <span id="totals-display" style="font-size: 11px; color: #D4D0C5;">D:0 G:0 W:0</span>
+            <span id="totals-display" style="font-size: 11px; color: #D4D0C5;">D:0 G:0 W:0 S:0</span>
         </div>
     </div>
 
@@ -389,6 +389,52 @@
         osc.stop(now + noteLength * 2.4);
     }
 
+    // Resonant two-note Trumpeter Swan bugle call ("koh-hoh!") as it soars across the upper pond sky
+    function playSwanCall() {
+        if (!chiptuneAudioCtx || isPaused) return;
+        const now = chiptuneAudioCtx.currentTime;
+
+        // First shorter pickup honk (G4 -> A4)
+        const osc1 = chiptuneAudioCtx.createOscillator();
+        const gain1 = chiptuneAudioCtx.createGain();
+        osc1.type = 'sawtooth';
+        osc1.frequency.setValueAtTime(392.00, now);
+        osc1.frequency.exponentialRampToValueAtTime(440.00, now + 0.14);
+        gain1.gain.setValueAtTime(0.001, now);
+        gain1.gain.linearRampToValueAtTime(0.18, now + 0.03);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+        osc1.connect(gain1);
+        gain1.connect(chiptuneAudioCtx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.19);
+
+        // Second soaring resonant trumpet note (C5 with subtle harmonic vibrato)
+        const osc2 = chiptuneAudioCtx.createOscillator();
+        const osc2Harm = chiptuneAudioCtx.createOscillator();
+        const gain2 = chiptuneAudioCtx.createGain();
+        osc2.type = 'sawtooth';
+        osc2Harm.type = 'triangle';
+        osc2.frequency.setValueAtTime(510.00, now + 0.22);
+        osc2.frequency.linearRampToValueAtTime(523.25, now + 0.30);
+        osc2.frequency.exponentialRampToValueAtTime(493.88, now + 0.72);
+
+        osc2Harm.frequency.setValueAtTime(1020.00, now + 0.22);
+        osc2Harm.frequency.linearRampToValueAtTime(1046.50, now + 0.30);
+        osc2Harm.frequency.exponentialRampToValueAtTime(987.77, now + 0.72);
+
+        gain2.gain.setValueAtTime(0.001, now + 0.22);
+        gain2.gain.linearRampToValueAtTime(0.20, now + 0.28);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.75);
+
+        osc2.connect(gain2);
+        osc2Harm.connect(gain2);
+        gain2.connect(chiptuneAudioCtx.destination);
+        osc2.start(now + 0.22);
+        osc2Harm.start(now + 0.22);
+        osc2.stop(now + 0.76);
+        osc2Harm.stop(now + 0.76);
+    }
+
     function playMenuBlip(f1, f2) {
         initChiptuneAudio();
         playTone(f1, 'triangle', 0.08, 0.25);
@@ -560,7 +606,42 @@
         ]
     ];
 
-    // --- Distinct Proportioned Sprites: LI BWAA (Woodland Small Fur Game) ---
+    // Majestic Trumpeter Swan (26x13 — rare upper-sky pond bonus target)
+    // 1: Pure White Plumage, 2: Soft Pearl Wing Shading, 3: Jet Black Bill & Lore, 4: Crisp Dark Outline Accent
+    const sprTrumpeterSwan = [
+        [ // Soaring Wings Raised (Gliding Gracefully)
+            [0,0,0,0,0,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,2,1,1,1,1,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,2,1,1,1,1,1,1,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,2,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0],
+            [0,0,0,0,0,2,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,3,3,3,3],
+            [0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,3,3,0],
+            [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0],
+            [1,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0],
+            [0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0],
+            [0,0,0,0,2,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,2,2,1,1,1,1,1,2,2,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+        ],
+        [ // Soaring Wings Swept Down
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,3,3,3,3],
+            [0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,3,3,0],
+            [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0],
+            [1,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0],
+            [0,0,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0],
+            [0,0,0,0,2,1,1,1,1,1,1,1,1,2,2,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,2,1,1,1,1,1,1,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,2,1,1,1,1,1,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+        ]
+    ];
+
+    // --- Distinct Proportioned Sprites: LI BWAA (Nocturnal Woodland Small Fur Game) ---
     const sprHare = [
         [
             [0,0,0,0,0,0,0,0,3,3,0,3,3,0,0,0],
@@ -690,8 +771,8 @@
     let lastTime = 0;
     let score = 0;
     let stats = { c1: 0, c2: 0, c3: 0, c4: 0 };
-    let porcupinesSpawned = 0;
-    let porcupineTriggerTimes = [];
+    let rareSpawned = 0;
+    let rareTriggerTimes = [];
     let isLoaded = true;
     let gunDropY = 0;
 
@@ -744,7 +825,33 @@
         }
     }
 
-    // Porcupine walks down the Birch tree trunk head-first along exact 12x12 rows (Rows 2..9)
+    // Rare Pond Event (<1 per game probability): Trumpeter Swan soaring majestically across upper sky (Rows 0..1)
+    function spawnTrumpeterSwan() {
+        let fromLeft = Math.random() > 0.5;
+        let ent = {
+            id: Math.random(),
+            kind: 'SWAN',
+            slot: 'c4',
+            pts: 300,
+            x: fromLeft ? -1.4 : (GRID_W + 0.4),
+            y: Math.random() > 0.5 ? 0 : 1, // Upper sky Rows 0 or 1
+            dir: fromLeft ? 1 : -1,
+            speed: 0.022, // Majestic, unhurried soaring pace
+            scale: 2,
+            depth: 1,
+            callTimer: 110, // Emits a second answering call mid-flight
+            dead: false,
+            hitDelay: 0,
+            dropY: 0,
+            animFrame: 0,
+            colorMap: { 1: '#FDFEFE', 2: '#D5D8DC', 3: '#111111' },
+            spriteFrames: sprTrumpeterSwan
+        };
+        entities.push(ent);
+        playSwanCall();
+    }
+
+    // Rare Woodland Event (<1 per game probability): Porcupine walks down Birch trunk head-first, then back up
     function spawnPorcupine() {
         const birchBlind = forestBlinds.find(bl => bl.type === 'BIRCH');
         if (!birchBlind) return;
@@ -772,7 +879,8 @@
             hitDelay: 0,
             dropY: 0,
             animFrame: 0,
-            colorMap: { 1: '#1C1A24', 2: '#85929E', 3: '#0B0910' },
+            // Darkened nocturnal night-shaded quill & coat palette
+            colorMap: { 1: '#121018', 2: '#4F5566', 3: '#07050B' },
             spriteFrames: sprPorcupineVertical
         };
         entities.push(ent);
@@ -803,20 +911,23 @@
                 ent.spriteFrames = sprGoose;
             }
         } else {
+            // LI BWAA — All woodland animals carry a moonlit nocturnal shadow/darker night shade
             if (rand < 0.16) {
                 ent.kind = 'FOX';
                 ent.slot = 'c3'; ent.pts = 200; ent.y = 6 + Math.floor(Math.random() * 4);
                 ent.speed = 0.036; ent.scale = 2; ent.depth = 2;
                 ent.pauseTimer = 0;
                 ent.pausedBlinds = new Set();
-                ent.colorMap = {1: '#D35400', 2: '#EAECEE', 3: '#111111', 4: '#922B21'};
+                // Nocturnal night-shaded russet fox palette
+                ent.colorMap = {1: '#873600', 2: '#99A3A4', 3: '#09090B', 4: '#511812'};
                 ent.spriteFrames = sprRedFox;
             } else if (rand < 0.58) {
                 ent.kind = 'HARE';
                 ent.slot = 'c1'; ent.pts = 100; ent.y = 7 + Math.floor(Math.random() * 4);
                 ent.speed = 0.046; ent.scale = 2; ent.depth = 2;
                 ent.hopTimer = Math.floor(Math.random() * 20);
-                ent.colorMap = {1: '#F2F4F4', 2: '#BDC3C7', 3: '#111111', 4: '#2C3E50'};
+                // Nocturnal moon-shaded winter hare palette
+                ent.colorMap = {1: '#A6ACAF', 2: '#707B7C', 3: '#09090B', 4: '#17202A'};
                 ent.spriteFrames = sprHare;
             } else {
                 ent.kind = 'GROUSE';
@@ -826,7 +937,8 @@
                 ent.bumpTimer = 55 + Math.floor(Math.random() * 50);
                 ent.isBumpedUp = false;
                 ent.speed = 0.024; ent.scale = 2; ent.depth = 2;
-                ent.colorMap = {1: '#5D6D7E', 2: '#8E281C', 3: '#E74C3C', 4: '#EAECEE'};
+                // Nocturnal shaded slate-grey & dark crimson spruce grouse palette
+                ent.colorMap = {1: '#34495E', 2: '#5B1912', 3: '#922B21', 4: '#99A3A4'};
                 ent.spriteFrames = sprSpruceGrouse;
             }
         }
@@ -845,11 +957,11 @@
         if (currentSec > lastTime) {
             timeLeft--; lastTime = currentSec; updateUI();
 
-            if (activeLevel === 'WOODS' && porcupinesSpawned < porcupineTriggerTimes.length) {
-                if (timeLeft <= porcupineTriggerTimes[porcupinesSpawned]) {
-                    porcupinesSpawned++;
-                    spawnPorcupine();
-                }
+            // Trigger rare event (<1 per game rate): Porcupine in Woods, Trumpeter Swan in Pond
+            if (rareSpawned < rareTriggerTimes.length && timeLeft <= rareTriggerTimes[rareSpawned]) {
+                rareSpawned++;
+                if (activeLevel === 'WOODS') spawnPorcupine();
+                else spawnTrumpeterSwan();
             }
 
             if (timeLeft <= 0) endGame();
@@ -877,6 +989,14 @@
             if (b.dead) {
                 if (b.hitDelay > 0) b.hitDelay--;
                 else { b.dropY += (VIEW_H / 60); if (b.dropY > VIEW_H + 60) entities.splice(i, 1); }
+            } else if (b.kind === 'SWAN') {
+                b.x += b.speed * b.dir;
+                b.animFrame = (frame % 32 < 16) ? 0 : 1;
+                if (b.callTimer > 0) {
+                    b.callTimer--;
+                    if (b.callTimer === 0) playSwanCall();
+                }
+                if ((b.dir === 1 && b.x > GRID_W + 1.5) || (b.dir === -1 && b.x < -2.5)) entities.splice(i, 1);
             } else if (b.kind === 'PORCUPINE') {
                 b.animFrame = (frame % 28 < 14) ? 0 : 1;
                 if (b.climbPhase === 'DOWN') {
@@ -1555,6 +1675,12 @@
         const matrix = b.spriteFrames[b.animFrame];
         const { drawX, drawY, w, h } = getEntityBounds(b);
 
+        // Grounded nocturnal night-shadow beneath woodland animals
+        if (activeLevel === 'WOODS' && !b.dead && b.kind !== 'PORCUPINE') {
+            ctx.fillStyle = 'rgba(4, 6, 8, 0.55)';
+            ctx.fillRect(Math.floor(drawX + 2), Math.floor(drawY + h - 2), Math.max(6, w - 4), 3);
+        }
+
         ctx.save();
         if (b.kind === 'PORCUPINE') {
             if (b.climbPhase === 'UP') {
@@ -1652,7 +1778,7 @@
         else { ammoEl.innerText = "EMPTY"; ammoEl.className = "ammo-status"; }
 
         if (activeLevel === 'POND') {
-            document.getElementById('totals-display').innerText = `D:${stats.c1} G:${stats.c2} W:${stats.c3}`;
+            document.getElementById('totals-display').innerText = `D:${stats.c1} G:${stats.c2} W:${stats.c3} S:${stats.c4}`;
         } else {
             document.getElementById('totals-display').innerText = `H:${stats.c1} G:${stats.c2} F:${stats.c3} P:${stats.c4}`;
         }
@@ -1766,19 +1892,13 @@
         gunAim = { x: (crosshair.x + 0.5) * TILE_W, y: (crosshair.y + 0.5) * TILE_H };
         flashEffect = 0;
 
-        porcupinesSpawned = 0;
-        if (activeLevel === 'WOODS') {
-            const count = Math.random() > 0.45 ? 2 : 1;
-            if (count === 1) {
-                porcupineTriggerTimes = [110 + Math.floor(Math.random() * 120)];
-            } else {
-                porcupineTriggerTimes = [
-                    195 + Math.floor(Math.random() * 65),
-                    65 + Math.floor(Math.random() * 85)
-                ];
-            }
+        // Rare <1 per game event schedule (Porcupine in Woods, Trumpeter Swan in Pond)
+        rareSpawned = 0;
+        const willAppear = Math.random() < 0.65; // <1 per gameplay average rate (~0.65 per 5-min hunt)
+        if (willAppear) {
+            rareTriggerTimes = [95 + Math.floor(Math.random() * 145)];
         } else {
-            porcupineTriggerTimes = [];
+            rareTriggerTimes = [];
         }
 
         gameOverScreen.style.display = 'none';
@@ -1793,19 +1913,20 @@
         stopChiptuneTrack();
         clearInputStates();
         if (activeLevel === 'POND') {
-            document.getElementById('final-stats').innerHTML = `Ducks: ${stats.c1}<br>Geese: ${stats.c2}<br>Woodducks: ${stats.c3}<br><br><b>TOTAL SCORE: ${score}</b>`;
+            document.getElementById('final-stats').innerHTML = `Ducks: ${stats.c1}<br>Geese: ${stats.c2}<br>Woodducks: ${stats.c3}<br>Trumpeter Swans: ${stats.c4}<br><br><b>TOTAL SCORE: ${score}</b>`;
         } else {
             document.getElementById('final-stats').innerHTML = `Snowshoe Hares: ${stats.c1}<br>Spruce Grouse: ${stats.c2}<br>Red Foxes: ${stats.c3}<br>Porcupines: ${stats.c4}<br><br><b>TOTAL SCORE: ${score}</b>`;
         }
         gameOverScreen.style.display = 'flex';
     }
 
-    // --- ARCADE CABINET postMessage BRIDGE (Tactile Single-Step + DAS/ARR Auto-Repeat) ---
+    // --- ARCADE CABINET postMessage BRIDGE ---
+    // Simple, deterministic 1-tap = 1 tile movement | click-and-hold = continuous glide until screen edge
     const dpadState = {
-        UP:    { active: false, lastStepAt: 0, dasTimer: null, arrTimer: null, expiry: null },
-        DOWN:  { active: false, lastStepAt: 0, dasTimer: null, arrTimer: null, expiry: null },
-        LEFT:  { active: false, lastStepAt: 0, dasTimer: null, arrTimer: null, expiry: null },
-        RIGHT: { active: false, lastStepAt: 0, dasTimer: null, arrTimer: null, expiry: null }
+        UP:    { active: false, lastTapTime: 0, holdDelayTimer: null, glideInterval: null, streamWatchdog: null },
+        DOWN:  { active: false, lastTapTime: 0, holdDelayTimer: null, glideInterval: null, streamWatchdog: null },
+        LEFT:  { active: false, lastTapTime: 0, holdDelayTimer: null, glideInterval: null, streamWatchdog: null },
+        RIGHT: { active: false, lastTapTime: 0, holdDelayTimer: null, glideInterval: null, streamWatchdog: null }
     };
 
     const dirVectors = {
@@ -1820,18 +1941,18 @@
     let lastMenuNavTime = 0;
     const BTN_DEBOUNCE_MS = 110;
     const MENU_DEBOUNCE_MS = 160;
-    const TAP_COOLDOWN_MS = 135;   // Prevents burst pulses from double-jumping 1 tile on a single tap
-    const HOLD_DAS_MS = 260;       // Intentional hold delay before auto-repeat kicks in
-    const HOLD_ARR_MS = 150;       // Controlled glide rate while holding a direction
-    const HOLD_EXPIRY_MS = 175;    // Release timeout for parent joystick stream
+    const TAP_LOCKOUT_MS = 190;    // Guarantees a tap or slight hold never double-steps 1 tile
+    const HOLD_THRESHOLD_MS = 310; // Deliberate click-and-hold threshold before continuous glide begins
+    const GLIDE_STEP_MS = 165;     // Smooth continuous movement speed while held until screen edge
+    const STREAM_RELEASE_MS = 180; // Watchdog timeout when parent drag-joystick stops sending pulses
 
     function releaseDir(dir) {
         const entry = dpadState[dir];
         if (!entry) return;
         entry.active = false;
-        if (entry.dasTimer) { clearTimeout(entry.dasTimer); entry.dasTimer = null; }
-        if (entry.arrTimer) { clearInterval(entry.arrTimer); entry.arrTimer = null; }
-        if (entry.expiry) { clearTimeout(entry.expiry); entry.expiry = null; }
+        if (entry.holdDelayTimer) { clearTimeout(entry.holdDelayTimer); entry.holdDelayTimer = null; }
+        if (entry.glideInterval) { clearInterval(entry.glideInterval); entry.glideInterval = null; }
+        if (entry.streamWatchdog) { clearTimeout(entry.streamWatchdog); entry.streamWatchdog = null; }
     }
 
     function clearInputStates() {
@@ -1866,30 +1987,29 @@
 
         if (!entry.active) {
             entry.active = true;
-            // Execute exactly 1 crisp tile step on initial press/pulse if outside tap cooldown
-            if (now - entry.lastStepAt >= TAP_COOLDOWN_MS) {
+
+            // 1 Tap = Exactly 1 tile step (protected against duplicate pulse bursts)
+            if (now - entry.lastTapTime >= TAP_LOCKOUT_MS) {
                 moveCrosshair(dx, dy);
-                entry.lastStepAt = now;
+                entry.lastTapTime = now;
             }
 
-            // Start DAS delay; only begin auto-repeating if the player intentionally holds the stick
-            entry.dasTimer = setTimeout(() => {
+            // Click and hold = Continuous movement until edge of screen
+            entry.holdDelayTimer = setTimeout(() => {
                 if (!isPaused && state === 'PLAYING' && entry.active) {
                     moveCrosshair(dx, dy);
-                    entry.lastStepAt = Date.now();
-                    entry.arrTimer = setInterval(() => {
+                    entry.glideInterval = setInterval(() => {
                         if (!isPaused && state === 'PLAYING' && entry.active) {
                             moveCrosshair(dx, dy);
-                            entry.lastStepAt = Date.now();
                         }
-                    }, HOLD_ARR_MS);
+                    }, GLIDE_STEP_MS);
                 }
-            }, HOLD_DAS_MS);
+            }, HOLD_THRESHOLD_MS);
         }
 
-        // Keep hold alive while stream pulses continue without double-stepping during the tap window
-        if (entry.expiry) clearTimeout(entry.expiry);
-        entry.expiry = setTimeout(() => releaseDir(dir), HOLD_EXPIRY_MS);
+        // Refresh watchdog for pulse streams so releasing the stick stops movement immediately
+        if (entry.streamWatchdog) clearTimeout(entry.streamWatchdog);
+        entry.streamWatchdog = setTimeout(() => releaseDir(dir), STREAM_RELEASE_MS);
     }
 
     window.addEventListener('message', function(event) {
