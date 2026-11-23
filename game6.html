@@ -939,9 +939,9 @@
   let totalFurs = 0;
   let totalRobes = 0;
 
-  let hbcDealsLost = 0;     // x = small game deals lost to HBC
-  let buffaloRedirects = 0; // y = times a buffalo hunter re-directed an HBC officer
-  let hbcBrokenCount = 0;   // z = Red River Carts busted by HBC officer
+  let hbcDealsLost = 0;
+  let buffaloRedirects = 0;
+  let hbcBrokenCount = 0;
 
   let activeCheckpointIndex = 0;
   let player = { x: 54, y: 120, dir: 'right', moving: false };
@@ -953,13 +953,15 @@
   let whiteHorseTriggeredThisRun = false;
   let whiteHorse = null;
 
-  // --- POSTMESSAGE JOYSTICK HOLD & BUTTON DEBOUNCE STATE ---
+  // --- POSTMESSAGE JOYSTICK HOLD, COOLDOWN & BUTTON DEBOUNCE STATE ---
   const dpadExpiry = { UP: 0, DOWN: 0, LEFT: 0, RIGHT: 0 };
   const DPAD_HOLD_WINDOW_MS = 145;
   let lastBtnATime = 0;
   let lastBtnBTime = 0;
-  const BTN_DEBOUNCE_MS = 110;
+  const BTN_DEBOUNCE_MS = 120;
   let weirStepCooldown = 0;
+  let lastMapCycleTime = 0;
+  const MAP_CYCLE_COOLDOWN_MS = 185;
 
   function isDpadHeld(dir) {
     return performance.now() < dpadExpiry[dir];
@@ -1050,6 +1052,17 @@
       else if (isDpadHeld('DOWN'))  { moveWeirPlayer('DOWN');  weirStepCooldown = 0.11; }
       else if (isDpadHeld('LEFT'))  { moveWeirPlayer('LEFT');  weirStepCooldown = 0.11; }
       else if (isDpadHeld('RIGHT')) { moveWeirPlayer('RIGHT'); weirStepCooldown = 0.11; }
+    }
+
+    // Smooth held-joystick stepping through the 6 parishes on the MAP carousel
+    if (gameState === 'MAP' && (now - lastMapCycleTime) >= MAP_CYCLE_COOLDOWN_MS) {
+      if (isDpadHeld('RIGHT') || isDpadHeld('DOWN')) {
+        cycleCheckpoint(1);
+        lastMapCycleTime = now;
+      } else if (isDpadHeld('LEFT') || isDpadHeld('UP')) {
+        cycleCheckpoint(-1);
+        lastMapCycleTime = now;
+      }
     }
 
     if (gameState !== 'MAP' && gameState !== 'WEIR') return;
@@ -2167,16 +2180,13 @@
     const bottomHudH = 56;
     const availH = Math.max(120, VIEW_H - topHudH - bottomHudH);
 
-    // Fill outer background seamlessly with current seasonal prairie edge
     ctx.fillStyle = season.outerBg;
     ctx.fillRect(0, topHudH, VIEW_W, availH);
 
-    // Cover-fit the 480x336 settlement map cleanly without letterboxing or distortion
     const scale = Math.max(VIEW_W / MAP_WIDTH, availH / MAP_HEIGHT);
     const drawW = MAP_WIDTH * scale;
     const drawH = MAP_HEIGHT * scale;
 
-    // Camera gently tracks active checkpoint horizontally while keeping full settlement framed
     const activeCp = CHECKPOINTS[activeCheckpointIndex];
     const desiredCenterX = activeCp.x * scale;
     let offsetX = (VIEW_W * 0.5) - desiredCenterX;
@@ -2191,10 +2201,8 @@
     ctx.translate(Math.round(offsetX), Math.round(offsetY));
     ctx.scale(scale, scale);
 
-    // 1. Baked Seasonal Settlement Terrain
     ctx.drawImage(terrainCanvas, 0, 0);
 
-    // 2. Animated River Sparkles or Drifting Ice Chunks
     if (season.hasIceChunks) {
       for (let i = 0; i < ASSINIBOINE_POINTS.length - 1; i += 2) {
         const [x1, y1] = ASSINIBOINE_POINTS[i];
@@ -2234,7 +2242,6 @@
       }
     }
 
-    // 3. Drifting Clouds
     clouds.forEach(c => {
       c.x += c.speed;
       if (c.x > MAP_WIDTH + 30) c.x = -40;
@@ -2251,7 +2258,6 @@
       ctx.globalAlpha = 1.0;
     });
 
-    // 4. Early Winter Snowfall on Minimap
     if (season.stage === 4) {
       const activeFlakes = Math.floor(65 * season.snowAmount);
       ctx.fillStyle = '#ffffff';
@@ -2263,7 +2269,6 @@
       }
     }
 
-    // 5. Checkpoint Nodes, HBC/Warden Icons, Cart Gauges & Capote-Blue Target Reticle
     const pulse = Math.floor(frameTick / 18) % 2;
     CHECKPOINTS.forEach((cp, idx) => {
       const isSelected = idx === activeCheckpointIndex;
@@ -2329,7 +2334,6 @@
 
     ctx.restore();
 
-    // 6. Bottom-Anchored 6-Parish RPG Selection Strip (VIEW_H - bottomHudH)
     drawBottomCheckpointStrip(VIEW_H - bottomHudH, bottomHudH);
   }
 
@@ -2411,7 +2415,6 @@
         false
       );
 
-      // Compact capacity/status meter inside each parish cell
       if (cp.status !== 'UNSET') {
         const barW = cellW - 10;
         const barX = bx + 5;
@@ -2449,7 +2452,6 @@
     ctx.fillStyle = '#0f1324';
     ctx.fillRect(0, 0, VIEW_W, horizonY);
 
-    // Distant woodland silhouette
     const treeShift = Math.floor(frameTick * 0.05) % 24;
     ctx.fillStyle = PALETTE.woodlandDark;
     ctx.fillRect(0, horizonY - 4, VIEW_W, 40);
@@ -2459,7 +2461,6 @@
       ctx.fillRect(tx - treeShift + 7, horizonY - 14, 10, 6);
     }
 
-    // Prairie meadow
     const meadowY = horizonY + 28;
     ctx.fillStyle = PALETTE.prairieBase;
     ctx.fillRect(0, meadowY, VIEW_W, 60);
@@ -2468,14 +2469,12 @@
       ctx.fillRect(gx, meadowY + 6, 4, 2);
     }
 
-    // Dirt trail where the Red River Cart rests
     const roadY = meadowY + 30;
     ctx.fillStyle = PALETTE.roadDark;
     ctx.fillRect(0, roadY, VIEW_W, 24);
     ctx.fillStyle = PALETTE.road;
     ctx.fillRect(0, roadY + 2, VIEW_W, 20);
 
-    // Sand bank & full-bleed river water stretching to bottom of viewport
     const riverY = roadY + 24;
     ctx.fillStyle = PALETTE.sandBank;
     ctx.fillRect(0, riverY, VIEW_W, 4);
@@ -2496,7 +2495,6 @@
     const subY = Math.max(72, Math.floor(horizonY * 0.16) + 60);
     drawPixelText('1850 RED RIVER FREETRADE', Math.floor(VIEW_W / 2), subY, 7, PALETTE.teal, 'center', true);
 
-    // Stationary Red River Cart with lowered shafts & stacked pixel furs
     const cartX = Math.floor(VIEW_W / 2) - 54;
     const cartY = roadY - 42;
 
@@ -2715,7 +2713,6 @@
     const topHudH = 26;
     const availH = Math.max(180, VIEW_H - topHudH);
 
-    // Fill outer vertical bands seamlessly with seasonal terrain so there are zero black bars
     ctx.fillStyle = season.grassBase;
     ctx.fillRect(0, topHudH, VIEW_W, availH);
 
@@ -3965,8 +3962,11 @@
     dpadExpiry[dir] = now + DPAD_HOLD_WINDOW_MS;
 
     if (gameState === 'MAP') {
-      if (dir === 'RIGHT' || dir === 'DOWN') cycleCheckpoint(1);
-      else if (dir === 'LEFT' || dir === 'UP') cycleCheckpoint(-1);
+      if (!wasHeld && (now - lastMapCycleTime) >= 95) {
+        if (dir === 'RIGHT' || dir === 'DOWN') cycleCheckpoint(1);
+        else if (dir === 'LEFT' || dir === 'UP') cycleCheckpoint(-1);
+        lastMapCycleTime = now;
+      }
       return;
     }
 
