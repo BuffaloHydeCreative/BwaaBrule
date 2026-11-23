@@ -134,7 +134,7 @@
   }
 
   function resumeChiptuneTrack() {
-    if (!chiptuneIsPlaying && (state === 'PLAYING' || state === 'TRANSITION')) {
+    if (!chiptuneIsPlaying && (state === 'PLAYING' || state === 'FRAME_SLIDE' || state === 'LEVEL_END_CUTSCENE')) {
       chiptuneIsPlaying = true;
       chiptuneInterval = setInterval(stepChiptuneTrack, CHIPTUNE_NOTE_LEN * 1000);
     }
@@ -148,30 +148,26 @@
   
   let VIEW_W = 320;
   let VIEW_H = 240;
-  const HUD_HEIGHT = 24;
+  const HUD_HEIGHT = 22;
 
-  // Game states: 'TITLE', 'CUTSCENE', 'PLAYING', 'TRANSITION', 'LEVEL_POPUP', 'GAMEOVER'
+  // Game states: 'TITLE', 'INTRO_CUTSCENE', 'PLAYING', 'FRAME_SLIDE', 'LEVEL_END_CUTSCENE', 'GAMEOVER'
   let state = 'TITLE'; 
   let level = 1;
-  let peltsCollected = 0;
+  let subFrame = 0; // 0 = Frame 1 (South/Cart Circle -> North), 1 = Frame 2 (South -> North/Buffalo Herd)
+  let slideProgress = 0;
   let shakeFrames = 0;
   let frame = 0;
   let isPaused = false;
-  let cutsceneScroll = 0;
-  let worldScrollDist = 0;
+  let cutsceneTimer = 0;
   
   // Player dimensions (20x24 matrix at scale 2 = 40x48 rendered; tight hitbox inside)
-  let player = { x: 140, y: 175, dead: false, w: 40, h: 48, inCreek: false, inBrush: false };
-  let obstacles = [];
-  let terrainFeatures = []; // Creeks, Rocky Ledges, Dense Timber Zones
-  let buffaloes = [];
-  let groundPatches = [];
-  let baseSpeed = 1.05;
-  let effectiveSpeed = 1.05;
-
-  // Creek pacing trackers: strictly 2–3 creeks across an entire 10-pelt level
-  let creeksSpawnedThisLevel = 0;
-  let nextCreekSpawnDist = 360;
+  let player = { x: 140, y: 180, dead: false, w: 32, h: 38 };
+  
+  // Two pre-built frames per level for seamless 2-frame sliding transition
+  let levelFrames = [
+    { statics: [], dynamics: [], groundPatches: [], herd: [] },
+    { statics: [], dynamics: [], groundPatches: [], herd: [] }
+  ];
 
   function resizeViewport() {
     const w = window.innerWidth;
@@ -185,11 +181,11 @@
     cvs.height = VIEW_H;
     ctx.imageSmoothingEnabled = false;
 
-    if (player.y > VIEW_H - player.h - 6) {
-      player.y = VIEW_H - player.h - 6;
+    if (player.y > VIEW_H - player.h - 4) {
+      player.y = VIEW_H - player.h - 4;
     }
-    if (player.x > VIEW_W - player.w - 6) {
-      player.x = VIEW_W - player.w - 6;
+    if (player.x > VIEW_W - player.w - 4) {
+      player.x = VIEW_W - player.w - 4;
     }
   }
   
@@ -197,7 +193,7 @@
   resizeViewport();
 
   // ==========================================
-  // 16-BIT SNES WILD BIOME PALETTES & LORE
+  // 4 REGIONAL BIOMES & SUNSET HORIZON PALETTES
   // ==========================================
   const BIOMES = [
     { 
@@ -207,8 +203,12 @@
       patch2: '#465054', 
       tuft: '#7c8a62',
       tuftDark: '#394238',
+      skyBands: ['#1d1936', '#452647', '#7a3347', '#b85b3b', '#e6994c', '#f7d168'],
+      farHills: '#33283d',
+      midHills: '#4a3d42',
+      groundHoriz: '#59656b',
       type: 'mountain',
-      desc: "THE WESTERN FOOTHILLS! WATCH FOR STEPPED ROCK LEDGES JUTTING FROM THE SLOPES AND FIND THE SHALLOW FORD."
+      desc: "THE WESTERN FOOTHILLS! WEAVE PAST STEPPED ROCK LEDGES AND BOULDERS AS MOOSE, DEER, FOXES, AND SNAKES CROSS YOUR PATH."
     },
     { 
       name: "DRY PRAIRIE", 
@@ -217,8 +217,12 @@
       patch2: '#735434', 
       tuft: '#b59259',
       tuftDark: '#5c4125',
+      skyBands: ['#241438', '#541b36', '#8f2929', '#c95822', '#eb9634', '#f7c844'],
+      farHills: '#472836',
+      midHills: '#664324',
+      groundHoriz: '#8c6943',
       type: 'desert',
-      desc: "THE SUN-BAKED PLAINS! CROSS RARE PRAIRIE CREEKS AT THEIR CENTER SHALLOWS AND DODGE DARTING FOXES."
+      desc: "THE SUN-BAKED PLAINS! NAVIGATE TALL DRY GRASS CLUMPS, SANDSTONE LEDGES, AND SWIFT PRAIRIE WILDLIFE TO REACH THE HERD."
     },
     { 
       name: "RED RIVER VALLEY", 
@@ -227,8 +231,12 @@
       patch2: '#80631b', 
       tuft: '#cfa83e',
       tuftDark: '#695012',
+      skyBands: ['#291836', '#612233', '#a33629', '#d96c26', '#f2a638', '#fce068'],
+      farHills: '#4f3524',
+      midHills: '#6e521b',
+      groundHoriz: '#9c7b27',
       type: 'grass',
-      desc: "THE GOLDEN TALLGRASS! FORD RUSHING VALLEY STREAMS AT THE CENTER AND THREAD THROUGH OAK GROVES."
+      desc: "THE GOLDEN TALLGRASS! THREAD THROUGH DENSE TALLGRASS STANDS AND CROSSING HERDS OF MOOSE, DEER, AND FOXES."
     },
     { 
       name: "EASTERN WOODLANDS", 
@@ -237,8 +245,12 @@
       patch2: '#1b3313', 
       tuft: '#487d36',
       tuftDark: '#12240c',
+      skyBands: ['#141a33', '#2e2447', '#662b42', '#ab4933', '#de843b', '#f5c256'],
+      farHills: '#1d2b24',
+      midHills: '#1f3b18',
+      groundHoriz: '#26471c',
       type: 'forest',
-      desc: "LAKE OF THE WOODS! SLALOM THROUGH THICK TIMBER STANDS OR THREAD THE NARROW CLEARINGS."
+      desc: "LAKE OF THE WOODS! SLALOM AROUND TIMBER LEDGES, BOULDERS, AND FOREST WILDLIFE TO DRIVE THE HERD INTO THE SUNSET."
     }
   ];
 
@@ -260,7 +272,7 @@
     }
   };
 
-  // Sculpted Top-Down Mounted Buffalo Runner (20x24 SNES shaded)
+  // Sculpted Top-Down Mounted Métis Buffalo Runner (16x19 shaded)
   const PAL_PLAYER = {
     1: '#120d09', // Crisp Dark Outline
     2: '#8f5932', // Warm Bay Horse Coat
@@ -277,60 +289,50 @@
 
   const sprPlayerAnim = [
     [ // Frame 1: Extended Gallop
-      [0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0],
-      [0,0,0,0,0,0,0,1,4,2,2,4,1,0,0,0,0,0,0,0],
-      [0,0,0,0,0,0,1,2,2,2,2,2,2,1,0,0,0,0,0,0],
-      [0,0,0,0,0,1,5,1,2,4,4,2,1,5,1,0,0,0,0,0],
-      [0,0,0,0,0,1,5,2,2,2,2,2,2,5,1,0,0,0,0,0],
-      [0,0,0,0,1,3,2,5,2,2,2,2,5,2,3,1,0,0,0,0],
-      [0,0,0,1,3,4,2,5,5,9,9,5,5,2,4,3,1,0,0,0],
-      [0,0,1,5,3,2,2,1,11,11,11,11,1,2,2,3,5,1,0,0],
-      [0,0,1,1,3,2,1,11,11,9,9,11,11,1,2,3,1,1,0,0],
-      [0,0,0,1,2,1,6,6,11,11,11,11,6,6,1,2,1,0,0,0],
-      [0,0,1,3,2,1,6,7,6,10,10,6,7,6,1,2,3,1,0,0],
-      [0,0,1,2,2,1,6,6,8,9,8,9,6,6,1,2,2,1,0,0],
-      [0,0,1,3,2,1,7,6,8,8,8,8,6,7,1,2,3,1,0,0],
-      [0,0,0,1,2,2,1,6,7,6,6,7,6,1,2,2,1,0,0,0],
-      [0,0,0,1,3,4,2,1,1,1,1,1,1,2,4,3,1,0,0,0],
-      [0,0,0,1,3,2,2,2,2,5,5,2,2,2,2,3,1,0,0,0],
-      [0,0,0,0,1,3,2,2,5,5,5,5,2,2,3,1,0,0,0],
-      [0,0,0,0,1,3,3,2,5,5,5,5,2,3,3,1,0,0,0],
-      [0,0,0,0,0,1,3,1,5,5,5,5,1,3,1,0,0,0,0],
-      [0,0,0,0,0,1,5,1,1,5,5,1,1,5,1,0,0,0,0],
-      [0,0,0,0,0,0,1,0,0,5,5,0,0,1,0,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+      [0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0],
+      [0,0,0,0,0,1,4,2,2,4,1,0,0,0,0,0],
+      [0,0,0,0,1,5,2,4,4,2,5,1,0,0,0,0],
+      [0,0,0,1,3,2,5,2,2,5,2,3,1,0,0,0],
+      [0,0,1,5,3,4,5,9,9,5,4,3,5,1,0,0],
+      [0,0,1,1,3,2,1,11,11,1,2,3,1,1,0,0],
+      [0,0,0,1,2,1,11,9,9,11,1,2,1,0,0,0],
+      [0,0,1,3,2,1,6,6,6,6,1,2,3,1,0,0],
+      [0,0,1,2,2,1,6,7,10,6,1,2,2,1,0,0],
+      [0,0,1,3,2,1,6,8,9,6,1,2,3,1,0,0],
+      [0,0,0,1,2,1,7,8,8,7,1,2,1,0,0,0],
+      [0,0,0,1,3,4,1,6,6,1,4,3,1,0,0,0],
+      [0,0,0,1,3,2,2,5,5,2,2,3,1,0,0,0],
+      [0,0,0,0,1,3,2,5,5,2,3,1,0,0,0,0],
+      [0,0,0,0,1,3,1,5,5,1,3,1,0,0,0,0],
+      [0,0,0,0,0,1,5,1,1,5,1,0,0,0,0,0],
+      [0,0,0,0,0,0,1,5,5,1,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
     ],
-    [ // Frame 2: Gathered Gallop Stride
-      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-      [0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0],
-      [0,0,0,0,0,0,0,1,4,2,2,4,1,0,0,0,0,0,0,0],
-      [0,0,0,0,0,0,1,2,2,2,2,2,2,1,0,0,0,0,0,0],
-      [0,0,0,0,0,1,5,1,2,4,4,2,1,5,1,0,0,0,0,0],
-      [0,0,0,0,0,1,5,2,2,2,2,2,2,5,1,0,0,0,0,0],
-      [0,0,0,0,1,3,2,5,2,2,2,2,5,2,3,1,0,0,0,0],
-      [0,0,0,1,3,4,2,5,5,9,9,5,5,2,4,3,1,0,0,0],
-      [0,0,0,1,3,2,2,1,11,11,11,11,1,2,2,3,1,0,0,0],
-      [0,0,1,5,3,2,1,11,11,9,9,11,11,1,2,3,5,1,0,0],
-      [0,0,1,1,2,1,6,6,11,11,11,11,6,6,1,2,1,1,0,0],
-      [0,0,0,1,2,1,6,7,6,10,10,6,7,6,1,2,1,0,0,0],
-      [0,0,0,1,2,1,6,6,8,9,8,9,6,6,1,2,1,0,0,0],
-      [0,0,0,1,3,2,1,6,7,6,6,7,6,1,2,3,1,0,0,0],
-      [0,0,0,1,3,4,2,1,1,1,1,1,1,2,4,3,1,0,0,0],
-      [0,0,0,0,1,3,2,2,2,5,5,2,2,2,3,1,0,0,0,0],
-      [0,0,0,0,1,3,2,2,5,5,5,5,2,2,3,1,0,0,0],
-      [0,0,0,0,0,1,3,2,5,5,5,5,2,3,1,0,0,0,0],
-      [0,0,0,0,0,1,5,1,5,5,5,5,1,5,1,0,0,0,0],
-      [0,0,0,0,0,0,1,0,1,5,5,1,0,1,0,0,0,0,0],
-      [0,0,0,0,0,0,0,0,1,5,5,1,0,0,0,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+    [ // Frame 2: Gathered Gallop
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0],
+      [0,0,0,0,0,1,4,2,2,4,1,0,0,0,0,0],
+      [0,0,0,0,1,5,2,4,4,2,5,1,0,0,0,0],
+      [0,0,0,1,3,2,5,2,2,5,2,3,1,0,0,0],
+      [0,0,0,1,3,4,5,9,9,5,4,3,1,0,0,0],
+      [0,0,1,5,3,2,1,11,11,1,2,3,5,1,0,0],
+      [0,0,1,1,2,1,11,9,9,11,1,2,1,1,0,0],
+      [0,0,0,1,2,1,6,6,6,6,1,2,1,0,0,0],
+      [0,0,0,1,2,1,6,7,10,6,1,2,1,0,0,0],
+      [0,0,0,1,3,2,6,8,9,6,2,3,1,0,0,0],
+      [0,0,0,1,3,4,7,8,8,7,4,3,1,0,0,0],
+      [0,0,0,0,1,3,1,6,6,1,3,1,0,0,0,0],
+      [0,0,0,0,1,3,2,5,5,2,3,1,0,0,0,0],
+      [0,0,0,0,0,1,5,5,5,5,1,0,0,0,0,0],
+      [0,0,0,0,0,0,1,5,5,1,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
     ]
   ];
 
-  // Anatomically Sculpted Top-Down Buffalo (Strict deep brown hide & ivory horns, zero red markings)
+  // Top-Down Rumbling Buffalo (Deep Brown Hide & Ivory Horns — zero red markings)
   const PAL_BUFFALO_TOP = {
     1: '#120c08', // Dark Outline
     2: '#593b27', // Shaggy Shoulder Hump (Rich Deep Brown)
@@ -339,27 +341,25 @@
     5: '#ede5cf'  // Curved Ivory Horns
   };
   const sprBuffaloTop = [
-    [0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0],
-    [0,0,0,5,1,2,2,4,4,2,2,1,5,0,0,0],
-    [0,0,5,5,1,2,4,2,2,4,2,1,5,5,0,0],
-    [0,0,5,1,2,2,4,4,4,4,2,2,1,5,0,0],
-    [0,0,0,1,2,4,2,2,2,2,4,2,1,0,0,0],
-    [0,0,1,2,2,2,4,4,4,4,2,2,2,1,0,0],
-    [0,1,2,2,4,2,2,2,2,2,2,4,2,2,1,0],
-    [0,1,2,2,2,2,4,4,4,4,2,2,2,2,1,0],
-    [0,1,2,3,2,2,2,2,2,2,2,2,3,2,1,0],
-    [0,0,1,3,3,2,2,3,3,2,2,3,3,1,0,0],
-    [0,0,1,3,3,3,3,3,3,3,3,3,3,1,0,0],
-    [0,0,0,1,3,3,3,3,3,3,3,3,1,0,0,0],
-    [0,0,0,1,3,3,3,3,3,3,3,3,1,0,0,0],
-    [0,0,0,1,3,1,3,3,3,3,1,3,1,0,0,0],
-    [0,0,0,0,1,0,1,3,3,1,0,1,0,0,0,0],
-    [0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+    [0,0,0,0,1,1,1,1,1,1,0,0,0,0],
+    [0,0,5,1,2,2,4,4,2,2,1,5,0,0],
+    [0,5,5,1,2,4,2,2,4,2,1,5,5,0],
+    [0,5,1,2,2,4,4,4,4,2,2,1,5,0],
+    [0,0,1,2,4,2,2,2,2,4,2,1,0,0],
+    [0,1,2,2,2,4,4,4,4,2,2,2,1,0],
+    [1,2,2,4,2,2,2,2,2,2,4,2,2,1],
+    [1,2,2,2,2,4,4,4,4,2,2,2,2,1],
+    [1,2,3,2,2,2,2,2,2,2,2,3,2,1],
+    [0,1,3,3,2,2,3,3,2,2,3,3,1,0],
+    [0,1,3,3,3,3,3,3,3,3,3,3,1,0],
+    [0,0,1,3,3,3,3,3,3,3,3,1,0,0],
+    [0,0,1,3,1,3,3,3,3,1,3,1,0,0],
+    [0,0,0,1,0,1,3,3,1,0,1,0,0,0],
+    [0,0,0,0,0,1,1,1,1,0,0,0,0,0],
+    [0,0,0,0,0,0,1,1,0,0,0,0,0,0]
   ];
 
-  // Side-Profile Buffalo for Title Screen & Cutscene (Strictly deep brown hide & ivory horns, zero red markings)
+  // Side-Profile Buffalo for Title Screen & Level-Ending Sunset Cutscenes (Deep Brown Hide & Ivory Horns)
   const PAL_BUFFALO_SIDE = {
     1: '#120c08', // Dark Outline
     2: '#593b27', // Shaggy Hump Fur (Deep Brown)
@@ -380,7 +380,7 @@
     [0,0,1,1,0,0,0,0,1,1,0,1,1,0,0,0,0,0]
   ];
 
-  // Side-Profile Mounted Hunter for Title Screen & Cutscene
+  // Side-Profile Mounted Hunter for Title Screen & Level-Ending Sunset Cutscenes
   const PAL_HUNTER_SIDE = {
     1: '#120d0a', // Outline
     2: '#8f5932', // Horse Coat
@@ -406,67 +406,102 @@
     [0,1,1,0,0,0,0,0,0,0,0,1,1,0,0,0]
   ];
 
-  // SNES Shaded Obstacles & Collectibles
+  // ==========================================
+  // STATIC BLOCKING OBJECTS (Rocks, Tall Grass, Ledges)
+  // ==========================================
   const PAL_ROCK = { 1: '#1c2024', 2: '#7a8691', 3: '#a8b5c2', 4: '#4c545c' };
   const sprRock = [
-    [0,0,1,1,1,1,0,0],
-    [0,1,3,3,2,2,1,0],
-    [1,3,2,2,2,4,2,1],
-    [1,2,2,4,4,4,4,1],
-    [1,4,4,4,4,4,4,1],
-    [0,1,1,1,1,1,1,0]
-  ];
-
-  const PAL_TREE = { 1: '#0e1f0b', 2: '#23591b', 3: '#3b822e', 4: '#173b12', 5: '#52341e' };
-  const sprTree = [
-    [0,0,0,1,1,1,1,0,0,0],
-    [0,0,1,3,3,2,2,1,0,0],
-    [0,1,3,3,2,2,4,2,1,0],
-    [1,3,2,2,2,4,4,4,2,1],
-    [1,2,2,4,4,4,4,4,4,1],
-    [0,1,4,4,4,4,4,4,1,0],
-    [0,0,1,1,5,5,1,1,0,0],
-    [0,0,0,1,5,5,1,0,0,0],
-    [0,0,0,1,5,5,1,0,0,0],
-    [0,0,1,1,1,1,1,1,0,0]
-  ];
-
-  const PAL_SHRUB = { 1: '#14290e', 2: '#437a28', 3: '#68a63c', 4: '#294f17', 5: '#ad1c21' };
-  const sprShrub = [
-    [0,0,1,1,1,1,0,0],
-    [0,1,3,3,2,2,1,0],
-    [1,3,5,2,2,5,2,1],
-    [1,2,2,4,4,2,4,1],
-    [0,1,4,4,4,4,1,0],
-    [0,0,1,1,1,1,0,0]
-  ];
-
-  const PAL_FOX = { 1: '#260d05', 2: '#e35b14', 3: '#ff8533', 4: '#ffffff' };
-  const sprFox = [
-    [0,1,0,0,0,0,1,0],
-    [0,1,2,1,1,2,1,0],
-    [1,2,3,2,2,3,2,1],
-    [1,2,2,1,1,2,2,1],
-    [0,1,2,2,2,2,1,0],
-    [0,0,1,4,4,1,0,0]
-  ];
-
-  // Rich Golden Beaded Pelt (10x9)
-  const PAL_PELT = { 1: '#1c1206', 2: '#f7c844', 3: '#fff2a6', 4: '#c98e18', 5: '#ad1c21', 6: '#12aea2' };
-  const sprPelt = [
     [0,0,1,1,1,1,1,1,0,0],
-    [0,1,3,3,2,2,2,2,1,0],
-    [1,3,2,5,2,2,5,2,4,1],
-    [1,2,2,2,6,6,2,2,4,1],
-    [1,2,2,6,3,3,6,2,4,1],
-    [1,2,2,2,6,6,2,2,4,1],
-    [1,2,4,5,4,4,5,4,4,1],
-    [0,1,4,4,4,4,4,4,1,0],
-    [0,0,1,1,1,1,1,1,0,0]
+    [0,1,3,3,3,2,2,2,1,0],
+    [1,3,2,2,2,2,4,2,2,1],
+    [1,2,2,4,4,4,4,4,2,1],
+    [1,4,4,4,4,4,4,4,4,1],
+    [0,1,1,1,1,1,1,1,1,0]
+  ];
+
+  const PAL_TALLGRASS = { 1: '#2e2408', 2: '#b89428', 3: '#e8c448', 4: '#7d6214' };
+  const sprTallGrass = [
+    [0,1,0,0,1,0,0,1,0,0],
+    [1,3,1,1,3,1,1,3,1,0],
+    [1,2,1,1,2,1,1,2,1,1],
+    [1,2,3,1,2,3,1,2,3,1],
+    [1,4,2,2,4,2,2,4,2,1],
+    [1,4,4,4,4,4,4,4,4,1]
   ];
 
   // ==========================================
-  // STYLIZED PIXEL TEXT RENDERER (SNES BLOCK)
+  // DYNAMIC COLLISION WILDLIFE (Foxes, Moose, Deer, Snakes)
+  // ==========================================
+  // 1. Red Fox (12x7 facing right)
+  const PAL_FOX = { 1: '#260d05', 2: '#e35b14', 3: '#ff8533', 4: '#ffffff', 5: '#140c08' };
+  const sprFox = [
+    [0,0,0,0,0,0,0,0,1,0,1,0],
+    [0,1,1,0,0,0,0,1,2,1,2,1],
+    [1,4,4,1,1,1,1,2,3,2,2,1],
+    [1,2,2,2,2,2,2,2,2,5,2,1],
+    [0,1,2,2,2,2,2,2,1,1,1,0],
+    [0,0,1,5,1,0,1,5,1,0,0,0],
+    [0,0,1,1,0,0,1,1,0,0,0,0]
+  ];
+
+  // 2. Bull Moose (16x13 facing right - broad palmate antlers, dark brown coat, bell)
+  const PAL_MOOSE = { 1: '#120c08', 2: '#3d2817', 3: '#593c24', 4: '#24170c', 5: '#d9ccb4' };
+  const sprMoose = [
+    [0,0,0,0,0,0,0,0,5,5,0,5,5,0,0,0],
+    [0,0,0,0,0,0,0,5,5,5,5,5,5,5,0,0],
+    [0,0,0,0,0,0,0,0,1,5,5,5,1,0,0,0],
+    [0,0,1,1,1,1,1,1,2,2,2,2,2,1,0,0],
+    [0,1,2,3,3,2,2,2,3,2,2,2,2,2,1,0],
+    [1,4,2,2,2,2,2,2,2,2,1,2,2,2,2,1],
+    [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
+    [0,1,2,4,4,4,2,2,2,2,2,1,1,1,1,0],
+    [0,0,1,2,1,1,2,2,2,2,1,2,1,0,0,0],
+    [0,0,1,4,1,0,1,4,1,1,2,1,0,0,0,0],
+    [0,0,1,4,1,0,1,4,1,1,4,1,0,0,0,0],
+    [0,0,1,1,0,0,1,1,0,1,1,0,0,0,0,0]
+  ];
+
+  // 3. White-Tailed Deer (14x11 facing right - sleek tan coat, branching antlers, white tail)
+  const PAL_DEER = { 1: '#1c1209', 2: '#b87d42', 3: '#d99e62', 4: '#ffffff', 5: '#e6d8be' };
+  const sprDeer = [
+    [0,0,0,0,0,0,0,0,5,0,5,0,0,0],
+    [0,0,0,0,0,0,0,0,0,5,5,0,0,0],
+    [0,0,0,0,0,0,0,0,1,2,2,1,0,0],
+    [0,4,1,1,1,1,1,1,2,3,2,2,1,0],
+    [1,4,2,3,3,2,2,2,2,2,1,2,2,1],
+    [1,2,2,2,2,2,2,2,2,2,2,2,1,0],
+    [0,1,2,2,2,2,2,2,2,1,1,1,0,0],
+    [0,0,1,2,1,1,1,2,1,2,1,0,0,0],
+    [0,0,1,2,1,0,0,1,2,1,0,0,0,0],
+    [0,0,1,1,0,0,0,1,1,0,0,0,0,0]
+  ];
+
+  // 4. Prairie Rattlesnake / Garter Snake (12x6 slithering S-coil)
+  const PAL_SNAKE = { 1: '#141a0d', 2: '#56782d', 3: '#8cb342', 4: '#f7c844', 5: '#ad1c21' };
+  const sprSnake = [
+    [0,0,1,1,0,0,0,0,1,1,0,0],
+    [0,1,3,2,1,0,0,1,2,3,1,5],
+    [1,2,4,2,1,0,1,2,4,2,1,0],
+    [1,2,2,1,0,1,2,2,1,0,0,0],
+    [0,1,1,0,1,2,3,1,0,0,0,0],
+    [0,0,0,0,1,1,1,0,0,0,0,0]
+  ];
+
+  // Red River Cart Sprite for Starting Platform Circle (14x10)
+  const PAL_CART = { 1: '#1c1209', 2: '#8c542b', 3: '#b87642', 4: '#593317', 5: '#d4d0c5' };
+  const sprRedRiverCart = [
+    [0,0,0,1,1,1,1,1,1,1,1,0,0,0],
+    [0,0,1,5,5,3,3,5,5,3,3,1,0,0],
+    [0,0,1,3,2,2,2,2,2,2,3,1,0,0],
+    [1,1,1,2,4,2,2,2,2,4,2,1,1,1],
+    [0,0,1,1,2,1,1,1,1,2,1,1,0,0],
+    [0,0,1,4,1,4,1,0,1,4,1,4,1,0],
+    [0,0,1,1,4,1,1,0,1,1,4,1,1,0],
+    [0,0,0,1,1,1,0,0,0,1,1,1,0,0]
+  ];
+
+  // ==========================================
+  // STYLIZED PIXEL TEXT & SNES WINDOWS
   // ==========================================
   const FONT_5X7 = {
     'L': ["10000","10000","10000","10000","10000","10000","11111"],
@@ -515,11 +550,8 @@
     }
   }
 
-  // ==========================================
-  // SNES RPG DIALOGUE BOX HELPER
-  // ==========================================
   function drawSNESWindow(x, y, w, h) {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
     ctx.fillRect(x + 4, y + 4, w, h);
 
     ctx.fillStyle = '#182238';
@@ -556,206 +588,205 @@
   }
 
   // ==========================================
-  // WILD TERRAIN FEATURES & NATURAL SPAWNING
+  // FROGGER-STYLE 2-FRAME LEVEL GENERATOR
   // ==========================================
-  function initGroundPatches() {
-    groundPatches = [];
-    for (let i = 0; i < 65; i++) {
-      groundPatches.push({
+  function generateGroundPatches(minY, maxY) {
+    let patches = [];
+    for (let i = 0; i < 42; i++) {
+      patches.push({
         x: Math.random() * VIEW_W,
-        y: Math.random() * VIEW_H,
+        y: minY + Math.random() * (maxY - minY),
         w: 4 + Math.floor(Math.random() * 14),
         h: 3 + Math.floor(Math.random() * 8),
-        kind: i % 3 // 0: patch1, 1: patch2, 2: grass tuft
+        kind: i % 3
       });
     }
+    return patches;
   }
 
-  // Clear any obstacles that might overlap or block a creek crossing corridor
-  function clearCreekCorridor(creekY, creekH, fordStart, fordEnd) {
-    const padY = 44; // Generous vertical clearance above and below the creek
-    for (let i = obstacles.length - 1; i >= 0; i--) {
-      let obs = obstacles[i];
-      // Remove any obstacle inside the creek band or blocking the entry/exit funnel of the ford
-      if (obs.y + obs.h > creekY - padY && obs.y < creekY + creekH + padY) {
-        obstacles.splice(i, 1);
-      }
-    }
-  }
+  function buildFrameData(fIdx) {
+    const bIdx = (level - 1) % BIOMES.length;
+    const bType = BIOMES[bIdx].type;
+    const speedScale = 1 + (level - 1) * 0.16;
 
-  function spawnCreekFeature() {
-    let fordCenter = Math.floor(VIEW_W * (0.42 + Math.random() * 0.16));
-    let fordHalfW = 36; // 72px wide passable shallow ford
-    let bufferW = 14;   // 14px shallow gravel/wading transition buffer on each side before deep water
-    let creekY = -36;
-    let creekH = 26;
+    // Safe start zone at bottom of Frame 0; Safe goal zone (Buffalo Herd Horizon) at top of Frame 1
+    const safeBottomH = (fIdx === 0) ? 48 : 16;
+    const safeTopH = (fIdx === 1) ? 54 : HUD_HEIGHT + 10;
+    const playTop = safeTopH;
+    const playBottom = VIEW_H - safeBottomH;
+    const playHeight = Math.max(80, playBottom - playTop);
 
-    // Guarantee zero objects block the crossing or sit in the creek approaches
-    clearCreekCorridor(creekY, creekH, fordCenter - fordHalfW - bufferW, fordCenter + fordHalfW + bufferW);
+    let statics = [];
+    let dynamics = [];
+    let groundPatches = generateGroundPatches(playTop, playBottom);
 
-    terrainFeatures.push({
-      kind: 'CREEK',
-      x: 0,
-      y: creekY,
-      w: VIEW_W,
-      h: creekH,
-      fordStart: fordCenter - fordHalfW,
-      fordEnd: fordCenter + fordHalfW,
-      bufferW: bufferW
-    });
+    // 1. STATIC BLOCKING OBJECTS (Rocks, Tall Grass, Ledges)
+    // Placed in alternating bands so there is always a navigable path north
+    const numStaticBands = 3;
+    const bandH = playHeight / numStaticBands;
 
-    creeksSpawnedThisLevel++;
-    // Space creeks far apart so strictly 2–3 creeks occur over a full 10-pelt level (~950–1250px)
-    nextCreekSpawnDist = worldScrollDist + 950 + Math.floor(Math.random() * 350);
-  }
+    for (let b = 0; b < numStaticBands; b++) {
+      let bandY = playTop + b * bandH + 6;
+      // Leave a guaranteed open corridor X in each band so the level is never soft-locked
+      let openCorridorX = 40 + ((b * 95 + level * 47 + fIdx * 63) % (VIEW_W - 110));
 
-  function spawnTerrainFeature() {
-    let bIdx = (level - 1) % BIOMES.length;
-    let bType = BIOMES[bIdx].type;
-
-    // 1. Rocky Foothills: Impassable stepped rocky ledges jutting from left/right slopes
-    if (bType === 'mountain') {
-      let ledgeW = 72 + Math.floor(Math.random() * 44);
-      let fromLeft = Math.random() > 0.5;
-      let lx = fromLeft ? 0 : (VIEW_W - ledgeW);
-      let lh = 26;
-      terrainFeatures.push({
-        kind: 'LEDGE',
-        x: lx,
-        y: -36,
-        w: ledgeW,
-        h: lh,
-        fromLeft: fromLeft
-      });
-      obstacles.push({
-        x: fromLeft ? ledgeW - 18 : lx - 6,
-        y: -12,
-        dx: 0,
-        dy: 0,
-        type: 'rock',
-        w: 24,
-        h: 18,
-        scale: 3,
-        dead: false
-      });
-    }
-
-    // 2. Eastern Woodlands: Thick timber woods with a slalom clearing corridor
-    if (bType === 'forest') {
-      let clearingCenter = Math.floor(VIEW_W * (0.28 + Math.random() * 0.44));
-      let clearingHalfW = 42;
-      terrainFeatures.push({
-        kind: 'WOODS',
-        x: 0,
-        y: -52,
-        w: VIEW_W,
-        h: 44,
-        clearStart: clearingCenter - clearingHalfW,
-        clearEnd: clearingCenter + clearingHalfW
-      });
-      let leftTreeX = Math.max(4, clearingCenter - clearingHalfW - 44);
-      let rightTreeX = Math.min(VIEW_W - 44, clearingCenter + clearingHalfW + 6);
-      if (clearingCenter - clearingHalfW > 32) {
-        obstacles.push({ x: leftTreeX, y: -50, dx: 0, dy: 0, type: 'tree', w: 40, h: 40, scale: 4, dead: false });
-      }
-      if (VIEW_W - (clearingCenter + clearingHalfW) > 32) {
-        obstacles.push({ x: rightTreeX, y: -46, dx: 0, dy: 0, type: 'tree', w: 40, h: 40, scale: 4, dead: false });
-      }
-    }
-  }
-
-  function spawnNaturalEntities() {
-    let bIdx = (level - 1) % BIOMES.length;
-    let bType = BIOMES[bIdx].type;
-
-    // Prevent spawning inside or near any creek crossing or active terrain feature
-    for (let tf of terrainFeatures) {
-      let clearance = (tf.kind === 'CREEK') ? 68 : 22;
-      if (tf.y < clearance) return;
-    }
-
-    // Chance to spawn a Golden Beaded Pelt in a fair, reachable spot
-    if (Math.random() < 0.30) {
-      let px = 28 + Math.random() * (VIEW_W - 76);
-      obstacles.push({ x: px, y: -24, dx: 0, dy: 0, type: 'pelt', w: 20, h: 18, scale: 2, dead: false });
-      return;
-    }
-
-    // Spawn natural cluster or roaming wildlife integrated with the scrolling ground
-    let pool = [];
-    if (bType === 'mountain') pool = ['rock', 'rock', 'shrub', 'fox'];
-    else if (bType === 'desert') pool = ['rock', 'shrub', 'shrub', 'fox'];
-    else if (bType === 'grass') pool = ['shrub', 'shrub', 'tree', 'fox'];
-    else if (bType === 'forest') pool = ['shrub', 'tree', 'tree', 'fox'];
-
-    let type = pool[Math.floor(Math.random() * pool.length)];
-    let x = 14 + Math.random() * (VIEW_W - 64);
-
-    if (type === 'fox') {
-      let dir = Math.random() > 0.5 ? 0.65 : -0.65;
-      obstacles.push({ x: x, y: -24, dx: dir, dy: 0, type: 'fox', w: 24, h: 18, scale: 3, dead: false });
-    } else if (type === 'tree') {
-      obstacles.push({ x: x, y: -44, dx: 0, dy: 0, type: 'tree', w: 40, h: 40, scale: 4, dead: false });
-    } else if (type === 'rock') {
-      obstacles.push({ x: x, y: -24, dx: 0, dy: 0, type: 'rock', w: 24, h: 18, scale: 3, dead: false });
-      if (Math.random() > 0.45 && x + 28 < VIEW_W - 30) {
-        obstacles.push({ x: x + 24, y: -16, dx: 0, dy: 0, type: 'shrub', w: 24, h: 18, scale: 3, dead: false });
-      }
-    } else {
-      obstacles.push({ x: x, y: -24, dx: 0, dy: 0, type: 'shrub', w: 24, h: 18, scale: 3, dead: false });
-    }
-  }
-
-  function startLevelGameplay(withRumble = true) {
-    baseSpeed = 1.1 + (level * 0.14); 
-    effectiveSpeed = baseSpeed;
-    obstacles = [];
-    terrainFeatures = [];
-    peltsCollected = 0;
-    worldScrollDist = 0;
-    creeksSpawnedThisLevel = 0;
-    nextCreekSpawnDist = 420 + Math.floor(Math.random() * 180);
-    player = { x: (VIEW_W / 2) - 20, y: VIEW_H - 58, dead: false, w: 40, h: 48, inCreek: false, inBrush: false };
-    initGroundPatches();
-    
-    if (withRumble) {
-      triggerRumble();
-    } else {
-      state = 'PLAYING';
-    }
-  }
-
-  function triggerRumble() {
-    state = 'TRANSITION';
-    shakeFrames = 95;
-    buffaloes = [];
-    for (let i = 0; i < 20; i++) {
-      buffaloes.push({
-        x: Math.random() * (VIEW_W - 48),
-        y: VIEW_H + Math.random() * 240, 
-        dy: -(3.2 + Math.random() * 2.2)
-      });
-    }
-  }
-
-  function move(dx, dy) {
-    if (state !== 'PLAYING') return;
-    let step = (player.inCreek || player.inBrush) ? 13 : 20; 
-    let nx = player.x + (dx * step);
-    let ny = player.y + (dy * step);
-
-    // Prevent stepping directly into impassable rocky ledges
-    for (let tf of terrainFeatures) {
-      if (tf.kind === 'LEDGE') {
-        if (nx + 8 < tf.x + tf.w && nx + player.w - 8 > tf.x &&
-            ny + 10 < tf.y + tf.h && ny + player.h - 6 > tf.y) {
-          return;
+      // Rocky Ledges (especially in Foothills & Woodlands)
+      if ((bType === 'mountain' && b % 2 === 0) || (bType === 'forest' && b === 1)) {
+        let fromLeft = (b + fIdx) % 2 === 0;
+        let ledgeW = Math.min(96, fromLeft ? Math.max(44, openCorridorX - 18) : Math.max(44, VIEW_W - (openCorridorX + 54)));
+        let lx = fromLeft ? 0 : (VIEW_W - ledgeW);
+        if (ledgeW >= 38) {
+          statics.push({
+            type: 'LEDGE',
+            x: lx,
+            y: bandY,
+            w: ledgeW,
+            h: 20,
+            fromLeft: fromLeft
+          });
         }
       }
+
+      // Rocks & Tall Grass Clumps
+      let numObs = 2 + Math.min(2, Math.floor(level / 2));
+      for (let k = 0; k < numObs; k++) {
+        let ox = 10 + ((k * 85 + b * 43 + fIdx * 29) % (VIEW_W - 42));
+        // Keep clear of the open corridor
+        if (Math.abs(ox - openCorridorX) < 38) continue;
+
+        let sType = 'ROCK';
+        if (bType === 'grass' || bType === 'forest') {
+          sType = (k + b) % 2 === 0 ? 'TALLGRASS' : 'ROCK';
+        } else if (bType === 'desert') {
+          sType = (k + b) % 3 === 0 ? 'TALLGRASS' : 'ROCK';
+        } else {
+          sType = (k + b) % 3 === 1 ? 'TALLGRASS' : 'ROCK';
+        }
+
+        statics.push({
+          type: sType,
+          x: ox,
+          y: bandY + (k % 2) * 8,
+          w: 30,
+          h: 18
+        });
+      }
     }
 
-    if (nx >= 4 && nx <= VIEW_W - player.w - 4) player.x = nx;
-    if (ny >= HUD_HEIGHT + 2 && ny <= VIEW_H - player.h - 4) player.y = ny;
+    // 2. DYNAMIC COLLISION WILDLIFE LANES (Foxes, Moose, Deer, Snakes)
+    const numLanes = 4;
+    const laneStep = playHeight / (numLanes + 0.5);
+
+    const biomeAnimals = {
+      mountain: ['MOOSE', 'FOX', 'DEER', 'SNAKE'],
+      desert:   ['FOX', 'SNAKE', 'DEER', 'FOX'],
+      grass:    ['DEER', 'FOX', 'MOOSE', 'SNAKE'],
+      forest:   ['MOOSE', 'DEER', 'FOX', 'SNAKE']
+    }[bType];
+
+    for (let l = 0; l < numLanes; l++) {
+      let ly = Math.floor(playTop + (l + 0.45) * laneStep);
+      let aType = biomeAnimals[(l + fIdx) % biomeAnimals.length];
+      let dir = ((l + fIdx) % 2 === 0) ? 1 : -1;
+
+      let baseSpd = 0.75;
+      let w = 24, h = 14, scale = 2;
+
+      if (aType === 'FOX') {
+        baseSpd = 1.15; w = 24; h = 14; scale = 2;
+      } else if (aType === 'MOOSE') {
+        baseSpd = 0.62; w = 32; h = 24; scale = 2;
+      } else if (aType === 'DEER') {
+        baseSpd = 0.92; w = 28; h = 20; scale = 2;
+      } else if (aType === 'SNAKE') {
+        baseSpd = 0.78; w = 24; h = 12; scale = 2;
+      }
+
+      let count = (aType === 'MOOSE') ? 1 : (level >= 3 ? 2 : 1 + (l % 2));
+      for (let c = 0; c < count; c++) {
+        let startX = (c * (VIEW_W / count)) + Math.random() * 40;
+        dynamics.push({
+          type: aType,
+          x: startX % VIEW_W,
+          y: ly,
+          w: w,
+          h: h,
+          vx: dir * baseSpd * speedScale,
+          scale: scale
+        });
+      }
+    }
+
+    // 3. Top Horizon Buffalo Herd on Frame 1 (End Platform Target)
+    let herd = [];
+    if (fIdx === 1) {
+      for (let h = 0; h < 6; h++) {
+        herd.push({
+          x: 24 + h * 46 + (h % 2) * 8,
+          y: HUD_HEIGHT + 12 + (h % 2) * 6,
+          phase: h * 11
+        });
+      }
+    }
+
+    return { statics, dynamics, groundPatches, herd };
+  }
+
+  function initLevel() {
+    subFrame = 0;
+    slideProgress = 0;
+    levelFrames[0] = buildFrameData(0);
+    levelFrames[1] = buildFrameData(1);
+    player = { x: Math.floor(VIEW_W / 2) - 16, y: VIEW_H - 42, dead: false, w: 32, h: 38 };
+    state = 'PLAYING';
+  }
+
+  // ==========================================
+  // MOVEMENT & STATIC BLOCKING COLLISION
+  // ==========================================
+  function move(dx, dy) {
+    if (state !== 'PLAYING') return;
+    const stepX = 18;
+    const stepY = 18;
+    let nx = player.x + dx * stepX;
+    let ny = player.y + dy * stepY;
+
+    // Keep within horizontal screen edges
+    nx = Math.max(4, Math.min(VIEW_W - player.w - 4, nx));
+
+    // Prevent walking off bottom edge
+    if (ny > VIEW_H - player.h - 2) ny = VIEW_H - player.h - 2;
+
+    // Check Static Blocking Objects (Rocks, Tall Grass, Ledges)
+    const activeData = levelFrames[subFrame];
+    const pLeft = nx + 6;
+    const pRight = nx + player.w - 6;
+    const pTop = ny + 8;
+    const pBottom = ny + player.h - 4;
+
+    for (let st of activeData.statics) {
+      if (pLeft < st.x + st.w - 2 &&
+          pRight > st.x + 2 &&
+          pTop < st.y + st.h - 2 &&
+          pBottom > st.y + 2) {
+        // Blocked by static object!
+        return;
+      }
+    }
+
+    player.x = nx;
+    player.y = ny;
+
+    // Check Top Transition / Goal Platform
+    if (subFrame === 0 && player.y <= HUD_HEIGHT + 6) {
+      // Trigger smooth 2-frame vertical slide into Frame 2!
+      state = 'FRAME_SLIDE';
+      slideProgress = 0;
+    } else if (subFrame === 1 && player.y <= HUD_HEIGHT + 44) {
+      // Reached the End Platform Buffalo Herd! Launch Level-Ending Sunset Cutscene
+      state = 'LEVEL_END_CUTSCENE';
+      cutsceneTimer = 0;
+    }
   }
 
   // ==========================================
@@ -764,226 +795,182 @@
   function update() {
     frame++;
 
-    if (state === 'TITLE') {
+    if (state === 'TITLE' || state === 'GAMEOVER') {
       return;
     }
 
-    if (state === 'CUTSCENE') {
-      cutsceneScroll += 1.5;
+    if (state === 'INTRO_CUTSCENE' || state === 'LEVEL_END_CUTSCENE') {
+      cutsceneTimer++;
       return;
     }
 
-    if (state === 'LEVEL_POPUP' || state === 'GAMEOVER') {
+    if (state === 'FRAME_SLIDE') {
+      // Smoothly slide Frame 0 down off-screen while Frame 1 slides in from above, carrying the hunter down to the South entry
+      const slideSteps = 32;
+      slideProgress++;
+      const totalShift = VIEW_H - HUD_HEIGHT - 44;
+      player.y = (HUD_HEIGHT + 6) + (slideProgress / slideSteps) * totalShift;
+
+      if (slideProgress >= slideSteps) {
+        subFrame = 1;
+        player.y = VIEW_H - player.h - 6;
+        state = 'PLAYING';
+      }
       return;
     }
 
     if (state === 'PLAYING') {
-      player.inCreek = false;
-      player.inBrush = false;
+      const activeData = levelFrames[subFrame];
+      const pLeft = player.x + 7;
+      const pRight = player.x + player.w - 7;
+      const pTop = player.y + 8;
+      const pBottom = player.y + player.h - 5;
 
-      const pLeft = player.x + 10;
-      const pRight = player.x + player.w - 10;
-      const pTop = player.y + 12;
-      const pBottom = player.y + player.h - 6;
-      const pCenterX = player.x + player.w / 2;
+      // Update Dynamic Collision Wildlife (Foxes, Moose, Deer, Snakes)
+      for (let dyn of activeData.dynamics) {
+        dyn.x += dyn.vx;
+        if (dyn.vx > 0 && dyn.x > VIEW_W + 10) dyn.x = -dyn.w - 6;
+        if (dyn.vx < 0 && dyn.x < -dyn.w - 10) dyn.x = VIEW_W + 6;
 
-      for (let i = terrainFeatures.length - 1; i >= 0; i--) {
-        let tf = terrainFeatures[i];
-        
-        if (pLeft < tf.x + tf.w && pRight > tf.x && pTop < tf.y + tf.h && pBottom > tf.y) {
-          if (tf.kind === 'LEDGE') {
-            player.y = tf.y + tf.h - 10;
-            if (player.y + player.h > VIEW_H + 6) {
-              state = 'GAMEOVER';
-              stopChiptuneTrack();
-              return;
-            }
-          } else if (tf.kind === 'CREEK') {
-            // Includes generous buffer zone between the shallow ford and deep water flanks
-            const safeMin = tf.fordStart - tf.bufferW;
-            const safeMax = tf.fordEnd + tf.bufferW;
-            if (pCenterX < safeMin || pCenterX > safeMax) {
-              state = 'GAMEOVER';
-              stopChiptuneTrack();
-              return;
-            } else {
-              player.inCreek = true;
-            }
-          } else if (tf.kind === 'WOODS') {
-            if (pCenterX < tf.clearStart || pCenterX > tf.clearEnd) {
-              player.inBrush = true;
-            }
-          }
+        // Collision check with player
+        if (pLeft < dyn.x + dyn.w - 3 &&
+            pRight > dyn.x + 3 &&
+            pTop < dyn.y + dyn.h - 2 &&
+            pBottom > dyn.y + 2) {
+          state = 'GAMEOVER';
+          stopChiptuneTrack();
+          return;
         }
-      }
-
-      effectiveSpeed = (player.inCreek || player.inBrush) ? (baseSpeed * 0.55) : baseSpeed;
-      worldScrollDist += effectiveSpeed;
-
-      for (let gp of groundPatches) {
-        gp.y += effectiveSpeed;
-        if (gp.y > VIEW_H) {
-          gp.y = -10;
-          gp.x = Math.random() * VIEW_W;
-        }
-      }
-
-      for (let i = terrainFeatures.length - 1; i >= 0; i--) {
-        terrainFeatures[i].y += effectiveSpeed;
-        if (terrainFeatures[i].y > VIEW_H + 20) {
-          terrainFeatures.splice(i, 1);
-        }
-      }
-
-      // Rare Creek Spawning (strictly 2–3 creeks over a full playable level in Dry Prairie / Red River Valley)
-      let bIdx = (level - 1) % BIOMES.length;
-      let bType = BIOMES[bIdx].type;
-      if ((bType === 'desert' || bType === 'grass') && creeksSpawnedThisLevel < 3 && worldScrollDist >= nextCreekSpawnDist) {
-        spawnCreekFeature();
-      }
-
-      // Periodic terrain spawning for Mountains (ledges) and Forest (thick woods)
-      const terrainInterval = 225;
-      if (Math.floor(worldScrollDist / terrainInterval) > Math.floor((worldScrollDist - effectiveSpeed) / terrainInterval)) {
-        spawnTerrainFeature();
-      }
-
-      const objInterval = Math.max(54, 118 - (level * 8));
-      if (Math.floor(worldScrollDist / objInterval) > Math.floor((worldScrollDist - effectiveSpeed) / objInterval)) {
-        spawnNaturalEntities();
-      }
-
-      // Update obstacles (anchored to ground scroll + any horizontal wildlife movement)
-      for (let i = obstacles.length - 1; i >= 0; i--) {
-        let obs = obstacles[i];
-        obs.x += obs.dx;
-        if (obs.x < 4 || obs.x + obs.w > VIEW_W - 4) obs.dx *= -1;
-        obs.y += effectiveSpeed;
-
-        let inset = (obs.type === 'pelt') ? 0 : 4;
-
-        if (!obs.dead && 
-            pLeft < obs.x + obs.w - inset && 
-            pRight > obs.x + inset &&
-            pTop < obs.y + obs.h - inset && 
-            pBottom > obs.y + inset) {
-          
-          if (obs.type === 'pelt') {
-            peltsCollected++;
-            obs.dead = true; 
-            if (peltsCollected >= 10) {
-              level++;
-              state = 'LEVEL_POPUP';
-            }
-          } else {
-            state = 'GAMEOVER';
-            stopChiptuneTrack(); 
-          }
-        }
-
-        if (obs.y > VIEW_H + 10 || obs.dead) obstacles.splice(i, 1);
-      }
-
-    } else if (state === 'TRANSITION') {
-      shakeFrames--;
-      for (let gp of groundPatches) {
-        gp.y += baseSpeed * 1.4;
-        if (gp.y > VIEW_H) {
-          gp.y = -10;
-          gp.x = Math.random() * VIEW_W;
-        }
-      }
-
-      buffaloes.forEach(b => b.y += b.dy);
-      if (shakeFrames <= 0) {
-        state = 'PLAYING';
       }
     }
   }
 
   // ==========================================
-  // PARALLAX SCENERY & WILDERNESS RENDERING
+  // PARALLAX HORIZON & LEVEL-ENDING SUNSET SCENE
   // ==========================================
-  function drawPrairieParallax(scrollOffset, isCutscene) {
-    const skyBands = ['#241438', '#541b36', '#8f2929', '#c95822', '#eb9634', '#f7c844'];
+  function drawBiomeHorizonCutscene(biome, scrollOffset, isEndingChase) {
     const horizonY = Math.floor(VIEW_H * 0.56);
-    const bandH = Math.ceil(horizonY / skyBands.length);
-    for (let i = 0; i < skyBands.length; i++) {
-      ctx.fillStyle = skyBands[i];
+
+    // 1. Region-Specific Banded SNES Sunset Sky
+    const bandH = Math.ceil(horizonY / biome.skyBands.length);
+    for (let i = 0; i < biome.skyBands.length; i++) {
+      ctx.fillStyle = biome.skyBands[i];
       ctx.fillRect(0, i * bandH, VIEW_W, bandH + 1);
     }
 
+    // 2. Setting Golden Sun on the Horizon
+    const sunY = isEndingChase 
+      ? Math.min(horizonY - 6, Math.floor(horizonY * 0.42) + Math.floor(cutsceneTimer * 0.08))
+      : Math.floor(horizonY * 0.36);
+    const sunX = Math.floor(VIEW_W * 0.72);
     ctx.fillStyle = '#fff5b8';
-    ctx.fillRect(Math.floor(VIEW_W * 0.72), Math.floor(horizonY * 0.35), 22, 22);
+    ctx.fillRect(sunX, sunY, 22, 22);
     ctx.fillStyle = '#f7c844';
-    ctx.fillRect(Math.floor(VIEW_W * 0.72) - 2, Math.floor(horizonY * 0.35) + 2, 26, 18);
+    ctx.fillRect(sunX - 2, sunY + 2, 26, 18);
 
+    // Drifting Clouds (Parallax Layer 1)
     ctx.fillStyle = '#f7b267';
     for (let c = 0; c < 4; c++) {
       let cx = ((c * 110) - Math.floor(scrollOffset * 0.15)) % (VIEW_W + 60);
       if (cx < -60) cx += VIEW_W + 60;
-      let cy = 18 + (c % 2) * 16;
+      let cy = 16 + (c % 2) * 15;
       ctx.fillRect(cx, cy, 36, 6);
       ctx.fillRect(cx + 6, cy - 4, 22, 4);
     }
 
-    ctx.fillStyle = '#472836';
-    for (let m = -1; m < 6; m++) {
-      let mx = (m * 80) - (Math.floor(scrollOffset * 0.35) % 80);
-      ctx.fillRect(mx, horizonY - 22, 60, 22);
-      ctx.fillRect(mx + 12, horizonY - 32, 36, 10);
-      ctx.fillRect(mx + 22, horizonY - 38, 16, 6);
+    // 3. Level-Specific Distant Horizon Silhouette (Parallax Layer 2)
+    ctx.fillStyle = biome.farHills;
+    if (biome.type === 'mountain') {
+      // Jagged Rocky Mountain Peaks
+      for (let m = -1; m < 6; m++) {
+        let mx = (m * 76) - (Math.floor(scrollOffset * 0.3) % 76);
+        ctx.fillRect(mx, horizonY - 26, 64, 26);
+        ctx.fillRect(mx + 14, horizonY - 40, 36, 14);
+        ctx.fillRect(mx + 24, horizonY - 50, 16, 10);
+      }
+    } else if (biome.type === 'forest') {
+      // Dense Eastern Pine & Spruce Skyline
+      for (let t = -1; t < 18; t++) {
+        let tx = (t * 22) - (Math.floor(scrollOffset * 0.35) % 22);
+        let th = 22 + (t % 3) * 8;
+        ctx.fillRect(tx + 4, horizonY - th, 10, th);
+        ctx.fillRect(tx + 7, horizonY - th - 6, 4, 6);
+      }
+    } else {
+      // Rolling Prairie Buttes & Valley Ridges
+      for (let m = -1; m < 6; m++) {
+        let mx = (m * 84) - (Math.floor(scrollOffset * 0.3) % 84);
+        ctx.fillRect(mx, horizonY - 16, 68, 16);
+        ctx.fillRect(mx + 16, horizonY - 24, 36, 8);
+      }
     }
 
-    ctx.fillStyle = '#5e4318';
-    ctx.fillRect(0, horizonY, VIEW_W, 18);
-    ctx.fillStyle = '#382a10';
-    for (let t = -1; t < 12; t++) {
-      let tx = (t * 34) - (Math.floor(scrollOffset * 0.7) % 34);
-      ctx.fillRect(tx + 4, horizonY - 10, 6, 10);
-      ctx.fillRect(tx + 2, horizonY - 6, 10, 6);
+    // 4. Midground Regional Landmarks (Parallax Layer 3)
+    ctx.fillStyle = biome.midHills;
+    ctx.fillRect(0, horizonY, VIEW_W, 16);
+    if (biome.type === 'forest' || biome.type === 'grass') {
+      for (let t = -1; t < 12; t++) {
+        let tx = (t * 34) - (Math.floor(scrollOffset * 0.65) % 34);
+        ctx.fillRect(tx + 4, horizonY - 10, 6, 10);
+        ctx.fillRect(tx + 2, horizonY - 6, 10, 6);
+      }
     }
 
-    const groundY = horizonY + 14;
-    ctx.fillStyle = '#8a681a';
+    // 5. Foreground Wild Landscape
+    const groundY = horizonY + 12;
+    ctx.fillStyle = biome.groundHoriz;
     ctx.fillRect(0, groundY, VIEW_W, VIEW_H - groundY);
 
-    ctx.fillStyle = '#755614';
+    ctx.fillStyle = biome.patch2;
     ctx.fillRect(0, groundY + 18, VIEW_W, 14);
-    ctx.fillStyle = '#9c7821';
+    ctx.fillStyle = biome.patch1;
     ctx.fillRect(0, groundY + 42, VIEW_W, 16);
 
-    for (let g = 0; g < 28; g++) {
-      let gx = ((g * 27) - Math.floor(scrollOffset * 2.2)) % (VIEW_W + 20);
+    for (let g = 0; g < 26; g++) {
+      let gx = ((g * 27) - Math.floor(scrollOffset * 2.1)) % (VIEW_W + 20);
       if (gx < -20) gx += VIEW_W + 20;
       let gy = groundY + 6 + ((g * 13) % Math.max(24, VIEW_H - groundY - 12));
-      ctx.fillStyle = (g % 2 === 0) ? '#bd9632' : '#5e4310';
+      ctx.fillStyle = (g % 2 === 0) ? biome.tuft : biome.tuftDark;
       ctx.fillRect(gx, gy, 3, 6);
       ctx.fillRect(gx + 4, gy + 2, 3, 4);
     }
 
+    // 6. Buffalo Herd & Pursuing Hunter
     const bob = Math.floor(frame / 6) % 2 === 0 ? 0 : -2;
-    const chaseY = groundY + Math.min(22, Math.floor((VIEW_H - groundY) * 0.25));
-    const chaseBaseX = isCutscene 
-      ? ((Math.floor(frame * 1.4) % (VIEW_W + 160)) - 130)
-      : Math.floor(VIEW_W * 0.52);
+    const chaseY = groundY + Math.min(20, Math.floor((VIEW_H - groundY) * 0.24));
+    
+    // In level-ending cutscene, the hunter & herd ride across toward the sunset horizon!
+    let chaseBaseX = Math.floor(VIEW_W * 0.52);
+    let chaseScale = 2;
+    let drawYOffset = 0;
 
+    if (isEndingChase) {
+      // Ride from left across the scene and into the distant sunset horizon
+      let progress = Math.min(1, cutsceneTimer / 220);
+      chaseBaseX = Math.floor(40 + progress * (VIEW_W * 0.68));
+      drawYOffset = -Math.floor(progress * 18);
+      chaseScale = progress > 0.65 ? 1 : 2;
+    }
+
+    // Kicking dust particles
     ctx.fillStyle = '#d4d0c5';
     for (let d = 0; d < 6; d++) {
-      let dx = chaseBaseX - 45 + ((d * 23 + frame * 2) % 130);
-      let dy = chaseY + 24 - ((d * 7 + frame) % 8);
+      let dx = chaseBaseX - 36 + ((d * 21 + frame * 2) % 110);
+      let dy = chaseY + 22 + drawYOffset - ((d * 7 + frame) % 8);
       ctx.fillRect(dx, dy, 3, 3);
     }
 
-    drawSprite(chaseBaseX + 46, chaseY + bob, sprBuffaloSide, PAL_BUFFALO_SIDE, 2);
-    drawSprite(chaseBaseX + 16, chaseY + 10 - bob, sprBuffaloSide, PAL_BUFFALO_SIDE, 2);
-    drawSprite(chaseBaseX + 34, chaseY + 18 + bob, sprBuffaloSide, PAL_BUFFALO_SIDE, 2);
+    // Buffalo Herd (Strictly Deep Brown Hide & Ivory Horns)
+    drawSprite(chaseBaseX + 26 * chaseScale, chaseY + bob + drawYOffset, sprBuffaloSide, PAL_BUFFALO_SIDE, chaseScale);
+    drawSprite(chaseBaseX + 10 * chaseScale, chaseY + (5 * chaseScale) - bob + drawYOffset, sprBuffaloSide, PAL_BUFFALO_SIDE, chaseScale);
+    drawSprite(chaseBaseX + 20 * chaseScale, chaseY + (9 * chaseScale) + bob + drawYOffset, sprBuffaloSide, PAL_BUFFALO_SIDE, chaseScale);
 
-    drawSprite(chaseBaseX - 42, chaseY + 6 - bob, sprHunterSide, PAL_HUNTER_SIDE, 2);
+    // Mounted Métis Hunter chasing behind
+    drawSprite(chaseBaseX - 22 * chaseScale, chaseY + (3 * chaseScale) - bob + drawYOffset, sprHunterSide, PAL_HUNTER_SIDE, chaseScale);
   }
 
   function drawTitleScreen() {
-    drawPrairieParallax(frame * 1.2, false);
+    drawBiomeHorizonCutscene(BIOMES[1], frame * 1.2, false);
 
     ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
     ctx.fillRect(0, 0, VIEW_W, 76);
@@ -1010,8 +997,8 @@
     }
   }
 
-  function drawCutsceneScreen() {
-    drawPrairieParallax(cutsceneScroll, true);
+  function drawIntroCutscene() {
+    drawBiomeHorizonCutscene(BIOMES[0], cutsceneTimer * 1.5, false);
 
     const pad = 14;
     const boxW = VIEW_W - pad * 2;
@@ -1025,11 +1012,11 @@
     ctx.font = "bold 11px 'Courier New', Courier, monospace";
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText("THE GREAT PLAINS RUN", bx + 10, by + 8);
+    ctx.fillText("THE BUFFALO RUN", bx + 10, by + 8);
 
     ctx.fillStyle = '#F4F4F4';
     ctx.font = "10px 'Courier New', Courier, monospace";
-    const story = "THE BUFFALO HERD THUNDERS ACROSS THE WILD LAND! RIDE NORTH ON YOUR RUNNER STEED, FORD CREEKS AT SHALLOWS, AND GATHER 10 GOLDEN PELTS PER REGION.";
+    const story = "LEAVE THE RED RIVER CART CAMP AND RIDE NORTH! NAVIGATE PAST ROCKS, TALL GRASS, AND CROSSING WILDLIFE TO REACH THE BUFFALO HERD ON THE HORIZON.";
     const lines = wrapText(story, boxW - 20);
     for (let i = 0; i < lines.length; i++) {
       ctx.fillText(lines[i], bx + 10, by + 24 + (i * 13));
@@ -1043,98 +1030,61 @@
     }
   }
 
-  function drawTerrainFeatures() {
-    for (let tf of terrainFeatures) {
-      const y = Math.floor(tf.y);
+  function drawLevelEndCutscene() {
+    const bIdx = (level - 1) % BIOMES.length;
+    const biome = BIOMES[bIdx];
+    const nextBiome = BIOMES[level % BIOMES.length];
 
-      if (tf.kind === 'LEDGE') {
-        ctx.fillStyle = '#2c3338';
-        ctx.fillRect(tf.x, y, tf.w, tf.h);
-        ctx.fillStyle = '#78848c';
-        ctx.fillRect(tf.x, y, tf.w, tf.h - 6);
-        ctx.fillStyle = '#9aa6b0';
-        ctx.fillRect(tf.x, y, tf.w, 5);
-        ctx.fillStyle = '#434d54';
-        for (let sx = tf.x + 8; sx < tf.x + tf.w - 6; sx += 14) {
-          ctx.fillRect(sx, y + 6, 3, tf.h - 10);
-        }
-        const capX = tf.fromLeft ? (tf.x + tf.w - 6) : tf.x;
-        ctx.fillStyle = '#1c2024';
-        ctx.fillRect(capX, y, 6, tf.h);
-      }
+    // Depicts the rider achieving the herd and chasing them into the level-specific sunset horizon
+    drawBiomeHorizonCutscene(biome, cutsceneTimer * 1.8, true);
 
-      if (tf.kind === 'CREEK') {
-        // Organic winding creek banks
-        ctx.fillStyle = '#4a3825';
-        ctx.fillRect(0, y - 3, VIEW_W, tf.h + 6);
+    const pad = 14;
+    const boxW = VIEW_W - pad * 2;
+    const boxH = 98;
+    const bx = pad;
+    const by = 10;
 
-        // Deep rushing creek water on flanks
-        ctx.fillStyle = '#0f6f9e';
-        ctx.fillRect(0, y, VIEW_W, tf.h);
+    drawSNESWindow(bx, by, boxW, boxH);
 
-        // Transitional Wading Buffer Zone (gradual sandy/shallow shelf before deep water)
-        const bufStart = tf.fordStart - tf.bufferW;
-        const bufTotalW = (tf.fordEnd - tf.fordStart) + (tf.bufferW * 2);
-        ctx.fillStyle = '#2088ab';
-        ctx.fillRect(bufStart, y, bufTotalW, tf.h);
+    ctx.fillStyle = '#F7C844';
+    ctx.font = "bold 11px 'Courier New', Courier, monospace";
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`${biome.name} CLEARED!`, bx + 10, by + 8);
 
-        // Shallow passable gravel/pebble ford in the center
-        const fordW = tf.fordEnd - tf.fordStart;
-        ctx.fillStyle = '#38a3b8';
-        ctx.fillRect(tf.fordStart, y, fordW, tf.h);
+    ctx.fillStyle = '#F4F4F4';
+    ctx.font = "10px 'Courier New', Courier, monospace";
+    const msg = `YOU REACHED THE HERD AND CHASED THEM INTO THE SUNSET! NEXT REGION: ${nextBiome.name}.`;
+    const lines = wrapText(msg, boxW - 20);
+    for (let i = 0; i < lines.length; i++) {
+      ctx.fillText(lines[i], bx + 10, by + 24 + (i * 13));
+    }
 
-        // Stepping cobbles & sandbar ripples across the shallow ford and buffer edges
-        ctx.fillStyle = '#9c8b70';
-        for (let cx = bufStart + 4; cx < bufStart + bufTotalW - 6; cx += 12) {
-          ctx.fillRect(cx, y + 5, 5, 4);
-          ctx.fillRect(cx + 3, y + 15, 6, 4);
-        }
-
-        // Animated water current lines & whitewater foam
-        ctx.fillStyle = '#a3e8f5';
-        const rippleShift = Math.floor(frame * 0.8) % 24;
-        for (let rx = -24; rx < VIEW_W; rx += 24) {
-          ctx.fillRect(rx + rippleShift, y + 6, 8, 2);
-          ctx.fillRect(rx + ((rippleShift + 12) % 24), y + 17, 10, 2);
-        }
-      }
-
-      if (tf.kind === 'WOODS') {
-        ctx.fillStyle = '#142b0d';
-        ctx.fillRect(0, y, tf.clearStart, tf.h);
-        ctx.fillRect(tf.clearEnd, y, VIEW_W - tf.clearEnd, tf.h);
-
-        ctx.fillStyle = '#2d591f';
-        for (let bx = 4; bx < tf.clearStart - 6; bx += 12) {
-          ctx.fillRect(bx, y + 6, 6, 5);
-          ctx.fillRect(bx + 3, y + 24, 7, 6);
-        }
-        for (let bx = tf.clearEnd + 4; bx < VIEW_W - 6; bx += 12) {
-          ctx.fillRect(bx, y + 8, 6, 5);
-          ctx.fillRect(bx + 3, y + 26, 7, 6);
-        }
-      }
+    if (Math.floor(Date.now() / 450) % 2 === 0) {
+      ctx.fillStyle = '#12AEA2';
+      ctx.font = "bold 10px 'Courier New', Courier, monospace";
+      ctx.textAlign = 'right';
+      ctx.fillText("PRESS 'A' FOR NEXT REGION ►", bx + boxW - 10, by + boxH - 16);
     }
   }
 
-  function drawGameplay() {
-    let shakeX = 0, shakeY = 0;
-    if (state === 'TRANSITION') {
-      shakeX = (Math.random() - 0.5) * 6;
-      shakeY = (Math.random() - 0.5) * 6;
-    }
+  // ==========================================
+  // RENDER A SINGLE FROGGER-STYLE FRAME (FRAME 0 OR FRAME 1)
+  // ==========================================
+  function renderBoardFrame(fIdx, offsetY) {
+    const bIdx = (level - 1) % BIOMES.length;
+    const b = BIOMES[bIdx];
+    const fData = levelFrames[fIdx];
 
     ctx.save();
-    
-    let bIdx = (level - 1) % BIOMES.length;
-    let b = BIOMES[bIdx];
+    ctx.translate(0, offsetY);
 
     // 1. Wild Untamed Earth & Grassland Base
     ctx.fillStyle = b.bg;
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
 
-    // 2. Organic Ground Patches & Tallgrass Tufts
-    for (let gp of groundPatches) {
+    // 2. Natural Ground Patches & Grass Tufts
+    for (let gp of fData.groundPatches) {
       const gx = Math.floor(gp.x);
       const gy = Math.floor(gp.y);
       if (gp.kind === 0) {
@@ -1152,54 +1102,115 @@
       }
     }
 
-    ctx.translate(shakeX, shakeY);
+    // 3. Starting Platform (Frame 0 Bottom): Métis Red River Cart Circle Camp
+    if (fIdx === 0) {
+      const campY = VIEW_H - 46;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+      ctx.fillRect(0, campY, VIEW_W, 46);
+      ctx.fillStyle = b.tuft;
+      ctx.fillRect(0, campY, VIEW_W, 2);
 
-    // 3. Draw Integrated Terrain Features
-    drawTerrainFeatures();
-
-    // 4. Draw Natural Obstacles & Golden Pelts with Ground Shadows
-    obstacles.forEach(obs => {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
-      ctx.fillRect(Math.floor(obs.x + 2), Math.floor(obs.y + obs.h - 2), obs.w - 4, 4);
-
-      let pal, spr;
-      if (obs.type === 'rock') { spr = sprRock; pal = PAL_ROCK; }
-      else if (obs.type === 'tree') { spr = sprTree; pal = PAL_TREE; }
-      else if (obs.type === 'shrub') { spr = sprShrub; pal = PAL_SHRUB; }
-      else if (obs.type === 'fox') { spr = sprFox; pal = PAL_FOX; }
-      else if (obs.type === 'pelt') { spr = sprPelt; pal = PAL_PELT; }
-      
-      let flip = (obs.type === 'fox' && obs.dx < 0);
-      drawSprite(obs.x, obs.y, spr, pal, obs.scale, flip);
-    });
-
-    // 5. Draw Sculpted Mounted Hunter & Horse
-    if (state !== 'GAMEOVER' || frame % 10 < 5) { 
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
-      ctx.fillRect(Math.floor(player.x + 6), Math.floor(player.y + player.h - 6), player.w - 12, 6);
-
-      if (player.inCreek) {
-        ctx.fillStyle = '#d4f6fc';
-        ctx.fillRect(Math.floor(player.x + 4), Math.floor(player.y + player.h - 8), player.w - 8, 3);
-      }
-
-      let animSpeed = (player.inCreek || player.inBrush) ? 11 : 7;
-      let animFrame = (Math.floor(frame / animSpeed) % 2 === 0) ? sprPlayerAnim[0] : sprPlayerAnim[1];
-      drawSprite(player.x, player.y, animFrame, PAL_PLAYER, 2);
+      // Circle of Red River Carts flanking the hunter's starting camp
+      drawSprite(12, campY + 6, sprRedRiverCart, PAL_CART, 2);
+      drawSprite(48, campY + 18, sprRedRiverCart, PAL_CART, 2);
+      drawSprite(VIEW_W - 76, campY + 18, sprRedRiverCart, PAL_CART, 2, true);
+      drawSprite(VIEW_W - 40, campY + 6, sprRedRiverCart, PAL_CART, 2, true);
     }
 
-    // 6. Draw Rumbling Buffalo Herd Transition
-    if (state === 'TRANSITION') {
-      buffaloes.forEach(buf => {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
-        ctx.fillRect(Math.floor(buf.x + 6), Math.floor(buf.y + 44), 36, 7);
-        drawSprite(buf.x, buf.y, sprBuffaloTop, PAL_BUFFALO_TOP, 3);
-      });
+    // 4. End Platform (Frame 1 Top): Horizon Sunset Strip & Thundering Buffalo Herd
+    if (fIdx === 1) {
+      const goalY = HUD_HEIGHT;
+      const goalH = 52;
+      // Sunset horizon glow at top edge
+      ctx.fillStyle = b.skyBands[3];
+      ctx.fillRect(0, goalY, VIEW_W, 8);
+      ctx.fillStyle = b.skyBands[4];
+      ctx.fillRect(0, goalY + 8, VIEW_W, 8);
+      ctx.fillStyle = b.skyBands[5];
+      ctx.fillRect(0, goalY + 16, VIEW_W, 6);
+
+      // Herd of Buffalo grazing/stamping along the horizon platform
+      for (let h of fData.herd) {
+        let stompY = Math.floor((frame + h.phase) / 10) % 2 === 0 ? 0 : -2;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
+        ctx.fillRect(h.x + 3, h.y + 28, 22, 4);
+        drawSprite(h.x, h.y + stompY, sprBuffaloTop, PAL_BUFFALO_TOP, 2);
+      }
+    }
+
+    // 5. Static Blocking Objects (Rocks, Tall Grass, Ledges)
+    for (let st of fData.statics) {
+      if (st.type === 'LEDGE') {
+        ctx.fillStyle = '#2c3338';
+        ctx.fillRect(st.x, st.y, st.w, st.h);
+        ctx.fillStyle = '#78848c';
+        ctx.fillRect(st.x, st.y, st.w, st.h - 5);
+        ctx.fillStyle = '#9aa6b0';
+        ctx.fillRect(st.x, st.y, st.w, 4);
+        ctx.fillStyle = '#434d54';
+        for (let sx = st.x + 8; sx < st.x + st.w - 6; sx += 14) {
+          ctx.fillRect(sx, st.y + 5, 3, st.h - 8);
+        }
+        const capX = st.fromLeft ? (st.x + st.w - 5) : st.x;
+        ctx.fillStyle = '#1c2024';
+        ctx.fillRect(capX, st.y, 5, st.h);
+      } else if (st.type === 'ROCK') {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
+        ctx.fillRect(st.x + 2, st.y + st.h - 2, st.w - 4, 4);
+        drawSprite(st.x, st.y, sprRock, PAL_ROCK, 3);
+      } else if (st.type === 'TALLGRASS') {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+        ctx.fillRect(st.x + 2, st.y + st.h - 2, st.w - 4, 3);
+        drawSprite(st.x, st.y, sprTallGrass, PAL_TALLGRASS, 3);
+      }
+    }
+
+    // 6. Dynamic Collision Wildlife (Foxes, Moose, Deer, Snakes)
+    for (let dyn of fData.dynamics) {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.34)';
+      ctx.fillRect(Math.floor(dyn.x + 2), Math.floor(dyn.y + dyn.h - 2), dyn.w - 4, 4);
+
+      let spr, pal;
+      if (dyn.type === 'FOX') { spr = sprFox; pal = PAL_FOX; }
+      else if (dyn.type === 'MOOSE') { spr = sprMoose; pal = PAL_MOOSE; }
+      else if (dyn.type === 'DEER') { spr = sprDeer; pal = PAL_DEER; }
+      else if (dyn.type === 'SNAKE') { spr = sprSnake; pal = PAL_SNAKE; }
+
+      let flip = dyn.vx < 0;
+      let hopY = (dyn.type === 'FOX' || dyn.type === 'DEER') && (Math.floor(frame / 7) % 2 === 0) ? -1 : 0;
+      drawSprite(dyn.x, dyn.y + hopY, spr, pal, dyn.scale, flip);
     }
 
     ctx.restore();
-    
-    // 7. Top HUD Bar (Anchored y = 0)
+  }
+
+  function drawGameplay() {
+    const bIdx = (level - 1) % BIOMES.length;
+    const b = BIOMES[bIdx];
+
+    if (state === 'FRAME_SLIDE') {
+      const slideSteps = 32;
+      const progress = slideProgress / slideSteps;
+      const slideH = VIEW_H - HUD_HEIGHT;
+      const offset0 = Math.floor(progress * slideH);
+      const offset1 = offset0 - slideH;
+
+      renderBoardFrame(0, offset0);
+      renderBoardFrame(1, offset1);
+    } else {
+      renderBoardFrame(subFrame, 0);
+    }
+
+    // Draw Sculpted Mounted Hunter & Horse (32x38px)
+    if (state !== 'GAMEOVER' || frame % 10 < 5) { 
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
+      ctx.fillRect(Math.floor(player.x + 5), Math.floor(player.y + player.h - 4), player.w - 10, 5);
+
+      let animFrame = (Math.floor(frame / 7) % 2 === 0) ? sprPlayerAnim[0] : sprPlayerAnim[1];
+      drawSprite(player.x, player.y, animFrame, PAL_PLAYER, 2);
+    }
+
+    // Top HUD Bar (Anchored y = 0)
     ctx.fillStyle = '#182238';
     ctx.fillRect(0, 0, VIEW_W, HUD_HEIGHT);
     ctx.fillStyle = '#F7C844'; 
@@ -1213,39 +1224,9 @@
 
     ctx.fillStyle = '#12AEA2';
     ctx.textAlign = 'right';
-    ctx.fillText(`PELTS:${peltsCollected}/10 LVL:${level}`, VIEW_W - 6, HUD_HEIGHT / 2);
+    ctx.fillText(`STAGE:${level}  ZONE:${subFrame + 1}/2`, VIEW_W - 6, HUD_HEIGHT / 2);
 
-    // 8. Pop-up Cutscene Text Box on Level Change
-    if (state === 'LEVEL_POPUP') {
-      const boxW = VIEW_W - 32;
-      const boxH = 104;
-      const bx = 16;
-      const by = Math.floor((VIEW_H - boxH) / 2);
-
-      drawSNESWindow(bx, by, boxW, boxH);
-
-      ctx.fillStyle = '#12AEA2';
-      ctx.font = "bold 11px 'Courier New', Courier, monospace";
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'top';
-      ctx.fillText(`REGION ${level}: ${b.name}`, bx + 10, by + 8);
-
-      ctx.fillStyle = '#F4F4F4';
-      ctx.font = "10px 'Courier New', Courier, monospace";
-      const lines = wrapText(b.desc, boxW - 20);
-      for (let i = 0; i < lines.length; i++) {
-        ctx.fillText(lines[i], bx + 10, by + 25 + (i * 13));
-      }
-
-      if (Math.floor(Date.now() / 450) % 2 === 0) {
-        ctx.fillStyle = '#F7C844';
-        ctx.font = "bold 10px 'Courier New', Courier, monospace";
-        ctx.textAlign = 'right';
-        ctx.fillText("PRESS 'A' TO CONTINUE ►", bx + boxW - 10, by + boxH - 16);
-      }
-    }
-
-    // 9. Game Over Box
+    // Game Over Box
     if (state === 'GAMEOVER') {
       const boxW = 220;
       const boxH = 74;
@@ -1273,8 +1254,10 @@
 
     if (state === 'TITLE') {
       drawTitleScreen();
-    } else if (state === 'CUTSCENE') {
-      drawCutsceneScreen();
+    } else if (state === 'INTRO_CUTSCENE') {
+      drawIntroCutscene();
+    } else if (state === 'LEVEL_END_CUTSCENE') {
+      drawLevelEndCutscene();
     } else {
       drawGameplay();
     }
@@ -1323,29 +1306,31 @@
     if (cmd === 'BUTTON_A' && now - btnALast > 110) {
       btnALast = now;
       if (state === 'TITLE') {
-        state = 'CUTSCENE';
-        cutsceneScroll = 0;
+        state = 'INTRO_CUTSCENE';
+        cutsceneTimer = 0;
         startChiptuneTrack();
-      } else if (state === 'CUTSCENE') {
+      } else if (state === 'INTRO_CUTSCENE') {
         level = 1;
-        startLevelGameplay(true);
-      } else if (state === 'LEVEL_POPUP') {
-        startLevelGameplay(true);
+        initLevel();
+      } else if (state === 'LEVEL_END_CUTSCENE') {
+        level++;
+        initLevel();
       } else if (state === 'GAMEOVER') {
         level = 1;
         stopChiptuneTrack();
-        startLevelGameplay(true);
+        initLevel();
         startChiptuneTrack();
       }
     }
 
     if (cmd === 'BUTTON_B' && now - btnBLast > 110) {
       btnBLast = now;
-      if (state === 'CUTSCENE') {
+      if (state === 'INTRO_CUTSCENE') {
         level = 1;
-        startLevelGameplay(true);
-      } else if (state === 'LEVEL_POPUP') {
-        startLevelGameplay(true);
+        initLevel();
+      } else if (state === 'LEVEL_END_CUTSCENE') {
+        level++;
+        initLevel();
       }
     }
 
@@ -1394,7 +1379,6 @@
   }
 
   resizeViewport();
-  initGroundPatches();
   loop();
 
 </script>
