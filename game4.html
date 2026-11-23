@@ -51,43 +51,6 @@
         }
         .ammo-status { color: #AD1C21; }
         .ammo-status.loaded { color: #12AEA2; }
-        .overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.85);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            color: #fff;
-            text-align: center;
-            padding: 20px;
-            box-sizing: border-box;
-            z-index: 10;
-        }
-        h2 {
-            color: #F7C844;
-            margin: 0 0 12px 0;
-            font-size: 20px;
-            text-transform: uppercase;
-            text-shadow: 2px 2px 0 #000;
-        }
-        p {
-            font-size: 13px;
-            line-height: 1.5;
-            margin: 0 0 18px 0;
-            color: #D4D0C5;
-        }
-        .blink-text {
-            font-weight: bold;
-            color: #12AEA2;
-            font-size: 15px;
-            animation: blink 1s infinite;
-        }
-        @keyframes blink { 50% { opacity: 0; } }
     </style>
 </head>
 <body>
@@ -104,24 +67,14 @@
     </div>
 
     <canvas id="gameCanvas"></canvas>
-
-    <!-- Game Over Overlay -->
-    <div id="game-over-screen" class="overlay" style="display: none;">
-        <h2>HUNT OVER</h2>
-        <p id="final-stats"></p>
-        <div class="blink-text">PRESS 'A' FOR LEVEL SELECT</div>
-    </div>
 </div>
 
 <script>
     const cvs = document.getElementById('gameCanvas');
     const ctx = cvs.getContext('2d');
     const hudTop = document.getElementById('hud-top');
-    const gameOverScreen = document.getElementById('game-over-screen');
 
     // Unified 12x12 Grid (Cols 0..11, Rows 0..11) — Single Source of Truth for Crosshair, Targets & Blinds
-    // POND: Rows 0..5 Sky | Horizon at Row 6 boundary | Rows 6..11 Pond Water
-    // WOODS: Rows 0..2 Sky (Upper, Mid, Lower) | Horizon at Row 3 boundary | Rows 3..11 Forest Floor
     let VIEW_W = 240;
     let VIEW_H = 240;
     const GRID_W = 12;
@@ -147,20 +100,37 @@
         BLACK: '#000000', WHITE: '#FFFFFF', SUN: '#F7C844',
         CRIMSON: '#AD1C21', BORDEAUX: '#540E11', TEAL: '#12AEA2',
         MALLARD_DARK: '#0B3B24', MALLARD_MID: '#1E8449', MALLARD_LIGHT: '#2ECC71',
-        LEDGER_GOLD: '#F4D03F', LEDGER_CREAM: '#FCF3CF'
+        LEDGER_GOLD: '#F4D03F', LEDGER_CREAM: '#FCF3CF',
+        CART_WOOD: '#6E3B1E', CART_DARK: '#3E1F0D', OX_BROWN: '#5C3317', OX_HIDE: '#874C24'
     };
 
-    // Level Definitions
+    // Level Definitions & October 30th Red River Settlement Journal Entries
     const LEVELS = [
         {
             id: 'POND',
             title: 'AEN PCHI LAAK',
-            subtitle: 'FALL MARSH WATERFOWL'
+            subtitle: 'FALL MARSH WATERFOWL',
+            date: 'OCTOBRE 30 — RED RIVER MARSH',
+            journal: [
+                '"Dis morning de frost she sit heavy on de',
+                'reeds by Aen Pchi Laak. De mallard an',
+                'outarde fly low before de freeze-up, an',
+                'a lone white swan cry high in de wind.',
+                'Keep de flint dry — one good shot counts."'
+            ]
         },
         {
             id: 'WOODS',
             title: 'LI BWAA',
-            subtitle: 'NOCTURNAL WOODLAND & FOREST'
+            subtitle: 'NOCTURNAL WOODLAND & FOREST',
+            date: 'OCTOBRE 30 — LI BWAA NIGHT TRAIL',
+            journal: [
+                '"By moonrise we walk de spruce ridge of',
+                'Li Bwaa. De white lievre dart quick in de',
+                'brush, spruce hen flutter low, an dat sly',
+                'renard hide behind de blueberry bush. Watch',
+                'de birch trunk too — kakwa climb at night."'
+            ]
         }
     ];
     let selectedLevelIdx = 0;
@@ -284,7 +254,7 @@
     window.addEventListener('resize', resizeViewport);
     resizeViewport();
 
-    // --- AUDIO ENGINE ---
+    // --- AUDIO ENGINE & BESPOKE ANIMAL / WATERFOWL CALLS ---
     let chiptuneAudioCtx = null;
     let chiptuneInterval = null;
     let chiptuneIsPlaying = false;
@@ -389,26 +359,24 @@
         osc.stop(now + noteLength * 2.4);
     }
 
-    // Resonant two-note Trumpeter Swan bugle call ("koh-hoh!") as it soars across the upper pond sky
+    // 1. Trumpeter Swan: Resonant two-note brassy bugle call
     function playSwanCall() {
         if (!chiptuneAudioCtx || isPaused) return;
         const now = chiptuneAudioCtx.currentTime;
 
-        // First shorter pickup honk (G4 -> A4)
         const osc1 = chiptuneAudioCtx.createOscillator();
         const gain1 = chiptuneAudioCtx.createGain();
         osc1.type = 'sawtooth';
         osc1.frequency.setValueAtTime(392.00, now);
         osc1.frequency.exponentialRampToValueAtTime(440.00, now + 0.14);
         gain1.gain.setValueAtTime(0.001, now);
-        gain1.gain.linearRampToValueAtTime(0.18, now + 0.03);
+        gain1.gain.linearRampToValueAtTime(0.16, now + 0.03);
         gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
         osc1.connect(gain1);
         gain1.connect(chiptuneAudioCtx.destination);
         osc1.start(now);
         osc1.stop(now + 0.19);
 
-        // Second soaring resonant trumpet note (C5 with subtle harmonic vibrato)
         const osc2 = chiptuneAudioCtx.createOscillator();
         const osc2Harm = chiptuneAudioCtx.createOscillator();
         const gain2 = chiptuneAudioCtx.createGain();
@@ -417,13 +385,12 @@
         osc2.frequency.setValueAtTime(510.00, now + 0.22);
         osc2.frequency.linearRampToValueAtTime(523.25, now + 0.30);
         osc2.frequency.exponentialRampToValueAtTime(493.88, now + 0.72);
-
         osc2Harm.frequency.setValueAtTime(1020.00, now + 0.22);
         osc2Harm.frequency.linearRampToValueAtTime(1046.50, now + 0.30);
         osc2Harm.frequency.exponentialRampToValueAtTime(987.77, now + 0.72);
 
         gain2.gain.setValueAtTime(0.001, now + 0.22);
-        gain2.gain.linearRampToValueAtTime(0.20, now + 0.28);
+        gain2.gain.linearRampToValueAtTime(0.18, now + 0.28);
         gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.75);
 
         osc2.connect(gain2);
@@ -435,10 +402,206 @@
         osc2Harm.stop(now + 0.76);
     }
 
+    // 2. Mallard Duck: Wet-muted double quack as it crosses the y-axis center
+    function playMallardQuack() {
+        if (!chiptuneAudioCtx || isPaused) return;
+        const now = chiptuneAudioCtx.currentTime;
+        const filter = chiptuneAudioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(720, now);
+        filter.Q.setValueAtTime(3.2, now);
+        filter.connect(chiptuneAudioCtx.destination);
+
+        [0, 0.16].forEach((offset, idx) => {
+            const osc = chiptuneAudioCtx.createOscillator();
+            const gain = chiptuneAudioCtx.createGain();
+            osc.type = 'sawtooth';
+            const startF = idx === 0 ? 310 : 285;
+            const endF = idx === 0 ? 225 : 195;
+            osc.frequency.setValueAtTime(startF, now + offset);
+            osc.frequency.exponentialRampToValueAtTime(endF, now + offset + 0.11);
+
+            gain.gain.setValueAtTime(0.001, now + offset);
+            gain.gain.linearRampToValueAtTime(0.16, now + offset + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.12);
+
+            osc.connect(gain);
+            gain.connect(filter);
+            osc.start(now + offset);
+            osc.stop(now + offset + 0.13);
+        });
+    }
+
+    // 3. Canada Goose: Nasal two-tone honk ~1/3 across after entering offscreen
+    function playGooseHonk() {
+        if (!chiptuneAudioCtx || isPaused) return;
+        const now = chiptuneAudioCtx.currentTime;
+        const filter = chiptuneAudioCtx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(640, now);
+        filter.Q.setValueAtTime(2.5, now);
+        filter.connect(chiptuneAudioCtx.destination);
+
+        // Low nasal "ah-" pickup into high "-honk"
+        const osc1 = chiptuneAudioCtx.createOscillator();
+        const g1 = chiptuneAudioCtx.createGain();
+        osc1.type = 'sawtooth';
+        osc1.frequency.setValueAtTime(220, now);
+        osc1.frequency.linearRampToValueAtTime(255, now + 0.09);
+        g1.gain.setValueAtTime(0.001, now);
+        g1.gain.linearRampToValueAtTime(0.18, now + 0.02);
+        g1.gain.exponentialRampToValueAtTime(0.001, now + 0.10);
+        osc1.connect(g1); g1.connect(filter);
+        osc1.start(now); osc1.stop(now + 0.11);
+
+        const osc2 = chiptuneAudioCtx.createOscillator();
+        const g2 = chiptuneAudioCtx.createGain();
+        osc2.type = 'sawtooth';
+        osc2.frequency.setValueAtTime(345, now + 0.11);
+        osc2.frequency.exponentialRampToValueAtTime(315, now + 0.34);
+        g2.gain.setValueAtTime(0.001, now + 0.11);
+        g2.gain.linearRampToValueAtTime(0.22, now + 0.14);
+        g2.gain.exponentialRampToValueAtTime(0.001, now + 0.36);
+        osc2.connect(g2); g2.connect(filter);
+        osc2.start(now + 0.11); osc2.stop(now + 0.37);
+    }
+
+    // 4. Woodduck: Splash-water ripple sound as it enters the pond from offscreen
+    function playWoodduckSplash() {
+        if (!chiptuneAudioCtx || isPaused) return;
+        const now = chiptuneAudioCtx.currentTime;
+        // Filtered white noise splash + gentle water ripple droplets
+        const bufferSize = Math.floor(chiptuneAudioCtx.sampleRate * 0.28);
+        const buffer = chiptuneAudioCtx.createBuffer(1, bufferSize, chiptuneAudioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.35));
+        }
+        const noise = chiptuneAudioCtx.createBufferSource();
+        noise.buffer = buffer;
+
+        const filter = chiptuneAudioCtx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(950, now);
+        filter.frequency.exponentialRampToValueAtTime(420, now + 0.26);
+        filter.Q.setValueAtTime(1.8, now);
+
+        const gain = chiptuneAudioCtx.createGain();
+        gain.gain.setValueAtTime(0.22, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(chiptuneAudioCtx.destination);
+        noise.start(now);
+
+        // Soft trailing water ripple plink
+        const drop = chiptuneAudioCtx.createOscillator();
+        const dropGain = chiptuneAudioCtx.createGain();
+        drop.type = 'sine';
+        drop.frequency.setValueAtTime(540, now + 0.14);
+        drop.frequency.exponentialRampToValueAtTime(860, now + 0.22);
+        dropGain.gain.setValueAtTime(0.08, now + 0.14);
+        dropGain.gain.exponentialRampToValueAtTime(0.001, now + 0.23);
+        drop.connect(dropGain); dropGain.connect(chiptuneAudioCtx.destination);
+        drop.start(now + 0.14); drop.stop(now + 0.24);
+    }
+
+    // 5. Snowshoe Hare: Faint, small "tic" as it hops
+    function playHareTic() {
+        if (!chiptuneAudioCtx || isPaused) return;
+        const now = chiptuneAudioCtx.currentTime;
+        const osc = chiptuneAudioCtx.createOscillator();
+        const gain = chiptuneAudioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(1450, now);
+        osc.frequency.exponentialRampToValueAtTime(480, now + 0.025);
+        gain.gain.setValueAtTime(0.065, now);
+        gain.gain.exponentialRampToValueAtTime(0.0005, now + 0.028);
+        osc.connect(gain);
+        gain.connect(chiptuneAudioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.03);
+    }
+
+    // 6. Spruce Grouse: Wing-flap flutter when jumping rows
+    function playGrouseFlutter() {
+        if (!chiptuneAudioCtx || isPaused) return;
+        const now = chiptuneAudioCtx.currentTime;
+        // 4 rapid muffled wing-beat pulses
+        for (let i = 0; i < 4; i++) {
+            const t = now + i * 0.055;
+            const osc = chiptuneAudioCtx.createOscillator();
+            const gain = chiptuneAudioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(135 - i * 10, t);
+            osc.frequency.exponentialRampToValueAtTime(48, t + 0.045);
+            gain.gain.setValueAtTime(0.16, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.048);
+            osc.connect(gain);
+            gain.connect(chiptuneAudioCtx.destination);
+            osc.start(t);
+            osc.stop(t + 0.05);
+        }
+    }
+
+    // 7. Red Fox: Bush / tree branch rustle as it pauses behind a blind
+    function playFoxRustle() {
+        if (!chiptuneAudioCtx || isPaused) return;
+        const now = chiptuneAudioCtx.currentTime;
+        const bufferSize = Math.floor(chiptuneAudioCtx.sampleRate * 0.24);
+        const buffer = chiptuneAudioCtx.createBuffer(1, bufferSize, chiptuneAudioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            const env = Math.sin((i / bufferSize) * Math.PI);
+            data[i] = (Math.random() * 2 - 1) * env;
+        }
+        const noise = chiptuneAudioCtx.createBufferSource();
+        noise.buffer = buffer;
+
+        const filter = chiptuneAudioCtx.createBiquadFilter();
+        filter.type = 'highpass';
+        filter.frequency.setValueAtTime(1600, now);
+
+        const gain = chiptuneAudioCtx.createGain();
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(chiptuneAudioCtx.destination);
+        noise.start(now);
+    }
+
+    // 8. Porcupine: Rhythmic bark-gnawing sound when it reaches the base of the Birch tree
+    function playPorcupineGnaw() {
+        if (!chiptuneAudioCtx || isPaused) return;
+        const now = chiptuneAudioCtx.currentTime;
+        for (let i = 0; i < 3; i++) {
+            const t = now + i * 0.075;
+            const osc = chiptuneAudioCtx.createOscillator();
+            const gain = chiptuneAudioCtx.createGain();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(420 + (i % 2) * 75, t);
+            osc.frequency.exponentialRampToValueAtTime(190, t + 0.042);
+            gain.gain.setValueAtTime(0.07, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
+            osc.connect(gain);
+            gain.connect(chiptuneAudioCtx.destination);
+            osc.start(t);
+            osc.stop(t + 0.048);
+        }
+    }
+
     function playMenuBlip(f1, f2) {
         initChiptuneAudio();
         playTone(f1, 'triangle', 0.08, 0.25);
         if (f2) setTimeout(() => playTone(f2, 'triangle', 0.1, 0.25), 55);
+    }
+
+    function playScoreTick() {
+        if (!chiptuneAudioCtx || isPaused) return;
+        playTone(660, 'square', 0.045, 0.08);
     }
 
     function playShootSound() {
@@ -606,10 +769,8 @@
         ]
     ];
 
-    // Majestic Trumpeter Swan (26x13 — rare upper-sky pond bonus target)
-    // 1: Pure White Plumage, 2: Soft Pearl Wing Shading, 3: Jet Black Bill & Lore, 4: Crisp Dark Outline Accent
     const sprTrumpeterSwan = [
-        [ // Soaring Wings Raised (Gliding Gracefully)
+        [
             [0,0,0,0,0,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
             [0,0,0,0,2,1,1,1,1,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
             [0,0,0,2,1,1,1,1,1,1,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
@@ -624,7 +785,7 @@
             [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
             [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
         ],
-        [ // Soaring Wings Swept Down
+        [
             [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
             [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
             [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
@@ -690,7 +851,7 @@
             [0,1,4,1,4,1,4,1,0,0,0,0,0],
             [0,0,1,1,1,1,0,0,0,0,0,0,0],
             [0,0,0,2,0,2,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,0,0,0,0,0,0]
+            [0,0,0,0,0,0,0,0,0,0,0,0]
         ]
     ];
 
@@ -764,7 +925,7 @@
         ]
     ];
 
-    // Game State Machine: 'TITLE', 'SELECT', 'PLAYING', 'GAMEOVER'
+    // Game State Machine: 'TITLE', 'SELECT', 'INTRO', 'PLAYING', 'OUTRO'
     let state = 'TITLE';
     let isPaused = false;
     let timeLeft = 300;
@@ -775,6 +936,12 @@
     let rareTriggerTimes = [];
     let isLoaded = true;
     let gunDropY = 0;
+
+    // Cutscene & Scorecard Animation State
+    let introFrame = 0;
+    let outroFrame = 0;
+    let outroCountStep = 0;
+    let outroDisp = { c1: 0, c2: 0, c3: 0, c4: 0, total: 0 };
 
     // 12x12 Grid Crosshair + Smooth Gun Aiming Interpolation State
     let crosshair = { x: 5, y: 5 };
@@ -825,7 +992,7 @@
         }
     }
 
-    // Rare Pond Event (<1 per game probability): Trumpeter Swan soaring majestically across upper sky (Rows 0..1)
+    // Rare Pond Event: Trumpeter Swan soaring majestically across upper sky (Rows 0..1)
     function spawnTrumpeterSwan() {
         let fromLeft = Math.random() > 0.5;
         let ent = {
@@ -834,12 +1001,12 @@
             slot: 'c4',
             pts: 300,
             x: fromLeft ? -1.4 : (GRID_W + 0.4),
-            y: Math.random() > 0.5 ? 0 : 1, // Upper sky Rows 0 or 1
+            y: Math.random() > 0.5 ? 0 : 1,
             dir: fromLeft ? 1 : -1,
-            speed: 0.022, // Majestic, unhurried soaring pace
+            speed: 0.022,
             scale: 2,
             depth: 1,
-            callTimer: 110, // Emits a second answering call mid-flight
+            callTimer: 110,
             dead: false,
             hitDelay: 0,
             dropY: 0,
@@ -851,7 +1018,7 @@
         playSwanCall();
     }
 
-    // Rare Woodland Event (<1 per game probability): Porcupine walks down Birch trunk head-first, then back up
+    // Rare Woodland Event: Porcupine walks down Birch trunk head-first, gnaws at base, then climbs back up
     function spawnPorcupine() {
         const birchBlind = forestBlinds.find(bl => bl.type === 'BIRCH');
         if (!birchBlind) return;
@@ -871,6 +1038,7 @@
             baseRow: baseTargetRow,
             climbPhase: 'DOWN',
             holdTimer: 0,
+            gnawCooldown: 0,
             climbSpeed: 0.012,
             dir: 1,
             scale: 2,
@@ -879,7 +1047,6 @@
             hitDelay: 0,
             dropY: 0,
             animFrame: 0,
-            // Darkened nocturnal night-shaded quill & coat palette
             colorMap: { 1: '#121018', 2: '#4F5566', 3: '#07050B' },
             spriteFrames: sprPorcupineVertical
         };
@@ -895,30 +1062,38 @@
 
         if (activeLevel === 'POND') {
             if (rand < 0.22) {
+                // Woodduck: Splash-water ripple sound as it enters from offscreen
+                ent.kind = 'WOODDUCK';
                 ent.slot = 'c3'; ent.pts = 200; ent.y = 7 + Math.floor(Math.random() * 4);
                 ent.speed = 0.018; ent.scale = 2; ent.depth = 1;
+                ent.splashedOnEntry = false;
                 ent.colorMap = {1: '#751A1E', 2: '#1E8449', 3: '#F39C12', 4: '#FFFFFF', 6: '#D4AC0D'};
                 ent.spriteFrames = sprWoodduck;
             } else if (rand < 0.62) {
+                // Mallard: Wet-muted quack as it passes the y-axis center (x ≈ 6)
+                ent.kind = 'MALLARD';
                 ent.slot = 'c1'; ent.pts = 100; ent.y = 1 + Math.floor(Math.random() * 4);
                 ent.speed = 0.044; ent.scale = 2; ent.depth = 1;
+                ent.quackedAtCenter = false;
                 ent.colorMap = {1: '#111111', 2: '#1E8449', 3: '#F39C12', 4: '#FFFFFF', 5: '#444444'};
                 ent.spriteFrames = sprDuck;
             } else {
+                // Canada Goose: Honks ~1/3 across its entrance from offscreen
+                ent.kind = 'GOOSE';
                 ent.slot = 'c2'; ent.pts = 50; ent.y = 1 + Math.floor(Math.random() * 5);
                 ent.speed = 0.028; ent.scale = 2; ent.depth = 1;
+                ent.honkedOnEntry = false;
                 ent.colorMap = {1: '#5c3a21', 2: '#000000', 3: '#FFFFFF', 4: '#3a2010'};
                 ent.spriteFrames = sprGoose;
             }
         } else {
-            // LI BWAA — All woodland animals carry a moonlit nocturnal shadow/darker night shade
+            // LI BWAA — Nocturnal night-shaded woodland animals
             if (rand < 0.16) {
                 ent.kind = 'FOX';
                 ent.slot = 'c3'; ent.pts = 200; ent.y = 6 + Math.floor(Math.random() * 4);
                 ent.speed = 0.036; ent.scale = 2; ent.depth = 2;
                 ent.pauseTimer = 0;
                 ent.pausedBlinds = new Set();
-                // Nocturnal night-shaded russet fox palette
                 ent.colorMap = {1: '#873600', 2: '#99A3A4', 3: '#09090B', 4: '#511812'};
                 ent.spriteFrames = sprRedFox;
             } else if (rand < 0.58) {
@@ -926,7 +1101,6 @@
                 ent.slot = 'c1'; ent.pts = 100; ent.y = 7 + Math.floor(Math.random() * 4);
                 ent.speed = 0.046; ent.scale = 2; ent.depth = 2;
                 ent.hopTimer = Math.floor(Math.random() * 20);
-                // Nocturnal moon-shaded winter hare palette
                 ent.colorMap = {1: '#A6ACAF', 2: '#707B7C', 3: '#09090B', 4: '#17202A'};
                 ent.spriteFrames = sprHare;
             } else {
@@ -937,7 +1111,6 @@
                 ent.bumpTimer = 55 + Math.floor(Math.random() * 50);
                 ent.isBumpedUp = false;
                 ent.speed = 0.024; ent.scale = 2; ent.depth = 2;
-                // Nocturnal shaded slate-grey & dark crimson spruce grouse palette
                 ent.colorMap = {1: '#34495E', 2: '#5B1912', 3: '#922B21', 4: '#99A3A4'};
                 ent.spriteFrames = sprSpruceGrouse;
             }
@@ -951,13 +1124,47 @@
 
     function update() {
         frame++;
+
+        if (state === 'INTRO') {
+            introFrame++;
+            return;
+        }
+
+        if (state === 'OUTRO') {
+            outroFrame++;
+            // Step-by-step animated tally of harvested species and final total score
+            if (outroFrame > 45 && outroFrame % 8 === 0) {
+                if (outroDisp.c1 < stats.c1) {
+                    outroDisp.c1++;
+                    outroDisp.total += 100;
+                    playScoreTick();
+                } else if (outroDisp.c2 < stats.c2) {
+                    outroDisp.c2++;
+                    outroDisp.total += 50;
+                    playScoreTick();
+                } else if (outroDisp.c3 < stats.c3) {
+                    outroDisp.c3++;
+                    outroDisp.total += 200;
+                    playScoreTick();
+                } else if (outroDisp.c4 < stats.c4) {
+                    outroDisp.c4++;
+                    outroDisp.total += 300;
+                    playScoreTick();
+                } else if (outroCountStep === 0) {
+                    outroCountStep = 1;
+                    outroDisp.total = score;
+                    playMenuBlip(523.25, 659.25);
+                }
+            }
+            return;
+        }
+
         if (state !== 'PLAYING' || isPaused) return;
 
         let currentSec = Math.floor(Date.now() / 1000);
         if (currentSec > lastTime) {
             timeLeft--; lastTime = currentSec; updateUI();
 
-            // Trigger rare event (<1 per game rate): Porcupine in Woods, Trumpeter Swan in Pond
             if (rareSpawned < rareTriggerTimes.length && timeLeft <= rareTriggerTimes[rareSpawned]) {
                 rareSpawned++;
                 if (activeLevel === 'WOODS') spawnPorcupine();
@@ -997,6 +1204,35 @@
                     if (b.callTimer === 0) playSwanCall();
                 }
                 if ((b.dir === 1 && b.x > GRID_W + 1.5) || (b.dir === -1 && b.x < -2.5)) entities.splice(i, 1);
+            } else if (b.kind === 'MALLARD') {
+                b.x += b.speed * b.dir;
+                b.animFrame = (frame % 24 < 12) ? 0 : 1;
+                // Wet-muted quack as Mallard passes the y-axis center (x ≈ 5.5)
+                if (!b.quackedAtCenter && Math.abs(b.x - 5.5) < 0.25) {
+                    b.quackedAtCenter = true;
+                    playMallardQuack();
+                }
+                if ((b.dir === 1 && b.x > GRID_W + 0.9) || (b.dir === -1 && b.x < -1.9)) entities.splice(i, 1);
+            } else if (b.kind === 'GOOSE') {
+                b.x += b.speed * b.dir;
+                b.animFrame = (frame % 24 < 12) ? 0 : 1;
+                // Honk ~1/3 across its entrance from offscreen (col ~3.5 from left or ~7.5 from right)
+                const thirdMark = (b.dir === 1) ? 3.5 : 7.5;
+                if (!b.honkedOnEntry && Math.abs(b.x - thirdMark) < 0.25) {
+                    b.honkedOnEntry = true;
+                    playGooseHonk();
+                }
+                if ((b.dir === 1 && b.x > GRID_W + 0.9) || (b.dir === -1 && b.x < -1.9)) entities.splice(i, 1);
+            } else if (b.kind === 'WOODDUCK') {
+                b.x += b.speed * b.dir;
+                b.animFrame = (frame % 24 < 12) ? 0 : 1;
+                // Splash-water ripple sound right as Woodduck enters the pond from offscreen
+                const entryMark = (b.dir === 1) ? 0.2 : (GRID_W - 1.2);
+                if (!b.splashedOnEntry && Math.abs(b.x - entryMark) < 0.25) {
+                    b.splashedOnEntry = true;
+                    playWoodduckSplash();
+                }
+                if ((b.dir === 1 && b.x > GRID_W + 0.9) || (b.dir === -1 && b.x < -1.9)) entities.splice(i, 1);
             } else if (b.kind === 'PORCUPINE') {
                 b.animFrame = (frame % 28 < 14) ? 0 : 1;
                 if (b.climbPhase === 'DOWN') {
@@ -1004,9 +1240,17 @@
                     if (b.y >= b.baseRow) {
                         b.y = b.baseRow;
                         b.climbPhase = 'BASE_HOLD';
-                        b.holdTimer = 150;
+                        b.holdTimer = 165;
+                        b.gnawCooldown = 10;
                     }
                 } else if (b.climbPhase === 'BASE_HOLD') {
+                    // Gnawing sound at the base of the Birch tree
+                    if (b.gnawCooldown > 0) {
+                        b.gnawCooldown--;
+                    } else {
+                        playPorcupineGnaw();
+                        b.gnawCooldown = 62;
+                    }
                     b.holdTimer--;
                     if (b.holdTimer <= 0) {
                         b.climbPhase = 'UP';
@@ -1023,6 +1267,8 @@
                     b.animFrame = 0;
                     b.x += (b.speed * 0.25) * b.dir;
                 } else if (b.hopTimer < 32) {
+                    // Faint small "tic" right as the Snowshoe Hare launches into its hop
+                    if (b.hopTimer === 14) playHareTic();
                     b.animFrame = 1;
                     b.x += (b.speed * 1.60) * b.dir;
                 } else {
@@ -1036,6 +1282,8 @@
                     b.isBumpedUp = !b.isBumpedUp;
                     b.y = b.isBumpedUp ? Math.max(5, b.baseY - 1) : b.baseY;
                     b.bumpTimer = b.isBumpedUp ? 95 : 115;
+                    // Wing-flap flutter whenever Spruce Grouse jumps rows
+                    playGrouseFlutter();
                 }
                 b.x += b.speed * b.dir;
                 b.animFrame = (frame % 22 < 11) ? 0 : 1;
@@ -1055,15 +1303,13 @@
                             if (Math.abs(foxCenterX - blindMidX) < 3 && foxCenterY >= bl.topY && foxCenterY <= bl.bottomY) {
                                 b.pausedBlinds.add(bIdx);
                                 b.pauseTimer = 110;
+                                // Bush/tree rustles as the Red Fox pauses behind cover
+                                playFoxRustle();
                             }
                         }
                     });
                 }
                 if ((b.dir === 1 && b.x > GRID_W + 1.2) || (b.dir === -1 && b.x < -2.2)) entities.splice(i, 1);
-            } else {
-                b.x += b.speed * b.dir;
-                b.animFrame = (frame % 24 < 12) ? 0 : 1;
-                if ((b.dir === 1 && b.x > GRID_W + 0.9) || (b.dir === -1 && b.x < -1.9)) entities.splice(i, 1);
             }
         }
 
@@ -1338,18 +1584,18 @@
     }
 
     function drawBackground() {
-        let progress = (state === 'PLAYING' || state === 'GAMEOVER') ? (1 - (timeLeft / 300)) : 0.25;
-        if (activeLevel === 'WOODS' && state === 'PLAYING') {
-            drawWoodlandBackdrop(progress);
+        let progress = (state === 'PLAYING' || state === 'OUTRO') ? (1 - (timeLeft / 300)) : 0.25;
+        if (activeLevel === 'WOODS' && (state === 'PLAYING' || state === 'INTRO' || state === 'OUTRO')) {
+            drawWoodlandBackdrop(state === 'INTRO' ? 0.12 : progress);
         } else {
-            drawPondFallBackdrop(progress, 0);
+            drawPondFallBackdrop(state === 'INTRO' ? 0.15 : progress, 0);
         }
     }
 
     function drawForeground(parallaxShift = 0) {
         const hScale = VIEW_H / 240;
 
-        if (activeLevel === 'WOODS' && state === 'PLAYING') {
+        if (activeLevel === 'WOODS' && (state === 'PLAYING' || state === 'INTRO' || state === 'OUTRO')) {
             grassBlades.forEach(g => {
                 ctx.fillStyle = '#1E2D27'; ctx.fillRect(g.x, VIEW_H - Math.round(g.h1 * 0.65), 4, Math.round(g.h1 * 0.65));
                 ctx.fillStyle = '#121C18'; ctx.fillRect(g.x + 1, VIEW_H - Math.round(g.h2 * 0.65), 3, Math.round(g.h2 * 0.65));
@@ -1600,6 +1846,298 @@
         ctx.textAlign = 'left';
     }
 
+    // --- CUTSCENE TOP 1/3 VIEWPORT HELPER ---
+    function drawCutsceneTopStrip(isOutro) {
+        const stripH = Math.floor(VIEW_H / 3);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, VIEW_W, stripH);
+        ctx.clip();
+
+        // Scale the full scenic background cleanly into the top 1/3 horizontal cutaway strip
+        ctx.save();
+        ctx.scale(1, 1 / 3);
+
+        if (activeLevel === 'WOODS') {
+            drawWoodlandBackdrop(isOutro ? 0.92 : 0.12);
+            forestBlinds.forEach(drawWoodlandBlind);
+
+            if (!isOutro) {
+                // Intro panning wildlife: Snowshoe Hare & Red Fox on the nocturnal woodland trail
+                const animF = (frame % 24 < 12) ? 0 : 1;
+                const hareX = ((introFrame * 0.95) % (VIEW_W + 60)) - 25;
+                drawSprite(hareX, Math.floor(VIEW_H * 0.66), sprHare[animF], {1: '#A6ACAF', 2: '#707B7C', 3: '#09090B', 4: '#17202A'}, 2);
+
+                const foxX = VIEW_W - (((introFrame * 0.55) + 40) % (VIEW_W + 80));
+                ctx.save();
+                ctx.translate(foxX + 48, Math.floor(VIEW_H * 0.54));
+                ctx.scale(-1, 1);
+                drawSprite(0, 0, sprRedFox[animF], {1: '#873600', 2: '#99A3A4', 3: '#09090B', 4: '#511812'}, 2);
+                ctx.restore();
+            }
+        } else {
+            const panOffset = isOutro ? 0 : -(introFrame * 0.45);
+            drawPondFallBackdrop(isOutro ? 0.90 : 0.14, panOffset);
+
+            if (!isOutro) {
+                // Intro panning wildlife: Mallard flying overhead & Woodduck gliding on the pond
+                const animF = (frame % 24 < 12) ? 0 : 1;
+                const duckX = ((introFrame * 0.90) % (VIEW_W + 60)) - 30;
+                drawSprite(duckX, Math.floor(VIEW_H * 0.22), sprDuck[animF], {1: '#111111', 2: '#1E8449', 3: '#F39C12', 4: '#FFFFFF', 5: '#444444'}, 2);
+
+                const woodX = VIEW_W - (((introFrame * 0.40) + 20) % (VIEW_W + 50));
+                ctx.save();
+                ctx.translate(woodX + 22, Math.floor(VIEW_H * 0.68));
+                ctx.scale(-1, 1);
+                drawSprite(0, 0, sprWoodduck[animF], {1: '#751A1E', 2: '#1E8449', 3: '#F39C12', 4: '#FFFFFF', 6: '#D4AC0D'}, 2);
+                ctx.restore();
+            }
+        }
+
+        // Draw Red River Cart loaded with furs/fowl departing on Outro Cutscene
+        if (isOutro) {
+            drawRedRiverCartDeparture();
+        }
+
+        drawForeground(isOutro ? 0 : -(introFrame * 0.45));
+        ctx.restore();
+
+        // Crisp double gold/cream ledger border framing the top 1/3 cutaway
+        ctx.strokeStyle = C.LEDGER_GOLD;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(1, 1, VIEW_W - 2, stripH - 2);
+        ctx.restore();
+
+        return stripH;
+    }
+
+    // --- PIXEL RED RIVER OX/HORSE CART LOADED WITH FURS & FOWL (Outro Animation) ---
+    function drawRedRiverCartDeparture() {
+        const groundY = Math.floor(VIEW_H * 0.76);
+        // Cart travels smoothly from left-center off to the right edge
+        const cartX = Math.floor(18 + (outroFrame * 0.42) % (VIEW_W + 70));
+        const wheelTurn = Math.floor(outroFrame / 6) % 2;
+        const bob = wheelTurn === 0 ? 0 : -2;
+
+        // 1. Draft Ox / Pony pulling the Red River Cart (facing right)
+        const oxX = cartX + 46;
+        const oxY = groundY - 22 + bob;
+        // Legs (animated trot)
+        ctx.fillStyle = C.OX_BROWN;
+        if (wheelTurn === 0) {
+            ctx.fillRect(oxX + 4, oxY + 14, 4, 10);
+            ctx.fillRect(oxX + 18, oxY + 14, 4, 10);
+        } else {
+            ctx.fillRect(oxX + 2, oxY + 14, 4, 10);
+            ctx.fillRect(oxX + 20, oxY + 14, 4, 10);
+        }
+        // Ox Body & Shoulder Hump
+        ctx.fillStyle = C.OX_HIDE;
+        ctx.fillRect(oxX + 2, oxY + 4, 22, 12);
+        ctx.fillStyle = C.OX_BROWN;
+        ctx.fillRect(oxX + 14, oxY + 2, 10, 12);
+        // Head & Curved Ivory Horns
+        ctx.fillRect(oxX + 22, oxY + 1, 8, 9);
+        ctx.fillStyle = C.BIRCH_BARK;
+        ctx.fillRect(oxX + 25, oxY - 3, 2, 4);
+        ctx.fillRect(oxX + 28, oxY - 2, 2, 3);
+
+        // 2. Wooden Cart Shafts connecting ox harness to cart box
+        ctx.fillStyle = C.CART_WOOD;
+        ctx.fillRect(cartX + 28, groundY - 12 + bob, 22, 3);
+
+        // 3. Harvested Cargo Stacked High in the Red River Cart Box
+        const cargoX = cartX + 4;
+        const cargoY = groundY - 26 + bob;
+        if (activeLevel === 'WOODS') {
+            // Bundled Woodland Furs & Pelts (Russet Fox, White Hare, Dark Porcupine)
+            ctx.fillStyle = '#873600'; // Fox pelt bundle
+            ctx.fillRect(cargoX + 2, cargoY + 2, 14, 8);
+            ctx.fillStyle = '#D5D8DC'; // Snowshoe hare pelts
+            ctx.fillRect(cargoX + 14, cargoY + 3, 12, 7);
+            ctx.fillStyle = '#34495E'; // Spruce grouse bundle
+            ctx.fillRect(cargoX + 6, cargoY - 3, 14, 6);
+            ctx.fillStyle = C.LEDGER_GOLD; // Leather tie straps
+            ctx.fillRect(cargoX + 8, cargoY - 3, 2, 12);
+            ctx.fillRect(cargoX + 18, cargoY + 2, 2, 8);
+        } else {
+            // Harvested Waterfowl Stack (Mallards, Geese & White Swan plumage)
+            ctx.fillStyle = '#5c3a21'; // Canada goose stack
+            ctx.fillRect(cargoX + 2, cargoY + 1, 16, 9);
+            ctx.fillStyle = '#1E8449'; // Mallard green plumage
+            ctx.fillRect(cargoX + 15, cargoY + 3, 11, 7);
+            ctx.fillStyle = '#FDFEFE'; // White swan feathers
+            ctx.fillRect(cargoX + 6, cargoY - 3, 14, 6);
+        }
+
+        // 4. Hunter Seated on Front Bench of the Cart (Capote coat & sash)
+        const hunterX = cartX + 24;
+        const hunterY = groundY - 29 + bob;
+        ctx.fillStyle = '#1A5276'; // Hudson's Bay blue capote coat
+        ctx.fillRect(hunterX, hunterY + 5, 8, 10);
+        ctx.fillStyle = C.CRIMSON; // Red Métis sash
+        ctx.fillRect(hunterX, hunterY + 10, 8, 2);
+        ctx.fillStyle = '#D2B48C'; // Face
+        ctx.fillRect(hunterX + 2, hunterY + 1, 5, 4);
+        ctx.fillStyle = '#2C1B0E'; // Fur hat
+        ctx.fillRect(hunterX + 1, hunterY - 2, 7, 3);
+
+        // 5. Slatted Red River Cart Wooden Box
+        ctx.fillStyle = C.CART_WOOD;
+        ctx.fillRect(cartX, groundY - 18 + bob, 32, 9);
+        ctx.fillStyle = C.CART_DARK;
+        ctx.fillRect(cartX + 2, groundY - 16 + bob, 28, 2);
+        // Vertical wooden stakes
+        for (let sx = cartX + 2; sx <= cartX + 28; sx += 6) {
+            ctx.fillStyle = C.CART_WOOD;
+            ctx.fillRect(sx, groundY - 23 + bob, 2, 6);
+        }
+
+        // 6. Iconic Large Wooden Spoked Red River Cart Wheel
+        const wheelCX = cartX + 15;
+        const wheelCY = groundY - 7;
+        const r = 11;
+        ctx.strokeStyle = C.CART_DARK;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(wheelCX, wheelCY, r, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = C.CART_WOOD;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(wheelCX, wheelCY, r - 1, 0, Math.PI * 2);
+        // Rotating wooden spokes
+        if (wheelTurn === 0) {
+            ctx.moveTo(wheelCX - r, wheelCY); ctx.lineTo(wheelCX + r, wheelCY);
+            ctx.moveTo(wheelCX, wheelCY - r); ctx.lineTo(wheelCX, wheelCY + r);
+        } else {
+            ctx.moveTo(wheelCX - 8, wheelCY - 8); ctx.lineTo(wheelCX + 8, wheelCY + 8);
+            ctx.moveTo(wheelCX - 8, wheelCY + 8); ctx.lineTo(wheelCX + 8, wheelCY - 8);
+        }
+        ctx.stroke();
+        // Central wooden hub
+        ctx.fillStyle = C.LEDGER_GOLD;
+        ctx.fillRect(wheelCX - 2, wheelCY - 2, 4, 4);
+    }
+
+    // --- LEVEL INTRO CUTSCENE (Top 1/3 Panning Cutaway + Bottom 2/3 October 30th Settlement Journal) ---
+    function drawIntroScreen() {
+        ctx.fillStyle = '#070605';
+        ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+
+        const stripH = drawCutsceneTopStrip(false);
+        const lvl = LEVELS[selectedLevelIdx];
+        const bodyTop = stripH + 8;
+        const padX = Math.max(10, Math.floor(VIEW_W * 0.06));
+
+        // Ledger Header & October 30th Date Stamp
+        ctx.textAlign = 'left';
+        ctx.font = 'bold 11px "Courier New", monospace';
+        ctx.fillStyle = C.LEDGER_GOLD;
+        ctx.fillText(lvl.title, padX, bodyTop + 10);
+
+        ctx.font = 'bold 9px "Courier New", monospace';
+        ctx.fillStyle = C.TEAL;
+        ctx.fillText(lvl.date, padX, bodyTop + 22);
+
+        // Decorative ledger rule
+        ctx.fillStyle = '#3D3524';
+        ctx.fillRect(padX, bodyTop + 26, VIEW_W - padX * 2, 1);
+
+        // Cliche Red River Settlement Journal Entry (French-Michif accented English)
+        ctx.font = '9px "Courier New", monospace';
+        ctx.fillStyle = C.LEDGER_CREAM;
+        lvl.journal.forEach((line, idx) => {
+            ctx.fillText(line, padX, bodyTop + 40 + idx * 13);
+        });
+
+        // Blinking Prompt to Begin Hunt
+        if (Math.floor(frame / 25) % 2 === 0) {
+            ctx.textAlign = 'center';
+            ctx.font = 'bold 11px "Courier New", monospace';
+            ctx.fillStyle = C.TEAL;
+            ctx.fillText("PRESS 'A' TO BEGIN HUNT", VIEW_W / 2, VIEW_H - 12);
+        }
+        ctx.textAlign = 'left';
+    }
+
+    // --- LEVEL OUTRO SCORECARD (Top 1/3 Red River Cart Departure + Bottom 2/3 Counting Species & Pelt Icons) ---
+    function drawOutroScreen() {
+        ctx.fillStyle = '#050505';
+        ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+
+        const stripH = drawCutsceneTopStrip(true);
+        const bodyTop = stripH + 8;
+        const padX = Math.max(12, Math.floor(VIEW_W * 0.07));
+
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 12px "Courier New", monospace';
+        ctx.fillStyle = C.LEDGER_GOLD;
+        ctx.fillText('RED RIVER TALLY — OCTOBRE 30', VIEW_W / 2, bodyTop + 10);
+
+        ctx.fillStyle = '#3D3524';
+        ctx.fillRect(padX, bodyTop + 15, VIEW_W - padX * 2, 1);
+
+        // Species Rows with Hunted Species / Pelt Pixel Icons & Running Count
+        const rows = activeLevel === 'POND'
+            ? [
+                { label: 'MALLARD DUCK',   count: outroDisp.c1, pts: 100, icon: sprDuck[0],        pal: {1: '#111111', 2: '#1E8449', 3: '#F39C12', 4: '#FFFFFF', 5: '#444444'} },
+                { label: 'CANADA GOOSE',   count: outroDisp.c2, pts: 50,  icon: sprGoose[0],       pal: {1: '#5c3a21', 2: '#000000', 3: '#FFFFFF', 4: '#3a2010'} },
+                { label: 'WOODDUCK',       count: outroDisp.c3, pts: 200, icon: sprWoodduck[0],    pal: {1: '#751A1E', 2: '#1E8449', 3: '#F39C12', 4: '#FFFFFF', 6: '#D4AC0D'} },
+                { label: 'TRUMPETER SWAN', count: outroDisp.c4, pts: 300, icon: sprTrumpeterSwan[0], pal: {1: '#FDFEFE', 2: '#D5D8DC', 3: '#111111'} }
+              ]
+            : [
+                { label: 'SNOWSHOE PELT',  count: outroDisp.c1, pts: 100, icon: sprHare[0],        pal: {1: '#D5D8DC', 2: '#85929E', 3: '#111111', 4: '#2C3E50'} },
+                { label: 'SPRUCE GROUSE',  count: outroDisp.c2, pts: 50,  icon: sprSpruceGrouse[0], pal: {1: '#5D6D7E', 2: '#8E281C', 3: '#E74C3C', 4: '#EAECEE'} },
+                { label: 'RED FOX PELT',   count: outroDisp.c3, pts: 200, icon: sprRedFox[0],      pal: {1: '#D35400', 2: '#EAECEE', 3: '#111111', 4: '#922B21'} },
+                { label: 'PORCUPINE QUILL',count: outroDisp.c4, pts: 300, icon: sprPorcupineVertical[0], pal: {1: '#1C1A24', 2: '#85929E', 3: '#0B0910'} }
+              ];
+
+        const rowSpacing = Math.max(20, Math.floor((VIEW_H - bodyTop - 54) / 4));
+        rows.forEach((r, idx) => {
+            const ry = bodyTop + 24 + idx * rowSpacing;
+
+            // Draw scaled species/pelt icon on the left
+            const iconScale = 1;
+            const iconW = r.icon[0].length * iconScale;
+            const iconH = r.icon.length * iconScale;
+            drawSprite(padX, ry - Math.floor(iconH / 2) + 4, r.icon, r.pal, iconScale);
+
+            // Species name & running count
+            ctx.textAlign = 'left';
+            ctx.font = 'bold 9px "Courier New", monospace';
+            ctx.fillStyle = r.count > 0 ? C.LEDGER_CREAM : '#777777';
+            ctx.fillText(r.label, padX + 30, ry + 7);
+
+            ctx.textAlign = 'right';
+            ctx.fillStyle = r.count > 0 ? C.TEAL : '#666666';
+            ctx.fillText(`x${r.count}  (${r.count * r.pts})`, VIEW_W - padX, ry + 7);
+        });
+
+        // Running Total Score Bar
+        const totalY = bodyTop + 24 + 4 * rowSpacing + 2;
+        ctx.fillStyle = '#3D3524';
+        ctx.fillRect(padX, totalY - 9, VIEW_W - padX * 2, 1);
+
+        ctx.textAlign = 'left';
+        ctx.font = 'bold 11px "Courier New", monospace';
+        ctx.fillStyle = C.LEDGER_GOLD;
+        ctx.fillText('TOTAL SCORE:', padX, totalY + 4);
+
+        ctx.textAlign = 'right';
+        ctx.fillStyle = C.WHITE;
+        ctx.fillText(`${outroDisp.total}`, VIEW_W - padX, totalY + 4);
+
+        if (Math.floor(frame / 25) % 2 === 0) {
+            ctx.textAlign = 'center';
+            ctx.font = 'bold 10px "Courier New", monospace';
+            ctx.fillStyle = C.TEAL;
+            ctx.fillText("PRESS 'A' FOR LEVEL SELECT", VIEW_W / 2, VIEW_H - 9);
+        }
+        ctx.textAlign = 'left';
+    }
+
     function drawMuzzleFlash(muzzleX, muzzleY) {
         if (flashEffect <= 0) return;
         let progress = flashEffect / 15;
@@ -1675,7 +2213,6 @@
         const matrix = b.spriteFrames[b.animFrame];
         const { drawX, drawY, w, h } = getEntityBounds(b);
 
-        // Grounded nocturnal night-shadow beneath woodland animals
         if (activeLevel === 'WOODS' && !b.dead && b.kind !== 'PORCUPINE') {
             ctx.fillStyle = 'rgba(4, 6, 8, 0.55)';
             ctx.fillRect(Math.floor(drawX + 2), Math.floor(drawY + h - 2), Math.max(6, w - 4), 3);
@@ -1717,6 +2254,14 @@
         }
         if (state === 'SELECT') {
             drawSelectScreen();
+            return;
+        }
+        if (state === 'INTRO') {
+            drawIntroScreen();
+            return;
+        }
+        if (state === 'OUTRO') {
+            drawOutroScreen();
             return;
         }
 
@@ -1876,9 +2421,17 @@
     function openLevelSelect() {
         state = 'SELECT';
         hudTop.style.display = 'none';
-        gameOverScreen.style.display = 'none';
         clearInputStates();
         playMenuBlip(350, 460);
+    }
+
+    function openIntroCutscene() {
+        activeLevel = LEVELS[selectedLevelIdx].id;
+        state = 'INTRO';
+        introFrame = 0;
+        hudTop.style.display = 'none';
+        clearInputStates();
+        playMenuBlip(420, 540);
     }
 
     function startGame() {
@@ -1892,36 +2445,30 @@
         gunAim = { x: (crosshair.x + 0.5) * TILE_W, y: (crosshair.y + 0.5) * TILE_H };
         flashEffect = 0;
 
-        // Rare <1 per game event schedule (Porcupine in Woods, Trumpeter Swan in Pond)
         rareSpawned = 0;
-        const willAppear = Math.random() < 0.65; // <1 per gameplay average rate (~0.65 per 5-min hunt)
+        const willAppear = Math.random() < 0.65;
         if (willAppear) {
             rareTriggerTimes = [95 + Math.floor(Math.random() * 145)];
         } else {
             rareTriggerTimes = [];
         }
 
-        gameOverScreen.style.display = 'none';
         hudTop.style.display = 'flex';
-
         startChiptuneTrack();
         updateUI();
     }
 
     function endGame() {
-        state = 'GAMEOVER';
+        state = 'OUTRO';
+        outroFrame = 0;
+        outroCountStep = 0;
+        outroDisp = { c1: 0, c2: 0, c3: 0, c4: 0, total: 0 };
+        hudTop.style.display = 'none';
         stopChiptuneTrack();
         clearInputStates();
-        if (activeLevel === 'POND') {
-            document.getElementById('final-stats').innerHTML = `Ducks: ${stats.c1}<br>Geese: ${stats.c2}<br>Woodducks: ${stats.c3}<br>Trumpeter Swans: ${stats.c4}<br><br><b>TOTAL SCORE: ${score}</b>`;
-        } else {
-            document.getElementById('final-stats').innerHTML = `Snowshoe Hares: ${stats.c1}<br>Spruce Grouse: ${stats.c2}<br>Red Foxes: ${stats.c3}<br>Porcupines: ${stats.c4}<br><br><b>TOTAL SCORE: ${score}</b>`;
-        }
-        gameOverScreen.style.display = 'flex';
     }
 
     // --- ARCADE CABINET postMessage BRIDGE ---
-    // Simple, deterministic 1-tap = 1 tile movement | click-and-hold = continuous glide until screen edge
     const dpadState = {
         UP:    { active: false, lastTapTime: 0, holdDelayTimer: null, glideInterval: null, streamWatchdog: null },
         DOWN:  { active: false, lastTapTime: 0, holdDelayTimer: null, glideInterval: null, streamWatchdog: null },
@@ -1941,10 +2488,10 @@
     let lastMenuNavTime = 0;
     const BTN_DEBOUNCE_MS = 110;
     const MENU_DEBOUNCE_MS = 160;
-    const TAP_LOCKOUT_MS = 190;    // Guarantees a tap or slight hold never double-steps 1 tile
-    const HOLD_THRESHOLD_MS = 310; // Deliberate click-and-hold threshold before continuous glide begins
-    const GLIDE_STEP_MS = 165;     // Smooth continuous movement speed while held until screen edge
-    const STREAM_RELEASE_MS = 180; // Watchdog timeout when parent drag-joystick stops sending pulses
+    const TAP_LOCKOUT_MS = 190;
+    const HOLD_THRESHOLD_MS = 310;
+    const GLIDE_STEP_MS = 165;
+    const STREAM_RELEASE_MS = 180;
 
     function releaseDir(dir) {
         const entry = dpadState[dir];
@@ -1988,13 +2535,11 @@
         if (!entry.active) {
             entry.active = true;
 
-            // 1 Tap = Exactly 1 tile step (protected against duplicate pulse bursts)
             if (now - entry.lastTapTime >= TAP_LOCKOUT_MS) {
                 moveCrosshair(dx, dy);
                 entry.lastTapTime = now;
             }
 
-            // Click and hold = Continuous movement until edge of screen
             entry.holdDelayTimer = setTimeout(() => {
                 if (!isPaused && state === 'PLAYING' && entry.active) {
                     moveCrosshair(dx, dy);
@@ -2007,7 +2552,6 @@
             }, HOLD_THRESHOLD_MS);
         }
 
-        // Refresh watchdog for pulse streams so releasing the stick stops movement immediately
         if (entry.streamWatchdog) clearTimeout(entry.streamWatchdog);
         entry.streamWatchdog = setTimeout(() => releaseDir(dir), STREAM_RELEASE_MS);
     }
@@ -2017,7 +2561,6 @@
         const cmd = typeof raw === 'string' ? raw : (raw && (raw.type || raw.cmd || raw.action));
         if (!cmd) return;
 
-        // System Pause / Resume
         if (cmd === 'PAUSE') {
             isPaused = true;
             clearInputStates();
@@ -2039,13 +2582,13 @@
 
         if (isPaused) return;
 
-        // Action Buttons (110ms debounce guard)
         const now = Date.now();
         if (cmd === 'BUTTON_A' || cmd === 'BUTTON_A_PRESS') {
             if (now - lastBtnATime < BTN_DEBOUNCE_MS) return;
             lastBtnATime = now;
-            if (state === 'TITLE' || state === 'GAMEOVER') openLevelSelect();
-            else if (state === 'SELECT') startGame();
+            if (state === 'TITLE' || state === 'OUTRO') openLevelSelect();
+            else if (state === 'SELECT') openIntroCutscene();
+            else if (state === 'INTRO') startGame();
             else if (state === 'PLAYING') fireGun();
             return;
         }
@@ -2055,6 +2598,8 @@
             if (state === 'SELECT') {
                 state = 'TITLE';
                 playMenuBlip(280, 200);
+            } else if (state === 'INTRO') {
+                openLevelSelect();
             } else if (state === 'PLAYING') {
                 isLoaded = true;
                 updateUI();
@@ -2062,7 +2607,6 @@
             return;
         }
 
-        // Cardinal D-Pad Pulses & Hold-States
         if (cmd === 'DPAD_UP') handleDirSignal('UP', true);
         else if (cmd === 'DPAD_UP_PRESS') handleDirSignal('UP', false);
         else if (cmd === 'DPAD_UP_RELEASE') releaseDir('UP');
