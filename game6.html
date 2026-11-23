@@ -960,8 +960,7 @@
   let lastBtnBTime = 0;
   const BTN_DEBOUNCE_MS = 120;
   let weirStepCooldown = 0;
-  let lastMapCycleTime = 0;
-  const MAP_CYCLE_COOLDOWN_MS = 185;
+  let mapStepCooldown = 0;
 
   function isDpadHeld(dir) {
     return performance.now() < dpadExpiry[dir];
@@ -973,6 +972,7 @@
     dpadExpiry.LEFT = 0;
     dpadExpiry.RIGHT = 0;
     weirStepCooldown = 0;
+    mapStepCooldown = 0;
   }
 
   function setViewMode(mode) {
@@ -1045,6 +1045,7 @@
 
     frameTick++;
     if (weirStepCooldown > 0) weirStepCooldown = Math.max(0, weirStepCooldown - dt);
+    if (mapStepCooldown > 0) mapStepCooldown = Math.max(0, mapStepCooldown - dt);
 
     // Smooth continuous walking when joystick is held in WEIR scene
     if (gameState === 'WEIR' && weirStepCooldown <= 0) {
@@ -1054,14 +1055,14 @@
       else if (isDpadHeld('RIGHT')) { moveWeirPlayer('RIGHT'); weirStepCooldown = 0.11; }
     }
 
-    // Smooth held-joystick stepping through the 6 parishes on the MAP carousel
-    if (gameState === 'MAP' && (now - lastMapCycleTime) >= MAP_CYCLE_COOLDOWN_MS) {
+    // Smooth continuous stepping through all 6 parishes when joystick is held on MAP
+    if (gameState === 'MAP' && mapStepCooldown <= 0) {
       if (isDpadHeld('RIGHT') || isDpadHeld('DOWN')) {
         cycleCheckpoint(1);
-        lastMapCycleTime = now;
+        mapStepCooldown = 0.22;
       } else if (isDpadHeld('LEFT') || isDpadHeld('UP')) {
         cycleCheckpoint(-1);
-        lastMapCycleTime = now;
+        mapStepCooldown = 0.22;
       }
     }
 
@@ -3962,10 +3963,10 @@
     dpadExpiry[dir] = now + DPAD_HOLD_WINDOW_MS;
 
     if (gameState === 'MAP') {
-      if (!wasHeld && (now - lastMapCycleTime) >= 95) {
+      if (mapStepCooldown <= 0) {
         if (dir === 'RIGHT' || dir === 'DOWN') cycleCheckpoint(1);
         else if (dir === 'LEFT' || dir === 'UP') cycleCheckpoint(-1);
-        lastMapCycleTime = now;
+        mapStepCooldown = 0.22;
       }
       return;
     }
@@ -3997,10 +3998,32 @@
   }
 
   // =========================================================================
-  // EXCLUSIVE POSTMESSAGE JOYSTICK & BUTTON BRIDGE
+  // UNIVERSAL POSTMESSAGE PAYLOAD NORMALIZER & CABINET BRIDGE
   // =========================================================================
+  function extractCommand(rawData) {
+    if (typeof rawData === 'string') {
+      const trimmed = rawData.trim();
+      if (trimmed.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          return extractCommand(parsed);
+        } catch (e) {
+          return trimmed.toUpperCase();
+        }
+      }
+      return trimmed.toUpperCase();
+    }
+    if (rawData && typeof rawData === 'object') {
+      const candidate = rawData.cmd || rawData.command || rawData.action || rawData.button || rawData.direction || rawData.dir || rawData.type;
+      if (typeof candidate === 'string') return candidate.trim().toUpperCase();
+    }
+    return '';
+  }
+
   window.addEventListener('message', function(event) {
-    const cmd = event.data;
+    const cmd = extractCommand(event.data);
+    if (!cmd) return;
+
     if (cmd === 'PAUSE') {
       isPaused = true;
       clearAllInputs();
@@ -4013,16 +4036,21 @@
       return;
     }
 
-    if (cmd === 'DPAD_UP' || cmd === 'DPAD_UP_PRESS')          handleDpadPulse('UP');
-    else if (cmd === 'DPAD_DOWN' || cmd === 'DPAD_DOWN_PRESS')  handleDpadPulse('DOWN');
-    else if (cmd === 'DPAD_LEFT' || cmd === 'DPAD_LEFT_PRESS')  handleDpadPulse('LEFT');
-    else if (cmd === 'DPAD_RIGHT' || cmd === 'DPAD_RIGHT_PRESS') handleDpadPulse('RIGHT');
+    if (cmd === 'RELEASE' || cmd === 'STOP' || cmd === 'NEUTRAL' || cmd === 'DPAD_RELEASE') {
+      clearAllInputs();
+      return;
+    }
+
+    if (cmd === 'DPAD_UP' || cmd === 'DPAD_UP_PRESS' || cmd === 'UP')          handleDpadPulse('UP');
+    else if (cmd === 'DPAD_DOWN' || cmd === 'DPAD_DOWN_PRESS' || cmd === 'DOWN')  handleDpadPulse('DOWN');
+    else if (cmd === 'DPAD_LEFT' || cmd === 'DPAD_LEFT_PRESS' || cmd === 'LEFT')  handleDpadPulse('LEFT');
+    else if (cmd === 'DPAD_RIGHT' || cmd === 'DPAD_RIGHT_PRESS' || cmd === 'RIGHT') handleDpadPulse('RIGHT');
     else if (cmd === 'DPAD_UP_RELEASE')    dpadExpiry.UP = 0;
     else if (cmd === 'DPAD_DOWN_RELEASE')  dpadExpiry.DOWN = 0;
     else if (cmd === 'DPAD_LEFT_RELEASE')  dpadExpiry.LEFT = 0;
     else if (cmd === 'DPAD_RIGHT_RELEASE') dpadExpiry.RIGHT = 0;
-    else if (cmd === 'BUTTON_A') handleActionA();
-    else if (cmd === 'BUTTON_B') handleActionB();
+    else if (cmd === 'BUTTON_A' || cmd === 'BUTTON_A_PRESS' || cmd === 'A') handleActionA();
+    else if (cmd === 'BUTTON_B' || cmd === 'BUTTON_B_PRESS' || cmd === 'B') handleActionB();
   });
 
   // Boot Initialization
