@@ -10,12 +10,18 @@
       --site-header-clearance: max(54px, env(safe-area-inset-top, 0px));
       /* Extra bottom lift so mobile Safari/Chrome search bars + gesture bars never cover controls */
       --browser-hud-clearance: max(115px, calc(env(safe-area-inset-bottom, 0px) + 72px));
+      /* Locked 1:1 Control Cluster Size (100px * 1.15 = 115px) */
+      --cluster-size: 115px;
+      --btn-size: 54px;
     }
 
     @media (min-width: 768px) {
       :root {
         --site-header-clearance: max(56px, env(safe-area-inset-top, 0px));
         --browser-hud-clearance: max(18px, env(safe-area-inset-bottom, 0px));
+        /* Locked 1:1 Control Cluster Size (112px * 1.15 = 129px) */
+        --cluster-size: 129px;
+        --btn-size: 60px;
       }
     }
 
@@ -30,7 +36,7 @@
     html, body { 
       margin: 0; 
       padding: 0; 
-      background: #050505; 
+      background: #064744; 
       color: #fff; 
       font-family: 'Courier New', Courier, monospace; 
       height: 100%; 
@@ -39,21 +45,29 @@
       touch-action: none; 
     }
 
-    /* Full-Page Responsive Embed Shell (synced to visualViewport via JS) */
+    /* --- N64 TRANSLUCENT FUNTASTIC SHELL (#0EACA6 BUFFALOHYDE TEAL) --- */
     .embed-shell {
       position: fixed;
       top: 0;
       left: 0;
       width: 100vw;
       height: 100svh;
-      background: #050505;
+      background:
+        radial-gradient(circle at 22% 18%, rgba(164, 255, 250, 0.28) 0%, transparent 48%),
+        radial-gradient(circle at 82% 84%, rgba(4, 48, 46, 0.65) 0%, transparent 55%),
+        linear-gradient(160deg, rgba(20, 198, 191, 0.84) 0%, rgba(14, 172, 166, 0.88) 52%, rgba(7, 108, 104, 0.94) 100%);
       padding-top: var(--site-header-clearance);
+      padding-left: 6px;
+      padding-right: 6px;
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      box-shadow:
+        inset 0 2px 4px rgba(255, 255, 255, 0.42),
+        inset 0 -4px 12px rgba(3, 46, 44, 0.78);
     }
 
-    /* --- SECTION 1: EXPANDED CRT VIEWPORT --- */
+    /* --- SECTION 1: EXPANDED CRT VIEWPORT IN MOLDED TEAL BEZEL --- */
     .crt-screen {
       flex: 1 1 auto;
       min-height: 0;
@@ -61,8 +75,12 @@
       background: #000;
       position: relative;
       overflow: hidden;
-      border-top: 2px solid #1d1d1d;
-      border-bottom: 2px solid #222;
+      border-radius: 12px;
+      border: 3px solid rgba(5, 62, 60, 0.88);
+      box-shadow:
+        0 0 0 1.5px rgba(175, 255, 251, 0.35),
+        inset 0 4px 14px rgba(0, 0, 0, 0.95);
+      z-index: 2;
     }
 
     .screen-layer {
@@ -171,9 +189,9 @@
 
     /* --- SUPER MARIO ALL-STARS STYLE GAME BANNER CAROUSEL WITH 360 FORKS PANORAMA --- */
     #game-carousel {
-      background: #06070d;
+      background: #0a1124;
       color: #12AEA2;
-      padding: 10px 12px 12px 12px;
+      padding: 10px 12px 10px 12px;
       flex-direction: column;
       justify-content: space-between;
       align-items: center;
@@ -188,13 +206,19 @@
       height: 100%;
       object-fit: cover;
       image-rendering: pixelated;
-      opacity: 0.24;
+      opacity: 0.52;
+      transition: opacity 0.45s ease;
       pointer-events: none;
       z-index: 0;
     }
 
+    #game-carousel.scenic-mode #forksPanoramaCanvas {
+      opacity: 0.96;
+    }
+
     .carousel-topbar,
     .carousel-stage,
+    .mini-title-card,
     .carousel-footer {
       position: relative;
       z-index: 2;
@@ -211,7 +235,7 @@
       font-weight: bold;
       letter-spacing: 1px;
       flex: 0 0 auto;
-      background: rgba(6, 7, 13, 0.72);
+      background: rgba(8, 12, 26, 0.78);
       padding: 4px 6px 5px 6px;
     }
 
@@ -234,6 +258,10 @@
       justify-content: center;
       gap: 8px;
       padding: 8px 0;
+    }
+
+    #game-carousel.scenic-mode .carousel-stage {
+      display: none;
     }
 
     .nav-arrow {
@@ -318,13 +346,96 @@
       100% { opacity: 0; transform: translateX(100%); }
     }
 
+    /* Compact Minimized Game Title Banner (Visible when Down Arrow hides the Artbox) */
+    .mini-title-card {
+      display: none;
+      width: 100%;
+      max-width: 560px;
+      margin-top: auto;
+      margin-bottom: 6px;
+      background: rgba(6, 8, 16, 0.9);
+      border: 2px solid #F7C844;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.75);
+      padding: 8px 10px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    #game-carousel.scenic-mode .mini-title-card {
+      display: flex;
+    }
+
+    .mini-nav-btn {
+      flex: 0 0 28px;
+      height: 36px;
+      background: #111626;
+      border: 1.5px solid #12AEA2;
+      color: #F7C844;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 16px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .mini-nav-btn:active {
+      background: #12AEA2;
+      color: #000;
+    }
+
+    .mini-card-body {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .mini-badge {
+      flex: 0 0 auto;
+      background: #F7C844;
+      color: #000;
+      font-weight: bold;
+      font-size: 13px;
+      padding: 3px 7px;
+    }
+
+    .mini-text-wrap {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .mini-title {
+      color: #ffffff;
+      font-size: 15px;
+      font-weight: bold;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .mini-genre {
+      color: #12AEA2;
+      font-size: 11px;
+      font-weight: bold;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     .carousel-footer {
       width: 100%;
       max-width: 560px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       flex: 0 0 auto;
     }
 
@@ -350,16 +461,16 @@
     }
 
     .carousel-prompt {
-      font-size: 12px;
+      font-size: 11px;
       font-weight: bold;
       color: #12AEA2;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.4px;
       text-align: center;
-      background: rgba(6, 7, 13, 0.72);
+      background: rgba(8, 12, 26, 0.82);
       padding: 2px 10px;
     }
 
-    /* --- PAUSE HUD OVERLAY --- */
+    /* --- PAUSE & SETTINGS HUD OVERLAY --- */
     #pause-overlay {
       background: rgba(0, 0, 0, 0.86);
       color: #12AEA2;
@@ -371,8 +482,8 @@
     }
 
     .pause-box {
-      width: 90%;
-      max-width: 320px;
+      width: 92%;
+      max-width: 340px;
       background: #050505;
       border: 2px solid #12AEA2;
       box-shadow: 0 0 24px rgba(18, 174, 162, 0.3), inset 0 0 12px rgba(0, 0, 0, 0.9);
@@ -400,12 +511,20 @@
     }
 
     .pause-list li {
-      font-size: 15px;
+      font-size: 14px;
       text-transform: uppercase;
       color: #12AEA2;
-      opacity: 0.72;
-      padding: 5px 6px;
+      opacity: 0.75;
+      padding: 6px 6px;
       cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .pause-list li .item-label::before {
+      content: "  ";
+      white-space: pre;
     }
 
     .pause-list li.active {
@@ -415,20 +534,68 @@
       color: #000;
     }
 
-    .pause-list li::before {
-      content: "  ";
-      white-space: pre;
+    .pause-list li.active .item-label::before {
+      content: "> ";
     }
 
-    .pause-list li.active::before {
-      content: "> ";
+    /* Retro Volume Widget (Mute + 3 Bars: Min / Mid / Max) */
+    .vol-widget {
+      display: inline-flex;
+      align-items: flex-end;
+      gap: 5px;
+      padding: 2px 4px;
+    }
+
+    .vol-mute {
+      font-size: 11px;
+      font-weight: bold;
+      padding: 1px 4px;
+      border: 1.5px solid currentColor;
+      line-height: 1.1;
+      opacity: 0.45;
+    }
+
+    .vol-mute.is-muted {
+      opacity: 1;
+      background: #AD1C21;
+      color: #ffffff;
+      border-color: #ffffff;
+    }
+
+    .vol-bars {
+      display: inline-flex;
+      align-items: flex-end;
+      gap: 3px;
+      height: 14px;
+    }
+
+    .vol-bar {
+      width: 6px;
+      border: 1.5px solid currentColor;
+      background: transparent;
+      opacity: 0.4;
+    }
+
+    .vol-bar[data-bar="1"] { height: 6px; }
+    .vol-bar[data-bar="2"] { height: 10px; }
+    .vol-bar[data-bar="3"] { height: 14px; }
+
+    .vol-bar.lit {
+      background: currentColor;
+      opacity: 1;
+    }
+
+    .vol-tag {
+      font-size: 10px;
+      min-width: 28px;
+      text-align: right;
     }
 
     .pause-hint {
       margin-top: 14px;
       padding-top: 8px;
       border-top: 1px dashed #333;
-      font-size: 11px;
+      font-size: 10px;
       color: #999;
       text-align: center;
     }
@@ -459,163 +626,263 @@
       box-shadow: inset 0 0 32px rgba(0, 0, 0, 0.65);
     }
 
-    /* --- SECTION 2: CONTROL DECK LIFTED WELL ABOVE BROWSER BOTTOM HUD --- */
+    /* --- SECTION 2: N64 TRANSLUCENT POLYCARBONATE CONTROL DECK --- */
     .control-deck {
       flex: 0 0 auto;
       width: 100%;
-      background: linear-gradient(to bottom, #161616 0%, #090909 70%, #050505 100%);
-      border-top: 1px solid #2c2c2c;
+      position: relative;
+      overflow: hidden;
+      background:
+        radial-gradient(ellipse at 50% 0%, rgba(185, 255, 252, 0.34) 0%, rgba(14, 172, 166, 0.42) 52%, rgba(5, 68, 65, 0.68) 100%);
+      border-top: 2px solid rgba(190, 255, 252, 0.52);
+      border-radius: 16px 16px 0 0;
+      margin-top: 4px;
       padding-top: 10px;
-      padding-left: calc(18px + env(safe-area-inset-left));
-      padding-right: calc(18px + env(safe-area-inset-right));
-      padding-bottom: calc(12px + var(--browser-hud-clearance));
+      padding-left: calc(10px + env(safe-area-inset-left));
+      padding-right: calc(10px + env(safe-area-inset-right));
+      padding-bottom: calc(10px + var(--browser-hud-clearance));
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: center;
+      box-shadow:
+        inset 0 2px 6px rgba(255, 255, 255, 0.4),
+        inset 0 -8px 18px rgba(3, 44, 42, 0.68);
       z-index: 30;
     }
 
+    /* Contained Translucent Gridded Box enclosing Joystick, Start, and B-A Buttons */
     .deck-inner {
+      position: relative;
+      z-index: 2;
       width: 100%;
       max-width: 560px;
-      margin: 0 auto;
+      padding: 12px 16px;
+      border-radius: 16px;
+      background-color: rgba(9, 41, 34, 0.58);
+      background-image:
+        linear-gradient(to right, rgba(24, 96, 82, 0.48) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(24, 96, 82, 0.48) 1px, transparent 1px);
+      background-size: 16px 16px;
+      border: 2px solid rgba(25, 112, 96, 0.65);
+      box-shadow:
+        inset 0 2px 8px rgba(0, 0, 0, 0.52),
+        0 1px 0 rgba(190, 255, 252, 0.32);
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
 
-    /* Left Thumb: Drag Joystick */
+    /* Left Thumb: Expanded 1:1 (+0.15) Translucent N64 Octagonal Gate + Charcoal Joystick (#1A1A1A) */
     .joystick-base {
-      width: 100px;
-      height: 100px;
-      background: radial-gradient(circle, #141414 32%, #242424 100%);
+      flex: 0 0 var(--cluster-size);
+      width: var(--cluster-size);
+      height: var(--cluster-size);
+      background:
+        radial-gradient(circle at 38% 32%, rgba(255, 255, 255, 0.22) 0%, transparent 45%),
+        radial-gradient(circle, rgba(12, 34, 32, 0.72) 34%, rgba(14, 152, 146, 0.52) 74%, rgba(4, 48, 46, 0.85) 100%);
       border-radius: 50%;
-      border: 3px solid #050505;
-      box-shadow: inset 0 4px 12px rgba(0, 0, 0, 0.9), 0 1px 4px rgba(255, 255, 255, 0.08);
+      border: 2.5px solid rgba(5, 56, 54, 0.88);
+      box-shadow:
+        inset 0 4px 10px rgba(0, 0, 0, 0.6),
+        inset 0 -2px 5px rgba(185, 255, 252, 0.3),
+        0 2px 5px rgba(3, 42, 40, 0.45);
       position: relative;
       touch-action: none; 
       cursor: grab;
+    }
+
+    /* Inner N64-style octagonal gate ring inside translucent well */
+    .joystick-base::before {
+      content: '';
+      position: absolute;
+      inset: 14px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(185, 255, 252, 0.25);
+      box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5);
+      pointer-events: none;
     }
 
     .joystick-base:active {
       cursor: grabbing;
     }
 
+    /* Charcoal Thumbstick (#1A1A1A) */
     .joystick-stick {
-      width: 50px; 
-      height: 50px;
-      background: radial-gradient(circle at 35% 35%, #8f8f8f, #222);
-      border: 1.5px solid rgba(255, 255, 255, 0.22);
+      width: 56px; 
+      height: 56px;
+      background:
+        radial-gradient(circle at 36% 32%, #383838 0%, #1A1A1A 60%, #101010 100%);
+      border: 2px solid #0c0c0c;
       border-radius: 50%;
       position: absolute;
-      top: 22px; 
-      left: 22px; 
-      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.75);
+      top: 50%;
+      left: 50%;
+      margin-top: -28px;
+      margin-left: -28px;
+      box-shadow:
+        inset 0 2px 3px rgba(255, 255, 255, 0.16),
+        inset 0 -3px 6px rgba(0, 0, 0, 0.78),
+        0 5px 10px rgba(0, 0, 0, 0.65);
       pointer-events: none; 
       transition: transform 0.14s ease-out; 
       z-index: 1;
+    }
+
+    .joystick-stick::after {
+      content: '';
+      position: absolute;
+      inset: 11px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(255, 255, 255, 0.09);
+      box-shadow: inset 0 1.5px 3px rgba(0, 0, 0, 0.75);
     }
 
     .joystick-stick.dragging {
       transition: none; 
     }
 
-    /* Center: System Home / Pause Button */
+    /* Center: Compact Dark Olive START Pill (#34403A) — 0.70x width, 0.80x height, engraved label */
     .center-hud {
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 5px;
-      align-self: flex-end;
-      margin-bottom: 4px;
+      align-self: center;
     }
 
-    .home-btn {
-      padding: 7px 14px;
-      background: #1b1b1b;
-      border: 1.5px solid rgba(18, 174, 162, 0.55);
-      border-radius: 14px;
-      color: #d8d8d8;
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 11px;
-      font-weight: bold;
-      letter-spacing: 1px;
+    .start-btn {
+      width: 48px;
+      height: 22px;
+      background: linear-gradient(180deg, #404e47 0%, #34403A 58%, #252e29 100%);
+      border: 1.5px solid #1b221e;
+      border-radius: 11px;
+      color: rgba(185, 202, 193, 0.62);
+      text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.75), 0 1px 0 rgba(255, 255, 255, 0.12);
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.7px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       cursor: pointer;
-      box-shadow: 0 3px 0 #000, 0 4px 10px rgba(0, 0, 0, 0.6);
+      box-shadow:
+        inset 0 1px 2px rgba(255, 255, 255, 0.18),
+        0 2px 0 #161c19,
+        0 3px 6px rgba(0, 0, 0, 0.38);
       touch-action: none;
     }
 
-    .home-btn:active, .home-btn.active-press {
-      transform: translateY(3px);
-      box-shadow: 0 0 0 #000;
-      background: rgba(18, 174, 162, 0.28);
-      border-color: #12AEA2;
-      color: #fff;
+    .start-btn:active, .start-btn.active-press {
+      transform: translateY(2px);
+      box-shadow:
+        inset 0 2px 3px rgba(0, 0, 0, 0.55),
+        0 0 0 #161c19;
+      color: rgba(235, 245, 240, 0.85);
     }
 
-    .key-hint {
-      font-size: 9px;
-      color: #666;
-      letter-spacing: 0.5px;
+    /* Right Thumb: Locked 1:1 Diagonal Cluster fixed inside the gridded box */
+    .action-cluster {
+      flex: 0 0 var(--cluster-size);
+      width: var(--cluster-size);
+      height: var(--cluster-size);
+      position: relative;
     }
 
-    /* Right Thumb: Angled B & A Action Buttons */
-    .action-container {
+    /* Recessed molded bezel collars around B and A seated flush inside the gridded box */
+    .btn-well {
+      width: calc(var(--btn-size) + 4px);
+      height: calc(var(--btn-size) + 4px);
+      border-radius: 50%;
+      background: rgba(4, 46, 44, 0.55);
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.65), 0 1px 0 rgba(190, 255, 252, 0.25);
+      position: absolute;
       display: flex;
-      gap: 14px;
-      transform: rotate(-14deg);
-      margin-right: 4px;
-    }
-
-    .action-btn-wrapper {
-      display: flex;
-      flex-direction: column;
       align-items: center;
-      gap: 4px;
+      justify-content: center;
+    }
+
+    .btn-well-b {
+      bottom: 0;
+      left: 0;
+    }
+
+    .btn-well-a {
+      top: 0;
+      right: 0;
     }
 
     .action-btn {
-      width: 50px;
-      height: 50px;
+      width: var(--btn-size);
+      height: var(--btn-size);
       border-radius: 50%;
-      border: 2.5px solid #090909;
       cursor: pointer;
       position: relative;
-      box-shadow: inset 0 4px 10px rgba(255, 255, 255, 0.2), inset 0 -6px 12px rgba(0, 0, 0, 0.65), 0 5px 0 #000, 0 8px 14px rgba(0, 0, 0, 0.65);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 18px;
+      font-weight: 800;
       touch-action: none;
     }
 
     .action-btn::after {
       content: '';
       position: absolute;
-      top: 4px; left: 10px; right: 10px; height: 15px;
-      background: linear-gradient(rgba(255, 255, 255, 0.22), transparent);
-      border-radius: 20px 20px 0 0;
+      inset: 3px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 28%, rgba(255, 255, 255, 0.14) 0%, transparent 62%);
       pointer-events: none;
     }
 
-    .action-btn:active, .action-btn.active-press {
-      transform: translateY(5px);
-      box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.55), 0 0 0 #000, 0 2px 5px rgba(0, 0, 0, 0.6);
-    }
-
+    /* Bottom-Left B Button: Natural Matte White with Subtle Debossed B */
     .btn-b { 
-      background: #AD1C21; 
-      margin-top: 16px; 
-    }
-    .btn-a { 
-      background: #12AEA2; 
+      background: radial-gradient(circle at 40% 35%, #f5f5f3 0%, #e4e4e0 72%, #cfcfc9 100%);
+      border: 2px solid #969690;
+      color: rgba(135, 135, 130, 0.42);
+      text-shadow: 0 -1px 0 rgba(95, 95, 90, 0.32), 0 1px 0 rgba(255, 255, 255, 0.75);
+      box-shadow:
+        inset 0 2px 3px rgba(255, 255, 255, 0.65),
+        inset 0 -3px 5px rgba(0, 0, 0, 0.16),
+        0 2.5px 0 #7c7c76,
+        0 4px 7px rgba(0, 0, 0, 0.35);
     }
 
-    .btn-label {
-      font-size: 11px;
-      font-weight: bold;
-      color: #888;
+    .btn-b:active, .btn-b.active-press {
+      transform: translateY(2.5px);
+      box-shadow:
+        inset 0 2px 5px rgba(0, 0, 0, 0.24),
+        0 0 0 #7c7c76,
+        0 1px 3px rgba(0, 0, 0, 0.35);
+    }
+
+    /* Top-Right A Button: Natural Crimson Red (#C52334) with Subtle Debossed A */
+    .btn-a { 
+      background: radial-gradient(circle at 40% 35%, #d42c3e 0%, #C52334 72%, #9c1826 100%);
+      border: 2px solid #690e18;
+      color: rgba(88, 10, 18, 0.46);
+      text-shadow: 0 -1px 0 rgba(55, 4, 10, 0.45), 0 1px 0 rgba(240, 110, 124, 0.28);
+      box-shadow:
+        inset 0 2px 3px rgba(255, 165, 174, 0.24),
+        inset 0 -3px 5px rgba(55, 4, 10, 0.45),
+        0 2.5px 0 #590b13,
+        0 4px 7px rgba(0, 0, 0, 0.38);
+    }
+
+    .btn-a:active, .btn-a.active-press {
+      transform: translateY(2.5px);
+      box-shadow:
+        inset 0 2px 5px rgba(40, 2, 6, 0.5),
+        0 0 0 #590b13,
+        0 1px 3px rgba(0, 0, 0, 0.38);
     }
 
     /* Desktop / Wide Embed Enhancement */
     @media (min-width: 768px) {
+      .embed-shell {
+        padding-left: 14px;
+        padding-right: 14px;
+      }
       .control-deck {
         padding-top: 12px;
         padding-left: 32px;
@@ -624,20 +891,21 @@
       }
       .deck-inner {
         max-width: 680px;
-      }
-      .joystick-base {
-        width: 112px;
-        height: 112px;
+        padding: 14px 24px;
       }
       .joystick-stick {
+        width: 62px;
+        height: 62px;
+        margin-top: -31px;
+        margin-left: -31px;
+      }
+      .start-btn {
         width: 54px;
-        height: 54px;
-        top: 26px;
-        left: 26px;
+        height: 24px;
+        font-size: 10px;
       }
       .action-btn {
-        width: 56px;
-        height: 56px;
+        font-size: 20px;
       }
     }
   </style>
@@ -689,22 +957,47 @@
           <div class="nav-arrow" id="arrow-next" aria-label="Next Game">&#9654;</div>
         </div>
 
+        <!-- Minimized Compact Title Card (Visible when Down Arrow hides the Artbox for Daytime Settlement View) -->
+        <div class="mini-title-card" id="mini-title-card">
+          <div class="mini-nav-btn" id="mini-prev" aria-label="Previous Game">&#9664;</div>
+          <div class="mini-card-body">
+            <span class="mini-badge" id="mini-badge">01</span>
+            <div class="mini-text-wrap">
+              <span class="mini-title" id="mini-title">RED RIVER RUN</span>
+              <span class="mini-genre" id="mini-genre">RIVER CANOE RUNNER</span>
+            </div>
+          </div>
+          <div class="mini-nav-btn" id="mini-next" aria-label="Next Game">&#9654;</div>
+        </div>
+
         <div class="carousel-footer">
           <div class="pip-dots" id="pip-dots"></div>
-          <div class="carousel-prompt">&#9664;/&#9654; BROWSE &nbsp;&bull;&nbsp; PRESS A TO PLAY</div>
+          <div class="carousel-prompt" id="carousel-prompt">&#9664;/&#9654; BROWSE &bull; &#9660; VIEW SETTLEMENT &bull; A: PLAY</div>
         </div>
       </div>
 
-      <!-- PAUSE HUD OVERLAY -->
+      <!-- PAUSE & SETTINGS HUD OVERLAY -->
       <div id="pause-overlay" class="screen-layer">
         <div class="pause-box">
-          <div class="pause-header">SYSTEM PAUSED</div>
+          <div class="pause-header" id="pause-header">SYSTEM PAUSED</div>
           <ul class="pause-list" id="pause-list">
-            <li class="active" data-action="RESUME">Return to Game</li>
-            <li data-action="RESTART">Restart Game</li>
-            <li data-action="MENU">Return to Game Selection</li>
+            <li class="active" data-action="RESUME"><span class="item-label">Resume</span></li>
+            <li data-action="VOLUME" id="pause-vol-row">
+              <span class="item-label">Volume</span>
+              <span class="vol-widget" id="vol-widget">
+                <span class="vol-mute" id="vol-mute-badge">M</span>
+                <span class="vol-bars">
+                  <span class="vol-bar lit" data-bar="1"></span>
+                  <span class="vol-bar lit" data-bar="2"></span>
+                  <span class="vol-bar lit" data-bar="3"></span>
+                </span>
+                <span class="vol-tag" id="vol-tag">MAX</span>
+              </span>
+            </li>
+            <li data-action="RESTART" id="pause-restart-row"><span class="item-label">Restart Game</span></li>
+            <li data-action="MENU" id="pause-menu-row"><span class="item-label">Return to Game Selection</span></li>
           </ul>
-          <div class="pause-hint">D-PAD: SELECT &nbsp;|&nbsp; A: OK</div>
+          <div class="pause-hint">D-PAD: SELECT / VOL &nbsp;|&nbsp; A: OK</div>
         </div>
       </div>
 
@@ -712,7 +1005,7 @@
 
     </div>
 
-    <!-- 2. CONTROL DECK LIFTED ABOVE MOBILE BROWSER BOTTOM HUD -->
+    <!-- 2. N64 TRANSLUCENT FUNTASTIC CONTROL DECK (CLEAN CONTAINED GRIDDED BOX) -->
     <div class="control-deck">
       <div class="deck-inner">
         <div class="joystick-base" id="joystick-base">
@@ -720,18 +1013,15 @@
         </div>
 
         <div class="center-hud">
-          <div class="home-btn" id="btn-home" onmousedown="handleSystemMenuTrigger()" ontouchstart="preventGhostClick(event, 'HOME')">HOME</div>
-          <span class="key-hint">ESC: PAUSE</span>
+          <div class="start-btn" id="btn-start" onmousedown="handleSystemMenuTrigger()" ontouchstart="preventGhostClick(event, 'START')">START</div>
         </div>
 
-        <div class="action-container">
-          <div class="action-btn-wrapper">
-            <div class="action-btn btn-b" id="btn-b" onmousedown="btnAction('BUTTON_B')" ontouchstart="preventGhostClick(event, 'BUTTON_B')"></div>
-            <span class="btn-label">B</span>
+        <div class="action-cluster">
+          <div class="btn-well btn-well-b">
+            <div class="action-btn btn-b" id="btn-b" onmousedown="btnAction('BUTTON_B')" ontouchstart="preventGhostClick(event, 'BUTTON_B')">B</div>
           </div>
-          <div class="action-btn-wrapper">
-            <div class="action-btn btn-a" id="btn-a" onmousedown="btnAction('BUTTON_A')" ontouchstart="preventGhostClick(event, 'BUTTON_A')"></div>
-            <span class="btn-label">A</span>
+          <div class="btn-well btn-well-a">
+            <div class="action-btn btn-a" id="btn-a" onmousedown="btnAction('BUTTON_A')" ontouchstart="preventGhostClick(event, 'BUTTON_A')">A</div>
           </div>
         </div>
       </div>
@@ -740,8 +1030,19 @@
 
   <script>
     let machineState = 'BOOT'; // BOOT, WARNING, STATIC, MENU, PLAYING, PAUSED
+    let pauseOrigin = 'PLAYING'; // 'PLAYING' or 'MENU'
     let currentIndex = 0;
     let pauseIndex = 0;
+
+    // Scenic Panorama Minimize Mode inside Game Selection Menu (Down Arrow = Daytime Settlement, Up Arrow = Night Artbox)
+    let isCarouselMinimized = false;
+    let daylightLevel = 0.0;   // 0.0 = Indigo Twilight Moon, 1.0 = Bright Daytime Sunrise Settlement
+    let daylightTarget = 0.0;
+
+    // 4-Step Master Volume State: 0 = MUTE, 1 = MIN, 2 = MID, 3 = MAX
+    let volumeLevel = 3;
+    const VOLUME_GAINS = [0.0, 0.30, 0.65, 1.0];
+    const VOLUME_LABELS = ['MUTE', 'MIN', 'MID', 'MAX'];
 
     const GAME_CATALOG = [
       {
@@ -835,22 +1136,85 @@
     const staticSplash = document.getElementById('static-splash');
     const gameCarousel = document.getElementById('game-carousel');
     const pauseOverlay = document.getElementById('pause-overlay');
+    const pauseHeader = document.getElementById('pause-header');
     const gameFrame = document.getElementById('arcade-frame');
-    const pauseItems = document.querySelectorAll('#pause-list li');
+    const pauseItems = Array.from(document.querySelectorAll('#pause-list li'));
+    const pauseRestartRow = document.getElementById('pause-restart-row');
+    const pauseMenuRow = document.getElementById('pause-menu-row');
     const btnAEl = document.getElementById('btn-a');
     const btnBEl = document.getElementById('btn-b');
-    const btnHomeEl = document.getElementById('btn-home');
+    const btnStartEl = document.getElementById('btn-start');
+
+    const volMuteBadge = document.getElementById('vol-mute-badge');
+    const volBars = document.querySelectorAll('#vol-widget .vol-bar');
+    const volTag = document.getElementById('vol-tag');
 
     const carouselCounter = document.getElementById('carousel-counter');
+    const carouselPrompt = document.getElementById('carousel-prompt');
     const artboxFrame = document.getElementById('artbox-frame');
     const artboxWipe = document.getElementById('artbox-wipe');
     const arrowPrev = document.getElementById('arrow-prev');
     const arrowNext = document.getElementById('arrow-next');
+    const miniTitleCard = document.getElementById('mini-title-card');
+    const miniPrev = document.getElementById('mini-prev');
+    const miniNext = document.getElementById('mini-next');
+    const miniBadge = document.getElementById('mini-badge');
+    const miniTitle = document.getElementById('mini-title');
+    const miniGenre = document.getElementById('mini-genre');
     const pipDotsContainer = document.getElementById('pip-dots');
 
     let staticStartTime = 0;
     let warningStartTime = 0;
     let lastInfinityStep = -1;
+
+    /* --- MASTER VOLUME SYNC (CABINET + ACTIVE GAME IFRAME) --- */
+    function getMasterGain() {
+      return VOLUME_GAINS[volumeLevel];
+    }
+
+    function applyVolumeToGameFrame() {
+      const gainVal = getMasterGain();
+      postToGame(`VOLUME_${volumeLevel}`);
+      postToGame(volumeLevel === 0 ? 'MUTE' : 'UNMUTE');
+      try {
+        const win = gameFrame.contentWindow;
+        if (!win) return;
+        const mediaEls = win.document.querySelectorAll('audio, video');
+        mediaEls.forEach(el => {
+          el.muted = (volumeLevel === 0);
+          el.volume = gainVal;
+        });
+        if (win.masterGain && win.masterGain.gain) {
+          win.masterGain.gain.value = gainVal;
+        }
+      } catch (err) {}
+    }
+
+    function updateVolumeUI() {
+      volMuteBadge.classList.toggle('is-muted', volumeLevel === 0);
+      volBars.forEach(bar => {
+        const barNum = Number(bar.dataset.bar);
+        bar.classList.toggle('lit', volumeLevel >= barNum);
+      });
+      volTag.textContent = VOLUME_LABELS[volumeLevel];
+      applyVolumeToGameFrame();
+    }
+
+    function adjustVolume(delta) {
+      volumeLevel = Math.max(0, Math.min(3, volumeLevel + delta));
+      updateVolumeUI();
+      if (volumeLevel > 0) {
+        playPulseCall(440 + volumeLevel * 110, 0, 0.05, 0.07);
+      }
+    }
+
+    function cycleVolume() {
+      volumeLevel = (volumeLevel + 1) % 4;
+      updateVolumeUI();
+      if (volumeLevel > 0) {
+        playPulseCall(440 + volumeLevel * 110, 0, 0.05, 0.07);
+      }
+    }
 
     /* --- DYNAMIC MOBILE BROWSER VIEWPORT SYNC --- */
     function syncViewportBounds() {
@@ -877,6 +1241,7 @@
 
     window.addEventListener('load', () => {
       syncViewportBounds();
+      updateVolumeUI();
       window.focus();
       embedShell.focus({ preventScroll: true });
     });
@@ -935,6 +1300,7 @@
       isFramePaused = false;
       pausedRAFCallbacks = [];
       attachFramePauseHook();
+      applyVolumeToGameFrame();
       try {
         gameFrame.contentWindow.dispatchEvent(new Event('resize'));
       } catch (err) {}
@@ -976,7 +1342,6 @@
       'Loading Bwaa_Brule.exe [8/8 HBC/NWC Merger]'
     ];
 
-    // 8 sequential segments tracing a continuous white figure-8 Métis infinity symbol
     const INFINITY_SEGMENTS = [
       { blocks: [[102, 58, 16, 10], [88, 48, 16, 10]] },
       { blocks: [[68, 38, 22, 10], [50, 38, 20, 10]] },
@@ -994,36 +1359,29 @@
       flagCtx.fillStyle = '#020817';
       flagCtx.fillRect(0, 0, W, H);
 
-      // Subtle vertical cloth ripple across vertical slices of the Métis Blue flag
       const flagX = 14;
       const flagW = W - 28;
       const flagBaseY = 12;
       const flagH = H - 24;
       const sliceW = 4;
 
-      // Render classic Métis Blue flag field with gentle sinusoidal cloth wave
       for (let sx = 0; sx < flagW; sx += sliceW) {
         const waveOffset = Math.round(Math.sin(elapsedSec * 3.2 + sx * 0.042) * 2.2);
         const shade = Math.sin(elapsedSec * 3.2 + sx * 0.042) > 0.25 ? '#0042c4' : '#0038A8';
 
-        // Outer white border trim
         flagCtx.fillStyle = '#ffffff';
         flagCtx.fillRect(flagX + sx, flagBaseY + waveOffset - 2, sliceW, flagH + 4);
 
-        // True Métis Blue banner field
         flagCtx.fillStyle = shade;
         flagCtx.fillRect(flagX + sx, flagBaseY + waveOffset, sliceW, flagH);
       }
 
-      // Draw the 8-piece white Infinity Symbol riding the gentle flag wave
       INFINITY_SEGMENTS.forEach((seg, idx) => {
         const isLit = idx < filledCount;
         seg.blocks.forEach(([bx, by, bw, bh]) => {
           const waveY = Math.round(Math.sin(elapsedSec * 3.2 + (bx - flagX) * 0.042) * 2.2);
-          // Subtle navy outline for unlit/lit crispness
           flagCtx.fillStyle = isLit ? '#001d5c' : '#00287a';
           flagCtx.fillRect(bx - 2, by + waveY - 2, bw + 4, bh + 4);
-          // Pure white fill when loaded, faint translucent blue-white slot before
           flagCtx.fillStyle = isLit ? '#ffffff' : 'rgba(255, 255, 255, 0.16)';
           flagCtx.fillRect(bx, by + waveY, bw, bh);
         });
@@ -1055,7 +1413,6 @@
       if (machineState !== 'WARNING') return;
       const elapsed = (timestamp - warningStartTime) / 1000;
       const stepDuration = 0.52;
-      // Step through 1..8 milestones as the 8 infinity segments fill in
       const filledPieces = Math.min(8, Math.floor(elapsed / stepDuration) + 1);
 
       drawWavingMetisFlag(filledPieces, elapsed);
@@ -1071,6 +1428,30 @@
         return;
       }
       requestAnimationFrame(warningLoop);
+    }
+
+    /* --- FULL MACHINE RESTART (BACK TO BUFFALOHYDE BOOT SPLASH) --- */
+    function restartMachine() {
+      stopSendingDirection();
+      stopAllMenuAudio();
+      isFramePaused = false;
+      pausedRAFCallbacks = [];
+      pauseOverlay.style.display = 'none';
+      staticSplash.style.display = 'none';
+      loadingWarning.style.display = 'none';
+      gameCarousel.style.display = 'none';
+      gameFrame.src = '';
+      gameFrame.style.display = 'none';
+      isPlaying = false;
+      isCarouselMinimized = false;
+      daylightLevel = 0.0;
+      daylightTarget = 0.0;
+      gameCarousel.classList.remove('scenic-mode');
+
+      machineState = 'BOOT';
+      splashState = 'WAITING';
+      bootSplash.style.display = 'flex';
+      requestAnimationFrame(bootLoop);
     }
 
     /* --- BWAA BRULE TITLE SCREEN + ST. BONIFACE CATHEDRAL + YORK BOAT BRIGADE --- */
@@ -1105,15 +1486,38 @@
       panoTargetAngle = (currentIndex / GAME_CATALOG.length) * 360;
     }
 
-    function openCarouselMenu() {
+    function setCarouselMinimized(minimized) {
+      if (isCarouselMinimized === minimized) return;
+      isCarouselMinimized = minimized;
+      daylightTarget = minimized ? 1.0 : 0.0;
+      gameCarousel.classList.toggle('scenic-mode', minimized);
+      carouselPrompt.innerHTML = minimized
+        ? '&#9664;/&#9654; PAN FORKS &bull; &#9650; CARD VIEW &bull; A: PLAY'
+        : '&#9664;/&#9654; BROWSE &bull; &#9660; VIEW SETTLEMENT &bull; A: PLAY';
+      if (audioCtx) {
+        const f = minimized ? 659.25 : 493.88;
+        playPulseCall(f, 0, 0.055, 0.045);
+      }
+    }
+
+    function openCarouselMenu(keepMinimizedState = false) {
       machineState = 'MENU';
       staticSplash.style.display = 'none';
       loadingWarning.style.display = 'none';
       pauseOverlay.style.display = 'none';
       gameCarousel.style.display = 'flex';
       jigFadeVolume = 1.0;
+      if (!keepMinimizedState) {
+        isCarouselMinimized = false;
+        daylightLevel = 0.0;
+        daylightTarget = 0.0;
+        gameCarousel.classList.remove('scenic-mode');
+        carouselPrompt.innerHTML = '&#9664;/&#9654; BROWSE &bull; &#9660; VIEW SETTLEMENT &bull; A: PLAY';
+      }
       syncPanoramaTarget();
-      panoCurrentAngle = panoTargetAngle;
+      if (!keepMinimizedState) {
+        panoCurrentAngle = panoTargetAngle;
+      }
       updateCarouselUI();
       if (!jigLoopRunning) {
         startRedRiverJigLoop(1.0);
@@ -1144,7 +1548,7 @@
         btnAction(actionType);
         e.target.classList.add('active-press');
         setTimeout(() => e.target.classList.remove('active-press'), 150);
-      } else if (actionType === 'HOME') {
+      } else if (actionType === 'START') {
         e.target.classList.add('active-press');
         setTimeout(() => e.target.classList.remove('active-press'), 150);
         handleSystemMenuTrigger();
@@ -1155,24 +1559,43 @@
       if (machineState === 'PLAYING') {
         sendSignal(directionStr);
       } else if (machineState === 'MENU') {
-        if (directionStr === 'DPAD_LEFT' || directionStr === 'DPAD_UP') cycleCarousel(-1);
-        if (directionStr === 'DPAD_RIGHT' || directionStr === 'DPAD_DOWN') cycleCarousel(1);
+        if (directionStr === 'DPAD_LEFT') cycleCarousel(-1);
+        else if (directionStr === 'DPAD_RIGHT') cycleCarousel(1);
+        else if (directionStr === 'DPAD_DOWN') setCarouselMinimized(true);
+        else if (directionStr === 'DPAD_UP') setCarouselMinimized(false);
       } else if (machineState === 'PAUSED') {
-        if (directionStr === 'DPAD_UP') movePauseMenu(-1);
-        if (directionStr === 'DPAD_DOWN') movePauseMenu(1);
+        const visibleItems = getVisiblePauseItems();
+        const currentPauseAction = visibleItems[pauseIndex].dataset.action;
+        if (directionStr === 'DPAD_UP') {
+          movePauseMenu(-1);
+        } else if (directionStr === 'DPAD_DOWN') {
+          movePauseMenu(1);
+        } else if (currentPauseAction === 'VOLUME') {
+          if (directionStr === 'DPAD_LEFT') adjustVolume(-1);
+          if (directionStr === 'DPAD_RIGHT') adjustVolume(1);
+        }
       }
     }
 
     function updateCarouselUI() {
+      const game = GAME_CATALOG[currentIndex];
       const numStr = String(currentIndex + 1).padStart(2, '0');
       const totStr = String(GAME_CATALOG.length).padStart(2, '0');
       carouselCounter.textContent = `${numStr} / ${totStr}`;
+
+      miniBadge.textContent = game.badge;
+      miniBadge.style.background = game.accent;
+      miniTitle.textContent = game.title;
+      miniGenre.textContent = game.genre;
+      miniTitleCard.style.borderColor = game.accent;
+
       pipDots.forEach((dot, idx) => {
         dot.classList.toggle('active', idx === currentIndex);
       });
     }
 
     function triggerWipeReveal(direction) {
+      if (isCarouselMinimized) return;
       artboxWipe.classList.remove('wipe-left', 'wipe-right');
       void artboxWipe.offsetWidth;
       artboxWipe.classList.add(direction >= 0 ? 'wipe-left' : 'wipe-right');
@@ -1204,35 +1627,84 @@
       if (machineState === 'MENU') cycleCarousel(1);
     });
 
+    miniPrev.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (machineState === 'MENU') cycleCarousel(-1);
+    });
+
+    miniNext.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (machineState === 'MENU') cycleCarousel(1);
+    });
+
+    miniTitleCard.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (machineState === 'MENU') btnAction('BUTTON_A');
+    });
+
     artboxFrame.addEventListener('click', (e) => {
       e.stopPropagation();
       if (machineState === 'MENU') btnAction('BUTTON_A');
     });
 
-    function movePauseMenu(direction) {
-      pauseItems[pauseIndex].classList.remove('active');
-      pauseIndex += direction;
-      if (pauseIndex < 0) pauseIndex = pauseItems.length - 1;
-      if (pauseIndex >= pauseItems.length) pauseIndex = 0;
-      pauseItems[pauseIndex].classList.add('active');
+    /* --- CONTEXT-AWARE PAUSE & SETTINGS OVERLAY --- */
+    function getVisiblePauseItems() {
+      return pauseItems.filter(item => item.style.display !== 'none');
     }
 
-    function openPauseMenu() {
-      if (machineState !== 'PLAYING') return;
+    function configurePauseOverlay(origin) {
+      pauseOrigin = origin;
+      pauseItems.forEach(item => item.classList.remove('active'));
+
+      if (origin === 'MENU') {
+        pauseHeader.textContent = 'SYSTEM SETTINGS';
+        pauseRestartRow.style.display = 'flex';
+        pauseRestartRow.dataset.action = 'RESTART_MACHINE';
+        pauseRestartRow.querySelector('.item-label').textContent = 'Restart Machine';
+        pauseMenuRow.style.display = 'none';
+      } else {
+        pauseHeader.textContent = 'SYSTEM PAUSED';
+        pauseRestartRow.style.display = 'flex';
+        pauseRestartRow.dataset.action = 'RESTART_GAME';
+        pauseRestartRow.querySelector('.item-label').textContent = 'Restart Game';
+        pauseMenuRow.style.display = 'flex';
+      }
+
+      const visible = getVisiblePauseItems();
+      pauseIndex = 0;
+      visible[0].classList.add('active');
+      updateVolumeUI();
+    }
+
+    function movePauseMenu(direction) {
+      const visible = getVisiblePauseItems();
+      visible[pauseIndex].classList.remove('active');
+      pauseIndex += direction;
+      if (pauseIndex < 0) pauseIndex = visible.length - 1;
+      if (pauseIndex >= visible.length) pauseIndex = 0;
+      visible[pauseIndex].classList.add('active');
+    }
+
+    function openPauseMenu(origin = 'PLAYING') {
+      if (machineState !== 'PLAYING' && machineState !== 'MENU') return;
       stopSendingDirection();
       machineState = 'PAUSED';
-      pauseItems[pauseIndex].classList.remove('active');
-      pauseIndex = 0;
-      pauseItems[pauseIndex].classList.add('active');
-      setFramePaused(true);
+      configurePauseOverlay(origin);
+      if (origin === 'PLAYING') {
+        setFramePaused(true);
+      }
       pauseOverlay.style.display = 'flex';
     }
 
-    function resumeGame() {
+    function resumeFromPause() {
       if (machineState !== 'PAUSED') return;
       pauseOverlay.style.display = 'none';
-      machineState = 'PLAYING';
-      setFramePaused(false);
+      if (pauseOrigin === 'MENU') {
+        openCarouselMenu(true);
+      } else {
+        machineState = 'PLAYING';
+        setFramePaused(false);
+      }
     }
 
     function restartGame() {
@@ -1256,23 +1728,29 @@
       gameFrame.src = "";
       gameFrame.style.display = 'none';
       isPlaying = false;
-      openCarouselMenu();
+      openCarouselMenu(false);
     }
 
     function executePauseSelection() {
-      const action = pauseItems[pauseIndex].dataset.action;
-      if (action === 'RESUME') resumeGame();
-      else if (action === 'RESTART') restartGame();
+      const visible = getVisiblePauseItems();
+      const action = visible[pauseIndex].dataset.action;
+      if (action === 'RESUME') resumeFromPause();
+      else if (action === 'VOLUME') cycleVolume();
+      else if (action === 'RESTART_GAME') restartGame();
+      else if (action === 'RESTART_MACHINE') restartMachine();
       else if (action === 'MENU') returnToGameMenu();
     }
 
-    pauseItems.forEach((item, idx) => {
+    pauseItems.forEach((item) => {
       item.addEventListener('click', (e) => {
         e.stopPropagation();
         if (machineState !== 'PAUSED') return;
-        pauseItems[pauseIndex].classList.remove('active');
+        const visible = getVisiblePauseItems();
+        const idx = visible.indexOf(item);
+        if (idx === -1) return;
+        visible[pauseIndex].classList.remove('active');
         pauseIndex = idx;
-        pauseItems[pauseIndex].classList.add('active');
+        visible[pauseIndex].classList.add('active');
         executePauseSelection();
       });
     });
@@ -1284,14 +1762,18 @@
         sendSignal(buttonStr);
       } else if (machineState === 'PAUSED') {
         if (buttonStr === 'BUTTON_A') executePauseSelection();
-        else if (buttonStr === 'BUTTON_B') resumeGame();
+        else if (buttonStr === 'BUTTON_B') resumeFromPause();
       } else if (machineState === 'STATIC' && buttonStr === 'BUTTON_A') {
-        openCarouselMenu();
+        openCarouselMenu(false);
       } else if (machineState === 'MENU') {
         if (buttonStr === 'BUTTON_A') {
           launchSelectedGame();
         } else if (buttonStr === 'BUTTON_B') {
-          returnToSplash();
+          if (isCarouselMinimized) {
+            setCarouselMinimized(false);
+          } else {
+            returnToSplash();
+          }
         }
       }
     }
@@ -1310,11 +1792,11 @@
 
     function handleSystemMenuTrigger() {
       if (machineState === 'PLAYING') {
-        openPauseMenu();
-      } else if (machineState === 'PAUSED') {
-        resumeGame();
+        openPauseMenu('PLAYING');
       } else if (machineState === 'MENU') {
-        returnToSplash();
+        openPauseMenu('MENU');
+      } else if (machineState === 'PAUSED') {
+        resumeFromPause();
       }
     }
 
@@ -1324,8 +1806,8 @@
     let isDragging = false;
     let currentDir = null;
     let activeBroadcastDir = null;
-    const maxRadius = 26; 
-    const deadzone = 11;  
+    const maxRadius = 30; 
+    const deadzone = 12;  
 
     let holdTimer = null;
     let repeatInterval = null;
@@ -1427,7 +1909,7 @@
     window.addEventListener('mouseup', endDrag);
     window.addEventListener('touchend', endDrag);
 
-    /* --- KEYBOARD INPUT HANDLERS (ARROWS = DPAD, Z/A = A, X/B = B, ESC = PAUSE) --- */
+    /* --- KEYBOARD INPUT HANDLERS (ARROWS = DPAD, Z/A = A, X/B = B, ESC = PAUSE/SETTINGS) --- */
     const activeDirectionKeys = new Set();
     const ARROW_TO_DIR = {
       ArrowUp: 'DPAD_UP',
@@ -1495,7 +1977,7 @@
       if (key === 'Escape' || key === 'Esc') {
         e.preventDefault();
         if (e.repeat) return;
-        btnHomeEl.classList.add('active-press');
+        btnStartEl.classList.add('active-press');
         handleSystemMenuTrigger();
         return;
       }
@@ -1526,7 +2008,7 @@
 
       if (key === 'Escape' || key === 'Esc') {
         e.preventDefault();
-        btnHomeEl.classList.remove('active-press');
+        btnStartEl.classList.remove('active-press');
         return;
       }
     });
@@ -1536,10 +2018,17 @@
       syncKeyboardJoystick();
       btnAEl.classList.remove('active-press');
       btnBEl.classList.remove('active-press');
-      btnHomeEl.classList.remove('active-press');
+      btnStartEl.classList.remove('active-press');
     });
 
     /* --- 1860s ST. BONIFACE CATHEDRAL, RIVERBANK, YORK BOAT BRIGADE & 360° FORKS PANORAMA --- */
+    function lerpRgb(c1, c2, t) {
+      const r = Math.round(c1[0] + (c2[0] - c1[0]) * t);
+      const g = Math.round(c1[1] + (c2[1] - c1[1]) * t);
+      const b = Math.round(c1[2] + (c2[2] - c1[2]) * t);
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+
     function drawPineTree(ctx, x, y, scale, snowy = false) {
       const s = scale;
       ctx.fillStyle = '#3a2311';
@@ -1616,7 +2105,6 @@
       const leftX = Math.round(x - bodyW / 2);
       const topY = Math.round(baseY - bodyH);
 
-      // Main brick body
       ctx.fillStyle = '#8f2922';
       ctx.fillRect(leftX, topY, bodyW, bodyH);
       ctx.fillStyle = '#6b1c17';
@@ -1626,14 +2114,12 @@
         ctx.fillRect(leftX + 3, by, bodyW - 6, 2);
       }
 
-      // Steep pitched center gable
       ctx.fillStyle = '#8f2922';
       ctx.fillRect(Math.round(x - 16 * s), Math.round(topY - 12 * s), Math.round(32 * s), Math.round(12 * s));
       ctx.fillRect(Math.round(x - 10 * s), Math.round(topY - 20 * s), Math.round(20 * s), Math.round(8 * s));
       ctx.fillStyle = '#dcd7c9';
       ctx.fillRect(Math.round(x - 16 * s), Math.round(topY - 12 * s), Math.round(32 * s), 2);
 
-      // Rose Window & Arched Portal
       ctx.fillStyle = '#F7C844';
       ctx.fillRect(Math.round(x - 5 * s), Math.round(topY + 8 * s), Math.round(10 * s), Math.round(10 * s));
       ctx.fillStyle = '#3b150c';
@@ -1641,7 +2127,6 @@
       ctx.fillStyle = '#dcd7c9';
       ctx.fillRect(Math.round(x - 8 * s), Math.round(baseY - 20 * s), Math.round(16 * s), 2);
 
-      // Twin Brick Bell Towers & Gleaming Tin Spires
       const towerW = Math.round(16 * s);
       const towerH = Math.round(68 * s);
       const leftTowerX = Math.round(leftX - 2 * s);
@@ -1678,15 +2163,198 @@
       });
     }
 
-    // Portage La Loche Brigade York Boat:
-    // Guide Bonami L'Espérance at the bow (left), Michel Dumas at the steering sweep (right),
-    // and 5 voyageurs in blue & HBC-striped capotes including a war-bonnet-clad Cree trader.
+    // Grey Nuns' Convent (1846-1860s White-Clapboard & Stone Two-Story Convent with Belfry & Dormers)
+    function drawGreyNunsConvent(ctx, x, baseY, scale = 1) {
+      const s = scale;
+      const w = Math.round(84 * s);
+      const h = Math.round(36 * s);
+      const lx = Math.round(x - w / 2);
+      const ty = Math.round(baseY - h);
+
+      ctx.fillStyle = '#4a3525';
+      ctx.fillRect(lx - 3, ty - Math.round(12 * s), w + 6, Math.round(12 * s));
+      ctx.fillStyle = '#634832';
+      ctx.fillRect(lx + 4, ty - Math.round(17 * s), w - 8, Math.round(6 * s));
+      ctx.fillStyle = '#f2efe9';
+      ctx.fillRect(Math.round(x - 6 * s), ty - Math.round(26 * s), Math.round(12 * s), Math.round(10 * s));
+      ctx.fillStyle = '#F7C844';
+      ctx.fillRect(Math.round(x - 1 * s), ty - Math.round(33 * s), 2, Math.round(7 * s));
+      ctx.fillRect(Math.round(x - 4 * s), ty - Math.round(31 * s), Math.round(8 * s), 2);
+
+      ctx.fillStyle = '#f2efe9';
+      ctx.fillRect(lx, ty, w, h);
+      ctx.fillStyle = '#dcd7c9';
+      ctx.fillRect(lx, ty + Math.round(h * 0.5), w, 2);
+
+      for (let wx = lx + Math.round(8 * s); wx <= lx + w - Math.round(14 * s); wx += Math.round(14 * s)) {
+        ctx.fillStyle = '#1e2b3a';
+        ctx.fillRect(wx, ty + Math.round(5 * s), Math.round(7 * s), Math.round(9 * s));
+        ctx.fillRect(wx, ty + Math.round(20 * s), Math.round(7 * s), Math.round(10 * s));
+        ctx.fillStyle = '#2d5e3e';
+        ctx.fillRect(wx - 2, ty + Math.round(5 * s), 2, Math.round(9 * s));
+        ctx.fillRect(wx + Math.round(7 * s), ty + Math.round(5 * s), 2, Math.round(9 * s));
+      }
+      ctx.fillStyle = '#5c3419';
+      ctx.fillRect(Math.round(x - 5 * s), baseY - Math.round(15 * s), Math.round(10 * s), Math.round(15 * s));
+    }
+
+    // Red River Log Cabin
+    function drawRedRiverLogHouse(ctx, x, baseY, scale = 1, hasSmoke = true, tick = 0) {
+      const s = scale;
+      const w = Math.round(38 * s);
+      const h = Math.round(22 * s);
+      const lx = Math.round(x - w / 2);
+      const ty = Math.round(baseY - h);
+
+      ctx.fillStyle = '#8a95ad';
+      ctx.fillRect(lx + w - Math.round(9 * s), ty - Math.round(16 * s), Math.round(6 * s), Math.round(16 * s));
+      if (hasSmoke) {
+        const drift = Math.round(Math.sin(tick * 0.05 + x) * 2);
+        ctx.fillStyle = 'rgba(245, 245, 245, 0.55)';
+        ctx.fillRect(lx + w - Math.round(7 * s) + drift, ty - Math.round(21 * s), 3, 3);
+        ctx.fillRect(lx + w - Math.round(5 * s) - drift, ty - Math.round(26 * s), 3, 3);
+      }
+
+      ctx.fillStyle = '#5c3b1e';
+      ctx.fillRect(lx - 2, ty - Math.round(9 * s), w + 4, Math.round(9 * s));
+      ctx.fillStyle = '#78502b';
+      ctx.fillRect(lx + 3, ty - Math.round(13 * s), w - 6, Math.round(5 * s));
+
+      ctx.fillStyle = '#7a4b26';
+      ctx.fillRect(lx, ty, w, h);
+      ctx.fillStyle = '#d9cbb8';
+      for (let ly = ty + 4; ly < baseY - 2; ly += Math.max(4, Math.round(5 * s))) {
+        ctx.fillRect(lx + 1, ly, w - 2, 1);
+      }
+
+      ctx.fillStyle = '#3b2110';
+      ctx.fillRect(lx + Math.round(7 * s), baseY - Math.round(13 * s), Math.round(7 * s), Math.round(13 * s));
+      ctx.fillStyle = '#F7C844';
+      ctx.fillRect(lx + Math.round(21 * s), ty + Math.round(7 * s), Math.round(8 * s), Math.round(7 * s));
+    }
+
+    // Turning Wooden Watermill on the Red River / Winnipeg Shore
+    function drawWatermill(ctx, x, baseY, tick) {
+      ctx.fillStyle = '#6b4423';
+      ctx.fillRect(x - 24, baseY - 30, 44, 30);
+      ctx.fillStyle = '#472c16';
+      ctx.fillRect(x - 27, baseY - 39, 50, 10);
+      ctx.fillStyle = '#F7C844';
+      ctx.fillRect(x - 16, baseY - 21, 8, 8);
+      ctx.fillRect(x + 2, baseY - 21, 8, 8);
+
+      const wheelX = x + 22;
+      const wheelY = baseY - 6;
+      const phase = Math.floor(tick / 8) % 2;
+      ctx.fillStyle = '#3a2311';
+      ctx.fillRect(wheelX - 12, wheelY - 12, 24, 24);
+      ctx.fillStyle = '#c4864b';
+      ctx.fillRect(wheelX - 9, wheelY - 9, 18, 18);
+      ctx.fillStyle = '#3a2311';
+      ctx.fillRect(wheelX - 5, wheelY - 5, 10, 10);
+      ctx.fillStyle = '#F7C844';
+      if (phase === 0) {
+        ctx.fillRect(wheelX - 14, wheelY - 2, 28, 4);
+        ctx.fillRect(wheelX - 2, wheelY - 14, 4, 28);
+      } else {
+        ctx.fillRect(wheelX - 11, wheelY - 11, 6, 6);
+        ctx.fillRect(wheelX + 5, wheelY + 5, 6, 6);
+        ctx.fillRect(wheelX + 5, wheelY - 11, 6, 6);
+        ctx.fillRect(wheelX - 11, wheelY + 5, 6, 6);
+      }
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
+      ctx.fillRect(wheelX - 14, baseY + 6, 26, 4);
+    }
+
+    // Bustling 1860s Red River Townspeople & Carts along the Shoreline
+    function drawSettlementTownsfolk(ctx, anchorX, baseY, tick, variant = 0) {
+      const walk = Math.round(Math.sin(tick * 0.08 + variant) * 6);
+      const stride = Math.floor(tick / 12) % 2;
+
+      if (variant === 0) {
+        const cx = anchorX + walk;
+        ctx.fillStyle = '#7a4b26';
+        ctx.fillRect(cx - 22, baseY - 14, 26, 8);
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(cx - 16, baseY - 12, 14, 12);
+        ctx.fillStyle = '#3a2311';
+        ctx.fillRect(cx - 12, baseY - 8, 6, 6);
+        const mx = cx + 10;
+        ctx.fillStyle = '#0038A8';
+        ctx.fillRect(mx, baseY - 14, 5, 9);
+        ctx.fillStyle = '#AD1C21';
+        ctx.fillRect(mx, baseY - 9, 5, 2);
+        ctx.fillStyle = '#8c5332';
+        ctx.fillRect(mx + 1, baseY - 18, 4, 4);
+        ctx.fillStyle = '#1e1b18';
+        ctx.fillRect(mx + 1 + stride, baseY - 5, 2, 5);
+        const wx = anchorX + 34 - walk;
+        ctx.fillStyle = '#dcd7c9';
+        ctx.fillRect(wx, baseY - 14, 5, 6);
+        ctx.fillStyle = '#732c3f';
+        ctx.fillRect(wx - 1, baseY - 8, 7, 8);
+        ctx.fillStyle = '#12AEA2';
+        ctx.fillRect(wx - 1, baseY - 4, 7, 1.5);
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(wx - 1, baseY - 2, 7, 1.5);
+        ctx.fillStyle = '#8c5332';
+        ctx.fillRect(wx + 1, baseY - 18, 4, 4);
+      } else if (variant === 1) {
+        const hx = anchorX - walk;
+        ctx.fillStyle = '#8c3b19';
+        ctx.fillRect(hx - 10, baseY - 11, 16, 7);
+        ctx.fillRect(hx + 3, baseY - 16, 6, 7);
+        ctx.fillRect(hx - 9 + stride * 2, baseY - 4, 3, 4);
+        ctx.fillRect(hx + 2 - stride * 2, baseY - 4, 3, 4);
+        ctx.fillStyle = '#12AEA2';
+        ctx.fillRect(hx - 4, baseY - 17, 5, 6);
+        ctx.fillStyle = '#AD1C21';
+        ctx.fillRect(hx - 7, baseY - 14, 8, 2);
+        ctx.fillStyle = '#dcd7c9';
+        ctx.fillRect(hx - 3, baseY - 20, 4, 3);
+
+        const ox = anchorX + 24 + walk;
+        ctx.fillStyle = '#AD1C21';
+        ctx.fillRect(ox, baseY - 15, 6, 8);
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(ox + 1, baseY - 14, 4, 2);
+        ctx.fillStyle = '#162447';
+        ctx.fillRect(ox + 1, baseY - 7, 4, 7);
+        ctx.fillStyle = '#dcd7c9';
+        ctx.fillRect(ox + 1, baseY - 19, 4, 4);
+        ctx.fillStyle = '#1e1b18';
+        ctx.fillRect(ox, baseY - 21, 6, 2);
+      } else {
+        const w1x = anchorX + walk;
+        ctx.fillStyle = '#12AEA2';
+        ctx.fillRect(w1x, baseY - 14, 5, 6);
+        ctx.fillStyle = '#0038A8';
+        ctx.fillRect(w1x - 1, baseY - 8, 7, 8);
+        ctx.fillStyle = '#AD1C21';
+        ctx.fillRect(w1x - 1, baseY - 4, 7, 1.5);
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(w1x - 1, baseY - 2, 7, 1.5);
+        ctx.fillStyle = '#8c5332';
+        ctx.fillRect(w1x + 1, baseY - 18, 4, 4);
+
+        const m2x = anchorX + 16 - walk;
+        ctx.fillStyle = '#f2efe9';
+        ctx.fillRect(m2x, baseY - 15, 5, 9);
+        ctx.fillStyle = '#AD1C21';
+        ctx.fillRect(m2x, baseY - 10, 5, 2);
+        ctx.fillStyle = '#8c5332';
+        ctx.fillRect(m2x + 1, baseY - 19, 4, 4);
+        ctx.fillStyle = '#AD1C21';
+        ctx.fillRect(m2x + 1, baseY - 21, 4, 2);
+      }
+    }
+
+    // Portage La Loche Brigade York Boat
     function drawPortageLaLocheYorkBoat(ctx, boatX, boatY, tick) {
       const bx = Math.round(boatX);
       const bobY = Math.round(boatY + Math.sin(tick * 0.1) * 1.5);
-      const oarPhase = Math.sin(tick * 0.16); // -1 to +1 rowing stroke
+      const oarPhase = Math.sin(tick * 0.16);
 
-      // 1. Shimmering Ripple Wake Trailing Behind the York Boat (to the right as it rows left)
       const wakeFlicker = Math.floor(tick / 10) % 2;
       ctx.fillStyle = 'rgba(255, 255, 255, 0.42)';
       ctx.fillRect(bx + 76, bobY + 12, 34 + wakeFlicker * 6, 3);
@@ -1694,20 +2362,17 @@
       ctx.fillStyle = 'rgba(247, 200, 68, 0.34)';
       ctx.fillRect(bx + 114, bobY + 15, 42, 3);
 
-      // 2. Crew of 7 Aboard the York Boat (Rowing Right -> Left)
-      // --- BOW GUIDE (Left): Bonami L'Espérance standing lookout with voyageur pole/hat ---
       const bowX = bx - 54;
-      ctx.fillStyle = '#12AEA2'; // Blue-teal capote
+      ctx.fillStyle = '#12AEA2';
       ctx.fillRect(bowX - 4, bobY - 18, 10, 18);
-      ctx.fillStyle = '#AD1C21'; // Red Métis sash
+      ctx.fillStyle = '#AD1C21';
       ctx.fillRect(bowX - 4, bobY - 10, 10, 3);
-      ctx.fillStyle = '#dcd7c9'; // Face
+      ctx.fillStyle = '#dcd7c9';
       ctx.fillRect(bowX - 3, bobY - 25, 8, 7);
-      ctx.fillStyle = '#3a2311'; // Guide's wide-brim hat
+      ctx.fillStyle = '#3a2311';
       ctx.fillRect(bowX - 6, bobY - 28, 14, 3);
       ctx.fillRect(bowX - 3, bobY - 31, 8, 3);
 
-      // --- 5 MIDSHIP CREW (4 Voyageurs in Blue & HBC-Stripe Capotes + 1 War-Bonnet Cree Trader) ---
       const crewPositions = [
         { dx: -36, type: 'HBC_WHITE' },
         { dx: -20, type: 'BLUE_CAPOTE' },
@@ -1716,29 +2381,26 @@
         { dx: 28,  type: 'BLUE_CAPOTE' }
       ];
 
-      crewPositions.forEach((member, idx) => {
+      crewPositions.forEach((member) => {
         const mx = bx + member.dx;
         const lean = Math.round(oarPhase * 2);
 
         if (member.type === 'CREE_BONNET') {
-          // Cree Trader wearing buckskin/capote & trailing eagle-feather war bonnet
           ctx.fillStyle = '#c9935b';
           ctx.fillRect(mx - 4 + lean, bobY - 15, 9, 15);
           ctx.fillStyle = '#AD1C21';
           ctx.fillRect(mx - 4 + lean, bobY - 9, 9, 3);
           ctx.fillStyle = '#b87444';
           ctx.fillRect(mx - 3 + lean, bobY - 22, 7, 7);
-          // Feathered War Bonnet crown & trailing feathers down back (to the right)
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(mx - 2 + lean, bobY - 27, 7, 5);
           ctx.fillRect(mx + 4 + lean, bobY - 23, 5, 13);
-          ctx.fillStyle = '#1e1b18'; // Black feather tips
+          ctx.fillStyle = '#1e1b18';
           ctx.fillRect(mx - 2 + lean, bobY - 28, 7, 2);
           ctx.fillRect(mx + 7 + lean, bobY - 23, 2, 13);
-          ctx.fillStyle = '#AD1C21'; // Red brow band
+          ctx.fillStyle = '#AD1C21';
           ctx.fillRect(mx - 3 + lean, bobY - 23, 8, 2);
         } else if (member.type === 'HBC_WHITE') {
-          // Hudson's Bay Point Blanket Capote (Cream white with green/red/yellow/indigo stripes)
           ctx.fillStyle = '#f2efe9';
           ctx.fillRect(mx - 4 + lean, bobY - 15, 9, 15);
           ctx.fillStyle = '#1b4728';
@@ -1749,61 +2411,53 @@
           ctx.fillRect(mx - 4 + lean, bobY - 4, 9, 2);
           ctx.fillStyle = '#dcd7c9';
           ctx.fillRect(mx - 3 + lean, bobY - 21, 7, 6);
-          ctx.fillStyle = '#AD1C21'; // Red voyageur tuque
+          ctx.fillStyle = '#AD1C21';
           ctx.fillRect(mx - 3 + lean, bobY - 25, 8, 4);
         } else {
-          // Classic Blue Capote with Red Sash
           ctx.fillStyle = '#0038A8';
           ctx.fillRect(mx - 4 + lean, bobY - 15, 9, 15);
           ctx.fillStyle = '#AD1C21';
           ctx.fillRect(mx - 4 + lean, bobY - 8, 9, 3);
           ctx.fillStyle = '#dcd7c9';
           ctx.fillRect(mx - 3 + lean, bobY - 21, 7, 6);
-          ctx.fillStyle = '#0038A8'; // Blue tuque
+          ctx.fillStyle = '#0038A8';
           ctx.fillRect(mx - 3 + lean, bobY - 25, 8, 4);
         }
       });
 
-      // Cargo Bales amidships
       ctx.fillStyle = '#826e2e';
       ctx.fillRect(bx - 12, bobY - 8, 28, 9);
       ctx.fillStyle = '#F7C844';
       ctx.fillRect(bx - 4, bobY - 8, 3, 9);
       ctx.fillRect(bx + 8, bobY - 8, 3, 9);
 
-      // --- STERN STEERSMAN (Right): Michel Dumas standing at the long steering sweep ---
       const sternX = bx + 52;
-      ctx.fillStyle = '#0038A8'; // Blue capote
+      ctx.fillStyle = '#0038A8';
       ctx.fillRect(sternX - 4, bobY - 19, 10, 19);
-      ctx.fillStyle = '#F7C844'; // Gold/red sash
+      ctx.fillStyle = '#F7C844';
       ctx.fillRect(sternX - 4, bobY - 11, 10, 3);
       ctx.fillStyle = '#dcd7c9';
       ctx.fillRect(sternX - 3, bobY - 26, 8, 7);
-      ctx.fillStyle = '#AD1C21'; // Red tuque
+      ctx.fillStyle = '#AD1C21';
       ctx.fillRect(sternX - 3, bobY - 30, 9, 4);
 
-      // 3. Double-Ended Timber York Boat Hull (High pointed bow & stern posts)
       ctx.fillStyle = '#6b4423';
       ctx.fillRect(bx - 60, bobY, 120, 14);
       ctx.fillStyle = '#8f5a2b';
       ctx.fillRect(bx - 56, bobY + 2, 112, 5);
-      // High pointed York boat stem & stern posts
       ctx.fillStyle = '#4a2d15';
       ctx.fillRect(bx - 68, bobY - 8, 10, 14);
       ctx.fillRect(bx - 72, bobY - 13, 6, 8);
       ctx.fillRect(bx + 58, bobY - 8, 10, 14);
       ctx.fillRect(bx + 66, bobY - 13, 6, 8);
-      // Crimson & Gold gunwale trim
       ctx.fillStyle = '#AD1C21';
       ctx.fillRect(bx - 58, bobY, 116, 3);
 
-      // 4. Michel Dumas's Long Steering Sweep Oar trailing off the stern
       const sweepY = Math.round(Math.sin(tick * 0.12) * 2);
       ctx.fillStyle = '#d9a760';
       ctx.fillRect(sternX - 4, bobY - 12, 34, 3);
       ctx.fillRect(sternX + 28, bobY - 10 + sweepY, 14, 5);
 
-      // 5. Animated Rowing Oars Dipping into the Red River
       const oarTipX = Math.round(oarPhase * 7);
       const oarDipY = oarPhase > 0 ? 18 : 13;
       [-34, -18, -2, 14, 28].forEach((odx) => {
@@ -1811,7 +2465,6 @@
         ctx.fillStyle = '#e8c382';
         ctx.fillRect(ox, bobY + 3, 3, oarDipY - 3);
         ctx.fillRect(ox + oarTipX - 1, bobY + oarDipY, 5, 4);
-        // Tiny water splash when oar catches water
         if (oarPhase > 0.35) {
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(ox + oarTipX - 3, bobY + oarDipY - 1, 2, 2);
@@ -1819,12 +2472,9 @@
       });
     }
 
-    // Draws the Bwaa Brule title screen background:
-    // Sunrise behind 1860s St. Boniface Cathedral + Riverbank in front + Portage La Loche York Boat Brigade
     function drawStBonifaceIntroScene(ctx, W, H, progress, boatCenterX, tick) {
       const p = Math.max(0, Math.min(1, progress));
 
-      // Sky gradient bands warming from pre-dawn indigo to rose-gold sunrise
       const skyBands = [
         { r: 10 + p * 34, g: 12 + p * 38, b: 26 + p * 74 },
         { r: 18 + p * 96, g: 16 + p * 54, b: 36 + p * 68 },
@@ -1837,7 +2487,6 @@
         ctx.fillRect(0, idx * bandH, W, bandH + 1);
       });
 
-      // Rising Prairie Sun behind the Twin Tin Towers of St. Boniface
       const sunX = Math.round(W * 0.5 + 34);
       const sunY = Math.round(H * 0.54 - p * (H * 0.22));
       if (p > 0.08) {
@@ -1849,7 +2498,6 @@
         ctx.fillRect(sunX - 16, sunY - 16, 32, 32);
       }
 
-      // Eastern St. Boniface Shoreline & Trees behind the Cathedral
       const cathedralBaseY = Math.round(H * 0.48);
       const driftSlow = Math.round(Math.sin(tick * 0.008) * 4);
 
@@ -1863,28 +2511,22 @@
       drawPineTree(ctx, W - 122 + driftSlow, cathedralBaseY - 2, 1.3, false);
       drawOakTree(ctx, W - 64 + driftSlow, cathedralBaseY - 2, 1.25);
 
-      // 1860s St. Boniface Cathedral (Brick face, tin twin towers)
       drawStBonifaceCathedral1860(ctx, Math.round(W * 0.5) + driftSlow, cathedralBaseY + 2, 1.35, p);
 
-      // Riverbank in Front of the Cathedral (Grassy upper slope + Red River clay bank)
       const bankTopY = cathedralBaseY + 2;
       ctx.fillStyle = `rgb(${Math.round(28 + p * 54)}, ${Math.round(44 + p * 64)}, ${Math.round(24 + p * 28)})`;
       ctx.fillRect(0, bankTopY, W, 14);
-      // Warm Red River clay/earth embankment sloping down to the water's edge
       ctx.fillStyle = `rgb(${Math.round(42 + p * 74)}, ${Math.round(26 + p * 44)}, ${Math.round(18 + p * 24)})`;
       ctx.fillRect(0, bankTopY + 14, W, 12);
-      // Shore reed tufts along the St. Boniface riverbank
       ctx.fillStyle = `rgb(${Math.round(38 + p * 72)}, ${Math.round(52 + p * 72)}, ${Math.round(24 + p * 26)})`;
       for (let rx = 18; rx < W - 16; rx += 46) {
         ctx.fillRect(rx + driftSlow, bankTopY + 8, 12, 6);
       }
 
-      // Red River Waters in Front of the Bank
       const waterY = bankTopY + 26;
       ctx.fillStyle = `rgb(${Math.round(14 + p * 28)}, ${Math.round(30 + p * 56)}, ${Math.round(46 + p * 70)})`;
       ctx.fillRect(0, waterY, W, H - waterY);
 
-      // Shimmering Sunrise Reflection Path across the Red River
       const wave = Math.floor(tick / 16) % 2;
       if (p > 0.12) {
         ctx.fillStyle = `rgba(247, 200, 68, ${Math.min(0.42, p * 0.45)})`;
@@ -1895,12 +2537,10 @@
         }
       }
 
-      // Portage La Loche Brigade York Boat Rowing Right -> Left down the Red River
       if (boatCenterX !== null) {
         drawPortageLaLocheYorkBoat(ctx, boatCenterX, waterY + 34, tick);
       }
 
-      // Near Foreground Forks Shoreline framing the bottom edge
       ctx.fillStyle = `rgb(${Math.round(16 + p * 30)}, ${Math.round(24 + p * 40)}, ${Math.round(14 + p * 20)})`;
       ctx.fillRect(0, H - 38, W, 38);
       ctx.fillStyle = `rgb(${Math.round(26 + p * 46)}, ${Math.round(38 + p * 56)}, ${Math.round(20 + p * 24)})`;
@@ -1908,45 +2548,178 @@
       ctx.fillRect(W - 155, H - 42, 155, 6);
     }
 
-    // 360-Degree Panoramic Sweep of the 1860s Forks
+    // 360-Degree Panoramic Sweep of the 1860s Forks:
+    // Exact Geographical Clockwise Order:
+    // 1. St. Boniface Cathedral & Convent (x = 180)
+    // 2. Red River Facing South (x = 520)
+    // 3. Fort Rouge — Forks with Assiniboine River on RIGHT frame (x = 880)
+    // 4. Upper Fort Garry — Assiniboine just to the left off-frame (x = 1220)
+    // 5. Early "Winnipeg" Settlement — Saloon, Shop & Watermill immediate right of Fort Garry (x = 1520)
+    // 6. Red River Facing North / Point Douglas (x = 1880)
+    // 7. St. Boniface Village — Log Houses & Townsfolk returning to St. Boniface Cathedral (x = 2200)
     const panoCanvas = document.getElementById('forksPanoramaCanvas');
     const pCtx = panoCanvas.getContext('2d');
     pCtx.imageSmoothingEnabled = false;
 
-    function drawForks360Panorama(ctx, angleDeg, tick) {
+    function drawForks360Panorama(ctx, angleDeg, tick, dayT = 0) {
       const W = panoCanvas.width;
       const H = panoCanvas.height;
       const PANO_W = 2400;
       const normAngle = ((angleDeg % 360) + 360) % 360;
-      const camX = (normAngle / 360) * PANO_W;
-
-      ctx.fillStyle = '#182b3e';
-      ctx.fillRect(0, 0, W, Math.round(H * 0.52));
-      ctx.fillStyle = '#0f3b52';
-      ctx.fillRect(0, Math.round(H * 0.52), W, Math.round(H * 0.48));
+      // Offset camera so index 0 centers cleanly on St. Boniface Cathedral & Convent
+      const camX = ((normAngle / 360) * PANO_W - 100 + PANO_W) % PANO_W;
 
       function worldToScreenX(wx) {
         let dx = ((wx - camX) % PANO_W + PANO_W) % PANO_W;
-        if (dx > PANO_W - 260) dx -= PANO_W;
+        if (dx > PANO_W - 340) dx -= PANO_W;
         return Math.round(dx);
       }
 
       const bankY = Math.round(H * 0.52);
 
-      ctx.fillStyle = '#364f38';
+      // 1. Sky Gradient Bands interpolating from Indigo Twilight (dayT=0) to Golden-Blue Morning Sunrise (dayT=1)
+      const nightSky = [
+        [30, 43, 84],
+        [40, 57, 107],
+        [51, 72, 130],
+        [64, 88, 153]
+      ];
+      const daySky = [
+        [68, 132, 198],
+        [108, 168, 214],
+        [226, 164, 108],
+        [247, 206, 128]
+      ];
+      const bandH = Math.ceil(bankY / nightSky.length);
+      for (let i = 0; i < nightSky.length; i++) {
+        ctx.fillStyle = lerpRgb(nightSky[i], daySky[i], dayT);
+        ctx.fillRect(0, i * bandH, W, bandH + 1);
+      }
+
+      // 2. Twinkling Stars (Occluded cleanly by dark lunar disc!)
+      const starAlpha = Math.max(0, 1 - dayT * 1.45);
+      if (starAlpha > 0.02) {
+        for (let i = 0; i < 42; i++) {
+          const sx = worldToScreenX((i * 57 + 23) % PANO_W);
+          if (sx < -10 || sx > W + 10) continue;
+          const sy = 14 + ((i * 37) % (bankY - 36));
+          const twinkle = Math.sin(tick * 0.06 + i * 1.7);
+
+          if (twinkle > 0.2) {
+            ctx.fillStyle = `rgba(255, 248, 214, ${(0.42 * starAlpha).toFixed(3)})`;
+            ctx.fillRect(sx - 3, sy, 8, 2);
+            ctx.fillRect(sx, sy - 3, 2, 8);
+            ctx.fillStyle = `rgba(255, 255, 255, ${starAlpha.toFixed(3)})`;
+            ctx.fillRect(sx, sy, 2, 2);
+          } else {
+            ctx.fillStyle = `rgba(220, 232, 255, ${(0.78 * starAlpha).toFixed(3)})`;
+            ctx.fillRect(sx, sy, 2, 2);
+          }
+        }
+      }
+
+      // 3. Crescent Moon with Full Dark Lunar Disc Occlusion (Stars never shine through the dark moon body)
+      const moonX = worldToScreenX(1180);
+      const moonY = Math.round(44 + dayT * (bankY + 26));
+      if (moonX > -80 && moonX < W + 80 && moonY < bankY + 20) {
+        ctx.fillStyle = `rgba(255, 244, 194, ${(0.20 * (1 - dayT * 0.6)).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(moonX, moonY, 20, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = lerpRgb(nightSky[1], daySky[1], dayT);
+        ctx.beginPath();
+        ctx.arc(moonX, moonY, 13, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(moonX, moonY, 13, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.fillStyle = '#fff5c0';
+        ctx.beginPath();
+        ctx.arc(moonX, moonY, 13, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(moonX - 14, moonY + 4, 28, 10);
+        ctx.fillStyle = lerpRgb(nightSky[1], daySky[1], dayT);
+        ctx.beginPath();
+        ctx.arc(moonX + 6, moonY - 4, 12, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // 4. Rising Golden Morning Sun during Sunrise (dayT > 0.12)
+      if (dayT > 0.12) {
+        const sunScreenX = Math.round(W * 0.72);
+        const sunScreenY = Math.round(bankY + 22 - dayT * (bankY * 0.68));
+        ctx.fillStyle = `rgba(247, 200, 68, ${(0.28 * dayT).toFixed(3)})`;
+        ctx.fillRect(sunScreenX - 36, sunScreenY - 36, 72, 72);
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(sunScreenX - 20, sunScreenY - 20, 40, 40);
+        ctx.fillStyle = '#fff8d6';
+        ctx.fillRect(sunScreenX - 13, sunScreenY - 13, 26, 26);
+      }
+
+      // 5. Forks River Waters
+      ctx.fillStyle = lerpRgb([24, 84, 117], [34, 124, 168], dayT);
+      ctx.fillRect(0, bankY, W, H - bankY);
+      ctx.fillStyle = lerpRgb([32, 107, 148], [52, 154, 198], dayT);
+      ctx.fillRect(0, bankY + 4, W, 28);
+
+      // Continuous Prairie & Riverbank Horizon Strip
+      ctx.fillStyle = lerpRgb([74, 110, 77], [104, 148, 86], dayT);
       ctx.fillRect(0, bankY - 12, W, 18);
-      ctx.fillStyle = '#5c4b23';
+      ctx.fillStyle = lerpRgb([128, 105, 50], [168, 134, 68], dayT);
       ctx.fillRect(0, bankY + 4, W, 8);
 
-      // 1. UPPER FORT GARRY
-      const ufgX = worldToScreenX(140);
-      if (ufgX > -220 && ufgX < W + 220) {
-        ctx.fillStyle = '#9aa3b8';
-        ctx.fillRect(ufgX - 90, bankY - 34, 180, 34);
-        ctx.fillStyle = '#6e768a';
-        ctx.fillRect(ufgX - 96, bankY - 42, 24, 42);
-        ctx.fillRect(ufgX + 72, bankY - 42, 24, 42);
-        ctx.fillStyle = '#dcd7c9';
+      // --- 1. ST. BONIFACE CATHEDRAL & GREY NUNS' CONVENT (x = 180) ---
+      const stbX = worldToScreenX(180);
+      if (stbX > -320 && stbX < W + 320) {
+        drawStBonifaceCathedral1860(ctx, stbX, bankY - 2, 1.22, 0.55 + dayT * 0.45);
+        // Grey Nuns' Convent immediately to the right of the Cathedral
+        drawGreyNunsConvent(ctx, stbX + 96, bankY - 2, 1.05);
+        drawPineTree(ctx, stbX + 154, bankY - 6, 1.25, false);
+        drawSettlementTownsfolk(ctx, stbX + 26, bankY + 4, tick, 0);
+      }
+
+      // --- 2. RED RIVER FACING SOUTH (x = 520) ---
+      const southX = worldToScreenX(520);
+      if (southX > -260 && southX < W + 260) {
+        // Wide southern Red River channel cutting into the prairie horizon
+        ctx.fillStyle = lerpRgb([32, 107, 148], [52, 154, 198], dayT);
+        ctx.fillRect(southX - 64, bankY - 14, 128, 28);
+        drawPineTree(ctx, southX - 92, bankY - 8, 1.3, false);
+        drawOakTree(ctx, southX + 94, bankY - 8, 1.25);
+        drawSettlementTownsfolk(ctx, southX + 54, bankY + 4, tick, 2);
+      }
+
+      // --- 3. FORT ROUGE — LEFT OF UPPER FORT GARRY, WITH ASSINIBOINE RIVER ON RIGHT FRAME (x = 880) ---
+      const frX = worldToScreenX(880);
+      if (frX > -280 && frX < W + 280) {
+        drawOakTree(ctx, frX - 104, bankY - 8, 1.2);
+        // Tipi & wood log village on the Fort Rouge point
+        drawWesternTipi(ctx, frX - 66, bankY - 2, 0.95, tick);
+        drawRedRiverLogHouse(ctx, frX - 18, bankY - 2, 0.95, true, tick);
+        drawWesternTipi(ctx, frX + 24, bankY - 2, 0.85, tick);
+        drawSettlementTownsfolk(ctx, frX - 44, bankY + 4, tick, 0);
+
+        // Assiniboine River inflow on the RIGHT side of the Fort Rouge frame (separating Fort Rouge from Upper Fort Garry)
+        ctx.fillStyle = lerpRgb([24, 84, 117], [34, 124, 168], dayT);
+        ctx.fillRect(frX + 54, bankY - 14, 92, 28);
+        ctx.fillStyle = lerpRgb([32, 107, 148], [52, 154, 198], dayT);
+        ctx.fillRect(frX + 62, bankY - 12, 76, 24);
+      }
+
+      // --- 4. UPPER FORT GARRY — ASSINIBOINE JUST TO THE LEFT OFF-FRAME (x = 1220) ---
+      const ufgX = worldToScreenX(1220);
+      if (ufgX > -260 && ufgX < W + 260) {
+        ctx.fillStyle = '#bcc5d9';
+        ctx.fillRect(ufgX - 88, bankY - 34, 176, 34);
+        ctx.fillStyle = '#8a95ad';
+        ctx.fillRect(ufgX - 94, bankY - 42, 22, 42);
+        ctx.fillRect(ufgX + 72, bankY - 42, 22, 42);
+        ctx.fillStyle = '#f2ede0';
         ctx.fillRect(ufgX - 18, bankY - 46, 36, 46);
         ctx.fillStyle = '#1e1b18';
         ctx.fillRect(ufgX - 8, bankY - 22, 16, 22);
@@ -1956,77 +2729,81 @@
         ctx.fillRect(ufgX + 3, bankY - 72, 20, 12);
       }
 
-      // 2. ASSINIBOINE INFLOW
-      const assnX = worldToScreenX(440);
-      if (assnX > -220 && assnX < W + 220) {
-        ctx.fillStyle = '#144966';
-        ctx.fillRect(assnX - 55, bankY - 14, 110, 28);
-        drawOakTree(ctx, assnX - 85, bankY - 8, 1.3);
-        drawOakTree(ctx, assnX + 85, bankY - 8, 1.25);
+      // --- 5. EARLY "WINNIPEG" SETTLEMENT — SALOON, SHOP & WATERMILL IMMEDIATE RIGHT OF FORT GARRY (x = 1520) ---
+      const wpgX = worldToScreenX(1520);
+      if (wpgX > -260 && wpgX < W + 260) {
+        // Wooden Saloon
+        ctx.fillStyle = '#7d4824';
+        ctx.fillRect(wpgX - 86, bankY - 36, 44, 34);
+        ctx.fillStyle = '#5c3419';
+        ctx.fillRect(wpgX - 88, bankY - 40, 48, 5);
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(wpgX - 80, bankY - 32, 32, 6);
+        ctx.fillRect(wpgX - 78, bankY - 20, 8, 8);
+        ctx.fillRect(wpgX - 58, bankY - 20, 8, 8);
+        ctx.fillStyle = '#2b190d';
+        ctx.fillRect(wpgX - 68, bankY - 14, 8, 12);
+
+        // General Trading Shop
+        ctx.fillStyle = '#a88f3d';
+        ctx.fillRect(wpgX - 34, bankY - 30, 42, 28);
+        ctx.fillStyle = '#AD1C21';
+        ctx.fillRect(wpgX - 36, bankY - 18, 46, 5);
+        ctx.fillStyle = '#12AEA2';
+        ctx.fillRect(wpgX - 26, bankY - 26, 26, 5);
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(wpgX - 28, bankY - 12, 10, 7);
+
+        // Turning Watermill on the Winnipeg riverbank
+        drawWatermill(ctx, wpgX + 42, bankY + 2, tick);
+        drawSettlementTownsfolk(ctx, wpgX - 28, bankY + 4, tick, 1);
       }
 
-      // 3. VILLAGE AT FORT ROUGE
-      const frX = worldToScreenX(760);
-      if (frX > -220 && frX < W + 220) {
-        ctx.fillStyle = '#6b4423';
-        ctx.fillRect(frX - 68, bankY - 26, 42, 24);
-        ctx.fillRect(frX + 14, bankY - 24, 38, 22);
-        ctx.fillStyle = '#dcd7c9';
-        ctx.fillRect(frX - 72, bankY - 32, 50, 7);
-        ctx.fillRect(frX + 10, bankY - 30, 46, 7);
-        drawOakTree(ctx, frX - 12, bankY - 8, 1.15);
-      }
-
-      // 4. RED RIVER SOUTH
-      const southX = worldToScreenX(1080);
-      if (southX > -220 && southX < W + 220) {
-        ctx.fillStyle = '#144966';
-        ctx.fillRect(southX - 60, bankY - 14, 120, 28);
-        drawPineTree(ctx, southX - 88, bankY - 8, 1.3, false);
-        drawOakTree(ctx, southX + 92, bankY - 8, 1.2);
-      }
-
-      // 5. 1860s ST. BONIFACE CATHEDRAL
-      const stbX = worldToScreenX(1420);
-      if (stbX > -240 && stbX < W + 240) {
-        drawOakTree(ctx, stbX - 84, bankY - 6, 1.2);
-        drawStBonifaceCathedral1860(ctx, stbX, bankY - 2, 1.2, 0.5);
-        drawPineTree(ctx, stbX + 86, bankY - 6, 1.25, false);
-      }
-
-      // 6. RED RIVER NORTH FACING POINT DOUGLAS
-      const pdX = worldToScreenX(1820);
-      if (pdX > -240 && pdX < W + 240) {
-        ctx.fillStyle = '#144966';
+      // --- 6. RED RIVER FACING NORTH / POINT DOUGLAS (x = 1880) ---
+      const pdX = worldToScreenX(1880);
+      if (pdX > -260 && pdX < W + 260) {
+        ctx.fillStyle = lerpRgb([32, 107, 148], [52, 154, 198], dayT);
         ctx.fillRect(pdX - 95, bankY - 14, 70, 28);
         drawOakTree(ctx, pdX - 6, bankY - 8, 1.4);
-        drawPineTree(ctx, pdX + 34, bankY - 8, 1.35, false);
-        drawOakTree(ctx, pdX + 74, bankY - 8, 1.25);
-        ctx.fillStyle = '#7a4b12';
-        ctx.fillRect(pdX + 12, bankY - 22, 30, 18);
+        drawRedRiverLogHouse(ctx, pdX + 36, bankY - 2, 1.0, true, tick);
+        drawPineTree(ctx, pdX + 76, bankY - 8, 1.35, false);
+        drawOakTree(ctx, pdX + 112, bankY - 8, 1.25);
+        drawSettlementTownsfolk(ctx, pdX + 18, bankY + 4, tick, 1);
       }
 
-      // 7. EARLY "WINNIPEG" SETTLEMENT
-      const wpgX = worldToScreenX(2160);
-      if (wpgX > -240 && wpgX < W + 240) {
-        ctx.fillStyle = '#5c3419';
-        ctx.fillRect(wpgX - 80, bankY - 28, 36, 26);
-        ctx.fillStyle = '#826e2e';
-        ctx.fillRect(wpgX - 36, bankY - 34, 44, 32);
-        ctx.fillStyle = '#6b4423';
-        ctx.fillRect(wpgX + 16, bankY - 26, 38, 24);
-        ctx.fillStyle = '#F7C844';
-        ctx.fillRect(wpgX - 24, bankY - 22, 6, 6);
-        ctx.fillRect(wpgX - 10, bankY - 22, 6, 6);
-        ctx.fillRect(wpgX + 26, bankY - 18, 6, 6);
+      // --- 7. ST. BONIFACE VILLAGE — LOG HOUSES LEFT OF CATHEDRAL WRAPPING BACK TO ST. BONIFACE (x = 2200) ---
+      const sbvX = worldToScreenX(2200);
+      if (sbvX > -280 && sbvX < W + 280) {
+        drawOakTree(ctx, sbvX - 118, bankY - 8, 1.2);
+        drawRedRiverLogHouse(ctx, sbvX - 76, bankY - 2, 0.95, true, tick);
+        drawOakTree(ctx, sbvX - 36, bankY - 6, 1.15);
+        drawRedRiverLogHouse(ctx, sbvX + 6, bankY - 2, 1.0, true, tick);
+        drawOakTree(ctx, sbvX + 48, bankY - 6, 1.15);
+        drawRedRiverLogHouse(ctx, sbvX + 86, bankY - 2, 0.95, true, tick);
+        drawSettlementTownsfolk(ctx, sbvX - 42, bankY + 4, tick, 2);
+        drawSettlementTownsfolk(ctx, sbvX + 38, bankY + 4, tick, 0);
       }
 
+      // Animated Water Ripples & Passing Voyageur Canoe on the Forks
       const wave = Math.floor(tick / 18) % 2;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
+      ctx.fillStyle = dayT > 0.4 ? 'rgba(255, 248, 214, 0.42)' : 'rgba(255, 255, 255, 0.32)';
       for (let rx = 20; rx < W - 20; rx += 68) {
         const shift = wave === 0 ? 0 : 12;
         ctx.fillRect(rx + shift, bankY + 24, 24, 3);
         ctx.fillRect(rx + 18 - shift, bankY + 52, 20, 3);
+      }
+
+      if (dayT > 0.25) {
+        const canoeX = W - ((tick * 0.9) % (W + 140)) + 70;
+        const canoeY = bankY + 38 + Math.round(Math.sin(tick * 0.08) * 1.5);
+        ctx.fillStyle = '#e3cfa8';
+        ctx.fillRect(canoeX - 22, canoeY, 44, 6);
+        ctx.fillRect(canoeX - 26, canoeY - 3, 6, 4);
+        ctx.fillRect(canoeX + 20, canoeY - 3, 6, 4);
+        ctx.fillStyle = '#0038A8';
+        ctx.fillRect(canoeX - 4, canoeY - 7, 7, 7);
+        ctx.fillStyle = '#AD1C21';
+        ctx.fillRect(canoeX - 3, canoeY - 10, 5, 3);
       }
     }
 
@@ -2086,25 +2863,64 @@
           ctx.fillRect(x + 28, 174, 18, 3);
         }
 
-        const canoeY = Math.round(148 + bob);
-        ctx.fillStyle = '#d9a760';
-        ctx.fillRect(cx - 56, canoeY, 112, 14);
-        ctx.fillRect(cx - 66, canoeY - 6, 14, 10);
-        ctx.fillRect(cx + 52, canoeY - 6, 14, 10);
-        ctx.fillStyle = '#AD1C21';
-        ctx.fillRect(cx - 50, canoeY + 4, 100, 4);
+        const canoeY = Math.round(146 + bob);
 
-        ctx.fillStyle = '#12AEA2';
-        ctx.fillRect(cx - 8, canoeY - 18, 16, 18);
-        ctx.fillStyle = '#dcd7c9';
-        ctx.fillRect(cx - 5, canoeY - 27, 10, 9);
+        const px = cx - 4;
+        const py = canoeY - 2;
+        ctx.fillStyle = '#1e1b18';
+        ctx.fillRect(px - 6, py - 27, 13, 12);
+        ctx.fillStyle = '#8c5332';
+        ctx.fillRect(px - 4, py - 25, 10, 9);
         ctx.fillStyle = '#AD1C21';
-        ctx.fillRect(cx - 6, canoeY - 32, 12, 6);
-        ctx.fillRect(cx - 11, canoeY - 30, 5, 5);
-        const strokeX = wave === 0 ? -6 : 6;
+        ctx.fillRect(px - 5, py - 26, 12, 3);
         ctx.fillStyle = '#F7C844';
-        ctx.fillRect(cx - 18 + strokeX, canoeY - 12, 36, 3);
-        ctx.fillRect(cx - 22 + strokeX, canoeY - 4, 8, 14);
+        ctx.fillRect(px - 1, py - 26, 4, 3);
+
+        ctx.fillStyle = '#b5783a';
+        ctx.fillRect(px - 9, py - 16, 19, 17);
+        ctx.fillStyle = '#d99e5b';
+        ctx.fillRect(px - 11, py - 12, 3, 9);
+        ctx.fillRect(px + 9, py - 12, 3, 9);
+        ctx.fillRect(px - 6, py - 7, 2, 6);
+        ctx.fillRect(px - 1, py - 7, 2, 6);
+        ctx.fillRect(px + 4, py - 7, 2, 6);
+        ctx.fillStyle = '#AD1C21';
+        ctx.fillRect(px - 9, py - 5, 19, 4);
+
+        ctx.fillStyle = '#e3cfa8';
+        ctx.fillRect(cx - 56, canoeY, 112, 14);
+        ctx.fillStyle = '#cbb082';
+        ctx.fillRect(cx - 52, canoeY + 8, 104, 6);
+        ctx.fillStyle = '#e3cfa8';
+        ctx.fillRect(cx - 66, canoeY - 7, 12, 14);
+        ctx.fillRect(cx - 72, canoeY - 15, 9, 11);
+        ctx.fillRect(cx - 69, canoeY - 20, 6, 6);
+        ctx.fillRect(cx + 54, canoeY - 7, 12, 14);
+        ctx.fillRect(cx + 63, canoeY - 15, 9, 11);
+        ctx.fillRect(cx + 63, canoeY - 20, 6, 6);
+        ctx.fillStyle = '#2e1a0c';
+        ctx.fillRect(cx - 58, canoeY, 116, 2);
+        ctx.fillRect(cx - 46, canoeY + 2, 2, 11);
+        ctx.fillRect(cx - 22, canoeY + 2, 2, 12);
+        ctx.fillRect(cx + 22, canoeY + 2, 2, 12);
+        ctx.fillRect(cx + 46, canoeY + 2, 2, 11);
+        ctx.fillStyle = '#AD1C21';
+        ctx.fillRect(cx - 62, canoeY - 4, 8, 5);
+        ctx.fillRect(cx + 54, canoeY - 4, 8, 5);
+
+        const paddleAngle = 0.58 + Math.sin(tick * 0.14) * 0.24;
+        ctx.save();
+        ctx.translate(px + 2, py - 8);
+        ctx.rotate(paddleAngle);
+        ctx.fillStyle = '#6b4423';
+        ctx.fillRect(-2, -24, 4, 42);
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(-4, -26, 8, 3);
+        ctx.fillStyle = '#d99e5b';
+        ctx.fillRect(-4, 14, 8, 18);
+        ctx.fillStyle = '#AD1C21';
+        ctx.fillRect(-4, 19, 8, 3);
+        ctx.restore();
 
       } else if (game.artType === 'FIDDLE') {
         ctx.fillStyle = '#1a122b';
@@ -2609,8 +3425,17 @@
         panoCurrentAngle = panoTargetAngle;
       }
 
-      drawForks360Panorama(pCtx, panoCurrentAngle, carouselTick);
-      drawArtboxScene(aCtx, GAME_CATALOG[currentIndex], carouselTick);
+      const dayDiff = daylightTarget - daylightLevel;
+      if (Math.abs(dayDiff) > 0.005) {
+        daylightLevel += dayDiff * 0.045;
+      } else {
+        daylightLevel = daylightTarget;
+      }
+
+      drawForks360Panorama(pCtx, panoCurrentAngle, carouselTick, daylightLevel);
+      if (!isCarouselMinimized) {
+        drawArtboxScene(aCtx, GAME_CATALOG[currentIndex], carouselTick);
+      }
       requestAnimationFrame(artboxLoop);
     }
 
@@ -2635,7 +3460,7 @@
         context.globalAlpha = 1.0;
     }
 
-    /* --- 1-FOR-1 RED RIVER JIG FIDDLE ENGINE (GENTLE FADE-IN) --- */
+    /* --- 1-FOR-1 RED RIVER JIG FIDDLE ENGINE (GENTLE FADE-IN + MASTER VOLUME) --- */
     let jigInterval = null;
     let jigLoopRunning = false;
     let jigStepIndex = 0;
@@ -2655,7 +3480,6 @@
     };
 
     const RED_RIVER_JIG_SEQ = [
-      // A PART
       { f: N.A5,  d: 2, drone: N.D3, grace: N.Fs5 },
       { f: N.Fs5, d: 1, drone: null },
       { f: N.D5,  d: 1, drone: N.A3 },
@@ -2674,7 +3498,6 @@
       { f: N.B4,  d: 2, drone: N.A3 },
       { f: N.A4,  d: 2, drone: N.D3 },
 
-      // A-Part Repeat
       { f: N.A5,  d: 2, drone: N.D3, grace: N.Fs5 },
       { f: N.Fs5, d: 1, drone: null },
       { f: N.D5,  d: 1, drone: N.A3 },
@@ -2692,7 +3515,6 @@
       { f: N.E5,  d: 2, drone: N.A3 },
       { f: N.D5,  d: 4, drone: N.D3 },
 
-      // B PART
       { f: N.D4,  d: 1, drone: N.D3 },
       { f: N.Fs4, d: 1, drone: null },
       { f: N.A4,  d: 2, drone: N.A3, grace: N.G4 },
@@ -2711,7 +3533,6 @@
       { f: N.Fs4, d: 2, drone: N.D3 },
       { f: N.D4,  d: 2, drone: N.A3 },
 
-      // B-Part Crooked Turnaround
       { f: N.D4,  d: 1, drone: N.D3 },
       { f: N.Fs4, d: 1, drone: null },
       { f: N.A4,  d: 2, drone: N.A3 },
@@ -2730,10 +3551,11 @@
     ];
 
     function playFiddleBowNote(noteObj, stepSec) {
-      if (!audioCtx || !jigLoopRunning || jigFadeVolume <= 0.005) return;
+      const masterGain = getMasterGain();
+      if (!audioCtx || !jigLoopRunning || jigFadeVolume <= 0.005 || masterGain <= 0.001) return;
       const now = audioCtx.currentTime;
       const dur = noteObj.d * stepSec * 0.94;
-      const volScale = Math.max(0, Math.min(1, jigFadeVolume));
+      const volScale = Math.max(0, Math.min(1, jigFadeVolume)) * masterGain;
 
       const oscMain = audioCtx.createOscillator();
       const oscBow = audioCtx.createOscillator();
@@ -2864,7 +3686,6 @@
         const blackPause = bwaaIntroActive ? 0.8 : 0.0;
         const sunriseDuration = 3.8;
 
-        // Brief pause on pure black before sunrise & Red River Jig fade in
         if (elapsed < blackPause) {
             requestAnimationFrame(staticLoop);
             return;
@@ -2873,7 +3694,6 @@
         const animElapsed = elapsed - blackPause;
         const progress = bwaaIntroActive ? Math.min(1, animElapsed / sunriseDuration) : 1.0;
 
-        // Gently fade in the Red River Jig fiddle melody matching the sunrise behind the cathedral
         if (!jigStarted) {
             jigStarted = true;
             startRedRiverJigLoop(bwaaIntroActive ? 0.05 : 1.0);
@@ -2884,7 +3704,6 @@
             jigFadeVolume = 1.0;
         }
 
-        // Compute Portage La Loche York Boat horizontal position (rows Right -> Left after sunrise completes)
         let boatCenterX = null;
         let promptRevealAlpha = 1.0;
 
@@ -2899,7 +3718,6 @@
                 if (boatTime <= boatTraverseDur) {
                     boatCenterX = startX + (endX - startX) * (boatTime / boatTraverseDur);
                 }
-                // Reveal "Press A to start" in the boat's ripple wake as it passes the center Y axis
                 const centerX = sCanvas.width / 2;
                 const wakeTrailX = boatCenterX !== null ? (boatCenterX + 65) : endX;
                 if (wakeTrailX <= centerX + 90) {
@@ -2909,7 +3727,6 @@
                 }
             }
         } else {
-            // Looping periodic pass of the Portage La Loche York boat when returning from menu
             const cycle = (animElapsed % 9.5) / 6.5;
             if (cycle <= 1.0) {
                 boatCenterX = (sCanvas.width + 115) + (-135 - (sCanvas.width + 115)) * cycle;
@@ -2917,15 +3734,12 @@
             promptRevealAlpha = 1.0;
         }
 
-        // 1. Parallax Sunrise Scene + Riverbank in front of 1860s St. Boniface Cathedral + York Boat
         drawStBonifaceIntroScene(sCtx, sCanvas.width, sCanvas.height, progress, boatCenterX, staticTick);
 
-        // 2. Faint white atmospheric veil between the background and the Bwaa Brule text for crisp readability
         const veilAlpha = 0.22 * progress;
         sCtx.fillStyle = `rgba(255, 255, 255, ${veilAlpha.toFixed(3)})`;
         sCtx.fillRect(0, 0, sCanvas.width, sCanvas.height);
 
-        // 3. Slow Fade-In of the Bwaa Brule Logo
         const logoAlpha = bwaaIntroActive
           ? Math.max(0, Math.min(1, (progress - 0.12) / 0.88))
           : 1.0;
@@ -2942,7 +3756,6 @@
         drawMatrix(sCtx, BWAA_SPRITE, BWAA_PALETTE, -spriteW/2, -spriteH/2, pSize, logoAlpha);
         sCtx.restore();
 
-        // 4. Ripple-Wake Revealed "Press A to start" Prompt on the Red River
         if (promptRevealAlpha > 0.02) {
             const blink = Math.floor(timestamp / 500) % 2 === 0;
             const pulseAlpha = promptRevealAlpha * (blink ? 1.0 : 0.62);
@@ -2957,13 +3770,11 @@
             sCtx.restore();
         }
 
-        // 5. French Script Pixel Subtext "Saint Boniface, 1860" (No underline) at Bottom Center
         if (logoAlpha > 0.05) {
             sCtx.save();
             sCtx.globalAlpha = logoAlpha;
             sCtx.font = 'italic bold 20px Georgia, "Times New Roman", serif';
             sCtx.textAlign = 'center';
-            // Crisp pixel drop-shadow for readability over shoreline
             sCtx.fillStyle = '#090b12';
             sCtx.fillText("Saint Boniface, 1860", sCanvas.width / 2 + 2, sCanvas.height - 13);
             sCtx.fillStyle = '#F7C844';
@@ -3075,6 +3886,8 @@
     }
 
     function playHerdThud(frequency, delay, duration, volume) {
+        const masterGain = getMasterGain();
+        if (!audioCtx || masterGain <= 0.001) return;
         const now = audioCtx.currentTime + delay;
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
@@ -3083,7 +3896,7 @@
         osc.frequency.exponentialRampToValueAtTime(frequency, now + Math.min(0.06, duration * 0.5));
 
         gain.gain.setValueAtTime(0.001, now);
-        gain.gain.linearRampToValueAtTime(volume, now + 0.012);
+        gain.gain.linearRampToValueAtTime(volume * masterGain, now + 0.012);
         gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
         osc.connect(gain);
@@ -3093,6 +3906,8 @@
     }
 
     function playHoofNoise(delay, duration, volume) {
+        const masterGain = getMasterGain();
+        if (!audioCtx || masterGain <= 0.001) return;
         const now = audioCtx.currentTime + delay;
         const sampleRate = audioCtx.sampleRate;
         const frameCount = Math.max(1, Math.floor(sampleRate * duration));
@@ -3111,7 +3926,7 @@
         filter.Q.setValueAtTime(2.2, now);
 
         const gain = audioCtx.createGain();
-        gain.gain.setValueAtTime(volume, now);
+        gain.gain.setValueAtTime(volume * masterGain, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
         noise.connect(filter);
@@ -3122,6 +3937,8 @@
     }
 
     function playPulseCall(frequency, delay, duration, volume) {
+        const masterGain = getMasterGain();
+        if (!audioCtx || masterGain <= 0.001) return;
         const now = audioCtx.currentTime + delay;
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
@@ -3134,7 +3951,7 @@
 
         osc.frequency.setValueAtTime(frequency, now);
         gain.gain.setValueAtTime(0.001, now);
-        gain.gain.linearRampToValueAtTime(volume, now + 0.012);
+        gain.gain.linearRampToValueAtTime(volume * masterGain, now + 0.012);
         gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
         osc.connect(gain);
