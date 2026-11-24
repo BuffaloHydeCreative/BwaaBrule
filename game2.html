@@ -29,7 +29,7 @@
 </head>
 <body>
 <div id="game-container">
-  <canvas id="gameCanvas" width="600" height="400"></canvas>
+  <canvas id="gameCanvas" width="720" height="480"></canvas>
 </div>
 
 <script>
@@ -37,31 +37,29 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 // --- DYNAMIC FULL-BLEED VIEWPORT SCALING ---
-const BASE_H = 400;
-let VIEW_W = 600;
-let VIEW_H = 400;
-let HIT_ZONE_X = 100;
+const BASE_H = 480;
+let VIEW_W = 720;
+let VIEW_H = 480;
 
 function resizeViewport() {
-  const ww = window.innerWidth || 600;
-  const wh = window.innerHeight || 400;
+  const ww = window.innerWidth || 720;
+  const wh = window.innerHeight || 480;
   const aspect = ww / Math.max(1, wh);
   VIEW_H = BASE_H;
-  VIEW_W = Math.max(360, Math.round(BASE_H * aspect));
+  VIEW_W = Math.max(480, Math.round(BASE_H * aspect));
   canvas.width = VIEW_W;
   canvas.height = VIEW_H;
-  HIT_ZONE_X = Math.max(82, Math.min(140, Math.round(VIEW_W * 0.20)));
   ctx.imageSmoothingEnabled = false;
 }
 window.addEventListener('resize', resizeViewport);
 resizeViewport();
 
-// --- 1855 RED RIVER MICHIF PALETTE ---
+// --- 1855 RED RIVER MICHIF KITCHEN PARTY PALETTE ---
 const PAL = {
   INK: '#0E0705',
   PANEL_BG: '#160B07',
-  CARD_BG: '#24130C',
-  CARD_SEL: '#3A1C10',
+  CARD_BG: '#26140D',
+  CARD_SEL: '#3E1E11',
   LOG_DARK: '#2C160C',
   LOG_MID: '#4D2817',
   LOG_LIGHT: '#733E24',
@@ -81,19 +79,15 @@ const PAL = {
   SHAWL_PURPLE: '#6B2D5C',
   SKIN: '#E5B288',
   HAIR_DARK: '#1C110B',
-  BEARD_GREY: '#9EA4AB',
   BUFFALO_FUR: '#3B2314',
   IRON_DARK: '#2E343B',
   IRON_LIGHT: '#8D99A6',
   WHITE: '#FFFFFF',
-  DIM: '#7A685D'
+  DIM: '#8A786D'
 };
 
 // ============================================================================
-// PHASE 1 & PHASE 2 ROSTERS (WITH X / Y / Z STAT LINES: -10 TO +10)
-// Slot 1 drives X (Harmonic Mapping)
-// Slot 2 drives Y (Rhythmic Engine)
-// Slot 3 drives Z (Structural Macro)
+// PHASE 1 & PHASE 2 ROSTERS (BACKEND X / Y / Z ENGINE: -10 TO +10)
 // ============================================================================
 const FIDDLE_ROSTER = [
   {
@@ -101,25 +95,25 @@ const FIDDLE_ROSTER = [
     name: 'FIDDLER 1',
     style: 'RED RIVER JIG',
     x: 0, y: 0, z: 0,
-    desc: 'X:0 Y:0 Z:0 • True 1860 McDallas Red River Jig baseline',
+    desc: 'Classic 1860 McDallas push-up & turnaround',
     coat: PAL.CAPOTE_BLUE,
     hat: PAL.SASH_RED
   },
   {
     id: 'METIS_WALTZ',
     name: 'FIDDLER 2',
-    style: 'METIS WALTZ',
+    style: 'WEDDING WALTZ',
     x: 4, y: -7, z: -4,
-    desc: 'X:+4 Y:-7 Z:-4 • Sweet double-stops, 90BPM 3/4, strict 16-bar',
+    desc: 'Slow 3/4 Manitoba sway with sweet double-stops',
     coat: PAL.CAPOTE_GREEN,
     hat: PAL.SASH_GOLD
   },
   {
     id: 'BREAKDOWN_REEL',
     name: 'FIDDLER 3',
-    style: 'BREAKDOWN REEL',
+    style: 'DANCEHALL REEL',
     x: 2, y: 8, z: 6,
-    desc: 'X:+2 Y:+8 Z:+6 • Bright A-Maj, 145BPM cut-time, crooked bars',
+    desc: 'Fast bright breakdown with crooked extra bars',
     coat: PAL.CAPOTE_RED,
     hat: PAL.HAIR_DARK
   },
@@ -128,7 +122,7 @@ const FIDDLE_ROSTER = [
     name: 'FIDDLER 4',
     style: 'FRONTIER DRONE',
     x: -6, y: -2, z: -8,
-    desc: 'X:-6 Y:-2 Z:-8 • Low-A drone, 110BPM heavy swing, solo+foot',
+    desc: 'Heavy low-A drone, swing & solo clog foot tap',
     coat: PAL.BUFFALO_FUR,
     hat: PAL.SASH_TEAL
   },
@@ -137,16 +131,16 @@ const FIDDLE_ROSTER = [
     name: 'FIDDLER 5',
     style: 'SPOON-CORDING',
     x: 1, y: 2, z: 1,
-    desc: 'X:+1 Y:+2 Z:+1 • Chops fiddle chords & taps spoons on strings',
+    desc: 'Chops fiddle chords & taps spoons on strings',
     coat: PAL.CAPOTE_CREAM,
     hat: PAL.CAPOTE_BLUE
   },
   {
     id: 'NONE',
     name: 'EMPTY',
-    style: 'NEUTRAL (0)',
+    style: 'RESTING',
     x: 0, y: 0, z: 0,
-    desc: 'Slot resting (contributes 0 to X/Y/Z axis)',
+    desc: 'Slot resting on the cabin bench',
     coat: PAL.DIM,
     hat: PAL.DIM
   }
@@ -321,10 +315,7 @@ const RRJ_PART_B = [
 ];
 
 // ============================================================================
-// X / Y / Z ARRANGEMENT COMPILER
-// Slot 1 -> X (Harmonic Mapping: -10 to +10)
-// Slot 2 -> Y (Rhythmic Engine: -10 to +10)
-// Slot 3 -> Z (Structural Macro: -10 to +10)
+// BACKEND X / Y / Z ARRANGEMENT COMPILER (HIDDEN STATS -> REALISTIC TITLES)
 // ============================================================================
 function computeXYZProfile() {
   const f1 = FIDDLE_ROSTER[bandSlots[0]];
@@ -335,69 +326,66 @@ function computeXYZProfile() {
   const Y = Math.max(-10, Math.min(10, f2.y));
   const Z = Math.max(-10, Math.min(10, f3.z));
 
-  // Derive BPM from Y (-10 -> 82 BPM, 0 -> 118 BPM, +10 -> 152 BPM)
   let bpm = 118;
   if (Y < 0) {
-    bpm = Math.round(118 + (Y / 10) * 36); // Y=-7 -> 93 BPM (~90 BPM Waltz), Y=-2 -> 111 BPM (~110 BPM)
+    bpm = Math.round(118 + (Y / 10) * 36);
   } else if (Y > 0) {
-    bpm = Math.round(118 + (Y / 10) * 34); // Y=+8 -> 145 BPM Breakdown Reel
+    bpm = Math.round(118 + (Y / 10) * 34);
   }
 
-  // Classify Resulting Track Archetype
-  let trackTitle = 'TRADITIONAL RED RIVER JIG';
-  let trackSub = '1860 McDallas • Classic A-D-A-E Jig';
+  // Authentic Red River / Manitoba Fiddle Tune Naming
+  let trackTitle = 'THE RED RIVER JIG';
+  let trackSub = '1860 McDallas • Classic Push-Up & Turnaround';
 
   if (Y <= -5 && X >= 2) {
-    trackTitle = 'THE METIS WALTZ';
-    trackSub = `Manitoba Wedding Waltz • ${bpm} BPM 3/4 Sway`;
+    trackTitle = 'MANITOBA WEDDING WALTZ';
+    trackSub = '3/4 Prairie Sway • Sweet Double-Stops';
+  } else if (Y <= -5) {
+    trackTitle = 'ST. BONIFACE FIDDLE AIR';
+    trackSub = 'Slow 3/4 Parlor Waltz • Squared Phrases';
   } else if (Y >= 5 && Z >= 3) {
-    trackTitle = 'FESTIVAL BREAKDOWN REEL';
-    trackSub = `High-Speed Dancehall Reel • ${bpm} BPM Crooked 4/4`;
+    trackTitle = 'ST. LAURENT BREAKDOWN REEL';
+    trackSub = 'High-Speed Dancehall Reel • Crooked Bars';
+  } else if (Y >= 5) {
+    trackTitle = 'PEMBINA CROSSING REEL';
+    trackSub = 'Blistering Cut-Time Double-Shuffle';
   } else if (X <= -4 && Z <= -5) {
-    trackTitle = 'OLD-TIME FRONTIER DRONE';
-    trackSub = `1860s Kitchen Party • ${bpm} BPM Low-A Solo + Foot`;
+    trackTitle = 'LA BARRIERE FRONTIER DRONE';
+    trackSub = '1860s Solo Fiddle, Low-A Drone & Foot Tap';
+  } else if (X <= -4) {
+    trackTitle = 'FORT GARRY LOW-A DRONE JIG';
+    trackSub = 'Heavy Cross-Tuned Bass Drone & Swing';
+  } else if (Z >= 4) {
+    trackTitle = 'BATOCHE CROOKED PUSH-UP';
+    trackSub = 'Extended Extra-Bar Fiddle Showcase';
   } else if (X !== 0 || Y !== 0 || Z !== 0) {
-    trackTitle = 'CUSTOM RED RIVER HYBRID';
-    trackSub = `X:${X >= 0 ? '+' + X : X}  Y:${Y >= 0 ? '+' + Y : Y}  Z:${Z >= 0 ? '+' + Z : Z} • ${bpm} BPM`;
+    trackTitle = 'STE. ANNE KITCHEN TWO-STEP';
+    trackSub = 'Lively Métis Cording & Settlement Groove';
   }
 
-  // Harmonic Mapping (X):
-  // X <= -4: Heavy Low-A Drone (57) + Dorian/Mixolydian flattened 7th
-  // X >= +3: Sweet 3rd/6th Double-Stops
-  // X > 0: Bright A-Major / D-Major Lift
   const semitoneShift = (X >= 2 && X <= 3) ? 0 : Math.round(X / 4);
   const lowADrone = (X <= -4);
   const sweetDoubleStops = (X >= 3);
-
-  // Rhythmic Engine (Y):
-  // Y <= -5: Smooths crooked triplets into 3/4 waltz sway
-  // Y between -4 and -1: Heavy frontier swing feel
-  // Y >= +5: Cut-time 4/4 high-speed double-shuffle
   const waltzSmooth = (Y <= -5);
   const swingAmount = (Y < 0 && Y > -5) ? Math.min(0.28, Math.abs(Y) * 0.065) : 0;
-
-  // Structural Macro (Z):
-  // Z <= -6: Solo fiddle + foot tap (mutes extra accompaniment)
-  // Z <= -3: Strict 16-bar squared phrases (trims crooked pickup tail)
-  // Z >= +4: Crooked phrasing (inserts extra high push-up turnaround bars!)
   const soloMode = (Z <= -6);
   const strictPhrasing = (Z <= -3 && Z > -6);
   const crookedPhrasing = (Z >= 4);
 
   const partA = strictPhrasing ? RRJ_PART_A.slice(0, 64) : RRJ_PART_A;
   const partB = strictPhrasing ? RRJ_PART_B.slice(0, 64) : RRJ_PART_B;
-  const crookedInsert = partA.slice(0, 24); // Extra crooked push-up bar extension
+  const crookedInsert = partA.slice(0, 24);
 
   let sequence = [];
   let boundaries = [];
 
   if (crookedPhrasing) {
     boundaries = [
-      { start: 0, label: 'PHASE 1: HIGH PUSH-UP' },
-      { start: partA.length, label: 'PHASE 2: CROOKED BAR!' },
-      { start: partA.length + crookedInsert.length, label: 'PHASE 3: BREAKDOWN B' },
-      { start: partA.length + crookedInsert.length + partB.length, label: 'PHASE 4: CROOKED PUSH-UP' },
-      { start: partA.length * 2 + crookedInsert.length + partB.length, label: 'PHASE 5: FINAL SPRINT' }
+      { start: 0, label: 'PART 1: HIGH PUSH-UP' },
+      { start: partA.length, label: 'PART 2: CROOKED BAR!' },
+      { start: partA.length + crookedInsert.length, label: 'PART 3: BREAKDOWN' },
+      { start: partA.length + crookedInsert.length + partB.length, label: 'PART 4: PUSH-UP' },
+      { start: partA.length * 2 + crookedInsert.length + partB.length, label: 'PART 5: FINALE' }
     ];
     sequence = [
       ...partA,
@@ -409,11 +397,11 @@ function computeXYZProfile() {
     ];
   } else if (strictPhrasing) {
     boundaries = [
-      { start: 0, label: 'PHASE 1: 3/4 WALTZ A' },
-      { start: partA.length, label: 'PHASE 2: 3/4 WALTZ B' },
-      { start: partA.length + partB.length, label: 'PHASE 3: SWEET HARMONY A' },
-      { start: partA.length * 2 + partB.length, label: 'PHASE 4: WEDDING TURN' },
-      { start: partA.length * 2 + partB.length * 2, label: 'PHASE 5: GRAND FINALE' }
+      { start: 0, label: 'PART 1: WALTZ AIR' },
+      { start: partA.length, label: 'PART 2: LOWER SWAY' },
+      { start: partA.length + partB.length, label: 'PART 3: HARMONY' },
+      { start: partA.length * 2 + partB.length, label: 'PART 4: TURNAROUND' },
+      { start: partA.length * 2 + partB.length * 2, label: 'PART 5: FINALE' }
     ];
     sequence = [
       ...partA,
@@ -425,11 +413,11 @@ function computeXYZProfile() {
     ];
   } else {
     boundaries = [
-      { start: 0, label: 'PHASE 1: SEGNO PUSH-UP' },
-      { start: partA.length, label: 'PHASE 2: LOW DOUBLE-STOPS' },
-      { start: partA.length + partB.length, label: 'PHASE 3: D.S. PUSH-UP' },
-      { start: partA.length * 2 + partB.length, label: 'PHASE 4: TURNAROUND' },
-      { start: partA.length * 2 + partB.length * 2, label: 'PHASE 5: FINAL PUSH-UP' }
+      { start: 0, label: 'PART 1: SEGNO PUSH-UP' },
+      { start: partA.length, label: 'PART 2: LOW STRINGS' },
+      { start: partA.length + partB.length, label: 'PART 3: D.S. PUSH-UP' },
+      { start: partA.length * 2 + partB.length, label: 'PART 4: TURNAROUND' },
+      { start: partA.length * 2 + partB.length * 2, label: 'PART 5: FINAL PUSH-UP' }
     ];
     sequence = [
       ...partA,
@@ -462,18 +450,18 @@ function computeXYZProfile() {
 // ============================================================================
 // GAME STATE & SELECTIONS
 // ============================================================================
+// Phases: 'BAND_SELECT' -> 'DANCER_SELECT' -> 'JIGGING' -> 'RESULTS'
 let phase = 'BAND_SELECT';
 let isPaused = false;
 let animFrame = 0;
 
 // Phase 1 Selections (5 Band Slots + Slot 5 = Next Button)
-// Default starts on Fiddler 1 (0,0,0) in Slot 1, Spoon-Cording in Slot 2, Empty in Slot 3
 const bandSlots = [
-  0, // Slot 1 (X): FIDDLER 1 (0 / 0 / 0)
-  4, // Slot 2 (Y): FIDDLER 5 (+1 / +2 / +1)
-  5, // Slot 3 (Z): EMPTY (0 / 0 / 0)
-  0, // Hand Perc: SPOONS
-  0  // Big Perc: HAND DRUM
+  0, // Fiddle 1 -> FIDDLER 1
+  4, // Fiddle 2 -> FIDDLER 5 (SPOON-CORDING)
+  5, // Fiddle 3 -> EMPTY
+  0, // Hand Perc -> SPOONS
+  0  // Big Perc  -> HAND DRUM
 ];
 let bandCursor = 0;
 
@@ -481,10 +469,12 @@ let bandCursor = 0;
 let selectedDancerIdx = 0;
 let phase2Row = 0;
 
-// Phase 3 Active Compiled Profile & Rhythm State
+// Active Compiled Profile & Sequencer State
 let activeProfile = computeXYZProfile();
 let totalSongSteps = 0;
 let currentStep = 0;
+let previewStep = 0;
+let isPreviewPlaying = false;
 let expectedBeats = [];
 let floatingTexts = [];
 let phaseShiftBanner = { text: '', timer: 0 };
@@ -497,9 +487,10 @@ let jiggerPoseTimer = 0;
 
 const LOOKAHEAD = 25.0;
 const SCHEDULE_AHEAD_TIME = 2.0;
-const TOLERANCE_PERFECT = 0.09;
-const TOLERANCE_GOOD = 0.175;
-const NOTE_SPEED = 285;
+// Generous half-tempo timing windows for comfortable, readable footwork
+const TOLERANCE_PERFECT = 0.11;
+const TOLERANCE_GOOD = 0.21;
+const NOTE_SPEED = 240;
 
 function getSongPhaseIndex(stepIdx) {
   let idx = 0;
@@ -510,7 +501,7 @@ function getSongPhaseIndex(stepIdx) {
 }
 
 // ============================================================================
-// WEB AUDIO ENGINE (WITH X/Y/Z HARMONIC, RHYTHMIC & STRUCTURAL DSP)
+// WEB AUDIO ENGINE (LIVE BAND-SELECT PREVIEW + PHASE 3 FULL SONG)
 // ============================================================================
 const AudioContext = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
@@ -534,8 +525,19 @@ function initAudio() {
   }
 }
 
-document.addEventListener('touchstart', initAudio, { passive: true });
-document.addEventListener('mousedown', initAudio, { passive: true });
+function startBandPreviewIfNeeded() {
+  initAudio();
+  if (phase === 'BAND_SELECT' && !isPreviewPlaying && !isPaused) {
+    isPreviewPlaying = true;
+    previewStep = 0;
+    nextStepTime = audioCtx.currentTime + 0.08;
+    clearTimeout(schedulerTimer);
+    scheduler();
+  }
+}
+
+document.addEventListener('touchstart', startBandPreviewIfNeeded, { passive: true });
+document.addEventListener('mousedown', startBandPreviewIfNeeded, { passive: true });
 
 function registerNode(node) {
   activeNodes.push(node);
@@ -583,19 +585,19 @@ function playFiddleTone(midi, time, dur, gainVal, detuneCents = 0, wave = 'sawto
   registerNode(osc);
 }
 
-function playFiddleCord(rootMidi, time, stepDur, stepIdx) {
+function playFiddleCord(rootMidi, time, stepDur, stepIdx, gainScale = 1.0) {
   if (!audioCtx || !noiseBuffer) return;
   if (stepIdx % 2 === 0) {
     const chordRoot = rootMidi ? rootMidi - 12 : 57;
-    playFiddleTone(chordRoot, time, stepDur * 0.65, 0.08, -4, 'sawtooth');
-    playFiddleTone(chordRoot + 7, time, stepDur * 0.65, 0.07, +4, 'sawtooth');
+    playFiddleTone(chordRoot, time, stepDur * 0.65, 0.08 * gainScale, -4, 'sawtooth');
+    playFiddleTone(chordRoot + 7, time, stepDur * 0.65, 0.07 * gainScale, +4, 'sawtooth');
   } else {
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.type = 'triangle';
     osc.frequency.setValueAtTime(340, time);
     osc.frequency.exponentialRampToValueAtTime(145, time + 0.045);
-    gain.gain.setValueAtTime(0.13, time);
+    gain.gain.setValueAtTime(0.13 * gainScale, time);
     gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
     osc.connect(gain);
     gain.connect(audioCtx.destination);
@@ -605,14 +607,14 @@ function playFiddleCord(rootMidi, time, stepDur, stepIdx) {
   }
 }
 
-function playFootTap(time) {
+function playFootTap(time, gainScale = 1.0) {
   if (!audioCtx) return;
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
   osc.type = 'sine';
   osc.frequency.setValueAtTime(92, time);
   osc.frequency.exponentialRampToValueAtTime(44, time + 0.07);
-  gain.gain.setValueAtTime(0.24, time);
+  gain.gain.setValueAtTime(0.24 * gainScale, time);
   gain.gain.exponentialRampToValueAtTime(0.001, time + 0.075);
   osc.connect(gain);
   gain.connect(audioCtx.destination);
@@ -621,10 +623,8 @@ function playFootTap(time) {
   registerNode(osc);
 }
 
-function playScoreEventForFiddler(fiddlerId, ev, time, stepDur, stepIdx, slotOffset) {
+function playScoreEventForFiddler(fiddlerId, ev, time, stepDur, stepIdx, slotOffset, gainScale = 1.0) {
   if (fiddlerId === 'NONE' || !ev) return;
-
-  // In Z <= -6 Solo Mode, mute secondary fiddles (slots 1 & 2) so the solo fiddle + foot tap shines
   if (activeProfile.soloMode && slotOffset > 0) return;
 
   const shift = activeProfile.semitoneShift;
@@ -633,41 +633,37 @@ function playScoreEventForFiddler(fiddlerId, ev, time, stepDur, stepIdx, slotOff
   const dur = activeProfile.waltzSmooth ? baseDur * 1.35 : baseDur;
 
   if (fiddlerId === 'SPOON_CORD') {
-    playFiddleCord((ev.d || ev.n || 62) + shift, time, stepDur, stepIdx);
+    playFiddleCord((ev.d || ev.n || 62) + shift, time, stepDur, stepIdx, gainScale);
     return;
   }
 
-  // Main Fiddle Lead + X-Axis Harmonic Mapping (Low-A Drone or Sweet Double-Stops)
   const note = ev.tri ? (activeProfile.waltzSmooth ? ev.tri[0] : null) : ev.n;
 
   if (ev.tri && !activeProfile.waltzSmooth) {
     const subDur = stepDur / 3;
     for (let t = 0; t < ev.tri.length; t++) {
-      playFiddleTone(ev.tri[t] + shift, time + t * subDur, subDur * 0.94, 0.10, detune);
+      playFiddleTone(ev.tri[t] + shift, time + t * subDur, subDur * 0.94, 0.10 * gainScale, detune);
     }
   } else if (ev.grace && !activeProfile.waltzSmooth) {
-    playFiddleTone(ev.grace + shift, time, stepDur * 0.25, 0.075, detune);
-    if (note) playFiddleTone(note + shift, time + stepDur * 0.22, dur * 0.8, 0.10, detune);
+    playFiddleTone(ev.grace + shift, time, stepDur * 0.25, 0.075 * gainScale, detune);
+    if (note) playFiddleTone(note + shift, time + stepDur * 0.22, dur * 0.8, 0.10 * gainScale, detune);
   } else if (note) {
-    playFiddleTone(note + shift, time, dur, 0.105, detune);
-
-    // Sweet Double-Stops when X >= +3
+    playFiddleTone(note + shift, time, dur, 0.105 * gainScale, detune);
     if (activeProfile.sweetDoubleStops) {
-      playFiddleTone(note + shift - 4, time, dur, 0.072, detune + 3);
+      playFiddleTone(note + shift - 4, time, dur, 0.072 * gainScale, detune + 3);
     }
   }
 
-  // Heavy Low-A Drone (57) when X <= -4, or written score double-stop drone
   if (activeProfile.lowADrone) {
     if (stepIdx % 2 === 0) {
-      playFiddleTone(57, time, stepDur * 1.9, 0.085, -3);
+      playFiddleTone(57, time, stepDur * 1.9, 0.085 * gainScale, -3);
     }
   } else if (ev.d) {
-    playFiddleTone(ev.d + shift, time, dur, 0.08, detune);
+    playFiddleTone(ev.d + shift, time, dur, 0.08 * gainScale, detune);
   }
 }
 
-function playHandPerc(percId, time, stepDur, stepIdx) {
+function playHandPerc(percId, time, stepDur, stepIdx, gainScale = 1.0) {
   if (percId === 'NONE' || activeProfile.soloMode || !audioCtx || !noiseBuffer) return;
 
   if (percId === 'SPOONS') {
@@ -681,7 +677,7 @@ function playHandPerc(percId, time, stepDur, stepIdx) {
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(i === 0 ? 165 : 135, t);
         osc.frequency.exponentialRampToValueAtTime(68, t + 0.07);
-        gain.gain.setValueAtTime(i === 0 ? 0.22 : 0.14, t);
+        gain.gain.setValueAtTime((i === 0 ? 0.22 : 0.14) * gainScale, t);
         gain.gain.exponentialRampToValueAtTime(0.001, t + 0.075);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
@@ -700,7 +696,7 @@ function playHandPerc(percId, time, stepDur, stepIdx) {
       filter.frequency.setValueAtTime(accent ? 2150 : 1850, time);
       filter.Q.setValueAtTime(3.2, time);
       const gain = audioCtx.createGain();
-      gain.gain.setValueAtTime(accent ? 0.22 : 0.13, time);
+      gain.gain.setValueAtTime((accent ? 0.22 : 0.13) * gainScale, time);
       gain.gain.exponentialRampToValueAtTime(0.001, time + 0.055);
       noise.connect(filter);
       filter.connect(gain);
@@ -712,10 +708,9 @@ function playHandPerc(percId, time, stepDur, stepIdx) {
   }
 }
 
-function playBigPerc(bigId, time, stepIdx) {
-  // In Z <= -6 Solo Mode, replace big percussion with the fiddler's own wooden clog foot tap!
+function playBigPerc(bigId, time, stepIdx, gainScale = 1.0) {
   if (activeProfile.soloMode) {
-    if (stepIdx % 4 === 0) playFootTap(time);
+    if (stepIdx % 4 === 0) playFootTap(time, gainScale);
     return;
   }
   if (bigId === 'NONE' || !audioCtx) return;
@@ -729,7 +724,7 @@ function playBigPerc(bigId, time, stepIdx) {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(accent ? 105 : 88, time);
       osc.frequency.exponentialRampToValueAtTime(42, time + 0.18);
-      gain.gain.setValueAtTime(accent ? 0.34 : 0.24, time);
+      gain.gain.setValueAtTime((accent ? 0.34 : 0.24) * gainScale, time);
       gain.gain.exponentialRampToValueAtTime(0.001, time + 0.19);
       osc.connect(gain);
       gain.connect(audioCtx.destination);
@@ -745,7 +740,7 @@ function playBigPerc(bigId, time, stepIdx) {
         const gain = audioCtx.createGain();
         osc.type = idx === 0 ? 'triangle' : 'sine';
         osc.frequency.setValueAtTime(f, time);
-        const vol = idx === 0 ? 0.14 : 0.06;
+        const vol = (idx === 0 ? 0.14 : 0.06) * gainScale;
         gain.gain.setValueAtTime(vol, time);
         gain.gain.exponentialRampToValueAtTime(0.0008, time + 0.24);
         osc.connect(gain);
@@ -776,12 +771,13 @@ function playStumbleClonk() {
 }
 
 // ============================================================================
-// PHASE 3 SONG SEQUENCER & DANCER-SPECIFIC JOYSTICK + A/B RHYTHM ENGINE
+// PHASE TRANSITIONS & HALF-TEMPO JIG SEQUENCER
 // ============================================================================
 function startJiggingPhase() {
   initAudio();
   clearTimeout(schedulerTimer);
   schedulerTimer = null;
+  isPreviewPlaying = false;
   stopAllAudio();
 
   activeProfile = computeXYZProfile();
@@ -797,16 +793,17 @@ function startJiggingPhase() {
   jiggerPoseTimer = 0;
 
   const dancer = DANCER_ROSTER[selectedDancerIdx];
-  phaseShiftBanner = { text: `HOLD ${DIR_ARROWS[dancer.phaseDirs[0]]} ${dancer.phaseDirs[0]}!`, timer: 90 };
+  phaseShiftBanner = { text: `HOLD ${DIR_ARROWS[dancer.phaseDirs[0]]} ${dancer.phaseDirs[0]}!`, timer: 95 };
 
   phase = 'JIGGING';
-  nextStepTime = audioCtx.currentTime + 0.7;
+  nextStepTime = audioCtx.currentTime + 0.75;
   scheduler();
 }
 
 function finishSongToMenu() {
   clearTimeout(schedulerTimer);
   schedulerTimer = null;
+  isPreviewPlaying = false;
   stopAllAudio();
   expectedBeats = [];
   phase = 'RESULTS';
@@ -817,22 +814,20 @@ function returnToBandBuilder() {
   schedulerTimer = null;
   stopAllAudio();
   expectedBeats = [];
+  activeProfile = computeXYZProfile();
   phase = 'BAND_SELECT';
+  isPreviewPlaying = false;
+  startBandPreviewIfNeeded();
 }
 
-function scheduleStep(stepIdx, time, stepDur) {
-  if (stepIdx >= totalSongSteps) return;
+function scheduleBandBandAudio(stepIdx, time, stepDur, gainScale) {
+  const scoreArr = activeProfile.score;
+  const ev = scoreArr[stepIdx % scoreArr.length];
 
-  // Apply Y-axis swing offset on odd 16th-note subdivisions
   const swingDelay = (stepIdx % 2 === 1 && activeProfile.swingAmount > 0)
     ? stepDur * activeProfile.swingAmount
     : 0;
   const playTime = time + swingDelay;
-
-  const ev = activeProfile.score[stepIdx];
-  const songPhaseIdx = getSongPhaseIndex(stepIdx);
-  const dancer = DANCER_ROSTER[selectedDancerIdx];
-  const requiredDir = dancer.phaseDirs[songPhaseIdx] || 'RIGHT';
 
   const f1 = FIDDLE_ROSTER[bandSlots[0]].id;
   const f2 = FIDDLE_ROSTER[bandSlots[1]].id;
@@ -840,16 +835,28 @@ function scheduleStep(stepIdx, time, stepDur) {
   const hp = HAND_PERC_ROSTER[bandSlots[3]].id;
   const bp = BIG_PERC_ROSTER[bandSlots[4]].id;
 
-  playScoreEventForFiddler(f1, ev, playTime, stepDur, stepIdx, 0);
-  playScoreEventForFiddler(f2, ev, playTime, stepDur, stepIdx, 1);
-  playScoreEventForFiddler(f3, ev, playTime, stepDur, stepIdx, 2);
-  playHandPerc(hp, playTime, stepDur, stepIdx);
-  playBigPerc(bp, playTime, stepIdx);
+  playScoreEventForFiddler(f1, ev, playTime, stepDur, stepIdx, 0, gainScale);
+  playScoreEventForFiddler(f2, ev, playTime, stepDur, stepIdx, 1, gainScale);
+  playScoreEventForFiddler(f3, ev, playTime, stepDur, stepIdx, 2, gainScale);
+  playHandPerc(hp, playTime, stepDur, stepIdx, gainScale);
+  playBigPerc(bp, playTime, stepIdx, gainScale);
 
-  // Spawn Dancer-Specific Joystick + A/B Footwork Notes
-  if (stepIdx % 2 === 0 && stepIdx < totalSongSteps - 4) {
-    const shuffleBeat = Math.floor(stepIdx / 2) % dancer.stepPattern.length;
-    const pat = dancer.stepPattern[shuffleBeat];
+  return playTime;
+}
+
+function scheduleJigStep(stepIdx, time, stepDur) {
+  if (stepIdx >= totalSongSteps) return;
+
+  const playTime = scheduleBandBandAudio(stepIdx, time, stepDur, 1.0);
+  const songPhaseIdx = getSongPhaseIndex(stepIdx);
+  const dancer = DANCER_ROSTER[selectedDancerIdx];
+  const requiredDir = dancer.phaseDirs[songPhaseIdx] || 'RIGHT';
+
+  // HALF-TEMPO JIGGING FOOTWORK:
+  // Spawn dancer footwork notes every 4 sixteenth-note steps (= quarter-note pulse, half the 8th-note fiddle speed!)
+  if (stepIdx % 4 === 0 && stepIdx < totalSongSteps - 8) {
+    const halfTempoBeat = Math.floor(stepIdx / 4) % dancer.stepPattern.length;
+    const pat = dancer.stepPattern[halfTempoBeat];
     const isPhaseStart = (stepIdx === activeProfile.boundaries[songPhaseIdx].start);
 
     if (pat.btn === 'LIFT') {
@@ -879,17 +886,31 @@ function scheduleStep(stepIdx, time, stepDur) {
 }
 
 function scheduler() {
-  if (isPaused || phase !== 'JIGGING' || !audioCtx) return;
-  const stepDur = (60.0 / activeProfile.bpm) / 4;
-  while (nextStepTime < audioCtx.currentTime + SCHEDULE_AHEAD_TIME && currentStep < totalSongSteps) {
-    scheduleStep(currentStep, nextStepTime, stepDur);
-    nextStepTime += stepDur;
-    currentStep++;
-  }
-  if (currentStep < totalSongSteps) {
+  if (isPaused || !audioCtx) return;
+
+  if (phase === 'BAND_SELECT' && isPreviewPlaying) {
+    const stepDur = (60.0 / activeProfile.bpm) / 4;
+    while (nextStepTime < audioCtx.currentTime + 0.8) {
+      scheduleBandBandAudio(previewStep, nextStepTime, stepDur, 0.72);
+      nextStepTime += stepDur;
+      previewStep++;
+    }
     schedulerTimer = setTimeout(scheduler, LOOKAHEAD);
-  } else {
-    schedulerTimer = null;
+    return;
+  }
+
+  if (phase === 'JIGGING') {
+    const stepDur = (60.0 / activeProfile.bpm) / 4;
+    while (nextStepTime < audioCtx.currentTime + SCHEDULE_AHEAD_TIME && currentStep < totalSongSteps) {
+      scheduleJigStep(currentStep, nextStepTime, stepDur);
+      nextStepTime += stepDur;
+      currentStep++;
+    }
+    if (currentStep < totalSongSteps) {
+      schedulerTimer = setTimeout(scheduler, LOOKAHEAD);
+    } else {
+      schedulerTimer = null;
+    }
   }
 }
 
@@ -977,7 +998,7 @@ function handleJigTap(btnPressed) {
     combo++;
     if (combo > maxCombo) maxCombo = combo;
     jiggerPose = (btnPressed === 'B') ? 'JIG_R' : 'JIG_L';
-    jiggerPoseTimer = now + 0.22;
+    jiggerPoseTimer = now + 0.28;
     spawnFloatingText(label, exactBtn ? PAL.SASH_TEAL : PAL.FIRE_ORANGE);
   } else {
     combo = 0;
@@ -993,7 +1014,7 @@ function spawnFloatingText(text, color) {
     text,
     color,
     x: VIEW_W / 2,
-    y: VIEW_H - 185,
+    y: VIEW_H - 220,
     life: 1.0
   });
 }
@@ -1007,10 +1028,15 @@ function cycleBandSlot(slotIdx, delta) {
     bandSlots[4] = (bandSlots[4] + delta + BIG_PERC_ROSTER.length) % BIG_PERC_ROSTER.length;
   }
   activeProfile = computeXYZProfile();
+  // Restart preview smoothly at the new arrangement's tempo
+  if (audioCtx && phase === 'BAND_SELECT') {
+    stopAllAudio();
+    nextStepTime = audioCtx.currentTime + 0.05;
+  }
 }
 
 function handleCardinalStep(dir) {
-  initAudio();
+  startBandPreviewIfNeeded();
 
   if (phase === 'BAND_SELECT') {
     if (dir === 'LEFT') {
@@ -1053,10 +1079,14 @@ function processHeldInputs(now) {
 }
 
 function handleActionA() {
-  initAudio();
+  startBandPreviewIfNeeded();
 
   if (phase === 'BAND_SELECT') {
     if (bandCursor === 5) {
+      clearTimeout(schedulerTimer);
+      schedulerTimer = null;
+      isPreviewPlaying = false;
+      stopAllAudio();
       activeProfile = computeXYZProfile();
       phase = 'DANCER_SELECT';
       phase2Row = 0;
@@ -1086,12 +1116,16 @@ function handleActionA() {
 }
 
 function handleActionB() {
-  initAudio();
+  startBandPreviewIfNeeded();
 
   if (phase === 'BAND_SELECT') {
     if (bandCursor < 5) {
       cycleBandSlot(bandCursor, +1);
     } else {
+      clearTimeout(schedulerTimer);
+      schedulerTimer = null;
+      isPreviewPlaying = false;
+      stopAllAudio();
       activeProfile = computeXYZProfile();
       phase = 'DANCER_SELECT';
       phase2Row = 0;
@@ -1103,7 +1137,7 @@ function handleActionB() {
     if (phase2Row === 0) {
       selectedDancerIdx = (selectedDancerIdx + 1) % DANCER_ROSTER.length;
     } else {
-      phase = 'BAND_SELECT';
+      returnToBandBuilder();
     }
     return;
   }
@@ -1139,9 +1173,14 @@ window.addEventListener('message', function(event) {
     isPaused = false;
     clearInputStates();
     if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-    if (audioCtx && phase === 'JIGGING' && !schedulerTimer && currentStep < totalSongSteps) {
-      nextStepTime = audioCtx.currentTime + 0.08;
-      scheduler();
+    if (audioCtx && !schedulerTimer) {
+      if (phase === 'BAND_SELECT' && isPreviewPlaying) {
+        nextStepTime = audioCtx.currentTime + 0.08;
+        scheduler();
+      } else if (phase === 'JIGGING' && currentStep < totalSongSteps) {
+        nextStepTime = audioCtx.currentTime + 0.08;
+        scheduler();
+      }
     }
     return;
   }
@@ -1190,7 +1229,7 @@ window.addEventListener('message', function(event) {
 });
 
 // ============================================================================
-// PIXEL ART HELPERS & CHARACTER RENDERERS
+// HIGH-READABILITY PIXEL ART & TEXT HELPERS
 // ============================================================================
 function pxRect(x, y, w, h, color) {
   ctx.fillStyle = color;
@@ -1206,11 +1245,28 @@ function drawText(txt, x, y, size, color, align = 'center') {
   ctx.fillText(txt, Math.floor(x), Math.floor(y));
 }
 
-function fmtSigned(n) {
-  return n > 0 ? `+${n}` : `${n}`;
+// Wraps long text cleanly so nothing ever clips or shrinks below readable size
+function drawWrappedText(txt, cx, startY, maxWidth, lineHeight, size, color) {
+  ctx.font = `${size}px "Press Start 2P", monospace`;
+  const words = txt.split(' ');
+  const lines = [];
+  let current = '';
+  for (const w of words) {
+    const test = current ? `${current} ${w}` : w;
+    if (ctx.measureText(test).width > maxWidth && current) {
+      lines.push(current);
+      current = w;
+    } else {
+      current = test;
+    }
+  }
+  if (current) lines.push(current);
+  lines.forEach((line, i) => {
+    drawText(line, cx, startY + i * lineHeight, size, color, 'center');
+  });
 }
 
-function drawMusicianMini(type, id, cx, cy, scale = 3, beatPulse = false, isMuted = false) {
+function drawMusicianMini(type, id, cx, cy, scale = 4, beatPulse = false, isMuted = false) {
   const s = scale;
   const bob = (id !== 'NONE' && !isMuted && beatPulse) ? -s : 0;
   const x = Math.floor(cx - 6 * s);
@@ -1273,12 +1329,12 @@ function drawMusicianMini(type, id, cx, cy, scale = 3, beatPulse = false, isMute
   ctx.restore();
 }
 
-function drawDancerSprite(dancer, cx, cy, scale = 4, pose = 'IDLE') {
+function drawDancerSprite(dancer, cx, cy, scale = 5, pose = 'IDLE') {
   const s = scale;
   const x = Math.floor(cx - 6 * s);
   const y = Math.floor(cy - 13 * s);
 
-  pxRect(cx - 22, cy - 2, 44, 6, 'rgba(0,0,0,0.45)');
+  pxRect(cx - 26, cy - 2, 52, 7, 'rgba(0,0,0,0.45)');
 
   if (pose === 'FALL') {
     pxRect(x + 2 * s, y + 7 * s, 8 * s, 4 * s, dancer.topCol);
@@ -1334,76 +1390,84 @@ function drawDancerSprite(dancer, cx, cy, scale = 4, pose = 'IDLE') {
 }
 
 function drawKitchenBackdrop(floorY) {
-  const logH = 22;
-  for (let y = 34; y < floorY; y += logH) {
+  const logH = 26;
+  for (let y = 48; y < floorY; y += logH) {
     pxRect(0, y, VIEW_W, logH - 3, PAL.LOG_MID);
     pxRect(0, y, VIEW_W, 4, PAL.LOG_LIGHT);
     pxRect(0, y + logH - 7, VIEW_W, 4, PAL.LOG_DARK);
     pxRect(0, y + logH - 3, VIEW_W, 3, PAL.CHINKING);
   }
-  pxRect(0, 34, 16, floorY - 34, PAL.LOG_DARK);
-  pxRect(VIEW_W - 16, 34, 16, floorY - 34, PAL.LOG_DARK);
+  pxRect(0, 48, 18, floorY - 48, PAL.LOG_DARK);
+  pxRect(VIEW_W - 18, 48, 18, floorY - 48, PAL.LOG_DARK);
 
-  const hearthX = Math.max(26, Math.floor(VIEW_W * 0.1));
-  const hearthW = 72;
-  const hearthTop = floorY - 92;
-  pxRect(hearthX, hearthTop, hearthW, 92, '#4A4947');
-  pxRect(hearthX + 4, hearthTop + 4, hearthW - 8, 88, '#696764');
+  // Hearth
+  const hearthX = Math.max(28, Math.floor(VIEW_W * 0.1));
+  const hearthW = 84;
+  const hearthTop = floorY - 108;
+  pxRect(hearthX, hearthTop, hearthW, 108, '#4A4947');
+  pxRect(hearthX + 4, hearthTop + 4, hearthW - 8, 104, '#696764');
   pxRect(hearthX - 6, hearthTop - 6, hearthW + 12, 8, PAL.LOG_DARK);
-  pxRect(hearthX + 16, floorY - 44, hearthW - 32, 44, PAL.INK);
+  pxRect(hearthX + 18, floorY - 52, hearthW - 36, 52, PAL.INK);
   const flicker = Math.sin(animFrame * 0.25) * 4;
-  pxRect(hearthX + 20, floorY - 24 - flicker, 32, 24 + flicker, PAL.FIRE_RED);
-  pxRect(hearthX + 24, floorY - 18 - flicker * 0.7, 24, 18 + flicker * 0.7, PAL.FIRE_ORANGE);
-  pxRect(hearthX + 29, floorY - 10, 14, 10, PAL.FIRE_GOLD);
+  pxRect(hearthX + 22, floorY - 28 - flicker, 40, 28 + flicker, PAL.FIRE_RED);
+  pxRect(hearthX + 27, floorY - 22 - flicker * 0.7, 30, 22 + flicker * 0.7, PAL.FIRE_ORANGE);
+  pxRect(hearthX + 33, floorY - 12, 18, 12, PAL.FIRE_GOLD);
 
-  const winX = Math.min(VIEW_W - 90, Math.floor(VIEW_W * 0.78));
-  const winY = floorY - 96;
-  pxRect(winX, winY, 52, 46, PAL.LOG_DARK);
-  pxRect(winX + 4, winY + 4, 44, 38, '#132842');
-  pxRect(winX + 4, winY + 28, 44, 14, '#DDF2FF');
-  pxRect(winX + 24, winY + 4, 4, 38, PAL.LOG_DARK);
-  pxRect(winX + 4, winY + 20, 44, 4, PAL.LOG_DARK);
+  // Window
+  const winX = Math.min(VIEW_W - 104, Math.floor(VIEW_W * 0.78));
+  const winY = floorY - 110;
+  pxRect(winX, winY, 60, 54, PAL.LOG_DARK);
+  pxRect(winX + 4, winY + 4, 52, 46, '#132842');
+  pxRect(winX + 4, winY + 34, 52, 16, '#DDF2FF');
+  pxRect(winX + 28, winY + 4, 4, 46, PAL.LOG_DARK);
+  pxRect(winX + 4, winY + 24, 52, 4, PAL.LOG_DARK);
 
+  // Floor & Braided Rug
   pxRect(0, floorY, VIEW_W, VIEW_H - floorY, PAL.FLOOR_MID);
   pxRect(0, floorY, VIEW_W, 4, PAL.LOG_DARK);
-  for (let py = floorY + 14; py < VIEW_H; py += 16) {
+  for (let py = floorY + 16; py < VIEW_H; py += 18) {
     pxRect(0, py, VIEW_W, 2, PAL.FLOOR_DARK);
   }
   const midX = Math.floor(VIEW_W / 2);
-  pxRect(midX - 66, floorY + 18, 132, 24, PAL.SASH_RED);
-  pxRect(midX - 60, floorY + 21, 120, 18, PAL.SASH_TEAL);
-  pxRect(midX - 54, floorY + 24, 108, 12, PAL.SASH_GOLD);
-  pxRect(midX - 48, floorY + 27, 96, 6, PAL.CAPOTE_CREAM);
+  pxRect(midX - 76, floorY + 20, 152, 28, PAL.SASH_RED);
+  pxRect(midX - 68, floorY + 24, 136, 20, PAL.SASH_TEAL);
+  pxRect(midX - 60, floorY + 28, 120, 12, PAL.SASH_GOLD);
+  pxRect(midX - 52, floorY + 31, 104, 6, PAL.CAPOTE_CREAM);
 }
 
 // ============================================================================
-// PHASE RENDERERS
+// PHASE RENDERERS (CRISP, LARGE, HIGH-CONTRAST TYPOGRAPHY)
 // ============================================================================
 
-// PHASE 1: BAND BUILDER PAGE (WITH LIVE X/Y/Z MODULATOR READOUT)
+// PHASE 1: BAND BUILDER PAGE (WITH LIVE SONG PREVIEW)
 function drawBandBuilderPhase() {
   pxRect(0, 0, VIEW_W, VIEW_H, PAL.PANEL_BG);
 
   const prof = activeProfile;
 
-  pxRect(0, 0, VIEW_W, 38, PAL.INK);
-  pxRect(0, 36, VIEW_W, 2, PAL.FIRE_ORANGE);
-  drawText("PHASE 1: BAND & X/Y/Z TUNE MODULATOR", VIEW_W / 2, 16, 9, PAL.FIRE_GOLD, 'center');
-  drawText(`RESULT: ${prof.trackTitle} (${prof.bpm} BPM)`, VIEW_W / 2, 31, 7, PAL.SASH_TEAL, 'center');
+  // Top Header Bar (y = 0)
+  pxRect(0, 0, VIEW_W, 54, PAL.INK);
+  pxRect(0, 52, VIEW_W, 2, PAL.FIRE_ORANGE);
+  drawText("BUILD YOUR KITCHEN BAND", VIEW_W / 2, 22, 13, PAL.FIRE_GOLD, 'center');
+  const previewTag = isPreviewPlaying ? "♪ LIVE PREVIEW" : "TAP ANY BUTTON FOR SOUND";
+  drawText(`${prof.trackTitle}  •  ${previewTag}`, VIEW_W / 2, 43, 9, PAL.SASH_TEAL, 'center');
 
   const slotDefs = [
-    { label: 'SLOT 1 [X]', axisTag: `X: ${fmtSigned(FIDDLE_ROSTER[bandSlots[0]].x)}`, type: 'FIDDLE', item: FIDDLE_ROSTER[bandSlots[0]] },
-    { label: 'SLOT 2 [Y]', axisTag: `Y: ${fmtSigned(FIDDLE_ROSTER[bandSlots[1]].y)}`, type: 'FIDDLE', item: FIDDLE_ROSTER[bandSlots[1]] },
-    { label: 'SLOT 3 [Z]', axisTag: `Z: ${fmtSigned(FIDDLE_ROSTER[bandSlots[2]].z)}`, type: 'FIDDLE', item: FIDDLE_ROSTER[bandSlots[2]] },
-    { label: 'HAND PERC',  axisTag: 'RHYTHM', type: 'HAND',   item: HAND_PERC_ROSTER[bandSlots[3]] },
-    { label: 'BIG PERC',   axisTag: 'PULSE',  type: 'BIG',    item: BIG_PERC_ROSTER[bandSlots[4]] }
+    { label: 'FIDDLE 1', type: 'FIDDLE', item: FIDDLE_ROSTER[bandSlots[0]] },
+    { label: 'FIDDLE 2', type: 'FIDDLE', item: FIDDLE_ROSTER[bandSlots[1]] },
+    { label: 'FIDDLE 3', type: 'FIDDLE', item: FIDDLE_ROSTER[bandSlots[2]] },
+    { label: 'HAND PERC', type: 'HAND',  item: HAND_PERC_ROSTER[bandSlots[3]] },
+    { label: 'BIG PERC',  type: 'BIG',   item: BIG_PERC_ROSTER[bandSlots[4]] }
   ];
 
-  const margin = 12;
-  const gap = 6;
+  const margin = 14;
+  const gap = 8;
   const cardW = Math.floor((VIEW_W - margin * 2 - gap * 4) / 5);
-  const cardTop = 48;
-  const cardH = 198;
+  const cardTop = 66;
+  const cardH = 224;
+  const beatPulse = isPreviewPlaying
+    ? (Math.floor(previewStep / 2) % 2 === 0)
+    : (Math.floor(animFrame / 14) % 2 === 0);
 
   for (let i = 0; i < 5; i++) {
     const sDef = slotDefs[i];
@@ -1411,116 +1475,119 @@ function drawBandBuilderPhase() {
     const isSel = (bandCursor === i);
 
     pxRect(cx, cardTop, cardW, cardH, isSel ? PAL.CARD_SEL : PAL.CARD_BG);
-    ctx.strokeStyle = isSel ? PAL.FIRE_GOLD : (sDef.item.id === 'NONE' ? '#3B2C24' : PAL.SASH_TEAL);
-    ctx.lineWidth = isSel ? 3 : 1;
+    ctx.strokeStyle = isSel ? PAL.FIRE_GOLD : (sDef.item.id === 'NONE' ? '#4A382E' : PAL.SASH_TEAL);
+    ctx.lineWidth = isSel ? 3 : 2;
     ctx.strokeRect(cx, cardTop, cardW, cardH);
 
-    drawText(sDef.label, cx + cardW / 2, cardTop + 16, 6, isSel ? PAL.FIRE_GOLD : PAL.CAPOTE_CREAM, 'center');
+    // Slot Role Header
+    drawText(sDef.label, cx + cardW / 2, cardTop + 22, 9, isSel ? PAL.FIRE_GOLD : PAL.CAPOTE_CREAM, 'center');
 
     if (isSel) {
-      drawText("▲", cx + cardW / 2, cardTop + 31, 8, PAL.FIRE_ORANGE, 'center');
-      drawText("▼", cx + cardW / 2, cardTop + 122, 8, PAL.FIRE_ORANGE, 'center');
+      drawText("▲", cx + cardW / 2, cardTop + 42, 11, PAL.FIRE_ORANGE, 'center');
+      drawText("▼", cx + cardW / 2, cardTop + 148, 11, PAL.FIRE_ORANGE, 'center');
     }
 
-    pxRect(cx + 8, cardTop + 104, cardW - 16, 8, PAL.FLOOR_MID);
-    drawMusicianMini(sDef.type, sDef.item.id, cx + cardW / 2, cardTop + 106, 3, isSel && (Math.floor(animFrame / 14) % 2 === 0));
+    // Mini Stage Floor & Sprite Preview
+    pxRect(cx + 10, cardTop + 124, cardW - 20, 8, PAL.FLOOR_MID);
+    drawMusicianMini(sDef.type, sDef.item.id, cx + cardW / 2, cardTop + 126, 4, beatPulse);
 
-    drawText(sDef.item.name, cx + cardW / 2, cardTop + 138, 7, PAL.WHITE, 'center');
-    drawText(sDef.item.style, cx + cardW / 2, cardTop + 155, 5, PAL.SASH_TEAL, 'center');
-    drawText(sDef.axisTag, cx + cardW / 2, cardTop + 174, 7, i < 3 ? PAL.FIRE_GOLD : PAL.CAPOTE_CREAM, 'center');
+    // Musician Name & Style (Wrapped cleanly for high readability)
+    drawText(sDef.item.name, cx + cardW / 2, cardTop + 170, 9, PAL.WHITE, 'center');
+    drawWrappedText(sDef.item.style, cx + cardW / 2, cardTop + 190, cardW - 10, 14, 8, PAL.SASH_TEAL);
   }
 
-  // Resulting Track & Slot Description Box
-  const descBoxY = cardTop + cardH + 8;
-  pxRect(margin, descBoxY, VIEW_W - margin * 2, 44, PAL.INK);
+  // Active Slot & Arrangement Description Box
+  const descBoxY = cardTop + cardH + 10;
+  pxRect(margin, descBoxY, VIEW_W - margin * 2, 56, PAL.INK);
   ctx.strokeStyle = PAL.LOG_LIGHT;
-  ctx.lineWidth = 1;
-  ctx.strokeRect(margin, descBoxY, VIEW_W - margin * 2, 44);
+  ctx.lineWidth = 2;
+  ctx.strokeRect(margin, descBoxY, VIEW_W - margin * 2, 56);
 
   if (bandCursor < 5) {
     const activeItem = slotDefs[bandCursor].item;
-    drawText(activeItem.desc, VIEW_W / 2, descBoxY + 17, 6, PAL.CAPOTE_CREAM, 'center');
-    drawText(prof.trackSub, VIEW_W / 2, descBoxY + 34, 6, PAL.SASH_GOLD, 'center');
+    drawText(activeItem.desc, VIEW_W / 2, descBoxY + 22, 9, PAL.CAPOTE_CREAM, 'center');
+    drawText(`TUNE: ${prof.trackTitle} (${prof.bpm} BPM)`, VIEW_W / 2, descBoxY + 44, 9, PAL.SASH_GOLD, 'center');
   } else {
-    drawText(`LOCK IN: ${prof.trackTitle}`, VIEW_W / 2, descBoxY + 17, 7, PAL.FIRE_GOLD, 'center');
-    drawText(prof.trackSub, VIEW_W / 2, descBoxY + 34, 6, PAL.SASH_TEAL, 'center');
+    drawText(`READY: ${prof.trackTitle}`, VIEW_W / 2, descBoxY + 22, 10, PAL.FIRE_GOLD, 'center');
+    drawText(prof.trackSub, VIEW_W / 2, descBoxY + 44, 9, PAL.SASH_TEAL, 'center');
   }
 
-  const nextBtnY = VIEW_H - 70;
+  // Next Button & Bottom Controls Bar
+  const nextBtnY = VIEW_H - 84;
   const nextSel = (bandCursor === 5);
-  pxRect(VIEW_W / 2 - 140, nextBtnY, 280, 32, nextSel ? PAL.FIRE_ORANGE : PAL.CAPOTE_RED);
+  pxRect(VIEW_W / 2 - 180, nextBtnY, 360, 40, nextSel ? PAL.FIRE_ORANGE : PAL.CAPOTE_RED);
   ctx.strokeStyle = nextSel ? PAL.WHITE : PAL.FIRE_GOLD;
   ctx.lineWidth = nextSel ? 3 : 2;
-  ctx.strokeRect(VIEW_W / 2 - 140, nextBtnY, 280, 32);
-  drawText("NEXT: CHOOSE DANCER ->", VIEW_W / 2, nextBtnY + 21, 8, nextSel ? PAL.INK : PAL.WHITE, 'center');
+  ctx.strokeRect(VIEW_W / 2 - 180, nextBtnY, 360, 40);
+  drawText("NEXT: CHOOSE DANCER ->", VIEW_W / 2, nextBtnY + 26, 11, nextSel ? PAL.INK : PAL.WHITE, 'center');
 
-  pxRect(0, VIEW_H - 24, VIEW_W, 24, PAL.INK);
-  drawText("L/R: SLOT   U/D or B: CHANGE   A: CONFIRM", VIEW_W / 2, VIEW_H - 8, 7, PAL.SASH_GOLD, 'center');
+  pxRect(0, VIEW_H - 30, VIEW_W, 30, PAL.INK);
+  drawText("L/R: SLOT  •  U/D or B: CHANGE  •  A: NEXT", VIEW_W / 2, VIEW_H - 10, 9, PAL.SASH_GOLD, 'center');
 }
 
-// PHASE 2: DANCER SELECTION & CHOREOGRAPHY PREVIEW
+// PHASE 2: DANCER SELECTION & ARRANGEMENT CARD
 function drawDancerSelectPhase() {
   pxRect(0, 0, VIEW_W, VIEW_H, PAL.PANEL_BG);
 
-  pxRect(0, 0, VIEW_W, 38, PAL.INK);
-  pxRect(0, 36, VIEW_W, 2, PAL.SASH_TEAL);
-  drawText("PHASE 2: SELECT RED RIVER JIGGER", VIEW_W / 2, 16, 10, PAL.FIRE_GOLD, 'center');
-  drawText(`ARRANGEMENT: ${activeProfile.trackTitle}`, VIEW_W / 2, 31, 7, PAL.CAPOTE_CREAM, 'center');
+  pxRect(0, 0, VIEW_W, 54, PAL.INK);
+  pxRect(0, 52, VIEW_W, 2, PAL.SASH_TEAL);
+  drawText("CHOOSE YOUR RED RIVER JIGGER", VIEW_W / 2, 22, 13, PAL.FIRE_GOLD, 'center');
+  drawText(`TUNE: ${activeProfile.trackTitle}`, VIEW_W / 2, 43, 9, PAL.CAPOTE_CREAM, 'center');
 
-  const margin = 16;
+  const margin = 18;
   const dancer = DANCER_ROSTER[selectedDancerIdx];
 
-  // Active X/Y/Z Track Transformation Summary Banner
-  const songBannerY = 48;
-  pxRect(margin, songBannerY, VIEW_W - margin * 2, 42, PAL.INK);
+  // Featured Arrangement Banner
+  const songBannerY = 66;
+  pxRect(margin, songBannerY, VIEW_W - margin * 2, 54, PAL.INK);
   ctx.strokeStyle = PAL.FIRE_ORANGE;
   ctx.lineWidth = 2;
-  ctx.strokeRect(margin, songBannerY, VIEW_W - margin * 2, 42);
-  drawText(`${activeProfile.trackTitle} (X:${fmtSigned(activeProfile.X)} Y:${fmtSigned(activeProfile.Y)} Z:${fmtSigned(activeProfile.Z)})`, VIEW_W / 2, songBannerY + 18, 7, PAL.FIRE_GOLD, 'center');
-  drawText(activeProfile.trackSub, VIEW_W / 2, songBannerY + 34, 6, PAL.SASH_TEAL, 'center');
+  ctx.strokeRect(margin, songBannerY, VIEW_W - margin * 2, 54);
+  drawText(activeProfile.trackTitle, VIEW_W / 2, songBannerY + 23, 11, PAL.FIRE_GOLD, 'center');
+  drawText(`${activeProfile.trackSub} • ${activeProfile.bpm} BPM`, VIEW_W / 2, songBannerY + 44, 8, PAL.SASH_TEAL, 'center');
 
   // ROW 0: DANCER SELECTOR CARD
-  const row0Y = 100;
+  const row0Y = 132;
   const row0Sel = (phase2Row === 0);
-  pxRect(margin, row0Y, VIEW_W - margin * 2, 186, row0Sel ? PAL.CARD_SEL : PAL.CARD_BG);
+  pxRect(margin, row0Y, VIEW_W - margin * 2, 222, row0Sel ? PAL.CARD_SEL : PAL.CARD_BG);
   ctx.strokeStyle = row0Sel ? PAL.FIRE_GOLD : PAL.SASH_TEAL;
-  ctx.lineWidth = row0Sel ? 3 : 1;
-  ctx.strokeRect(margin, row0Y, VIEW_W - margin * 2, 186);
+  ctx.lineWidth = row0Sel ? 3 : 2;
+  ctx.strokeRect(margin, row0Y, VIEW_W - margin * 2, 222);
 
-  drawText(`DANCER (${selectedDancerIdx + 1}/4): ${dancer.styleTitle}`, VIEW_W / 2, row0Y + 18, 7, PAL.SASH_TEAL, 'center');
+  drawText(`DANCER ${selectedDancerIdx + 1} OF 4 • ${dancer.styleTitle}`, VIEW_W / 2, row0Y + 24, 9, PAL.SASH_TEAL, 'center');
 
   const midX = Math.floor(VIEW_W / 2);
-  pxRect(midX - 58, row0Y + 104, 116, 14, PAL.SASH_RED);
-  pxRect(midX - 48, row0Y + 106, 96, 10, PAL.SASH_GOLD);
+  pxRect(midX - 68, row0Y + 124, 136, 16, PAL.SASH_RED);
+  pxRect(midX - 56, row0Y + 126, 112, 12, PAL.SASH_GOLD);
   const demoPose = ['IDLE', 'JIG_R', 'JIG_L', 'LIFT'][Math.floor(animFrame / 16) % 4];
-  drawDancerSprite(dancer, midX, row0Y + 106, 4, demoPose);
+  drawDancerSprite(dancer, midX, row0Y + 126, 5, demoPose);
 
-  drawText(`<   ${dancer.name}   >`, midX, row0Y + 134, 9, row0Sel ? PAL.FIRE_GOLD : PAL.WHITE, 'center');
-  drawText(dancer.outfit, midX, row0Y + 150, 6, PAL.CAPOTE_CREAM, 'center');
+  drawText(`<   ${dancer.name}   >`, midX, row0Y + 162, 12, row0Sel ? PAL.FIRE_GOLD : PAL.WHITE, 'center');
+  drawText(dancer.outfit, midX, row0Y + 184, 9, PAL.CAPOTE_CREAM, 'center');
 
-  const dirSeq = dancer.phaseDirs.map(d => DIR_ARROWS[d]).join(' -> ');
+  const dirSeq = dancer.phaseDirs.map(d => DIR_ARROWS[d]).join(' ');
   const btnSeq = dancer.stepPattern.filter(p => p.btn !== 'LIFT').map(p => p.btn).join('-');
-  drawText(`STICK PHASES: ${dirSeq}  |  STEPS: ${btnSeq}`, midX, row0Y + 172, 6, PAL.SASH_GOLD, 'center');
+  drawText(`STICK: ${dirSeq}   STEPS: ${btnSeq}`, midX, row0Y + 208, 9, PAL.SASH_GOLD, 'center');
 
   // ROW 1: START JIGGING BUTTON
-  const startBtnY = VIEW_H - 72;
+  const startBtnY = VIEW_H - 84;
   const row1Sel = (phase2Row === 1);
-  pxRect(VIEW_W / 2 - 150, startBtnY, 300, 34, row1Sel ? PAL.SASH_TEAL : PAL.CAPOTE_RED);
+  pxRect(VIEW_W / 2 - 180, startBtnY, 360, 40, row1Sel ? PAL.SASH_TEAL : PAL.CAPOTE_RED);
   ctx.strokeStyle = row1Sel ? PAL.WHITE : PAL.FIRE_GOLD;
   ctx.lineWidth = row1Sel ? 3 : 2;
-  ctx.strokeRect(VIEW_W / 2 - 150, startBtnY, 300, 34);
-  drawText("START KITCHEN PARTY JIG!", VIEW_W / 2, startBtnY + 22, 8, row1Sel ? PAL.INK : PAL.WHITE, 'center');
+  ctx.strokeRect(VIEW_W / 2 - 180, startBtnY, 360, 40);
+  drawText("START KITCHEN PARTY JIG!", VIEW_W / 2, startBtnY + 26, 11, row1Sel ? PAL.INK : PAL.WHITE, 'center');
 
-  pxRect(0, VIEW_H - 24, VIEW_W, 24, PAL.INK);
-  drawText("L/R: DANCER   U/D: ROW   A: START   B: BACK", VIEW_W / 2, VIEW_H - 8, 7, PAL.SASH_GOLD, 'center');
+  pxRect(0, VIEW_H - 30, VIEW_W, 30, PAL.INK);
+  drawText("L/R: DANCER  •  U/D: ROW  •  A: START  •  B: BACK", VIEW_W / 2, VIEW_H - 10, 9, PAL.SASH_GOLD, 'center');
 }
 
-// PHASE 3: JOYSTICK HOLD + A/B JIGGING MINI-GAME STAGE
+// PHASE 3: HALF-TEMPO JOYSTICK HOLD + A/B JIGGING MINI-GAME STAGE
 function drawJiggingPhase() {
-  const topBarH = 38;
-  const bottomBarH = 86;
+  const topBarH = 52;
+  const bottomBarH = 104;
   const bottomBarTop = VIEW_H - bottomBarH;
-  const floorY = bottomBarTop - 48;
+  const floorY = bottomBarTop - 54;
   const beatPulse = (Math.floor(currentStep / 2) % 2 === 0);
 
   const dancer = DANCER_ROSTER[selectedDancerIdx];
@@ -1532,20 +1599,23 @@ function drawJiggingPhase() {
 
   drawKitchenBackdrop(floorY);
 
+  // Top HUD Bar (y = 0)
   pxRect(0, 0, VIEW_W, topBarH, PAL.INK);
   pxRect(0, topBarH - 2, VIEW_W, 2, PAL.FIRE_ORANGE);
 
-  drawText(`SCORE:${score}`, 12, 16, 10, PAL.WHITE, 'left');
-  drawText(`COMBO:${combo}x`, VIEW_W - 12, 16, 10, combo >= 5 ? PAL.FIRE_ORANGE : PAL.SASH_TEAL, 'right');
-  drawText(`${activeProfile.trackTitle} • ${activeProfile.boundaries[activeSongPhaseIdx].label}`, VIEW_W / 2, 31, 6, PAL.FIRE_GOLD, 'center');
+  drawText(`SCORE:${score}`, 14, 22, 12, PAL.WHITE, 'left');
+  drawText(`COMBO:${combo}x`, VIEW_W - 14, 22, 12, combo >= 5 ? PAL.FIRE_ORANGE : PAL.SASH_TEAL, 'right');
+  drawText(`${activeProfile.trackTitle} • ${activeProfile.boundaries[activeSongPhaseIdx].label}`, VIEW_W / 2, 43, 8, PAL.FIRE_GOLD, 'center');
 
+  // Song Progress Bar under Top HUD
   const prog = totalSongSteps > 0 ? Math.min(1, currentStep / totalSongSteps) : 0;
-  pxRect(0, topBarH, VIEW_W, 4, PAL.LOG_DARK);
-  pxRect(0, topBarH, Math.floor(VIEW_W * prog), 4, PAL.SASH_TEAL);
+  pxRect(0, topBarH, VIEW_W, 5, PAL.LOG_DARK);
+  pxRect(0, topBarH, Math.floor(VIEW_W * prog), 5, PAL.SASH_TEAL);
 
+  // 5 Band Members on Back Stage
   const colW = VIEW_W / 5;
-  const backY = floorY + 12;
-  const frontY = floorY + 34;
+  const backY = floorY + 14;
+  const frontY = floorY + 40;
 
   const slotConfigs = [
     { type: 'FIDDLE', id: FIDDLE_ROSTER[bandSlots[0]].id, x: colW * 0.50, muted: false },
@@ -1559,86 +1629,88 @@ function drawJiggingPhase() {
     if (sc.id !== 'NONE' && !sc.muted) {
       ctx.save();
       ctx.beginPath();
-      ctx.moveTo(sc.x, 42);
-      ctx.lineTo(sc.x - 28, backY + 6);
-      ctx.lineTo(sc.x + 28, backY + 6);
+      ctx.moveTo(sc.x, 58);
+      ctx.lineTo(sc.x - 32, backY + 6);
+      ctx.lineTo(sc.x + 32, backY + 6);
       ctx.closePath();
       ctx.fillStyle = 'rgba(247, 200, 68, 0.14)';
       ctx.fill();
       ctx.restore();
     }
-    drawMusicianMini(sc.type, sc.id, sc.x, backY, 3, beatPulse, sc.muted);
+    drawMusicianMini(sc.type, sc.id, sc.x, backY, 4, beatPulse, sc.muted);
   }
 
-  drawDancerSprite(dancer, VIEW_W * 0.48, frontY, 4, jiggerPose);
+  // Central Selected Métis Dancer
+  drawDancerSprite(dancer, VIEW_W * 0.48, frontY, 5, jiggerPose);
 
+  // Phase-Shift Callout Banner when Joystick Direction Changes
   if (phaseShiftBanner.timer > 0 && phaseShiftBanner.text) {
-    const bw = Math.min(VIEW_W - 24, phaseShiftBanner.text.length * 10 + 28);
-    pxRect(VIEW_W / 2 - bw / 2, topBarH + 8, bw, 22, PAL.INK);
+    const bw = Math.min(VIEW_W - 24, phaseShiftBanner.text.length * 12 + 34);
+    pxRect(VIEW_W / 2 - bw / 2, topBarH + 12, bw, 30, PAL.INK);
     ctx.strokeStyle = PAL.FIRE_GOLD;
     ctx.lineWidth = 2;
-    ctx.strokeRect(VIEW_W / 2 - bw / 2, topBarH + 8, bw, 22);
-    drawText(phaseShiftBanner.text, VIEW_W / 2, topBarH + 23, 8, PAL.FIRE_GOLD, 'center');
+    ctx.strokeRect(VIEW_W / 2 - bw / 2, topBarH + 12, bw, 30);
+    drawText(phaseShiftBanner.text, VIEW_W / 2, topBarH + 33, 11, PAL.FIRE_GOLD, 'center');
   }
 
+  // Bottom HUD: Left Joystick Hold Indicator + Right Half-Tempo A/B Step Highway
   pxRect(0, bottomBarTop, VIEW_W, bottomBarH, PAL.INK);
   pxRect(0, bottomBarTop, VIEW_W, 3, PAL.SASH_TEAL);
 
-  // Joystick Direction Hold Box
-  const joyBoxX = 10;
-  const joyBoxY = bottomBarTop + 8;
-  const joyBoxW = 76;
-  const joyBoxH = 56;
+  const joyBoxX = 12;
+  const joyBoxY = bottomBarTop + 10;
+  const joyBoxW = 96;
+  const joyBoxH = 66;
   pxRect(joyBoxX, joyBoxY, joyBoxW, joyBoxH, dirMatched ? '#103B2C' : '#2E110E');
   ctx.strokeStyle = dirMatched ? PAL.SASH_TEAL : PAL.FIRE_GOLD;
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 3;
   ctx.strokeRect(joyBoxX, joyBoxY, joyBoxW, joyBoxH);
 
-  drawText("HOLD", joyBoxX + joyBoxW / 2, joyBoxY + 13, 6, PAL.CAPOTE_CREAM, 'center');
-  drawText(DIR_ARROWS[reqDir], joyBoxX + joyBoxW / 2, joyBoxY + 36, 16, dirMatched ? PAL.SASH_TEAL : PAL.FIRE_GOLD, 'center');
-  drawText(reqDir, joyBoxX + joyBoxW / 2, joyBoxY + 50, 6, dirMatched ? PAL.SASH_TEAL : PAL.WHITE, 'center');
+  drawText("HOLD", joyBoxX + joyBoxW / 2, joyBoxY + 16, 8, PAL.CAPOTE_CREAM, 'center');
+  drawText(DIR_ARROWS[reqDir], joyBoxX + joyBoxW / 2, joyBoxY + 42, 20, dirMatched ? PAL.SASH_TEAL : PAL.FIRE_GOLD, 'center');
+  drawText(reqDir, joyBoxX + joyBoxW / 2, joyBoxY + 59, 8, dirMatched ? PAL.SASH_TEAL : PAL.WHITE, 'center');
 
-  // Side-Scrolling A/B Rhythm Track
-  const trackX = joyBoxX + joyBoxW + 8;
-  const trackW = VIEW_W - trackX - 10;
-  const hitX = trackX + 26;
+  // Side-Scrolling Half-Tempo A/B Rhythm Track
+  const trackX = joyBoxX + joyBoxW + 10;
+  const trackW = VIEW_W - trackX - 12;
+  const hitX = trackX + 34;
   pxRect(trackX, joyBoxY, trackW, joyBoxH, '#0D2A3A');
 
   ctx.strokeStyle = dirMatched ? PAL.SASH_TEAL : PAL.FIRE_GOLD;
   ctx.lineWidth = 3;
-  ctx.strokeRect(hitX - 18, joyBoxY + 5, 36, 46);
-  drawText("B/A", hitX, joyBoxY + 32, 8, PAL.FIRE_GOLD, 'center');
+  ctx.strokeRect(hitX - 22, joyBoxY + 6, 44, 54);
+  drawText("B/A", hitX, joyBoxY + 38, 10, PAL.FIRE_GOLD, 'center');
 
   if (audioCtx) {
     const now = audioCtx.currentTime;
     for (let i = 0; i < expectedBeats.length; i++) {
       const b = expectedBeats[i];
       const nx = hitX + (b.time - now) * NOTE_SPEED;
-      if (nx > trackX - 16 && nx < VIEW_W + 30) {
+      if (nx > trackX - 18 && nx < VIEW_W + 30) {
         if (b.btn === 'LIFT') {
-          ctx.strokeStyle = 'rgba(247, 200, 68, 0.45)';
-          ctx.lineWidth = 1;
-          ctx.strokeRect(nx - 8, joyBoxY + 14, 16, 28);
-          drawText("LIFT", nx, joyBoxY + 31, 5, 'rgba(247, 200, 68, 0.65)', 'center');
+          ctx.strokeStyle = 'rgba(247, 200, 68, 0.55)';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(nx - 12, joyBoxY + 16, 24, 34);
+          drawText("LIFT", nx, joyBoxY + 37, 6, 'rgba(247, 200, 68, 0.8)', 'center');
         } else if (!b.hit && !b.missed) {
           const noteCol = (b.btn === 'B') ? PAL.FIRE_ORANGE : PAL.SASH_TEAL;
-          pxRect(nx - 13, joyBoxY + 8, 26, 40, noteCol);
+          pxRect(nx - 16, joyBoxY + 9, 32, 48, noteCol);
           ctx.strokeStyle = PAL.WHITE;
           ctx.lineWidth = 2;
-          ctx.strokeRect(nx - 13, joyBoxY + 8, 26, 40);
-          drawText(b.btn, nx, joyBoxY + 30, 10, PAL.INK, 'center');
-          drawText(DIR_ARROWS[b.dir], nx, joyBoxY + 44, 7, PAL.WHITE, 'center');
+          ctx.strokeRect(nx - 16, joyBoxY + 9, 32, 48);
+          drawText(b.btn, nx, joyBoxY + 35, 13, PAL.INK, 'center');
+          drawText(DIR_ARROWS[b.dir], nx, joyBoxY + 52, 8, PAL.WHITE, 'center');
         }
       }
     }
   }
 
-  drawText(`HOLD ${reqDir} ${DIR_ARROWS[reqDir]} + TAP B (RIGHT) / A (LEFT)`, VIEW_W / 2, VIEW_H - 7, 7, PAL.CAPOTE_CREAM, 'center');
+  drawText(`HOLD ${reqDir} ${DIR_ARROWS[reqDir]}  +  TAP B (RIGHT) / A (LEFT)`, VIEW_W / 2, VIEW_H - 9, 9, PAL.CAPOTE_CREAM, 'center');
 
   for (const ft of floatingTexts) {
     ctx.save();
     ctx.globalAlpha = Math.max(0, ft.life);
-    drawText(ft.text, ft.x, ft.y, 14, ft.color, 'center');
+    drawText(ft.text, ft.x, ft.y, 18, ft.color, 'center');
     ctx.restore();
   }
 }
@@ -1646,19 +1718,20 @@ function drawJiggingPhase() {
 // END-OF-SONG SCORE CARD
 function drawResultsPhase() {
   pxRect(0, 0, VIEW_W, VIEW_H, PAL.PANEL_BG);
-  pxRect(0, 0, VIEW_W, 38, PAL.INK);
-  pxRect(0, 36, VIEW_W, 2, PAL.FIRE_GOLD);
-  drawText("PERFORMANCE COMPLETE!", VIEW_W / 2, 24, 11, PAL.FIRE_GOLD, 'center');
+  pxRect(0, 0, VIEW_W, 54, PAL.INK);
+  pxRect(0, 52, VIEW_W, 2, PAL.FIRE_GOLD);
+  drawText("PERFORMANCE COMPLETE!", VIEW_W / 2, 34, 14, PAL.FIRE_GOLD, 'center');
 
   const dancer = DANCER_ROSTER[selectedDancerIdx];
-  drawDancerSprite(dancer, VIEW_W / 2, 175, 4, 'JIG_R');
+  drawDancerSprite(dancer, VIEW_W / 2, 210, 5, 'JIG_R');
 
-  drawText(`${activeProfile.trackTitle} • ${dancer.styleTitle}`, VIEW_W / 2, 212, 7, PAL.SASH_TEAL, 'center');
-  drawText(`FINAL SCORE: ${score}`, VIEW_W / 2, 248, 12, PAL.WHITE, 'center');
-  drawText(`MAX COMBO: ${maxCombo}x`, VIEW_W / 2, 276, 10, PAL.FIRE_ORANGE, 'center');
+  drawText(activeProfile.trackTitle, VIEW_W / 2, 252, 11, PAL.SASH_TEAL, 'center');
+  drawText(dancer.styleTitle, VIEW_W / 2, 276, 9, PAL.CAPOTE_CREAM, 'center');
+  drawText(`FINAL SCORE: ${score}`, VIEW_W / 2, 316, 14, PAL.WHITE, 'center');
+  drawText(`MAX COMBO: ${maxCombo}x`, VIEW_W / 2, 348, 12, PAL.FIRE_ORANGE, 'center');
 
-  pxRect(VIEW_W / 2 - 150, VIEW_H - 72, 300, 34, PAL.SASH_TEAL);
-  drawText("PRESS A: RETURN TO MENU", VIEW_W / 2, VIEW_H - 50, 8, PAL.INK, 'center');
+  pxRect(VIEW_W / 2 - 190, VIEW_H - 84, 380, 42, PAL.SASH_TEAL);
+  drawText("PRESS A: RETURN TO BAND MENU", VIEW_W / 2, VIEW_H - 57, 10, PAL.INK, 'center');
 }
 
 // ============================================================================
@@ -1686,7 +1759,7 @@ function update() {
       const newDir = activeBeat.dir;
       phaseShiftBanner = {
         text: `SHIFT STICK: HOLD ${DIR_ARROWS[newDir]} ${newDir}!`,
-        timer: 85
+        timer: 95
       };
     }
 
@@ -1696,7 +1769,7 @@ function update() {
         b.triggered = true;
         if (jiggerPose !== 'FALL') {
           jiggerPose = 'LIFT';
-          jiggerPoseTimer = now + 0.18;
+          jiggerPoseTimer = now + 0.24;
         }
       }
       if (!b.hit && !b.missed && b.btn !== 'LIFT' && now > b.time + TOLERANCE_GOOD) {
