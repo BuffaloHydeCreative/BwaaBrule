@@ -1,504 +1,1196 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Learn to Jig</title>
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: transparent;
-            color: #ffffff;
-            font-family: 'Press Start 2P', cursive;
-            overflow: hidden;
-            touch-action: none;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-        #game-container {
-            width: 100%;
-            height: 100%;
-            max-width: 600px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            box-sizing: border-box;
-            padding: 10px;
-        }
-        canvas {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            image-rendering: pixelated;
-            background-color: #540E11; /* Night Bordeaux */
-            border: 4px solid #FB6604; /* Blaze Orange */
-            border-radius: 8px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            aspect-ratio: 3 / 2;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Learn to Jig — 1855 Red River Kitchen Party</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  html, body, #game-container {
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: #1A0D08;
+    color: #FFFFFF;
+    font-family: 'Press Start 2P', monospace;
+    user-select: none;
+    touch-action: none;
+    image-rendering: pixelated;
+  }
+  canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    image-rendering: pixelated;
+  }
+</style>
 </head>
 <body>
+<div id="game-container">
+  <canvas id="gameCanvas" width="600" height="400"></canvas>
+</div>
 
-    <div id="game-container">
-        <canvas id="gameCanvas" width="600" height="400"></canvas>
-    </div>
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
 
-    <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
+// --- DYNAMIC FULL-BLEED VIEWPORT SCALING ---
+const BASE_H = 400;
+let VIEW_W = 600;
+let VIEW_H = 400;
+let HIT_ZONE_X = 100;
 
-        const BPM = 130;
-        const STEP_INTERVAL = (60.0 / BPM) / 2;
-        const LOOKAHEAD = 25.0;
-        const SCHEDULE_AHEAD_TIME = 2.5;
-        const TOLERANCE_PERFECT = 0.06;
-        const TOLERANCE_GOOD = 0.12;
-        const HIT_ZONE_X = 100;
-        const NOTE_SPEED = 300;
+function resizeViewport() {
+  const ww = window.innerWidth || 600;
+  const wh = window.innerHeight || 400;
+  const aspect = ww / Math.max(1, wh);
+  VIEW_H = BASE_H;
+  VIEW_W = Math.max(360, Math.round(BASE_H * aspect));
+  canvas.width = VIEW_W;
+  canvas.height = VIEW_H;
+  HIT_ZONE_X = Math.max(72, Math.min(130, Math.round(VIEW_W * 0.18)));
+  ctx.imageSmoothingEnabled = false;
+}
+window.addEventListener('resize', resizeViewport);
+resizeViewport();
 
-        const PALETTE = {
-            0: null, 
-            1: '#540E11', 
-            2: '#f1c27d', 
-            3: '#AD1C21', 
-            4: '#0F6F9E', 
-            5: '#FB6604', 
-            6: '#12AEA2', 
-            7: '#ffffff', 
-        };
+// --- 1855 RED RIVER MICHIF KITCHEN PARTY PALETTE ---
+const PAL = {
+  INK: '#0E0705',
+  LOG_DARK: '#2C160C',
+  LOG_MID: '#4D2817',
+  LOG_LIGHT: '#733E24',
+  CHINKING: '#C8B896',
+  FLOOR_DARK: '#241209',
+  FLOOR_MID: '#3D2011',
+  FLOOR_PLANK: '#572F1A',
+  FIRE_RED: '#AD1C21',
+  FIRE_ORANGE: '#FB6604',
+  FIRE_GOLD: '#F7C844',
+  CAPOTE_BLUE: '#1A3E6C',
+  CAPOTE_CREAM: '#E8DEC8',
+  CAPOTE_RED: '#9E1B20',
+  SASH_RED: '#C51E40',
+  SASH_TEAL: '#12AEA2',
+  SASH_GOLD: '#F2A922',
+  SKIN: '#E5B288',
+  SKIN_SHADE: '#B87E56',
+  HAIR_DARK: '#1C110B',
+  BEARD_GREY: '#9EA4AB',
+  BUFFALO_FUR: '#3B2314',
+  WHITE: '#FFFFFF',
+  DIM: '#6B5B52'
+};
 
-        const SPRITES = {
-            JIGGER_IDLE: [
-                [0,0,0,0,1,1,1,1,0,0,0,0],
-                [0,0,0,1,2,2,2,2,1,0,0,0],
-                [0,0,0,1,2,2,2,2,1,0,0,0],
-                [0,0,0,0,1,3,3,1,0,0,0,0],
-                [0,0,0,1,3,3,3,3,1,0,0,0],
-                [0,0,0,1,3,5,5,3,1,0,0,0],
-                [0,0,0,0,1,4,4,1,0,0,0,0],
-                [0,0,0,0,1,4,4,1,0,0,0,0],
-                [0,0,0,0,1,4,4,1,0,0,0,0],
-                [0,0,0,0,1,4,4,1,0,0,0,0],
-                [0,0,0,1,6,1,1,6,1,0,0,0],
-                [0,0,0,1,1,0,0,1,1,0,0,0]
-            ],
-            JIGGER_L: [
-                [0,0,0,0,1,1,1,1,0,0,0,0],
-                [0,0,0,1,2,2,2,2,1,0,0,0],
-                [0,0,0,1,2,2,2,2,1,0,0,0],
-                [0,0,0,0,1,3,3,1,0,0,0,0],
-                [0,0,1,1,3,3,3,3,1,1,0,0],
-                [0,1,2,1,3,5,5,3,1,2,1,0],
-                [0,0,0,0,1,4,4,1,0,0,0,0],
-                [0,0,0,1,4,0,1,4,1,0,0,0],
-                [0,0,1,4,0,0,0,1,4,1,0,0],
-                [0,1,6,1,0,0,0,0,1,4,1,0],
-                [0,1,1,0,0,0,0,0,1,6,1,0],
-                [0,0,0,0,0,0,0,0,1,1,0,0]
-            ],
-            JIGGER_R: [
-                [0,0,0,0,1,1,1,1,0,0,0,0],
-                [0,0,0,1,2,2,2,2,1,0,0,0],
-                [0,0,0,1,2,2,2,2,1,0,0,0],
-                [0,0,0,0,1,3,3,1,0,0,0,0],
-                [0,0,1,1,3,3,3,3,1,1,0,0],
-                [0,1,2,1,3,5,5,3,1,2,1,0],
-                [0,0,0,0,1,4,4,1,0,0,0,0],
-                [0,0,0,1,4,1,0,4,1,0,0,0],
-                [0,0,1,4,1,0,0,0,4,1,0,0],
-                [0,1,4,1,0,0,0,0,1,6,1,0],
-                [0,1,6,1,0,0,0,0,0,1,1,0],
-                [0,0,1,1,0,0,0,0,0,0,0,0]
-            ],
-            JIGGER_FALL: [
-                [0,0,0,0,0,0,0,0,0,0,0,0],
-                [0,0,0,0,0,0,0,0,0,0,0,0],
-                [0,0,0,0,0,0,0,0,0,0,0,0],
-                [0,0,0,1,1,0,0,0,0,0,0,0],
-                [0,0,1,2,2,1,0,0,1,1,0,0],
-                [0,1,2,2,2,1,1,1,4,1,0,0],
-                [0,1,3,3,3,3,3,4,4,1,1,0],
-                [0,0,1,3,5,3,1,4,4,6,1,0],
-                [0,0,0,1,1,1,0,1,1,1,0,0],
-                [0,0,0,0,1,4,1,0,0,0,0,0],
-                [0,0,0,1,4,1,0,0,0,0,0,0],
-                [0,0,1,6,1,0,0,0,0,0,0,0]
-            ]
-        };
+// --- MUSICAL & SEQUENCER STATE ---
+let currentBPM = 136;
+const LOOKAHEAD = 25.0;
+const SCHEDULE_AHEAD_TIME = 2.0;
+const TOLERANCE_PERFECT = 0.075;
+const TOLERANCE_GOOD = 0.145;
+const NOTE_SPEED = 290;
 
-        const baseJig = [
-            { n: 74, t: true }, { n: 69, t: false }, { n: 71, t: true }, { n: 67, t: false },
-            { n: 69, t: true }, { n: 66, t: false }, { n: 62, t: true }, { n: 64, t: false },
-            { n: 66, t: true }, { n: 67, t: false }, { n: 69, t: true }, { n: 71, t: false },
-            { n: 74, t: true }, { n: 71, t: false }, { n: 69, t: true }, { n: 64, t: false },
-            { n: 78, t: true }, { n: 76, t: false }, { n: 74, t: true }, { n: 73, t: false },
-            { n: 74, t: true }, { n: 69, t: false }, { n: 66, t: true }, { n: 69, t: false },
-            { n: 67, t: true }, { n: 64, t: false }, { n: 61, t: true }, { n: 64, t: false },
-            { n: 62, t: true }, { n: 66, t: false }, { n: 69, t: true }, { n: 74, t: false }
-        ];
+// Game Modes: 'BAND' (DAW-Band Control) | 'JIG' (Rhythm Match-the-Beat Mode)
+let controlMode = 'BAND';
+let isPaused = false;
+let cursorIdx = 2; // 0: Fiddle 1, 1: Fiddle 2, 2: Central Jigger, 3: Spoons/Bones, 4: Voyageur Caller
 
-        const baseOrangeBlossom = [
-            {n:64, t:true}, {n:64, t:false}, {n:67, t:true}, {n:64, t:false}, 
-            {n:69, t:true}, {n:64, t:false}, {n:67, t:true}, {n:64, t:false}, 
-            {n:64, t:true}, {n:64, t:false}, {n:67, t:true}, {n:64, t:false}, 
-            {n:62, t:true}, {n:60, t:false}, {n:64, t:true}, {n:64, t:false}, 
-            {n:69, t:true}, {n:69, t:false}, {n:71, t:true}, {n:69, t:false}, 
-            {n:72, t:true}, {n:69, t:false}, {n:71, t:true}, {n:69, t:false}, 
-            {n:69, t:true}, {n:69, t:false}, {n:71, t:true}, {n:69, t:false}, 
-            {n:67, t:true}, {n:64, t:false}, {n:64, t:true}, {n:64, t:false}
-        ];
+// Band Configuration
+const band = {
+  fiddle1On: true,
+  fiddle2On: true,
+  fiddleMode: 'UNISON', // 'UNISON' | 'COMPLEMENTARY' | 'BATTLE'
+  percOn: true,
+  percInstrument: 'SPOONS', // 'SPOONS' | 'BONES'
+  percStyle: 'GALLOP', // 'STEADY' | 'GALLOP' | 'ROLL'
+  callerOn: true,
+  callerSong: 'SHOUTS' // 'SHOUTS' | 'AVIRON' | 'MALBROUGH'
+};
 
-        const baseTeardropWaltz = [
-            {n:62, t:true}, {n:0, t:false}, {n:67, t:true}, {n:67, t:false}, 
-            {n:71, t:true}, {n:71, t:false}, {n:74, t:true}, {n:0, t:false}, 
-            {n:71, t:true}, {n:71, t:false}, {n:67, t:true}, {n:67, t:false}, 
-            {n:69, t:true}, {n:0, t:false}, {n:66, t:true}, {n:66, t:false}, 
-            {n:62, t:true}, {n:62, t:false}, {n:67, t:true}, {n:0, t:false}, 
-            {n:67, t:true}, {n:0, t:false}, {n:67, t:true}, {n:0, t:false}
-        ];
+const FIDDLE_MODES = ['UNISON', 'COMPLEMENTARY', 'BATTLE'];
+const PERC_COMBOS = [
+  { inst: 'SPOONS', style: 'STEADY', label: 'SPOONS: STEADY' },
+  { inst: 'SPOONS', style: 'GALLOP', label: 'SPOONS: GALLOP' },
+  { inst: 'SPOONS', style: 'ROLL',   label: 'SPOONS: ROLL' },
+  { inst: 'BONES',  style: 'STEADY', label: 'BONES: STEADY' },
+  { inst: 'BONES',  style: 'GALLOP', label: 'BONES: GALLOP' },
+  { inst: 'BONES',  style: 'ROLL',   label: 'BONES: ROLL' }
+];
+let percComboIdx = 1;
+const CALLER_SONGS = ['SHOUTS', 'AVIRON', 'MALBROUGH'];
 
-        function buildTrack(basePattern, loopCount, title) {
-            let fullPattern = [];
-            for(let i=0; i<loopCount; i++) fullPattern = fullPattern.concat(basePattern);
-            return { name: title, pattern: fullPattern };
+// --- 32-STEP PATTERNS (D MAJOR / A MIXOLYDIAN RED RIVER TUNING) ---
+// Melody 1: Red River Jig Primary Lead (MIDI notes)
+const JIG_LEAD_1 = [
+  74, 69, 71, 67, 69, 66, 62, 64,
+  66, 67, 69, 71, 74, 71, 69, 64,
+  78, 76, 74, 73, 74, 69, 66, 69,
+  67, 64, 61, 64, 62, 66, 69, 74
+];
+
+// Melody 2: Complementary Counter-Harmony & High Fiddle Variation
+const JIG_LEAD_2 = [
+  69, 66, 67, 62, 66, 62, 57, 61,
+  62, 64, 66, 67, 69, 67, 66, 61,
+  81, 79, 78, 76, 78, 74, 69, 74,
+  71, 67, 64, 67, 66, 69, 74, 78
+];
+
+// Traditional French-Canadian Paddling Round: "C'est l'aviron" (32 steps)
+const AVIRON_MELODY = [
+  69, 69, 71, 71, 73, 71, 69, 0,
+  73, 73, 74, 74, 76, 74, 73, 0,
+  74, 73, 71, 69, 71, 73, 74, 71,
+  69, 67, 66, 64, 62, 66, 62, 0
+];
+
+// Traditional French Song: "Malbrough s'en va-t-en guerre" (32 steps)
+const MALBROUGH_MELODY = [
+  62, 66, 66, 66, 67, 69, 67, 0,
+  66, 64, 64, 64, 66, 67, 66, 0,
+  62, 66, 66, 66, 67, 69, 67, 0,
+  66, 69, 67, 66, 64, 62, 62, 0
+];
+
+// Jig Rhythm Step Chart (button: 'A' = Left Heel, 'B' = Right Toe)
+const JIG_STEP_CHART = [
+  { s: 0, btn: 'A' }, { s: 2, btn: 'B' }, { s: 4, btn: 'A' }, { s: 6, btn: 'B' },
+  { s: 8, btn: 'A' }, { s: 10, btn: 'B' }, { s: 12, btn: 'A' }, { s: 13, btn: 'B' }, { s: 14, btn: 'A' },
+  { s: 16, btn: 'B' }, { s: 18, btn: 'A' }, { s: 20, btn: 'B' }, { s: 22, btn: 'A' },
+  { s: 24, btn: 'B' }, { s: 26, btn: 'A' }, { s: 28, btn: 'B' }, { s: 30, btn: 'A' }
+];
+
+// --- AUDIO ENGINE (WITH SAFARI iOS UNLOCK) ---
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+let noiseBuffer = null;
+let nextStepTime = 0.0;
+let currentStep = 0;
+let schedulerTimer = null;
+let activeNodes = [];
+
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new AudioContext();
+    // Create white/pink noise buffer for spoons & rib bones clacks
+    const bufferSize = audioCtx.sampleRate * 1.0;
+    noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+  }
+  if (audioCtx.state === 'suspended' && !isPaused) {
+    audioCtx.resume();
+  }
+}
+
+document.addEventListener('touchstart', initAudio, { passive: true });
+document.addEventListener('mousedown', initAudio, { passive: true });
+
+function registerNode(node) {
+  activeNodes.push(node);
+  node.onended = () => {
+    const idx = activeNodes.indexOf(node);
+    if (idx > -1) activeNodes.splice(idx, 1);
+  };
+}
+
+function stopAllAudio() {
+  activeNodes.forEach(n => {
+    try { n.stop(); } catch (e) {}
+  });
+  activeNodes = [];
+}
+
+function midiToFreq(m) {
+  return 440 * Math.pow(2, (m - 69) / 12);
+}
+
+// Bowed Chiptune Fiddle Voice
+function playFiddle(midi, time, dur, gainVal, detuneCents = 0) {
+  if (!midi || !audioCtx || gainVal <= 0) return;
+  const osc = audioCtx.createOscillator();
+  const filter = audioCtx.createBiquadFilter();
+  const gain = audioCtx.createGain();
+
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(midiToFreq(midi), time);
+  if (detuneCents !== 0) osc.detune.setValueAtTime(detuneCents, time);
+
+  filter.type = 'bandpass';
+  filter.frequency.setValueAtTime(1450, time);
+  filter.Q.setValueAtTime(1.4, time);
+
+  gain.gain.setValueAtTime(0.001, time);
+  gain.gain.linearRampToValueAtTime(gainVal, time + 0.018);
+  gain.gain.setValueAtTime(gainVal * 0.85, time + dur * 0.7);
+  gain.gain.exponentialRampToValueAtTime(0.0008, time + dur);
+
+  osc.connect(filter);
+  filter.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(time);
+  osc.stop(time + dur + 0.01);
+  registerNode(osc);
+}
+
+// Spoons (Dull Bass/Tom-esque Wooden/Metal Thud) vs Buffalo Rib Bones (Crisp Resonant Snare Clack)
+function playPercHit(time, isBones, accent) {
+  if (!audioCtx || !noiseBuffer) return;
+
+  if (!isBones) {
+    // SPOONS: Dull bass/tom-esque lap & knee thud
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'triangle';
+    const baseF = accent ? 165 : 135;
+    osc.frequency.setValueAtTime(baseF, time);
+    osc.frequency.exponentialRampToValueAtTime(68, time + 0.075);
+
+    const vol = accent ? 0.28 : 0.17;
+    gain.gain.setValueAtTime(vol, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.08);
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(time);
+    osc.stop(time + 0.085);
+    registerNode(osc);
+  } else {
+    // BUFFALO RIB BONES: Crisp resonant snare-like bone clack
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = noiseBuffer;
+
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(accent ? 2150 : 1850, time);
+    filter.Q.setValueAtTime(3.2, time);
+
+    const gain = audioCtx.createGain();
+    const vol = accent ? 0.26 : 0.16;
+    gain.gain.setValueAtTime(vol, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.055);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx.destination);
+    noise.start(time);
+    noise.stop(time + 0.06);
+    registerNode(noise);
+
+    // Bone wood-resonance click body
+    const clickOsc = audioCtx.createOscillator();
+    const clickGain = audioCtx.createGain();
+    clickOsc.type = 'square';
+    clickOsc.frequency.setValueAtTime(accent ? 740 : 620, time);
+    clickOsc.frequency.exponentialRampToValueAtTime(240, time + 0.03);
+    clickGain.gain.setValueAtTime(vol * 0.45, time);
+    clickGain.gain.exponentialRampToValueAtTime(0.001, time + 0.035);
+    clickOsc.connect(clickGain);
+    clickGain.connect(audioCtx.destination);
+    clickOsc.start(time);
+    clickOsc.stop(time + 0.04);
+    registerNode(clickOsc);
+  }
+}
+
+// Voyageur Caller Voice (Formant-filtered pulse vocal + Hé-Ho / Allez shouts)
+function playCallerVocal(midi, time, dur) {
+  if (!midi || !audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const filter = audioCtx.createBiquadFilter();
+  const gain = audioCtx.createGain();
+
+  osc.type = 'square';
+  // Baritone octave drop for hearty Voyageur singing
+  osc.frequency.setValueAtTime(midiToFreq(midi - 12), time);
+
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(880, time);
+  filter.Q.setValueAtTime(2.5, time);
+
+  gain.gain.setValueAtTime(0.001, time);
+  gain.gain.linearRampToValueAtTime(0.13, time + 0.025);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+
+  osc.connect(filter);
+  filter.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(time);
+  osc.stop(time + dur + 0.01);
+  registerNode(osc);
+}
+
+function playCallerShout(time, isAllez) {
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'triangle';
+  if (!isAllez) {
+    // "Hé-Ho!" two-syllable rising cheer
+    osc.frequency.setValueAtTime(196, time);
+    osc.frequency.setValueAtTime(293.66, time + 0.11);
+  } else {
+    // "Allez!" bright punchy call
+    osc.frequency.setValueAtTime(246.94, time);
+    osc.frequency.exponentialRampToValueAtTime(369.99, time + 0.16);
+  }
+  gain.gain.setValueAtTime(0.14, time);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + 0.22);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(time);
+  osc.stop(time + 0.23);
+  registerNode(osc);
+}
+
+function playStumbleClonk() {
+  if (!audioCtx) return;
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(110, now);
+  osc.frequency.exponentialRampToValueAtTime(42, now + 0.16);
+  gain.gain.setValueAtTime(0.35, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.17);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(now);
+  osc.stop(now + 0.18);
+  registerNode(osc);
+}
+
+// --- JIG RHYTHM & VISUAL CALLOUT STATE ---
+let expectedBeats = [];
+let floatingTexts = [];
+let shoutBanner = { text: '', timer: 0, x: 0 };
+let score = 0;
+let combo = 0;
+let maxCombo = 0;
+let jigStepsLeft = 0;
+let jiggerPose = 'IDLE'; // 'IDLE' | 'JIG_L' | 'JIG_R' | 'FALL'
+let jiggerPoseTimer = 0;
+let animFrame = 0;
+
+function triggerShout(text) {
+  shoutBanner.text = text;
+  shoutBanner.timer = 55;
+}
+
+// --- SEQUENCER STEP ENGINE ---
+function scheduleStep(stepIndex, time, stepDur) {
+  const s32 = stepIndex % 32;
+  const isAcapella = band.callerOn && (band.callerSong === 'AVIRON' || band.callerSong === 'MALBROUGH');
+
+  // 1. FIDDLE 1 & FIDDLE 2
+  // When Caller is in an a cappella French-Canadian round ("C'est l'aviron" or "Malbrough"),
+  // instruments drop back so the a cappella round shines (unless in Jig Rhythm Mode).
+  if (!isAcapella || controlMode === 'JIG') {
+    const n1 = JIG_LEAD_1[s32];
+    const n2 = JIG_LEAD_2[s32];
+
+    if (band.fiddle1On && band.fiddle2On) {
+      if (band.fiddleMode === 'UNISON') {
+        // Unison with automatic doubling-echo effect (+7 cents chorus & 45ms echo)
+        playFiddle(n1, time, stepDur * 0.9, 0.11, -6);
+        playFiddle(n1, time + 0.042, stepDur * 0.85, 0.075, +8);
+      } else if (band.fiddleMode === 'COMPLEMENTARY') {
+        // Harmonizing: Fiddle 1 plays lead, Fiddle 2 plays complementary harmony simultaneously
+        playFiddle(n1, time, stepDur * 0.9, 0.11, 0);
+        playFiddle(n2, time, stepDur * 0.9, 0.095, +4);
+      } else if (band.fiddleMode === 'BATTLE') {
+        // Battle: Verse-for-verse back and forth (Steps 0-15 Fiddle 1, Steps 16-31 Fiddle 2)
+        if (s32 < 16) {
+          playFiddle(n1, time, stepDur * 0.92, 0.13, 0);
+        } else {
+          playFiddle(n2, time, stepDur * 0.92, 0.13, +5);
         }
+      }
+    } else if (band.fiddle1On) {
+      playFiddle(n1, time, stepDur * 0.9, 0.12, 0);
+    } else if (band.fiddle2On) {
+      playFiddle(n2, time, stepDur * 0.9, 0.12, +4);
+    }
+  }
 
-        const TRACKS = [
-            buildTrack(baseJig, 6, "Red River Jig"),
-            buildTrack(baseOrangeBlossom, 6, "Orange Blossom"),
-            buildTrack(baseTeardropWaltz, 8, "Teardrop Waltz")
-        ];
+  // 2. SPOONS / BUFFALO RIB BONES
+  if (band.percOn && (!isAcapella || controlMode === 'JIG')) {
+    const isBones = (band.percInstrument === 'BONES');
+    if (band.percStyle === 'STEADY') {
+      // Backbeat on off-beats
+      if (s32 % 2 === 1) {
+        playPercHit(time, isBones, s32 % 4 === 3);
+      }
+    } else if (band.percStyle === 'GALLOP') {
+      // Métis triplet gallop (1-2-3, 1-2-3)
+      playPercHit(time, isBones, true);
+      playPercHit(time + stepDur * 0.33, isBones, false);
+      playPercHit(time + stepDur * 0.66, isBones, false);
+    } else if (band.percStyle === 'ROLL') {
+      // Rapid 32nd-note wrist roll on every step
+      playPercHit(time, isBones, s32 % 2 === 0);
+      playPercHit(time + stepDur * 0.5, isBones, false);
+    }
+  }
 
-        let gameState = 'START';
-        let score = 0, combo = 0, maxCombo = 0;
-        let audioCtx = null, nextStepTime = 0.0, currentStep = 0, timerID;
-        let activeOscillators = []; 
-        let expectedBeats = [], floatingTexts = [];
-        let jiggerState = 'IDLE', jiggerTimer = 0, lastLeg = 'L';
-        let currentTrackName = "";
-        let melodyPattern = [];
-
-        // --- AUDIO INITIALIZATION ---
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        
-        function initAudio() {
-            if (audioCtx) return;
-            audioCtx = new AudioContext();
+  // 3. VOYAGEUR CALLER
+  if (band.callerOn) {
+    if (band.callerSong === 'SHOUTS') {
+      // Shouts "Hé-Ho!" and "Allez!" when the band is in full swing
+      const bandActiveCount = (band.fiddle1On ? 1 : 0) + (band.fiddle2On ? 1 : 0) + (band.percOn ? 1 : 0);
+      if (bandActiveCount >= 2 || controlMode === 'JIG') {
+        if (s32 === 0) {
+          playCallerShout(time, false);
+          triggerShout("HÉ-HO!");
+        } else if (s32 === 16) {
+          playCallerShout(time, true);
+          triggerShout("ALLEZ!");
         }
-
-        function unlockAudio() {
-            initAudio();
-            if (audioCtx && audioCtx.state === 'suspended') {
-                audioCtx.resume();
-            }
+      }
+    } else if (band.callerSong === 'AVIRON') {
+      // French-Canadian Paddle A Cappella Round ("C'est l'aviron")
+      const vNote = AVIRON_MELODY[s32];
+      if (vNote) {
+        playCallerVocal(vNote, time, stepDur * 0.95);
+        // Round canon voice enters 4 steps behind!
+        const roundNote = AVIRON_MELODY[(s32 + 28) % 32];
+        if (roundNote) {
+          playCallerVocal(roundNote + 12, time, stepDur * 0.85);
         }
+      }
+      if (s32 === 0) triggerShout("C'EST L'AVIRON QUI NOUS MÈNE!");
+    } else if (band.callerSong === 'MALBROUGH') {
+      // Traditional French Song ("Malbrough s'en va-t-en guerre")
+      const mNote = MALBROUGH_MELODY[s32];
+      if (mNote) {
+        playCallerVocal(mNote, time, stepDur * 0.95);
+      }
+      if (s32 === 0) triggerShout("MALBROUGH S'EN VA-T-EN GUERRE!");
+    }
+  }
 
-        document.addEventListener('touchstart', unlockAudio, { once: true });
-        document.addEventListener('mousedown', unlockAudio, { once: true });
-
-        function stopAllAudio() {
-            activeOscillators.forEach(osc => {
-                try { osc.stop(); } catch(e) {}
-            });
-            activeOscillators = [];
+  // 4. JIG RHYTHM BEAT SPAWNING (When Central Jigger is engaged)
+  if (controlMode === 'JIG' && jigStepsLeft > 0) {
+    const hitDef = JIG_STEP_CHART.find(item => item.s === s32);
+    if (hitDef) {
+      expectedBeats.push({
+        time: time,
+        btn: hitDef.btn,
+        hit: false,
+        missed: false
+      });
+    }
+    jigStepsLeft--;
+    if (jigStepsLeft <= 0 && expectedBeats.length === 0) {
+      // Queue end-of-set return after final notes pass
+      setTimeout(() => {
+        if (controlMode === 'JIG' && jigStepsLeft <= 0) {
+          disengageJigMode(true);
         }
+      }, 1800);
+    }
+  }
+}
 
-        function playFiddleNote(midiNote, time, duration) {
-            if (!midiNote || !audioCtx) return;
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.type = 'square';
-            osc.frequency.value = 440 * Math.pow(2, (midiNote - 69) / 12);
-            gain.gain.setValueAtTime(0, time);
-            gain.gain.linearRampToValueAtTime(0.15, time + 0.01); 
-            gain.gain.setValueAtTime(0.15, time + duration - 0.05);
-            gain.gain.linearRampToValueAtTime(0, time + duration); 
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start(time);
-            osc.stop(time + duration);
+function scheduler() {
+  if (isPaused || !audioCtx) return;
+  const stepDur = (60.0 / currentBPM) / 2;
+  while (nextStepTime < audioCtx.currentTime + SCHEDULE_AHEAD_TIME) {
+    scheduleStep(currentStep, nextStepTime, stepDur);
+    nextStepTime += stepDur;
+    currentStep++;
+  }
+  schedulerTimer = setTimeout(scheduler, LOOKAHEAD);
+}
 
-            activeOscillators.push(osc);
-            osc.onended = () => {
-                const index = activeOscillators.indexOf(osc);
-                if (index > -1) activeOscillators.splice(index, 1);
-            };
+function ensureSequencerRunning() {
+  initAudio();
+  if (!schedulerTimer) {
+    nextStepTime = audioCtx.currentTime + 0.08;
+    scheduler();
+  }
+}
+
+// --- JIG RHYTHM MODE ENGAGE / DISENGAGE ---
+function engageJigMode() {
+  ensureSequencerRunning();
+  controlMode = 'JIG';
+  score = 0;
+  combo = 0;
+  maxCombo = 0;
+  expectedBeats = [];
+  floatingTexts = [];
+  // ~45 seconds of jigging (192 eighth-note steps at ~136 BPM)
+  jigStepsLeft = 192;
+  jiggerPose = 'IDLE';
+  triggerShout("CENTRE STAGE! MATCH THE STEPS!");
+}
+
+function disengageJigMode(completed = false) {
+  controlMode = 'BAND';
+  expectedBeats = [];
+  jiggerPose = 'IDLE';
+  if (completed) {
+    triggerShout(`BRAVO! SCORE: ${score} (MAX ${maxCombo}x)`);
+  } else {
+    triggerShout("BACK TO KITCHEN BAND CONTROL");
+  }
+}
+
+function handleJigTap(btnPressed) {
+  if (controlMode !== 'JIG' || !audioCtx || isPaused) return;
+  const now = audioCtx.currentTime;
+
+  let closest = null;
+  let minDiff = Infinity;
+  for (let i = 0; i < expectedBeats.length; i++) {
+    const b = expectedBeats[i];
+    if (!b.hit && !b.missed) {
+      const diff = Math.abs(now - b.time);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closest = b;
+      }
+    }
+  }
+
+  if (closest && minDiff <= TOLERANCE_GOOD) {
+    closest.hit = true;
+    const exactBtn = (closest.btn === btnPressed);
+    if (minDiff <= TOLERANCE_PERFECT && exactBtn) {
+      score += 100;
+      combo++;
+      if (combo > maxCombo) maxCombo = combo;
+      jiggerPose = (btnPressed === 'A') ? 'JIG_L' : 'JIG_R';
+      jiggerPoseTimer = now + 0.25;
+      spawnFloatingText("PERFECT!", PAL.SASH_TEAL);
+    } else {
+      score += 50;
+      combo++;
+      if (combo > maxCombo) maxCombo = combo;
+      jiggerPose = (btnPressed === 'A') ? 'JIG_L' : 'JIG_R';
+      jiggerPoseTimer = now + 0.25;
+      spawnFloatingText(exactBtn ? "GOOD!" : "STEP!", PAL.FIRE_ORANGE);
+    }
+  } else {
+    combo = 0;
+    jiggerPose = 'FALL';
+    jiggerPoseTimer = now + 0.65;
+    playStumbleClonk();
+    spawnFloatingText("STUMBLE!", PAL.FIRE_RED);
+  }
+}
+
+function spawnFloatingText(text, color) {
+  floatingTexts.push({
+    text,
+    color,
+    x: VIEW_W / 2,
+    y: VIEW_H - 185,
+    life: 1.0
+  });
+}
+
+// --- ARCADE CABINET POSTMESSAGE BRIDGE (Single Source of Truth) ---
+const dpadHold = {
+  UP:    { active: false, holdUntil: 0, nextRepeat: 0 },
+  DOWN:  { active: false, holdUntil: 0, nextRepeat: 0 },
+  LEFT:  { active: false, holdUntil: 0, nextRepeat: 0 },
+  RIGHT: { active: false, holdUntil: 0, nextRepeat: 0 }
+};
+const btnDebounce = { BUTTON_A: 0, BUTTON_B: 0 };
+const HOLD_WINDOW_MS = 145;
+const REPEAT_DELAY_MS = 195;
+const DEBOUNCE_MS = 110;
+
+function clearInputStates() {
+  for (const k in dpadHold) {
+    dpadHold[k].active = false;
+    dpadHold[k].holdUntil = 0;
+    dpadHold[k].nextRepeat = 0;
+  }
+}
+
+function handleCardinalStep(dir) {
+  ensureSequencerRunning();
+
+  if (controlMode === 'JIG') {
+    if (dir === 'UP') {
+      disengageJigMode(false);
+    }
+    return;
+  }
+
+  // BAND CONTROL MODE
+  if (dir === 'LEFT') {
+    cursorIdx = (cursorIdx + 4) % 5;
+  } else if (dir === 'RIGHT') {
+    cursorIdx = (cursorIdx + 1) % 5;
+  } else if (dir === 'UP') {
+    currentBPM = Math.min(185, currentBPM + 4);
+  } else if (dir === 'DOWN') {
+    currentBPM = Math.max(84, currentBPM - 4);
+  }
+}
+
+function processHeldInputs(now) {
+  for (const dir in dpadHold) {
+    const slot = dpadHold[dir];
+    if (!slot.active) continue;
+    if (now > slot.holdUntil) {
+      slot.active = false;
+      continue;
+    }
+    if (now >= slot.nextRepeat) {
+      handleCardinalStep(dir);
+      slot.nextRepeat = now + REPEAT_DELAY_MS;
+    }
+  }
+}
+
+function handleActionA() {
+  ensureSequencerRunning();
+
+  if (controlMode === 'JIG') {
+    handleJigTap('A');
+    return;
+  }
+
+  // BAND CONTROL MODE: Toggle selected member ON/OFF or engage Central Jigger
+  if (cursorIdx === 0) band.fiddle1On = !band.fiddle1On;
+  else if (cursorIdx === 1) band.fiddle2On = !band.fiddle2On;
+  else if (cursorIdx === 2) engageJigMode();
+  else if (cursorIdx === 3) band.percOn = !band.percOn;
+  else if (cursorIdx === 4) band.callerOn = !band.callerOn;
+}
+
+function handleActionB() {
+  ensureSequencerRunning();
+
+  if (controlMode === 'JIG') {
+    handleJigTap('B');
+    return;
+  }
+
+  // BAND CONTROL MODE: Cycle instrument style / mode for highlighted musician
+  if (cursorIdx === 0 || cursorIdx === 1) {
+    const idx = FIDDLE_MODES.indexOf(band.fiddleMode);
+    band.fiddleMode = FIDDLE_MODES[(idx + 1) % FIDDLE_MODES.length];
+    band.fiddle1On = true;
+    band.fiddle2On = true;
+  } else if (cursorIdx === 2) {
+    engageJigMode();
+  } else if (cursorIdx === 3) {
+    percComboIdx = (percComboIdx + 1) % PERC_COMBOS.length;
+    band.percInstrument = PERC_COMBOS[percComboIdx].inst;
+    band.percStyle = PERC_COMBOS[percComboIdx].style;
+    band.percOn = true;
+  } else if (cursorIdx === 4) {
+    const idx = CALLER_SONGS.indexOf(band.callerSong);
+    band.callerSong = CALLER_SONGS[(idx + 1) % CALLER_SONGS.length];
+    band.callerOn = true;
+  }
+}
+
+window.addEventListener('message', function(event) {
+  const raw = event.data;
+  let msg = raw;
+  if (typeof raw === 'string' && raw.startsWith('{')) {
+    try { msg = JSON.parse(raw); } catch (e) {}
+  }
+  const cmd = (typeof msg === 'string') ? msg : (msg && (msg.type || msg.action || msg.cmd || msg.command || msg.button));
+  if (!cmd || typeof cmd !== 'string') return;
+
+  if (cmd === 'PAUSE') {
+    isPaused = true;
+    clearInputStates();
+    clearTimeout(schedulerTimer);
+    schedulerTimer = null;
+    if (audioCtx && audioCtx.state === 'running') audioCtx.suspend();
+    return;
+  }
+  if (cmd === 'RESUME') {
+    isPaused = false;
+    clearInputStates();
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    if (audioCtx && !schedulerTimer) {
+      nextStepTime = audioCtx.currentTime + 0.08;
+      scheduler();
+    }
+    return;
+  }
+  if (isPaused) return;
+
+  if (cmd === 'RELEASE' || cmd === 'STOP' || cmd === 'DPAD_RELEASE' || cmd === 'NEUTRAL') {
+    clearInputStates();
+    return;
+  }
+
+  const now = performance.now();
+
+  for (const dir of ['UP', 'DOWN', 'LEFT', 'RIGHT']) {
+    if (cmd === `DPAD_${dir}` || cmd === `DPAD_${dir}_PRESS`) {
+      const slot = dpadHold[dir];
+      if (!slot.active) {
+        handleCardinalStep(dir);
+        slot.nextRepeat = now + REPEAT_DELAY_MS;
+      }
+      slot.active = true;
+      slot.holdUntil = now + HOLD_WINDOW_MS;
+      return;
+    }
+    if (cmd === `DPAD_${dir}_RELEASE`) {
+      dpadHold[dir].active = false;
+      dpadHold[dir].holdUntil = 0;
+      return;
+    }
+  }
+
+  if (cmd === 'BUTTON_A' || cmd === 'BUTTON_A_PRESS') {
+    if (now - btnDebounce.BUTTON_A >= DEBOUNCE_MS) {
+      btnDebounce.BUTTON_A = now;
+      handleActionA();
+    }
+    return;
+  }
+
+  if (cmd === 'BUTTON_B' || cmd === 'BUTTON_B_PRESS') {
+    if (now - btnDebounce.BUTTON_B >= DEBOUNCE_MS) {
+      btnDebounce.BUTTON_B = now;
+      handleActionB();
+    }
+    return;
+  }
+});
+
+// --- 1855 MICHIF LOG HOUSE KITCHEN PARTY PIXEL ART RENDERER ---
+function pxRect(x, y, w, h, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(Math.floor(x), Math.floor(y), Math.floor(w), Math.floor(h));
+}
+
+function drawText(txt, x, y, size, color, align = 'center') {
+  ctx.font = `${size}px "Press Start 2P", monospace`;
+  ctx.textAlign = align;
+  ctx.fillStyle = PAL.INK;
+  ctx.fillText(txt, Math.floor(x) + 2, Math.floor(y) + 2);
+  ctx.fillStyle = color;
+  ctx.fillText(txt, Math.floor(x), Math.floor(y));
+}
+
+function drawKitchenBackdrop(floorY) {
+  // 1. Horizontal Chinked Log Cabin Wall
+  const logH = 22;
+  for (let y = 36; y < floorY; y += logH) {
+    pxRect(0, y, VIEW_W, logH - 3, PAL.LOG_MID);
+    pxRect(0, y, VIEW_W, 4, PAL.LOG_LIGHT);
+    pxRect(0, y + logH - 7, VIEW_W, 4, PAL.LOG_DARK);
+    // Pale lime/clay chinking mortar between logs
+    pxRect(0, y + logH - 3, VIEW_W, 3, PAL.CHINKING);
+  }
+
+  // Vertical corner timber posts
+  pxRect(0, 36, 18, floorY - 36, PAL.LOG_DARK);
+  pxRect(VIEW_W - 18, 36, 18, floorY - 36, PAL.LOG_DARK);
+
+  // 2. Stone Hearth & Roaring Kitchen Fire (Left-Center Back Wall)
+  const hearthX = Math.max(28, Math.floor(VIEW_W * 0.12));
+  const hearthW = 76;
+  const hearthTop = floorY - 96;
+  pxRect(hearthX, hearthTop, hearthW, 96, '#4A4947');
+  pxRect(hearthX + 4, hearthTop + 4, hearthW - 8, 92, '#696764');
+  // Timber mantlepiece with brass kettle & stoneware jug
+  pxRect(hearthX - 6, hearthTop - 6, hearthW + 12, 8, PAL.LOG_DARK);
+  pxRect(hearthX + 10, hearthTop - 16, 12, 10, '#B8841E'); // Brass kettle
+  pxRect(hearthX + 52, hearthTop - 18, 10, 12, PAL.CAPOTE_CREAM); // Rum/molasses crock
+
+  // Firebox & flickering flames
+  pxRect(hearthX + 16, floorY - 46, hearthW - 32, 46, PAL.INK);
+  const flicker = Math.sin(animFrame * 0.25) * 4;
+  pxRect(hearthX + 22, floorY - 26 - flicker, 32, 26 + flicker, PAL.FIRE_RED);
+  pxRect(hearthX + 26, floorY - 20 - flicker * 0.7, 24, 20 + flicker * 0.7, PAL.FIRE_ORANGE);
+  pxRect(hearthX + 31, floorY - 12, 14, 12, PAL.FIRE_GOLD);
+
+  // Warm hearth light glow pool
+  ctx.fillStyle = 'rgba(251, 102, 4, 0.11)';
+  ctx.beginPath();
+  ctx.arc(hearthX + hearthW / 2, floorY - 20, 110, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 3. Frosted Cabin Window (Right-Center Back Wall showing 1855 snowy night)
+  const winX = Math.min(VIEW_W - 96, Math.floor(VIEW_W * 0.76));
+  const winY = floorY - 102;
+  pxRect(winX, winY, 54, 48, PAL.LOG_DARK);
+  pxRect(winX + 4, winY + 4, 46, 40, '#132842'); // Winter night sky
+  pxRect(winX + 4, winY + 30, 46, 14, '#DDF2FF'); // Snowdrift outside
+  // Window mullions & snow frost
+  pxRect(winX + 25, winY + 4, 4, 40, PAL.LOG_DARK);
+  pxRect(winX + 4, winY + 22, 46, 4, PAL.LOG_DARK);
+
+  // 4. Post-Buffalo-Hunt Trophy Pelt & Snowshoes on Wall
+  const midX = Math.floor(VIEW_W / 2);
+  // Hanging buffalo robe / hide
+  pxRect(midX - 28, floorY - 114, 56, 34, PAL.BUFFALO_FUR);
+  pxRect(midX - 24, floorY - 110, 48, 26, '#52321E');
+  // Crossed snowshoes above buffalo hide
+  pxRect(midX - 18, floorY - 126, 36, 4, PAL.SASH_GOLD);
+  pxRect(midX - 12, floorY - 130, 24, 12, PAL.LOG_LIGHT);
+
+  // 5. Hand-Hewn Wide Plank Log-House Floor
+  pxRect(0, floorY, VIEW_W, VIEW_H - floorY, PAL.FLOOR_MID);
+  pxRect(0, floorY, VIEW_W, 4, PAL.LOG_DARK);
+  for (let py = floorY + 14; py < VIEW_H; py += 16) {
+    pxRect(0, py, VIEW_W, 2, PAL.FLOOR_DARK);
+  }
+  // Braided rag rug under the central jigger
+  pxRect(midX - 66, floorY + 18, 132, 26, PAL.SASH_RED);
+  pxRect(midX - 60, floorY + 21, 120, 20, PAL.SASH_TEAL);
+  pxRect(midX - 54, floorY + 24, 108, 14, PAL.SASH_GOLD);
+  pxRect(midX - 48, floorY + 27, 96, 8, PAL.CAPOTE_CREAM);
+}
+
+// --- DETAILED 1855 MICHIF CHARACTER SPRITES ---
+function drawMichifCharacter(role, cx, cy, isLit, isSelected, beatPulse) {
+  const s = 4; // Crisp 4px pixel scale
+  const bob = (isLit && beatPulse) ? -s : 0;
+  const x = Math.floor(cx - 6 * s);
+  const y = Math.floor(cy - 14 * s + bob);
+
+  // Spotlight Cone from Cabin Rafters when Engaged
+  if (isLit) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(cx, 38);
+    ctx.lineTo(cx - 38, cy + 8);
+    ctx.lineTo(cx + 38, cy + 8);
+    ctx.closePath();
+    const grad = ctx.createLinearGradient(cx, 38, cx, cy + 8);
+    grad.addColorStop(0, 'rgba(247, 200, 68, 0.34)');
+    grad.addColorStop(1, 'rgba(247, 200, 68, 0.03)');
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Floor shadow
+  pxRect(cx - 22, cy - 2, 44, 6, 'rgba(0,0,0,0.45)');
+
+  // Selection Cursor Bracket Above Head
+  if (isSelected) {
+    const bounce = Math.sin(animFrame * 0.18) * 3;
+    pxRect(cx - 10, y - 16 + bounce, 20, 4, PAL.FIRE_GOLD);
+    pxRect(cx - 6, y - 12 + bounce, 12, 4, PAL.FIRE_GOLD);
+    pxRect(cx - 2, y - 8 + bounce, 4, 4, PAL.FIRE_GOLD);
+  }
+
+  // Dimming filter when muted
+  ctx.save();
+  if (!isLit && role !== 'JIGGER') {
+    ctx.globalAlpha = 0.45;
+  }
+
+  if (role === 'FIDDLE_1' || role === 'FIDDLE_2') {
+    // 1855 Michif Fiddler: Wool toque / wide-brim hat, Hudson's Bay Capote coat, Ceinture Fléchée sash
+    const coatCol = (role === 'FIDDLE_1') ? PAL.CAPOTE_BLUE : PAL.CAPOTE_CREAM;
+    const hatCol = (role === 'FIDDLE_1') ? PAL.SASH_RED : PAL.CAPOTE_BLUE;
+
+    // Hat / Toque
+    pxRect(x + 3 * s, y, 6 * s, 2 * s, hatCol);
+    pxRect(x + 2 * s, y + 2 * s, 8 * s, s, PAL.SASH_GOLD);
+    // Head & Beard
+    pxRect(x + 3 * s, y + 3 * s, 6 * s, 3 * s, PAL.SKIN);
+    pxRect(x + 3 * s, y + 5 * s, 6 * s, s, PAL.HAIR_DARK);
+    // Capote Coat
+    pxRect(x + 2 * s, y + 6 * s, 8 * s, 5 * s, coatCol);
+    // Woven Ceinture Fléchée (Red/Teal/Gold Sash)
+    pxRect(x + 2 * s, y + 9 * s, 8 * s, s, PAL.SASH_RED);
+    pxRect(x + 3 * s, y + 9 * s, 2 * s, s, PAL.SASH_TEAL);
+    pxRect(x + 7 * s, y + 9 * s, 2 * s, s, PAL.SASH_GOLD);
+    // Trousers & Moccasins
+    pxRect(x + 3 * s, y + 11 * s, 2 * s, 3 * s, PAL.LOG_DARK);
+    pxRect(x + 7 * s, y + 11 * s, 2 * s, 3 * s, PAL.LOG_DARK);
+    // Fiddle & Animated Bow
+    pxRect(x + 8 * s, y + 5 * s, 4 * s, 2 * s, '#B85D19');
+    const bowShift = (isLit && beatPulse) ? -s : s;
+    pxRect(x + 7 * s, y + 4 * s + bowShift, 6 * s, 2, PAL.WHITE);
+
+  } else if (role === 'PERC') {
+    // Spoons / Buffalo Rib Bones Player: Red River wool toque, buckskin/wool vest, sashes
+    pxRect(x + 3 * s, y, 6 * s, 2 * s, PAL.SASH_TEAL);
+    pxRect(x + 3 * s, y + 2 * s, 6 * s, 4 * s, PAL.SKIN);
+    pxRect(x + 2 * s, y + 6 * s, 8 * s, 5 * s, PAL.CAPOTE_RED);
+    pxRect(x + 2 * s, y + 9 * s, 8 * s, s, PAL.SASH_GOLD);
+    pxRect(x + 3 * s, y + 11 * s, 2 * s, 3 * s, PAL.CAPOTE_BLUE);
+    pxRect(x + 7 * s, y + 11 * s, 2 * s, 3 * s, PAL.CAPOTE_BLUE);
+
+    // Spoons or Curved White Buffalo Rib Bones clacking in hands
+    const handY = (isLit && beatPulse) ? y + 6 * s : y + 8 * s;
+    const toolCol = (band.percInstrument === 'BONES') ? PAL.CAPOTE_CREAM : '#A8B2BD';
+    pxRect(x + s, handY, 2 * s, s, toolCol);
+    pxRect(x + 9 * s, handY, 2 * s, s, toolCol);
+
+  } else if (role === 'CALLER') {
+    // Old-Time Voyageur Caller: Grey beard, red wool toque, blue capote, raising mug/hand to call
+    pxRect(x + 3 * s, y - s, 6 * s, 3 * s, PAL.SASH_RED);
+    pxRect(x + 3 * s, y + 2 * s, 6 * s, 3 * s, PAL.SKIN);
+    pxRect(x + 3 * s, y + 4 * s, 6 * s, 2 * s, PAL.BEARD_GREY);
+    pxRect(x + 2 * s, y + 6 * s, 8 * s, 5 * s, PAL.CAPOTE_BLUE);
+    pxRect(x + 2 * s, y + 9 * s, 8 * s, s, PAL.SASH_RED);
+    pxRect(x + 3 * s, y + 11 * s, 2 * s, 3 * s, PAL.LOG_DARK);
+    pxRect(x + 7 * s, y + 11 * s, 2 * s, 3 * s, PAL.LOG_DARK);
+    // Raised arm cheering / singing
+    const armY = (isLit && beatPulse) ? y + 2 * s : y + 5 * s;
+    pxRect(x + 10 * s, armY, 2 * s, 3 * s, PAL.CAPOTE_BLUE);
+    pxRect(x + 10 * s, armY - s, 2 * s, s, PAL.SKIN);
+
+  } else if (role === 'JIGGER') {
+    // Central Red River Jigger (Front & Center on the Rag Rug!)
+    const jx = Math.floor(cx - 6 * s);
+    const jy = Math.floor(cy - 13 * s);
+
+    if (jiggerPose === 'FALL') {
+      // Stumbled on the floorboards
+      pxRect(jx + 2 * s, jy + 7 * s, 8 * s, 4 * s, PAL.CAPOTE_RED);
+      pxRect(jx + s, jy + 6 * s, 3 * s, 3 * s, PAL.SKIN);
+      pxRect(jx + 9 * s, jy + 8 * s, 3 * s, 2 * s, PAL.SASH_TEAL);
+    } else {
+      // Hat & Head
+      pxRect(jx + 4 * s, jy, 4 * s, s, PAL.INK);
+      pxRect(jx + 3 * s, jy + s, 6 * s, 2 * s, PAL.SKIN);
+      // Red Shirt & Blaze Orange / Teal Métis Sash
+      pxRect(jx + 3 * s, jy + 3 * s, 6 * s, 3 * s, PAL.CAPOTE_RED);
+      pxRect(jx + 4 * s, jy + 5 * s, 4 * s, s, PAL.FIRE_ORANGE);
+      // Outstretched balancing arms
+      pxRect(jx + s, jy + 4 * s, 2 * s, s, PAL.CAPOTE_RED);
+      pxRect(jx + 9 * s, jy + 4 * s, 2 * s, s, PAL.CAPOTE_RED);
+      pxRect(jx, jy + 5 * s, s, s, PAL.SKIN);
+      pxRect(jx + 11 * s, jy + 5 * s, s, s, PAL.SKIN);
+
+      // Dynamic Jigging Footwork (Left Kick, Right Kick, or Idle Ready)
+      if (jiggerPose === 'JIG_L') {
+        pxRect(jx + 2 * s, jy + 6 * s, 3 * s, 2 * s, PAL.CAPOTE_BLUE);
+        pxRect(jx + s, jy + 8 * s, 2 * s, s, PAL.SASH_TEAL); // High Left Kick
+        pxRect(jx + 7 * s, jy + 6 * s, 2 * s, 5 * s, PAL.CAPOTE_BLUE);
+        pxRect(jx + 7 * s, jy + 11 * s, 2 * s, s, PAL.SASH_TEAL);
+      } else if (jiggerPose === 'JIG_R') {
+        pxRect(jx + 3 * s, jy + 6 * s, 2 * s, 5 * s, PAL.CAPOTE_BLUE);
+        pxRect(jx + 3 * s, jy + 11 * s, 2 * s, s, PAL.SASH_TEAL);
+        pxRect(jx + 7 * s, jy + 6 * s, 3 * s, 2 * s, PAL.CAPOTE_BLUE);
+        pxRect(jx + 9 * s, jy + 8 * s, 2 * s, s, PAL.SASH_TEAL); // High Right Kick
+      } else {
+        pxRect(jx + 4 * s, jy + 6 * s, 4 * s, 5 * s, PAL.CAPOTE_BLUE);
+        pxRect(jx + 3 * s, jy + 11 * s, 2 * s, s, PAL.SASH_TEAL);
+        pxRect(jx + 7 * s, jy + 11 * s, 2 * s, s, PAL.SASH_TEAL);
+      }
+    }
+  }
+
+  ctx.restore();
+}
+
+// --- UPDATE & RENDER LOOP ---
+function update() {
+  animFrame++;
+  processHeldInputs(performance.now());
+
+  if (shoutBanner.timer > 0) {
+    shoutBanner.timer--;
+  }
+
+  if (audioCtx && !isPaused) {
+    const now = audioCtx.currentTime;
+
+    if (jiggerPoseTimer > 0 && now >= jiggerPoseTimer) {
+      jiggerPose = 'IDLE';
+      jiggerPoseTimer = 0;
+    }
+
+    if (controlMode === 'JIG') {
+      for (let i = expectedBeats.length - 1; i >= 0; i--) {
+        const b = expectedBeats[i];
+        if (!b.hit && !b.missed && now > b.time + TOLERANCE_GOOD) {
+          b.missed = true;
+          combo = 0;
+          jiggerPose = 'FALL';
+          jiggerPoseTimer = now + 0.55;
+          playStumbleClonk();
+          spawnFloatingText("MISS!", PAL.FIRE_RED);
         }
-
-        function playClonk() {
-            if(!audioCtx) return;
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(100, audioCtx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.15);
-            gain.gain.setValueAtTime(0.6, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start();
-            osc.stop(audioCtx.currentTime + 0.15);
-
-            activeOscillators.push(osc);
-            osc.onended = () => {
-                const index = activeOscillators.indexOf(osc);
-                if (index > -1) activeOscillators.splice(index, 1);
-            };
+        if ((b.hit || b.missed) && now > b.time + 0.9) {
+          expectedBeats.splice(i, 1);
         }
+      }
+    }
+  }
 
-        function scheduler() {
-            if (gameState !== 'PLAYING') return;
-            while (nextStepTime < audioCtx.currentTime + SCHEDULE_AHEAD_TIME) {
-                if (currentStep < melodyPattern.length) {
-                    const stepData = melodyPattern[currentStep];
-                    if (stepData.n !== 0) playFiddleNote(stepData.n, nextStepTime, STEP_INTERVAL * 0.9);
-                    if (stepData.t) expectedBeats.push({ time: nextStepTime, hit: false, missed: false });
-                }
-                nextStepTime += STEP_INTERVAL;
-                currentStep++;
-            }
-            timerID = setTimeout(scheduler, LOOKAHEAD);
+  for (let i = floatingTexts.length - 1; i >= 0; i--) {
+    const ft = floatingTexts[i];
+    ft.y -= 0.9;
+    ft.life -= 0.02;
+    if (ft.life <= 0) floatingTexts.splice(i, 1);
+  }
+}
+
+function draw() {
+  const topBarH = 36;
+  const bottomBarH = 84;
+  const bottomBarTop = VIEW_H - bottomBarH;
+  const floorY = bottomBarTop - 48;
+  const beatPulse = (currentStep % 2 === 0);
+
+  // 1. Kitchen Party Backdrop
+  drawKitchenBackdrop(floorY);
+
+  // 2. Top HUD Bar (Anchored at y = 0)
+  pxRect(0, 0, VIEW_W, topBarH, PAL.INK);
+  pxRect(0, topBarH - 2, VIEW_W, 2, PAL.FIRE_ORANGE);
+
+  if (controlMode === 'BAND') {
+    drawText("1855 RED RIVER KITCHEN PARTY", 12, 15, 9, PAL.FIRE_GOLD, 'left');
+    drawText(`BPM:${currentBPM}`, VIEW_W - 12, 15, 9, PAL.SASH_TEAL, 'right');
+    drawText(`FIDDLES: ${band.fiddleMode}`, 12, 29, 8, PAL.CAPOTE_CREAM, 'left');
+    const callerLabel = band.callerSong === 'AVIRON' ? "C'EST L'AVIRON" : (band.callerSong === 'MALBROUGH' ? "MALBROUGH" : "HÉ-HO / ALLEZ");
+    drawText(`CALLER: ${callerLabel}`, VIEW_W - 12, 29, 8, PAL.SASH_GOLD, 'right');
+  } else {
+    drawText(`SCORE:${score}`, 12, 16, 11, PAL.WHITE, 'left');
+    drawText(`COMBO:${combo}x`, VIEW_W - 12, 16, 11, combo >= 5 ? PAL.FIRE_ORANGE : PAL.SASH_TEAL, 'right');
+    drawText("JIG RHYTHM MODE • UP: EXIT TO BAND", VIEW_W / 2, 30, 8, PAL.FIRE_GOLD, 'center');
+  }
+
+  // 3. Band & Central Jigger Positions across Stage
+  const colW = VIEW_W / 5;
+  const backRowY = floorY + 12;
+  const frontRowY = floorY + 34;
+
+  // Back Row: 4 Musicians
+  drawMichifCharacter('FIDDLE_1', colW * 0.55, backRowY, band.fiddle1On, controlMode === 'BAND' && cursorIdx === 0, beatPulse);
+  drawMichifCharacter('FIDDLE_2', colW * 1.45, backRowY, band.fiddle2On, controlMode === 'BAND' && cursorIdx === 1, beatPulse);
+  drawMichifCharacter('PERC',     colW * 3.55, backRowY, band.percOn,    controlMode === 'BAND' && cursorIdx === 3, beatPulse);
+  drawMichifCharacter('CALLER',   colW * 4.45, backRowY, band.callerOn,  controlMode === 'BAND' && cursorIdx === 4, beatPulse);
+
+  // Center Front Stage: The Jigger
+  drawMichifCharacter('JIGGER',   VIEW_W * 0.5, frontRowY, true, controlMode === 'BAND' && cursorIdx === 2, beatPulse);
+
+  // Voyageur Caller Shout / Lyric Banner
+  if (shoutBanner.timer > 0 && shoutBanner.text) {
+    const bw = Math.min(VIEW_W - 24, shoutBanner.text.length * 9 + 24);
+    pxRect(VIEW_W / 2 - bw / 2, topBarH + 8, bw, 22, PAL.INK);
+    ctx.strokeStyle = PAL.FIRE_GOLD;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(VIEW_W / 2 - bw / 2, topBarH + 8, bw, 22);
+    drawText(shoutBanner.text, VIEW_W / 2, topBarH + 23, 8, PAL.FIRE_GOLD, 'center');
+  }
+
+  // 4. Bottom HUD Bar (Anchored at VIEW_H - bottomBarH)
+  pxRect(0, bottomBarTop, VIEW_W, bottomBarH, PAL.INK);
+  pxRect(0, bottomBarTop, VIEW_W, 3, PAL.SASH_TEAL);
+
+  if (controlMode === 'BAND') {
+    // 5 Interactive Band Status Cards
+    const items = [
+      {
+        title: "FIDDLE 1",
+        on: band.fiddle1On,
+        sub: band.fiddleMode.slice(0, 6)
+      },
+      {
+        title: "FIDDLE 2",
+        on: band.fiddle2On,
+        sub: band.fiddleMode.slice(0, 6)
+      },
+      {
+        title: "JIGGER",
+        on: true,
+        sub: "A:DANCE!",
+        isJigger: true
+      },
+      {
+        title: band.percInstrument,
+        on: band.percOn,
+        sub: band.percStyle
+      },
+      {
+        title: "CALLER",
+        on: band.callerOn,
+        sub: band.callerSong.slice(0, 6)
+      }
+    ];
+
+    const cardW = Math.floor((VIEW_W - 24) / 5);
+    for (let i = 0; i < 5; i++) {
+      const it = items[i];
+      const cx = 12 + i * cardW;
+      const cy = bottomBarTop + 8;
+      const sel = (cursorIdx === i);
+
+      pxRect(cx + 2, cy, cardW - 4, 48, sel ? '#2D160E' : '#14100E');
+      ctx.strokeStyle = sel ? PAL.FIRE_GOLD : (it.on ? PAL.SASH_TEAL : '#3B332E');
+      ctx.lineWidth = sel ? 2 : 1;
+      ctx.strokeRect(cx + 2, cy, cardW - 4, 48);
+
+      drawText(it.title, cx + cardW / 2, cy + 14, 7, sel ? PAL.FIRE_GOLD : PAL.WHITE, 'center');
+      const stateTxt = it.isJigger ? "LEAD" : (it.on ? "ON" : "OFF");
+      const stateCol = it.isJigger ? PAL.FIRE_ORANGE : (it.on ? PAL.SASH_TEAL : PAL.DIM);
+      drawText(stateTxt, cx + cardW / 2, cy + 28, 8, stateCol, 'center');
+      drawText(it.sub, cx + cardW / 2, cy + 41, 6, PAL.CAPOTE_CREAM, 'center');
+    }
+
+    drawText("L/R: SELECT  A: TOGGLE/JIG  B: STYLE/INST  U/D: BPM", VIEW_W / 2, VIEW_H - 8, 7, PAL.SASH_GOLD, 'center');
+
+  } else {
+    // JIG RHYTHM TRACK HUD (Match the Beat with A & B)
+    pxRect(12, bottomBarTop + 8, VIEW_W - 24, 54, '#0D2A3A');
+
+    // Hit Target Box
+    ctx.strokeStyle = PAL.FIRE_GOLD;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(HIT_ZONE_X - 18, bottomBarTop + 12, 36, 46);
+    drawText("A/B", HIT_ZONE_X, bottomBarTop + 39, 8, PAL.FIRE_GOLD, 'center');
+
+    // Scrolling A (Left Heel - Teal) and B (Right Toe - Blaze Orange) Notes
+    if (audioCtx) {
+      const now = audioCtx.currentTime;
+      for (let i = 0; i < expectedBeats.length; i++) {
+        const b = expectedBeats[i];
+        if (!b.hit && !b.missed) {
+          const nx = HIT_ZONE_X + (b.time - now) * NOTE_SPEED;
+          if (nx > -30 && nx < VIEW_W + 30) {
+            const noteCol = (b.btn === 'A') ? PAL.SASH_TEAL : PAL.FIRE_ORANGE;
+            pxRect(nx - 12, bottomBarTop + 15, 24, 40, noteCol);
+            ctx.strokeStyle = PAL.WHITE;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(nx - 12, bottomBarTop + 15, 24, 40);
+            drawText(b.btn, nx, bottomBarTop + 40, 10, PAL.INK, 'center');
+          }
         }
+      }
+    }
 
-        function handleInput() {
-            if (gameState !== 'PLAYING' || jiggerState === 'FALL') return;
+    drawText("TAP 'A' (TEAL) & 'B' (ORANGE) ON THE BEAT!", VIEW_W / 2, VIEW_H - 7, 7, PAL.CAPOTE_CREAM, 'center');
+  }
 
-            const now = audioCtx.currentTime;
-            let closestBeat = null, minDiff = Infinity;
-            for (let i = 0; i < expectedBeats.length; i++) {
-                if (!expectedBeats[i].hit && !expectedBeats[i].missed) {
-                    const diff = Math.abs(now - expectedBeats[i].time);
-                    if (diff < minDiff) { minDiff = diff; closestBeat = expectedBeats[i]; }
-                }
-            }
+  // Floating Rhythm Feedback Popups
+  for (const ft of floatingTexts) {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, ft.life);
+    drawText(ft.text, ft.x, ft.y, 16, ft.color, 'center');
+    ctx.restore();
+  }
+}
 
-            if (closestBeat && minDiff <= TOLERANCE_PERFECT) {
-                closestBeat.hit = true;
-                handleSuccess('Perfect!', 100, '#12AEA2'); 
-            } else if (closestBeat && minDiff <= TOLERANCE_GOOD) {
-                closestBeat.hit = true;
-                handleSuccess('Good!', 50, '#FB6604'); 
-            } else {
-                handleMiss('Miss!');
-            }
-        }
+function loop() {
+  if (!isPaused) {
+    update();
+  }
+  draw();
+  requestAnimationFrame(loop);
+}
 
-        function handleSuccess(text, points, color) {
-            score += points; combo++;
-            if (combo > maxCombo) maxCombo = combo;
-            lastLeg = (lastLeg === 'L') ? 'R' : 'L';
-            jiggerState = 'JIG_' + lastLeg;
-            jiggerTimer = audioCtx.currentTime + 0.3;
-            spawnText(text, color);
-        }
-
-        function handleMiss(text) {
-            combo = 0; jiggerState = 'FALL';
-            jiggerTimer = audioCtx.currentTime + 1.0;
-            playClonk();
-            spawnText(text, '#AD1C21'); 
-        }
-
-        function spawnText(text, color) {
-            floatingTexts.push({ text: text, color: color, y: canvas.height / 2 - 50, x: canvas.width / 2 + 50, alpha: 1.0, life: 1.0 });
-        }
-
-        // --- Arcade Cabinet Bridge ---
-        window.addEventListener('message', function(event) {
-            if (event.data === 'BUTTON_A') {
-                if (gameState === 'START') {
-                    startGame();
-                } else if (gameState === 'PLAYING') {
-                    handleInput();
-                } else if (gameState === 'GAME_OVER') {
-                    returnToStart();
-                }
-            } else if (event.data === 'BUTTON_B') {
-                if (gameState === 'PLAYING') {
-                    startGame();
-                }
-            }
-        });
-
-        function returnToStart() {
-            clearTimeout(timerID);
-            stopAllAudio();
-            gameState = 'START';
-        }
-
-        function startGame() {
-            initAudio();
-            if(audioCtx.state === 'suspended') audioCtx.resume();
-            
-            clearTimeout(timerID); 
-            stopAllAudio();
-            
-            const selectedTrack = TRACKS[Math.floor(Math.random() * TRACKS.length)];
-            melodyPattern = selectedTrack.pattern;
-            currentTrackName = selectedTrack.name;
-
-            score = 0; combo = 0; expectedBeats = []; floatingTexts = [];
-            gameState = 'PLAYING'; jiggerState = 'IDLE';
-            nextStepTime = audioCtx.currentTime + 1.0;
-            currentStep = 0; 
-            scheduler();
-        }
-
-        function gameLoop() {
-            updateState(); 
-            draw();
-            requestAnimationFrame(gameLoop);
-        }
-
-        function updateState() {
-            if (gameState !== 'PLAYING') return;
-            const now = audioCtx.currentTime;
-            
-            for (let i = expectedBeats.length - 1; i >= 0; i--) {
-                let b = expectedBeats[i];
-                if (!b.hit && !b.missed && now > b.time + TOLERANCE_GOOD) {
-                    b.missed = true;
-                    if (jiggerState !== 'FALL') handleMiss('Miss!');
-                }
-                if ((b.hit || b.missed) && now > b.time + 1.0) expectedBeats.splice(i, 1);
-            }
-
-            if (currentStep >= melodyPattern.length && expectedBeats.length === 0 && now > nextStepTime + 1.0) {
-                gameState = 'GAME_OVER';
-            }
-
-            if (jiggerTimer > 0 && now >= jiggerTimer) { jiggerState = 'IDLE'; jiggerTimer = 0; }
-            
-            for (let i = floatingTexts.length - 1; i >= 0; i--) {
-                let ft = floatingTexts[i];
-                ft.y -= 1; ft.life -= 0.016; ft.alpha = ft.life;
-                if (ft.life <= 0) floatingTexts.splice(i, 1);
-            }
-        }
-
-        function drawSprite(spriteArray, startX, startY, pixelSize) {
-            for (let y = 0; y < spriteArray.length; y++) {
-                for (let x = 0; x < spriteArray[y].length; x++) {
-                    if (spriteArray[y][x] !== 0) {
-                        ctx.fillStyle = PALETTE[spriteArray[y][x]];
-                        ctx.fillRect(startX + x * pixelSize, startY + y * pixelSize, pixelSize, pixelSize);
-                    }
-                }
-            }
-        }
-
-        function draw() {
-            ctx.fillStyle = '#540E11';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            ctx.fillStyle = '#12AEA2'; 
-            ctx.fillRect(0, canvas.height - 140, canvas.width, 60);
-            
-            ctx.fillStyle = '#0F6F9E'; 
-            ctx.fillRect(0, canvas.height - 80, canvas.width, 80);
-
-            if (gameState === 'START') {
-                ctx.fillStyle = '#FB6604';
-                ctx.font = '36px "Press Start 2P"';
-                ctx.textAlign = 'center';
-                ctx.fillText("Learn to Jig", canvas.width/2, canvas.height/2 - 40);
-                
-                ctx.fillStyle = '#ffffff';
-                ctx.font = '14px "Press Start 2P"';
-                ctx.fillText("PRESS 'A' TO PLAY", canvas.width/2, canvas.height/2 + 20);
-
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-                ctx.font = '10px "Press Start 2P"';
-                ctx.fillText("(Safari iOS: Tap the screen once to unlock audio)", canvas.width/2, canvas.height/2 + 60);
-                return;
-            }
-
-            if (gameState === 'GAME_OVER') {
-                ctx.fillStyle = '#FB6604';
-                ctx.font = '36px "Press Start 2P"';
-                ctx.textAlign = 'center';
-                ctx.fillText("FINISHED!", canvas.width/2, canvas.height/2 - 60);
-                
-                ctx.fillStyle = '#ffffff';
-                ctx.font = '16px "Press Start 2P"';
-                ctx.fillText(`Final Score: ${score}`, canvas.width/2, canvas.height/2);
-                ctx.fillText(`Max Combo: ${maxCombo}`, canvas.width/2, canvas.height/2 + 30);
-                
-                ctx.fillStyle = '#12AEA2';
-                ctx.font = '14px "Press Start 2P"';
-                ctx.fillText("PRESS 'A' TO CONTINUE", canvas.width/2, canvas.height/2 + 80);
-                return;
-            }
-
-            if (gameState === 'PLAYING') {
-                ctx.strokeStyle = '#FB6604'; 
-                ctx.lineWidth = 4;
-                ctx.strokeRect(HIT_ZONE_X - 15, canvas.height - 75, 30, 70);
-
-                if (audioCtx) {
-                    const now = audioCtx.currentTime;
-                    for (let i = 0; i < expectedBeats.length; i++) {
-                        let b = expectedBeats[i];
-                        if (!b.hit && !b.missed) {
-                            let x = HIT_ZONE_X + (b.time - now) * NOTE_SPEED;
-                            if (x > -50 && x < canvas.width + 50) {
-                                ctx.fillStyle = '#AD1C21'; 
-                                ctx.fillRect(x - 10, canvas.height - 70, 20, 60);
-                                ctx.fillStyle = '#FB6604'; 
-                                ctx.fillRect(x - 5, canvas.height - 65, 10, 50);
-                            }
-                        }
-                    }
-                }
-            }
-
-            let jiggerSprite = SPRITES.JIGGER_IDLE;
-            if (jiggerState === 'JIG_L') jiggerSprite = SPRITES.JIGGER_L;
-            else if (jiggerState === 'JIG_R') jiggerSprite = SPRITES.JIGGER_R;
-            else if (jiggerState === 'FALL') jiggerSprite = SPRITES.JIGGER_FALL;
-            
-            drawSprite(jiggerSprite, canvas.width / 2 - 48, canvas.height - 230, 8);
-
-            ctx.fillStyle = '#ffffff';
-            ctx.font = '16px "Press Start 2P"';
-            ctx.textAlign = 'left';
-            ctx.fillText(`SCORE:${score}`, 20, 30);
-            ctx.textAlign = 'right';
-            ctx.fillStyle = combo > 5 ? '#FB6604' : '#ffffff'; 
-            ctx.fillText(`COMBO:${combo}`, canvas.width - 20, 30);
-
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-            ctx.font = '12px "Press Start 2P"';
-            ctx.textAlign = 'center';
-            ctx.fillText(`PLAYING: ${currentTrackName}`, canvas.width/2, canvas.height - 110);
-
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-            ctx.font = '10px "Press Start 2P"';
-            ctx.textAlign = 'center';
-            ctx.fillText("PRESS 'A' ON THE BEAT!", canvas.width/2, canvas.height - 90);
-
-            ctx.fillStyle = 'rgba(251, 102, 4, 0.5)';
-            ctx.fillText("PRESS 'B' TO SKIP TRACK", canvas.width/2, canvas.height - 70);
-
-            for (let ft of floatingTexts) {
-                ctx.fillStyle = ft.color;
-                ctx.globalAlpha = Math.max(0, ft.alpha);
-                ctx.font = '20px "Press Start 2P"';
-                ctx.shadowColor = 'black';
-                ctx.shadowBlur = 4;
-                ctx.fillText(ft.text, ft.x, ft.y);
-                ctx.shadowColor = 'transparent';
-                ctx.shadowBlur = 0;
-                ctx.globalAlpha = 1.0;
-            }
-        }
-
-        requestAnimationFrame(gameLoop);
-    </script>
+requestAnimationFrame(loop);
+</script>
 </body>
 </html>
