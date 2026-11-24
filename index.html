@@ -1056,7 +1056,7 @@
       {
         file: 'game2.html',
         title: 'LA GRANDE GIGUE',
-        genre: "A JIG N' RHYTHM GAME",
+        genre: 'KITCHEN PARTY RHYTHM GAME',
         accent: '#FB6604',
         badge: '02',
         artType: 'FIDDLE'
@@ -1064,7 +1064,7 @@
       {
         file: 'game3.html',
         title: 'LI RASSAD DI FLEUR',
-        genre: 'FLORAL BEADWORK CRAFT',
+        genre: 'BEADWORK PUZZLE SOLVING',
         accent: '#F7C844',
         badge: '03',
         artType: 'BEADWORK'
@@ -1080,7 +1080,7 @@
       {
         file: 'game5.html',
         title: 'LAND THUNDER!',
-        genre: 'HIGH-SPEED PRAIRIE DODGE',
+        genre: 'OBSTACLE ACTION CHASE',
         accent: '#F7C844',
         badge: '05',
         artType: 'BUFFALO'
@@ -1112,7 +1112,7 @@
       {
         file: 'game9.html',
         title: 'AEN ZHWAAL',
-        genre: 'HIGH STAKES HORSE RACING',
+        genre: 'RACE & TRADE STRATEGY',
         accent: '#F7C844',
         badge: '09',
         artType: 'HORSE'
@@ -1120,7 +1120,7 @@
       {
         file: 'game10.html',
         title: 'LA GLACE ROUGE',
-        genre: 'FROZEN RIVER CURLING',
+        genre: 'FROZEN RIVER BONSPIEL',
         accent: '#12AEA2',
         badge: '10',
         artType: 'ICE'
@@ -2163,7 +2163,7 @@
       });
     }
 
-    // Grey Nuns' Convent (1846-1860s White-Clapboard & Stone Two-Story Convent with Belfry & Dormers)
+    // Grey Nuns' Convent
     function drawGreyNunsConvent(ctx, x, baseY, scale = 1) {
       const s = scale;
       const w = Math.round(84 * s);
@@ -2566,7 +2566,6 @@
       const H = panoCanvas.height;
       const PANO_W = 2400;
       const normAngle = ((angleDeg % 360) + 360) % 360;
-      // Offset camera so index 0 centers cleanly on St. Boniface Cathedral & Convent
       const camX = ((normAngle / 360) * PANO_W - 100 + PANO_W) % PANO_W;
 
       function worldToScreenX(wx) {
@@ -2677,7 +2676,6 @@
       const stbX = worldToScreenX(180);
       if (stbX > -320 && stbX < W + 320) {
         drawStBonifaceCathedral1860(ctx, stbX, bankY - 2, 1.22, 0.55 + dayT * 0.45);
-        // Grey Nuns' Convent immediately to the right of the Cathedral
         drawGreyNunsConvent(ctx, stbX + 96, bankY - 2, 1.05);
         drawPineTree(ctx, stbX + 154, bankY - 6, 1.25, false);
         drawSettlementTownsfolk(ctx, stbX + 26, bankY + 4, tick, 0);
@@ -2686,7 +2684,6 @@
       // --- 2. RED RIVER FACING SOUTH (x = 520) ---
       const southX = worldToScreenX(520);
       if (southX > -260 && southX < W + 260) {
-        // Wide southern Red River channel cutting into the prairie horizon
         ctx.fillStyle = lerpRgb([32, 107, 148], [52, 154, 198], dayT);
         ctx.fillRect(southX - 64, bankY - 14, 128, 28);
         drawPineTree(ctx, southX - 92, bankY - 8, 1.3, false);
@@ -2698,13 +2695,11 @@
       const frX = worldToScreenX(880);
       if (frX > -280 && frX < W + 280) {
         drawOakTree(ctx, frX - 104, bankY - 8, 1.2);
-        // Tipi & wood log village on the Fort Rouge point
         drawWesternTipi(ctx, frX - 66, bankY - 2, 0.95, tick);
         drawRedRiverLogHouse(ctx, frX - 18, bankY - 2, 0.95, true, tick);
         drawWesternTipi(ctx, frX + 24, bankY - 2, 0.85, tick);
         drawSettlementTownsfolk(ctx, frX - 44, bankY + 4, tick, 0);
 
-        // Assiniboine River inflow on the RIGHT side of the Fort Rouge frame (separating Fort Rouge from Upper Fort Garry)
         ctx.fillStyle = lerpRgb([24, 84, 117], [34, 124, 168], dayT);
         ctx.fillRect(frX + 54, bankY - 14, 92, 28);
         ctx.fillStyle = lerpRgb([32, 107, 148], [52, 154, 198], dayT);
@@ -2732,7 +2727,6 @@
       // --- 5. EARLY "WINNIPEG" SETTLEMENT — SALOON, SHOP & WATERMILL IMMEDIATE RIGHT OF FORT GARRY (x = 1520) ---
       const wpgX = worldToScreenX(1520);
       if (wpgX > -260 && wpgX < W + 260) {
-        // Wooden Saloon
         ctx.fillStyle = '#7d4824';
         ctx.fillRect(wpgX - 86, bankY - 36, 44, 34);
         ctx.fillStyle = '#5c3419';
@@ -2744,7 +2738,6 @@
         ctx.fillStyle = '#2b190d';
         ctx.fillRect(wpgX - 68, bankY - 14, 8, 12);
 
-        // General Trading Shop
         ctx.fillStyle = '#a88f3d';
         ctx.fillRect(wpgX - 34, bankY - 30, 42, 28);
         ctx.fillStyle = '#AD1C21';
@@ -2754,7 +2747,6 @@
         ctx.fillStyle = '#F7C844';
         ctx.fillRect(wpgX - 28, bankY - 12, 10, 7);
 
-        // Turning Watermill on the Winnipeg riverbank
         drawWatermill(ctx, wpgX + 42, bankY + 2, tick);
         drawSettlementTownsfolk(ctx, wpgX - 28, bankY + 4, tick, 1);
       }
@@ -2923,70 +2915,185 @@
         ctx.restore();
 
       } else if (game.artType === 'FIDDLE') {
-        ctx.fillStyle = '#1a122b';
-        ctx.fillRect(0, 0, W, 65);
-        ctx.fillStyle = '#382259';
-        ctx.fillRect(0, 65, W, 65);
-        ctx.fillStyle = '#3D5948';
-        ctx.fillRect(0, 126, W, H - 126);
+        // 2. LA GRANDE GIGUE: Full Indoor Cozy Log Cabin Kitchen Party Band
+        //    (2-piece Métis fiddle duo, wooden spoons, 1 buffalo-bones percussionist & 1 lively sashed jigger)
+        const beat = Math.floor(tick / 10) % 2;
+        const jigStep = Math.floor(tick / 6) % 4;
+        const bowSlide = Math.round(Math.sin(tick * 0.24) * 5);
 
-        ctx.fillStyle = '#F7C844';
-        ctx.fillRect(64, 30, 4, 4);
-        ctx.fillRect(360, 42, 4, 4);
-        ctx.fillRect(310, 24, 3, 3);
+        // Cozy Log Cabin Timber Walls & Warm Plank Floor
+        ctx.fillStyle = '#29150b';
+        ctx.fillRect(0, 0, W, 144);
+        ctx.fillStyle = '#422312';
+        for (let ly = 10; ly < 140; ly += 24) {
+          ctx.fillRect(0, ly, W, 16);
+        }
+        // Timber Floorboards
+        ctx.fillStyle = '#5c3419';
+        ctx.fillRect(0, 144, W, H - 144);
+        ctx.fillStyle = '#3b200e';
+        ctx.fillRect(0, 154, W, 3);
+        ctx.fillRect(0, 168, W, 3);
 
-        const rockX = cx + 14;
-        const rockY = 104;
+        // Cozy Stone Fireplace / Hearth on Far Left with Flickering Firelight
         ctx.fillStyle = '#5a6275';
-        ctx.fillRect(rockX - 36, rockY + 14, 84, 38);
-        ctx.fillRect(rockX - 24, rockY, 64, 18);
-        ctx.fillStyle = '#7e889e';
-        ctx.fillRect(rockX - 20, rockY + 3, 44, 8);
+        ctx.fillRect(10, 56, 62, 88);
         ctx.fillStyle = '#3b4152';
-        ctx.fillRect(rockX + 18, rockY + 12, 26, 38);
+        ctx.fillRect(14, 60, 54, 6);
+        ctx.fillStyle = '#14100e';
+        ctx.fillRect(22, 96, 38, 48);
+        // Flickering hearth flames
+        ctx.fillStyle = beat === 0 ? '#FB6604' : '#F7C844';
+        ctx.fillRect(28, 114, 26, 26);
+        ctx.fillStyle = '#AD1C21';
+        ctx.fillRect(32, 124, 18, 16);
+        // Warm hearth & lantern glow pool across the cabin room
+        ctx.fillStyle = 'rgba(247, 200, 68, 0.14)';
+        ctx.fillRect(68, 36, W - 76, 122);
 
-        ctx.save();
-        ctx.translate(cx - 12, 118);
-        ctx.rotate(-0.34);
-
-        ctx.fillStyle = '#7a2e08';
-        ctx.fillRect(-20, -14, 40, 46);
-        ctx.fillStyle = '#d96b14';
-        ctx.fillRect(-17, -11, 34, 40);
-        ctx.fillStyle = '#382259';
-        ctx.fillRect(-18, 4, 5, 10);
-        ctx.fillRect(13, 4, 5, 10);
+        // Hanging Oil Lantern Overhead
         ctx.fillStyle = '#1e1b18';
-        ctx.fillRect(-9, 3, 3, 12);
-        ctx.fillRect(6, 3, 3, 12);
+        ctx.fillRect(cx - 1, 0, 3, 18);
         ctx.fillStyle = '#F7C844';
-        ctx.fillRect(-6, 9, 12, 3);
-        ctx.fillStyle = '#1e1b18';
-        ctx.fillRect(-4, 20, 8, 11);
+        ctx.fillRect(cx - 6, 18, 13, 14);
+        ctx.fillStyle = '#fff8d6';
+        ctx.fillRect(cx - 3, 21, 7, 8);
 
-        ctx.fillStyle = '#3a2311';
-        ctx.fillRect(-4, -46, 8, 34);
+        const floorY = 148;
+
+        // --- BAND MEMBER 1 (Left-Back): Lead Métis Fiddler (Blue Capote, Red Sash & Violin) ---
+        const f1X = 104;
+        const f1Y = floorY - 2;
+        ctx.fillStyle = '#1e1b18';
+        ctx.fillRect(f1X - 7, f1Y - 16, 6, 16);
+        ctx.fillRect(f1X + 2, f1Y - 16, 6, 16);
+        ctx.fillStyle = '#0038A8';
+        ctx.fillRect(f1X - 9, f1Y - 38, 19, 23);
+        ctx.fillStyle = '#AD1C21';
+        ctx.fillRect(f1X - 9, f1Y - 24, 19, 4);
+        ctx.fillStyle = '#8c5332';
+        ctx.fillRect(f1X - 5, f1Y - 48, 11, 10);
+        ctx.fillStyle = '#1e1b18';
+        ctx.fillRect(f1X - 6, f1Y - 51, 13, 4);
+        // Fiddle & animated bow
         ctx.fillStyle = '#d96b14';
-        ctx.fillRect(-6, -54, 12, 10);
+        ctx.fillRect(f1X + 4, f1Y - 41, 18, 7);
+        ctx.fillStyle = '#f2efe9';
+        ctx.fillRect(f1X + 10 + bowSlide, f1Y - 47, 2, 20);
+
+        // --- BAND MEMBER 2 (Left-Center): Second Métis Fiddler (Red Shirt, Dark Vest & Violin) ---
+        const f2X = 160;
+        const f2Y = floorY;
+        ctx.fillStyle = '#252830';
+        ctx.fillRect(f2X - 7, f2Y - 16, 6, 16);
+        ctx.fillRect(f2X + 2, f2Y - 16, 6, 16);
+        ctx.fillStyle = '#AD1C21';
+        ctx.fillRect(f2X - 9, f2Y - 38, 19, 23);
+        ctx.fillStyle = '#1e1b18';
+        ctx.fillRect(f2X - 7, f2Y - 38, 15, 16);
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(f2X - 9, f2Y - 23, 19, 4);
         ctx.fillStyle = '#dcd7c9';
-        ctx.fillRect(-2, -46, 1, 66);
-        ctx.fillRect(2, -46, 1, 66);
+        ctx.fillRect(f2X - 5, f2Y - 48, 11, 10);
+        ctx.fillStyle = '#3a2311';
+        ctx.fillRect(f2X - 8, f2Y - 52, 17, 4);
+        // Second fiddle & opposite bow stroke
+        ctx.fillStyle = '#FB6604';
+        ctx.fillRect(f2X + 4, f2Y - 41, 18, 7);
+        ctx.fillStyle = '#f2efe9';
+        ctx.fillRect(f2X + 10 - bowSlide, f2Y - 47, 2, 20);
 
-        ctx.fillStyle = '#AD1C21';
-        ctx.fillRect(-9, -36, 18, 6);
+        // --- BAND MEMBER 3 (Right-Center): Wooden Spoons Player Seated on Crate ---
+        const spX = 294;
+        const spY = floorY;
+        // Wooden apple/cargo crate seat
+        ctx.fillStyle = '#7a4b26';
+        ctx.fillRect(spX - 11, spY - 16, 22, 16);
+        ctx.fillStyle = '#252830';
+        ctx.fillRect(spX - 9, spY - 14, 7, 14);
+        // Teal shirt & sashed waist
         ctx.fillStyle = '#12AEA2';
-        ctx.fillRect(-6, -36, 4, 6);
-        ctx.fillStyle = '#F7C844';
-        ctx.fillRect(2, -36, 4, 6);
-        const sway = wave === 0 ? 0 : 3;
+        ctx.fillRect(spX - 8, spY - 36, 17, 21);
         ctx.fillStyle = '#AD1C21';
-        ctx.fillRect(8, -34, 7, 16 + sway);
-        ctx.fillRect(13, -31, 6, 14 - sway);
+        ctx.fillRect(spX - 8, spY - 22, 17, 4);
+        ctx.fillStyle = '#8c5332';
+        ctx.fillRect(spX - 4, spY - 46, 10, 10);
+        // Clacking wooden spoons tapping knee & hand
+        const spoonY = beat === 0 ? -24 : -31;
         ctx.fillStyle = '#F7C844';
-        ctx.fillRect(8, -18 + sway, 7, 4);
-        ctx.fillRect(13, -17 - sway, 6, 4);
+        ctx.fillRect(spX - 14, spY + spoonY, 9, 4);
+        ctx.fillRect(spX - 15, spY + spoonY + 5, 9, 4);
 
-        ctx.restore();
+        // --- BAND MEMBER 4 (Far Right): Buffalo Rib-Bones Percussionist ---
+        const bnX = 358;
+        const bnY = floorY - 2;
+        ctx.fillStyle = '#1e1b18';
+        ctx.fillRect(bnX - 7, bnY - 16, 6, 16);
+        ctx.fillRect(bnX + 2, bnY - 16, 6, 16);
+        ctx.fillStyle = '#b5783a'; // Buckskin shirt
+        ctx.fillRect(bnX - 9, bnY - 38, 19, 23);
+        ctx.fillStyle = '#0038A8'; // Blue sash
+        ctx.fillRect(bnX - 9, bnY - 23, 19, 4);
+        ctx.fillStyle = '#8c5332';
+        ctx.fillRect(bnX - 5, bnY - 48, 11, 10);
+        ctx.fillStyle = '#1e1b18';
+        ctx.fillRect(bnX - 6, bnY - 51, 13, 4);
+        // Clacking curved white buffalo rib bones held in hand
+        const boneTilt = beat === 0 ? -3 : 3;
+        ctx.fillStyle = '#f2efe9';
+        ctx.fillRect(bnX - 16, bnY - 38 + boneTilt, 4, 16);
+        ctx.fillRect(bnX - 11, bnY - 36 - boneTilt, 4, 16);
+
+        // --- CENTER SPOTLIGHT: 1 Lively Sashed Métis Jigger Stepping on the Floorboards ---
+        const jX = 228;
+        const hopY = (jigStep === 1 || jigStep === 3) ? -5 : 0;
+        const jY = floorY + 4 + hopY;
+
+        // Floorboard rhythm scuff marks under jigger's moccasins
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(jX - 18, floorY + 5, 36, 2);
+
+        // High-stepping jigging legs & beaded moccasins
+        ctx.fillStyle = '#1b263b';
+        if (jigStep === 0) {
+          ctx.fillRect(jX - 9, jY - 18, 7, 18);
+          ctx.fillRect(jX + 4, jY - 22, 7, 14);
+        } else if (jigStep === 1) {
+          ctx.fillRect(jX - 12, jY - 20, 7, 16);
+          ctx.fillRect(jX + 6, jY - 20, 7, 16);
+        } else if (jigStep === 2) {
+          ctx.fillRect(jX - 11, jY - 22, 7, 14);
+          ctx.fillRect(jX + 3, jY - 18, 7, 18);
+        } else {
+          ctx.fillRect(jX - 6, jY - 19, 7, 17);
+          ctx.fillRect(jX + 2, jY - 21, 7, 15);
+        }
+
+        // Jigger Torso (Crisp white shirt, dark vest & vibrant flying Ceinture Fléchée sash)
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(jX - 10, jY - 41, 21, 23);
+        ctx.fillStyle = '#252830';
+        ctx.fillRect(jX - 8, jY - 41, 17, 16);
+        // Flowing Red, Gold & Blue Métis Sash with swinging fringed tails
+        ctx.fillStyle = '#AD1C21';
+        ctx.fillRect(jX - 10, jY - 25, 21, 5);
+        ctx.fillStyle = '#F7C844';
+        ctx.fillRect(jX - 6, jY - 25, 13, 2);
+        const tailSwing = (jigStep % 2 === 0) ? -4 : 4;
+        ctx.fillStyle = '#AD1C21';
+        ctx.fillRect(jX + 10, jY - 24, 6 + tailSwing, 14);
+        ctx.fillStyle = '#0038A8';
+        ctx.fillRect(jX + 12, jY - 22, 4 + tailSwing, 11);
+
+        // Arms raised in lively jig balance + smiling face + voyageur hat
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(jX - 16, jY - 38 - (jigStep % 2) * 3, 6, 12);
+        ctx.fillRect(jX + 11, jY - 38 + (jigStep % 2) * 3, 6, 12);
+        ctx.fillStyle = '#8c5332';
+        ctx.fillRect(jX - 5, jY - 52, 11, 11);
+        ctx.fillStyle = '#3a2311';
+        ctx.fillRect(jX - 9, jY - 55, 19, 4);
+        ctx.fillRect(jX - 5, jY - 59, 11, 4);
 
       } else if (game.artType === 'BEADWORK') {
         ctx.fillStyle = '#2e180c';
@@ -3332,6 +3439,8 @@
         ctx.fillRect(hx - 13, hy - 42, 18, 4);
 
       } else if (game.artType === 'ICE') {
+        // 10. LA GLACE ROUGE (Frozen River Bonspiel):
+        //     Cornbroom & Handmade Turned-Wood Bonspiel Stone with Forged Iron Band & Kettle Handle
         ctx.fillStyle = '#0d1b2a';
         ctx.fillRect(0, 0, W, 56);
         ctx.fillStyle = '#1b3b5c';
@@ -3356,18 +3465,38 @@
         ctx.fillRect(290, 158, 86, 3);
         ctx.fillRect(140, 168, 54, 3);
 
+        // Handmade Wooden Bonspiel Stone with Forged Iron Band & Kettle Handle (Right-Center)
         const rockX = cx + 22;
         const rockY = Math.round(136 + bob * 0.5);
-        ctx.fillStyle = '#5a6275';
+        // Turned oak/birch timber stone body
+        ctx.fillStyle = '#7a4b26';
         ctx.fillRect(rockX - 24, rockY - 6, 48, 22);
-        ctx.fillStyle = '#AD1C21';
+        // Warm wood grain stripes & beveled top shoulder
+        ctx.fillStyle = '#a36836';
+        ctx.fillRect(rockX - 20, rockY - 6, 40, 6);
+        ctx.fillStyle = '#5c3419';
+        ctx.fillRect(rockX - 22, rockY + 11, 44, 5);
+        // Vertical wood stave / grain lines
+        ctx.fillStyle = '#472613';
+        ctx.fillRect(rockX - 12, rockY - 5, 2, 20);
+        ctx.fillRect(rockX, rockY - 5, 2, 20);
+        ctx.fillRect(rockX + 12, rockY - 5, 2, 20);
+        // Heavy Forged Wrought-Iron Striking Band with Rivets
+        ctx.fillStyle = '#252830';
         ctx.fillRect(rockX - 26, rockY + 2, 52, 7);
-        ctx.fillStyle = '#9aa3b8';
-        ctx.fillRect(rockX - 18, rockY - 4, 36, 4);
-        ctx.fillStyle = '#AD1C21';
-        ctx.fillRect(rockX - 6, rockY - 14, 10, 8);
-        ctx.fillRect(rockX - 14, rockY - 16, 22, 5);
+        ctx.fillStyle = '#8a95ad';
+        ctx.fillRect(rockX - 20, rockY + 4, 3, 3);
+        ctx.fillRect(rockX - 2, rockY + 4, 3, 3);
+        ctx.fillRect(rockX + 17, rockY + 4, 3, 3);
+        // Arched Wrought-Iron Kettle Handle bolted atop the wooden block
+        ctx.fillStyle = '#1e1b18';
+        ctx.fillRect(rockX - 13, rockY - 14, 4, 8);
+        ctx.fillRect(rockX + 9, rockY - 14, 4, 8);
+        ctx.fillRect(rockX - 13, rockY - 17, 26, 4);
+        ctx.fillStyle = '#6e768a';
+        ctx.fillRect(rockX - 9, rockY - 17, 18, 2);
 
+        // Traditional Tied Corn Broom (Left-Center)
         ctx.save();
         ctx.translate(cx - 32, 116);
         ctx.rotate(-0.38);
@@ -3480,6 +3609,7 @@
     };
 
     const RED_RIVER_JIG_SEQ = [
+      // A PART
       { f: N.A5,  d: 2, drone: N.D3, grace: N.Fs5 },
       { f: N.Fs5, d: 1, drone: null },
       { f: N.D5,  d: 1, drone: N.A3 },
@@ -3498,6 +3628,7 @@
       { f: N.B4,  d: 2, drone: N.A3 },
       { f: N.A4,  d: 2, drone: N.D3 },
 
+      // A-Part Repeat
       { f: N.A5,  d: 2, drone: N.D3, grace: N.Fs5 },
       { f: N.Fs5, d: 1, drone: null },
       { f: N.D5,  d: 1, drone: N.A3 },
@@ -3515,6 +3646,7 @@
       { f: N.E5,  d: 2, drone: N.A3 },
       { f: N.D5,  d: 4, drone: N.D3 },
 
+      // B PART
       { f: N.D4,  d: 1, drone: N.D3 },
       { f: N.Fs4, d: 1, drone: null },
       { f: N.A4,  d: 2, drone: N.A3, grace: N.G4 },
@@ -3533,6 +3665,7 @@
       { f: N.Fs4, d: 2, drone: N.D3 },
       { f: N.D4,  d: 2, drone: N.A3 },
 
+      // B-Part Crooked Turnaround
       { f: N.D4,  d: 1, drone: N.D3 },
       { f: N.Fs4, d: 1, drone: null },
       { f: N.A4,  d: 2, drone: N.A3 },
