@@ -199,7 +199,7 @@
     ST_PETERS_END: 1450,
     LAKE_DAY_END: 2050,
     WINTER_ONSET: 2150,
-    LAKE_CLOSE_START: 2530, // Natural North Shore lake closing (2530 -> 2650)
+    LAKE_CLOSE_START: 2530,
     LAKE_MIDNIGHT_END: 2650,
     DEPLOY_END: 2770,
     BLIZZARD_PEAK: 3300,
@@ -229,9 +229,11 @@
   let crashReason = "RUN AGROUND!";
   let lastSplashStrokeId = -1;
 
-  // Extended Opening Cutscene State (Upper Fort Garry & The Forks)
+  // Extended Opening Cutscene State (Slower pacing + waits for 'A' on dispatch dialogue)
   let openingFrame = 0;
-  const OPENING_TOTAL = 520; // ~8.6s full choreographed arrival, urgent dispatch & departure
+  let awaitingOpeningConfirm = false;
+  const OPENING_DIALOGUE_FRAME = 385;
+  const OPENING_TOTAL = 620;
 
   // Mid-Game Dogsled Deployment Cutscene (2650 - 2770)
   let isDeployingSled = false;
@@ -240,7 +242,7 @@
 
   // Extended Closing Cutscene State (York Factory -> Suited Factor -> Hudson Bay Barque -> Fade to Black)
   let closingFrame = 0;
-  const CLOSING_TOTAL = 420; // ~7s camera pan to Hudson Bay barque & fade to black
+  const CLOSING_TOTAL = 420;
 
   // River Features & Hazards
   let riverFeatures = [];
@@ -405,7 +407,6 @@
   // ==========================================
   // 4. STYLIZED "WOODLAND" PIXEL FONT TITLE SCREEN
   // ==========================================
-  // Custom 16-bit Woodland-inspired pixel serif glyph bitmaps (7x9 high-contrast flared serifs)
   const WOODLAND_GLYPHS = {
     'R': [
       '1111100',
@@ -501,7 +502,6 @@
       const gw = g[0].length;
       const gh = g.length;
 
-      // Deep dark maroon/black drop shadow for Woodland 16-bit relief
       ctx.fillStyle = PAL.OUTLINE;
       for (let r = 0; r < gh; r++) {
         for (let c = 0; c < gw; c++) {
@@ -512,7 +512,6 @@
         }
       }
 
-      // Shaded Woodland gold-to-ivory serif fill
       for (let r = 0; r < gh; r++) {
         for (let c = 0; c < gw; c++) {
           if (g[r][c] === '1') {
@@ -546,13 +545,12 @@
     drawShadedTipi(48, farHorizonY - 9);
     drawShadedPine(VIEW_W - 34, farHorizonY - 11, false, false);
 
-    // 2. Close-up of the Red River (rich shaded maroon water with animated current swells)
+    // 2. Close-up of the Red River (no canoe/character — pure river & riverbank scenery)
     const riverStartY = farHorizonY + 4;
     const lowerBankY = Math.floor(VIEW_H * 0.72);
     ctx.fillStyle = PAL.MAROON_DEEP;
     ctx.fillRect(0, riverStartY, VIEW_W, lowerBankY - riverStartY);
 
-    // Layered close-up river swells & reflections
     for (let ry = riverStartY + 4; ry < lowerBankY - 3; ry += 6) {
       const waveOff = Math.round(((frame * 0.45) + ry * 7) % 52);
       ctx.fillStyle = PAL.MAROON_MID;
@@ -565,10 +563,7 @@
       }
     }
 
-    // Close-up birchbark canoe gliding gently in the foreground river
-    drawCanoeAndHunter(Math.floor(VIEW_W * 0.14), lowerBankY - 18, frame);
-
-    // 3. Close-up Lower Riverbank (Foreground golden prairie grass, sand edge, oaks & boulders)
+    // 3. Close-up Lower Riverbank
     ctx.fillStyle = PAL.MAROON_FOAM;
     ctx.fillRect(0, lowerBankY - 2, VIEW_W, 2);
     ctx.fillStyle = PAL.SAND_MID;
@@ -580,7 +575,6 @@
     ctx.fillStyle = PAL.GOLD_DARK;
     ctx.fillRect(0, lowerBankY + 21, VIEW_W, VIEW_H - (lowerBankY + 21));
 
-    // Close-up grass tufts & riverbank stones framing the lower bank
     for (let gx = 6; gx < VIEW_W; gx += 18) {
       ctx.fillStyle = PAL.MID_PINE;
       ctx.fillRect(gx, lowerBankY + 2, 1, 4);
@@ -598,7 +592,7 @@
     drawWoodlandWord('RED RIVER', Math.floor(VIEW_W / 2), topWordY, titleScale);
     drawWoodlandWord('RUN', Math.floor(VIEW_W / 2), botWordY, titleScale);
 
-    // 5. "PRESS A TO START" fades in smoothly after 2.0 seconds on the lower banking!
+    // 5. "PRESS A TO START" fades in smoothly after 2.0 seconds on the lower banking
     if (elapsedSec >= 2.0) {
       const fadeInT = Math.min(1, (elapsedSec - 2.0) / 0.85);
       const pulse = 0.72 + Math.sin(tAnim * 2.2) * 0.28;
@@ -617,7 +611,6 @@
       ctx.restore();
     }
 
-    // Fade-to-black transition into Upper Fort Garry opening cutscene
     if (isFadingFromTitle) {
       titleFadeOutAlpha = Math.min(1, titleFadeOutAlpha + 0.045);
       ctx.fillStyle = `rgba(5, 10, 8, ${titleFadeOutAlpha.toFixed(3)})`;
@@ -701,7 +694,6 @@
 
     drawCanoeHullOnly(x, y, frameCount, !hasPackage, silT);
 
-    // Draw urgent wrapped parcel in bow if carrying package
     if (hasPackage) {
       const cOut = lerpColor(PAL.OUTLINE, PAL.SILHOUETTE, silT);
       const cWoodM = lerpColor(PAL.WOOD_MID, PAL.SILHOUETTE, silT);
@@ -756,7 +748,6 @@
     const strokePhase = strokeIdx % 4;
     const cycleNum = Math.floor(strokeIdx / 4);
 
-    // Subtle (25% volume) soft paddle splash audio on every SECOND paddle stroke!
     if (gameMode === 'PLAYING' && !isPaused && strokePhase === 1 && cycleNum % 2 === 1 && lastSplashStrokeId !== cycleNum) {
       lastSplashStrokeId = cycleNum;
       playPaddleSplashSound();
@@ -806,7 +797,6 @@
       }
     }
 
-    // Soft animated water splash droplets & ripple on every second paddle stroke
     if (strokePhase !== 3) {
       ctx.fillStyle = lerpColor(PAL.SNOW_LIGHT, '#72B8E8', silT);
       ctx.fillRect(bladeX - 2, py + 14, 5, 1);
@@ -881,26 +871,22 @@
   }
 
   // ==========================================
-  // 5. EXTENDED OPENING & CLOSING CUTSCENES
+  // 6. EXTENDED OPENING & CLOSING CUTSCENES
   // ==========================================
-  // Red River Cart (Two large spoked wooden wheels, oxen/horse, stacked trade crates)
   function drawRedRiverCart(x, y, frameCount, moving) {
-    const wheelSpin = moving ? (Math.floor(frameCount / 4) % 2) : 0;
+    const wheelSpin = moving ? (Math.floor(frameCount / 5) % 2) : 0;
 
-    // Ox / Draft horse pulling cart (facing left)
     ctx.fillStyle = '#3B2314';
     ctx.fillRect(x - 16, y + 3, 12, 6);
     ctx.fillRect(x - 19, y + 1, 4, 5);
     ctx.fillStyle = PAL.HIDE_LIGHT;
-    ctx.fillRect(x - 20, y, 2, 2); // Horn
+    ctx.fillRect(x - 20, y, 2, 2);
     ctx.fillStyle = '#1F120A';
     ctx.fillRect(x - 15 + wheelSpin, y + 9, 2, 4);
     ctx.fillRect(x - 7 - wheelSpin, y + 9, 2, 4);
-    // Wooden shafts
     ctx.fillStyle = PAL.WOOD_MID;
     ctx.fillRect(x - 6, y + 5, 8, 1);
 
-    // Cart wooden bed & stacked cargo crates
     ctx.fillStyle = PAL.WOOD_DARK;
     ctx.fillRect(x, y + 4, 22, 4);
     ctx.fillStyle = PAL.WOOD_LIGHT;
@@ -910,7 +896,6 @@
     ctx.fillStyle = PAL.SASH_RED;
     ctx.fillRect(x + 13, y + 1, 5, 1);
 
-    // Iconic tall spoked Red River wooden wheel
     ctx.fillStyle = PAL.OUTLINE;
     ctx.fillRect(x + 6, y + 3, 10, 10);
     ctx.fillStyle = PAL.WOOD_LIGHT;
@@ -929,9 +914,11 @@
     }
   }
 
-  // Extended Opening Cutscene at Upper Fort Garry & The Forks
+  // Slowed-Down Opening Cutscene at Upper Fort Garry & The Forks
+  // Pauses at OPENING_DIALOGUE_FRAME (385) until user presses 'A' to close text box and depart!
   function drawOpeningCutscene() {
     const f = openingFrame;
+    const animTick = awaitingOpeningConfirm ? frame : f;
     const hudH = 36;
     const horizonY = hudH + Math.floor((VIEW_H - hudH) * 0.24);
     const riverTopY = horizonY + 14;
@@ -959,7 +946,7 @@
     ctx.fillStyle = PAL.MAROON_MID;
     ctx.fillRect(0, riverTopY, VIEW_W, 6);
 
-    // Assiniboine River Tributary flowing down from horizon on the left to meet Red River at The Forks!
+    // Assiniboine River Tributary flowing down from horizon on the left to meet Red River at The Forks
     const forksJoinX = 56;
     fillPixelPoly([
       [12, horizonY],
@@ -974,18 +961,17 @@
       [forksJoinX + 13, riverTopY + 3]
     ], PAL.MAROON_FOAM);
 
-    // Background prairie trees
     drawShadedPine(12, horizonY - 12, false, false);
     drawShadedPine(VIEW_W - 28, horizonY - 12, false, false);
 
     // Upper Fort Garry locked beside The Forks (x = 64)
     const fortX = 64;
     const fortY = horizonY - 10;
-    const fortRustle = (f >= 210 && f <= 355) ? Math.round(Math.sin(f * 1.4) * 1.5) : 0;
+    const isFortRustling = (f >= 310 && f <= 415);
+    const fortRustle = isFortRustling ? Math.round(Math.sin(animTick * 1.1) * 1.5) : 0;
     drawFortLandmark(fortX + fortRustle, fortY, 'UPPER_FORT');
 
-    // Rustle dust puffs & windows glowing during fort activity (f: 210..355)
-    if (f >= 210 && f <= 355) {
+    if (isFortRustling) {
       ctx.fillStyle = PAL.GOLD_LIGHT;
       ctx.fillRect(fortX + 6 + fortRustle, fortY + 6, 3, 2);
       ctx.fillRect(fortX + 24 + fortRustle, fortY + 6, 3, 2);
@@ -994,16 +980,16 @@
       ctx.fillRect(fortX + 34, fortY + 10, 3, 2);
     }
 
-    // 1. Red River Cart rolls in from the right (f: 0..85) and parks beside Upper Fort Garry
+    // 1. Red River Cart rolls slowly in from the right (f: 0..125) and parks beside Upper Fort Garry
     const cartTargetX = fortX + 52;
-    const cartX = f < 85
-      ? Math.round(VIEW_W + 24 - (f / 85) * (VIEW_W + 24 - cartTargetX))
+    const cartX = f < 125
+      ? Math.round(VIEW_W + 24 - (f / 125) * (VIEW_W + 24 - cartTargetX))
       : cartTargetX;
-    drawRedRiverCart(cartX, horizonY - 9, f, f < 85);
+    drawRedRiverCart(cartX, horizonY - 9, animTick, f < 125);
 
-    // 2. Exclamation mark pops up and flashes 3 times above Upper Fort Garry (f: 85..145)
-    if (f >= 85 && f <= 145) {
-      const flashIdx = Math.floor((f - 85) / 10); // 0,1 (flash 1), 2,3 (flash 2), 4,5 (flash 3)
+    // 2. Exclamation mark pops up and flashes 3 times above Upper Fort Garry (f: 125..205)
+    if (f >= 125 && f <= 205) {
+      const flashIdx = Math.floor((f - 125) / 14);
       if (flashIdx % 2 === 0) {
         const exX = fortX + 16;
         const exY = fortY - 18;
@@ -1017,82 +1003,89 @@
       }
     }
 
-    // 3. Canoe comes down from the horizon along the Assiniboine River, stopping at Upper Fort Garry (f: 120..185)
+    // 3. Canoe comes steadily down from the horizon along the Assiniboine River, stopping at Upper Fort Garry (f: 175..270)
     const dockX = 28;
     const dockY = riverTopY - 6;
-    if (f >= 120 && f < 185) {
-      const ct = (f - 120) / 65;
+    if (f >= 175 && f < 270) {
+      const ct = (f - 175) / 95;
       const cx = Math.round(10 + ct * (dockX - 10));
       const cy = Math.round(horizonY - 6 + ct * (dockY - (horizonY - 6)));
-      drawCanoeAndHunter(cx, cy, f, false);
-    } else if (f >= 185 && f < 395) {
-      // Canoe parked at Upper Fort Garry landing while trapper fetches urgent package
-      drawCanoeHullOnly(dockX, dockY, f, true, 0);
+      drawCanoeAndHunter(cx, cy, animTick, false);
+    } else if (f >= 270 && f < 465) {
+      drawCanoeHullOnly(dockX, dockY, animTick, true, 0);
     }
 
-    // 4. Trapper walks from canoe to Upper Fort Garry (f: 185..215), enters fort, then returns with package (f: 355..395)
+    // 4. Trapper walks from canoe to Upper Fort Garry (f: 270..315), enters fort, then returns with package (f: 415..465)
     const gateX = fortX + 15;
     const gateY = horizonY - 3;
-    if (f >= 185 && f < 215) {
-      const wt = (f - 185) / 30;
+    if (f >= 270 && f < 315) {
+      const wt = (f - 270) / 45;
       const wx = Math.round(dockX + 16 + (gateX - (dockX + 16)) * wt);
       const wy = Math.round(dockY - 2 + (gateY - (dockY - 2)) * wt);
-      drawWalkingVoyageur(wx, wy, f, false);
-    } else if (f >= 355 && f < 395) {
-      const wt = (f - 355) / 40;
+      drawWalkingVoyageur(wx, wy, animTick, false);
+    } else if (f >= 415 && f < 465) {
+      const wt = (f - 415) / 50;
       const wx = Math.round(gateX + (dockX + 16 - gateX) * wt);
       const wy = Math.round(gateY + (dockY - 2 - gateY) * wt);
-      drawWalkingVoyageur(wx, wy, f, true);
+      drawWalkingVoyageur(wx, wy, animTick, true);
     }
 
-    // 5. Urgent Dispatch Speech Box above the fort during the rustle (f: 215..355)
-    if (f >= 215 && f <= 355) {
-      const boxW = Math.min(VIEW_W - 16, 216);
+    // 5. Urgent Dispatch Dialogue Box above the fort (f: 315..415, holds at 385 until user presses 'A'!)
+    if (f >= 315 && f <= 415) {
+      const boxW = Math.min(VIEW_W - 14, 224);
       const boxX = Math.floor((VIEW_W - boxW) / 2);
-      const boxY = 8;
+      const boxY = 6;
+      const boxH = awaitingOpeningConfirm ? 34 : 26;
+
       ctx.fillStyle = PAL.OUTLINE;
-      ctx.fillRect(boxX - 2, boxY - 2, boxW + 4, 30);
+      ctx.fillRect(boxX - 2, boxY - 2, boxW + 4, boxH + 4);
       ctx.fillStyle = '#12291E';
-      ctx.fillRect(boxX, boxY, boxW, 26);
+      ctx.fillRect(boxX, boxY, boxW, boxH);
       ctx.strokeStyle = PAL.GOLD_LIGHT;
       ctx.lineWidth = 1;
-      ctx.strokeRect(boxX + 0.5, boxY + 0.5, boxW - 1, 25);
+      ctx.strokeRect(boxX + 0.5, boxY + 0.5, boxW - 1, boxH - 1);
 
       ctx.fillStyle = PAL.SNOW_LIGHT;
       ctx.font = 'bold 6px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('This package is highly urgent and must get', Math.floor(VIEW_W / 2), boxY + 10);
-      ctx.fillText('to York Factory as soon as possible...no matter the weather!', Math.floor(VIEW_W / 2), boxY + 20);
+      ctx.fillText('This package is highly urgent and must get', Math.floor(VIEW_W / 2), boxY + 9);
+      ctx.fillText('to York Factory as soon as possible...no matter the weather!', Math.floor(VIEW_W / 2), boxY + 18);
+
+      if (awaitingOpeningConfirm) {
+        const blinkOn = Math.floor(frame / 18) % 2 === 0;
+        if (blinkOn) {
+          ctx.fillStyle = PAL.GOLD_LIGHT;
+          ctx.fillText("PRESS 'A' TO DEPART", Math.floor(VIEW_W / 2), boxY + 29);
+        }
+      }
       ctx.textAlign = 'left';
     }
 
-    // 6. Canoe paddles short stretch down the Assiniboine & turns right at The Forks into the Red River (f: 395..520)
-    if (f >= 395) {
-      const pt = Math.min(1, (f - 395) / (OPENING_TOTAL - 395));
+    // 6. Canoe paddles down the Assiniboine & turns right at The Forks into the Red River (f: 465..620)
+    if (f >= 465) {
+      const pt = Math.min(1, (f - 465) / (OPENING_TOTAL - 465));
       if (pt < 0.45) {
-        // Short paddle down the Assiniboine into The Forks junction
         const st = pt / 0.45;
         const cx = Math.round(dockX + (forksJoinX - 10 - dockX) * st);
         const cy = Math.round(dockY + (midY - dockY) * st);
-        drawCanoeAndHunter(cx, cy, f, true);
+        drawCanoeAndHunter(cx, cy, animTick, true);
       } else {
-        // Turns right at The Forks to begin the Red River paddle!
         const rt = (pt - 0.45) / 0.55;
         const cx = Math.round((forksJoinX - 10) * (1 - rt) + 16 * rt);
-        drawCanoeAndHunter(cx, midY, f, true);
+        drawCanoeAndHunter(cx, midY, animTick, true);
       }
     }
 
-    // Fade-in from black on first 22 frames
-    if (f < 22) {
-      const alpha = 1 - f / 22;
+    // Fade-in from black on first 30 frames
+    if (f < 30) {
+      const alpha = 1 - f / 30;
       ctx.fillStyle = `rgba(5, 10, 8, ${alpha.toFixed(3)})`;
       ctx.fillRect(0, 0, VIEW_W, VIEW_H);
     }
   }
 
   function drawWalkingVoyageur(wx, wy, frameCount, carryingPackage) {
-    const stepBob = Math.floor(frameCount / 5) % 2;
+    const stepBob = Math.floor(frameCount / 6) % 2;
     ctx.fillStyle = PAL.OUTLINE;
     ctx.fillRect(wx, wy, 7, 10);
     ctx.fillStyle = PAL.HIDE_MID;
@@ -1113,12 +1106,10 @@
     }
   }
 
-  // Full-Rigged 3-Masted HBC Barque Ship in Port at York Factory / Hudson Bay
   function drawHBCBarqueShip(x, waterY, frameCount) {
     const bob = Math.sin(frameCount * 0.06) * 1;
     const sy = Math.round(waterY + bob);
 
-    // Dark timber hull with white gunport stripe
     fillPixelPoly([
       [x, sy - 6],
       [x + 68, sy - 6],
@@ -1131,14 +1122,11 @@
       [x + 60, sy + 3],
       [x + 9, sy + 3]
     ], PAL.WOOD_DARK);
-    // White gunport stripe
     ctx.fillStyle = PAL.HIDE_LIGHT;
     ctx.fillRect(x + 5, sy - 2, 56, 2);
-    // Bowsprit pointing right toward open Hudson Bay
     ctx.fillStyle = PAL.WOOD_MID;
     ctx.fillRect(x + 66, sy - 7, 14, 2);
 
-    // Three tall masts (Fore, Main, Mizzen)
     const masts = [x + 18, x + 36, x + 52];
     const mastHeights = [30, 36, 26];
     for (let m = 0; m < 3; m++) {
@@ -1147,7 +1135,6 @@
       ctx.fillStyle = PAL.WOOD_LIGHT;
       ctx.fillRect(mx, sy - 6 - mh, 2, mh);
 
-      // Furled/billowing square sails on yards
       ctx.fillStyle = PAL.SNOW_MID;
       ctx.fillRect(mx - 6, sy - 6 - mh + 5, 14, 7);
       ctx.fillRect(mx - 7, sy - 6 - mh + 15, 16, 8);
@@ -1156,30 +1143,25 @@
       ctx.fillRect(mx - 6, sy - 6 - mh + 15, 13, 3);
     }
 
-    // Rigging lines
     ctx.fillStyle = 'rgba(20, 20, 20, 0.55)';
     ctx.fillRect(x + 6, sy - 18, 12, 1);
     ctx.fillRect(x + 54, sy - 20, 14, 1);
 
-    // Red Ensign HBC Flag flying proudly from the mainmast / stern!
     const flagWave = Math.floor(frameCount / 8) % 2;
     const fx = x + 38;
     const fy = sy - 44;
     ctx.fillStyle = PAL.SASH_RED;
     ctx.fillRect(fx, fy, 11, 6);
     ctx.fillRect(fx + 10, fy + flagWave, 3, 5);
-    // Union canton & white "HBC" mark
     ctx.fillStyle = PAL.NWC_BLUE;
     ctx.fillRect(fx, fy, 4, 3);
     ctx.fillStyle = PAL.SNOW_LIGHT;
     ctx.fillRect(fx + 5, fy + 2, 4, 2);
 
-    // Gangplank connecting snowy port pier to the barque deck
     ctx.fillStyle = PAL.WOOD_MID;
     ctx.fillRect(x - 10, sy - 4, 14, 2);
   }
 
-  // Extended Closing Cutscene: York Factory -> Suited Factor in Top Hat -> Camera Pan to Hudson Bay Barque -> Fade to Black
   function drawClosingCutscene() {
     const f = closingFrame;
     const hudH = 36;
@@ -1187,22 +1169,17 @@
     const riverTopY = horizonY + 4;
     const riverH = VIEW_H - riverTopY;
 
-    // Camera pan offset: stays locked on York Factory for f: 0..170, then pans smoothly right (0 -> 150px)
-    // to reveal the grand opening of Hudson Bay and the full-rigged HBC barque in port!
     const panT = f <= 170 ? 0 : Math.min(1, (f - 170) / 145);
     const camX = Math.round(panT * 155);
 
-    // 1. Crisp Northern Sky
     ctx.fillStyle = '#6BA3C4';
     ctx.fillRect(0, 0, VIEW_W, horizonY);
     ctx.fillStyle = '#F2E8D5';
     ctx.fillRect(0, Math.floor(horizonY * 0.55), VIEW_W, horizonY);
 
-    // 2. Ground & Open Hudson Bay Waterline (pans left as camera moves right)
-    const coastSplitWorldX = 165; // Where snowy York Factory shore meets open Hudson Bay
+    const coastSplitWorldX = 165;
     const coastSplitScreenX = coastSplitWorldX - camX;
 
-    // Snow-covered shore on left
     if (coastSplitScreenX > 0) {
       ctx.fillStyle = PAL.SNOW_LIGHT;
       ctx.fillRect(0, horizonY, coastSplitScreenX, VIEW_H - horizonY);
@@ -1210,7 +1187,6 @@
       ctx.fillRect(0, riverTopY, coastSplitScreenX, riverH);
     }
 
-    // Grand opening of Hudson Bay on right!
     if (coastSplitScreenX < VIEW_W) {
       const bayStartX = Math.max(0, coastSplitScreenX);
       ctx.fillStyle = PAL.BAY_DEEP;
@@ -1220,7 +1196,6 @@
       ctx.fillStyle = PAL.BAY_FOAM;
       ctx.fillRect(bayStartX, horizonY, VIEW_W - bayStartX, 1);
 
-      // Gentle Hudson Bay swells & ice floes
       for (let bx = bayStartX + 10; bx < VIEW_W; bx += 36) {
         const shimmer = Math.round(Math.sin((bx + f * 0.3) * 0.1) * 2);
         ctx.fillStyle = PAL.BAY_FOAM;
@@ -1228,7 +1203,6 @@
         ctx.fillRect(bx + 8 - shimmer, horizonY + 34, 18, 1);
       }
 
-      // Timber port pier extending into Hudson Bay
       if (coastSplitScreenX > -45) {
         ctx.fillStyle = PAL.WOOD_DARK;
         ctx.fillRect(coastSplitScreenX - 6, horizonY + 6, 48, 5);
@@ -1237,25 +1211,21 @@
       }
     }
 
-    // 3. York Factory Depot & Parked Dogsled (worldX ~ 55)
     const fortWorldX = 55;
     const fortScreenX = fortWorldX - camX;
     const fortY = horizonY - 11;
     if (fortScreenX > -60) {
       drawFortLandmark(fortScreenX, fortY, 'YORK_FACTORY');
       drawShadedPine(fortScreenX - 18, horizonY - 10, true, false);
-      // Parked dogsled resting outside York Factory
       drawDogSledAndHunter(fortScreenX - 24, riverTopY + 8, f, true, false, false);
     }
 
-    // 4. Full-Rigged HBC Barque Ship docked in Hudson Bay port (worldX = 202)
     const shipWorldX = 202;
     const shipScreenX = shipWorldX - camX;
     if (shipScreenX < VIEW_W + 20) {
       drawHBCBarqueShip(shipScreenX, horizonY + 9, f);
     }
 
-    // 5. Phase 1 (f: 0..105): Trapper carries package from sled inside York Factory
     const doorWorldX = fortWorldX + 20;
     if (f < 105) {
       const wt = f / 105;
@@ -1264,8 +1234,6 @@
       drawWalkingVoyageur(trapperWorldX - camX, trapperWorldY, f, true);
     }
 
-    // 6. Phase 2 (f: 125..355): Suited man in top hat exits York Factory with package, walks right across the pier,
-    //    and boards the HBC Barque ship in Hudson Bay!
     if (f >= 125 && f <= 355) {
       const walkProgress = (f - 125) / 230;
       const factorWorldX = Math.round(doorWorldX + (shipWorldX + 18 - doorWorldX) * walkProgress);
@@ -1274,39 +1242,32 @@
       const fy = factorWorldY;
       const stepBob = Math.floor(f / 5) % 2;
 
-      // Tailored dark suit & coat
       ctx.fillStyle = PAL.OUTLINE;
       ctx.fillRect(fx, fy, 7, 11);
       ctx.fillStyle = PAL.SUIT_DARK;
       ctx.fillRect(fx + 1, fy + 1, 5, 8);
       ctx.fillStyle = PAL.SUIT_MID;
       ctx.fillRect(fx + 2, fy + 2, 2, 6);
-      // White shirt cravat
       ctx.fillStyle = PAL.SNOW_LIGHT;
       ctx.fillRect(fx + 4, fy + 1, 2, 3);
-      // Face
       ctx.fillStyle = '#E0AC84';
       ctx.fillRect(fx + 3, fy - 2, 3, 3);
-      // Tall HBC Silk Top Hat
       ctx.fillStyle = PAL.OUTLINE;
-      ctx.fillRect(fx + 1, fy - 3, 7, 1); // Hat brim
-      ctx.fillRect(fx + 2, fy - 7, 5, 4); // Hat crown
+      ctx.fillRect(fx + 1, fy - 3, 7, 1);
+      ctx.fillRect(fx + 2, fy - 7, 5, 4);
       ctx.fillStyle = PAL.SUIT_MID;
       ctx.fillRect(fx + 3, fy - 6, 2, 3);
 
-      // Striding legs
       ctx.fillStyle = PAL.OUTLINE;
       ctx.fillRect(fx + 1 + stepBob, fy + 9, 2, 3);
       ctx.fillRect(fx + 4 - stepBob, fy + 9, 2, 3);
 
-      // Urgent package tucked securely under his arm
       ctx.fillStyle = PAL.WOOD_MID;
       ctx.fillRect(fx + 4, fy + 3, 6, 4);
       ctx.fillStyle = PAL.GOLD_LIGHT;
       ctx.fillRect(fx + 5, fy + 4, 4, 2);
     }
 
-    // 7. Phase 3 (f: 355..420): Suited factor has boarded the HBC barque; smooth fade to black!
     if (f > 355) {
       const fadeAlpha = Math.min(1, (f - 355) / 60);
       ctx.fillStyle = `rgba(0, 0, 0, ${fadeAlpha.toFixed(3)})`;
@@ -1314,7 +1275,6 @@
     }
   }
 
-  // Mid-Game North Shore Landing & Dogsled Deployment Animation (2650 - 2770)
   function drawDeploymentSequence(riverTopY, laneH) {
     const beachX = Math.round(VIEW_W * 0.42 - deployProgress * 30);
     const shoreTopY = riverTopY;
@@ -1387,7 +1347,7 @@
   }
 
   // ==========================================
-  // 5B. SCENERY PROPS, CEDARS, SNOW TIPIS, & LANDMARKS
+  // 6B. SCENERY PROPS, CEDARS, SNOW TIPIS, & LANDMARKS
   // ==========================================
   function drawShadedPine(x, y, isWinter, isSil) {
     if (isSil) {
@@ -1811,7 +1771,7 @@
   }
 
   // ==========================================
-  // 6. VARIABLE-LENGTH MEANDERS, ISLAND CHUTE VS. LOG JAM, & WAVES
+  // 7. VARIABLE-LENGTH MEANDERS, ISLAND CHUTE VS. LOG JAM, & WAVES
   // ==========================================
   function resetWorld() {
     riverFeatures = [];
@@ -1825,6 +1785,7 @@
     sugarIslandSpawned = false;
     yorkFactorySpawned = false;
     lakeWaveArmed = false;
+    awaitingOpeningConfirm = false;
     isDeployingSled = false;
     deployProgress = 0;
     isSledMode = false;
@@ -2093,7 +2054,7 @@
   }
 
   // ==========================================
-  // 7. MAIN RENDERING PIPELINE
+  // 8. MAIN RENDERING PIPELINE
   // ==========================================
   function drawScene() {
     if (gameMode === 'TITLE') {
@@ -2121,17 +2082,14 @@
     const silT = getSilhouetteFactor();
     const isSil = silT > 0.65;
 
-    // 1. Mouth opening of Lake Winnipeg (1330 -> 1450: 0 -> 1)
     const mouthOpenT = score < DIST.MOUTH_OPEN_START
       ? 0
       : Math.min(1, (score - DIST.MOUTH_OPEN_START) / (DIST.ST_PETERS_END - DIST.MOUTH_OPEN_START));
 
-    // 2. Natural North Shore lake closing (2530 -> 2650: 0 -> 1), mirroring the mouth opening!
     const lakeCloseT = score < DIST.LAKE_CLOSE_START
       ? 0
       : Math.min(1, (score - DIST.LAKE_CLOSE_START) / (DIST.LAKE_MIDNIGHT_END - DIST.LAKE_CLOSE_START));
 
-    // Combined openness of the lake (1 = fully open lake, 0 = river channel with north bank)
     const lakeOpenFactor = Math.max(0, mouthOpenT * (1 - lakeCloseT));
     const isLakeOpen = lakeOpenFactor >= 1;
 
@@ -2159,7 +2117,6 @@
     ctx.fillStyle = env.skyBot;
     ctx.fillRect(0, Math.floor(horizonY * 0.55), VIEW_W, horizonY);
 
-    // Glowing Midnight Moon during DK-style Silhouette Lake Winnipeg
     if (silT > 0.05) {
       const moonX = Math.floor(VIEW_W * 0.72);
       const moonY = playTop + 10;
@@ -2170,7 +2127,6 @@
       ctx.fillRect(moonX - 1, moonY - 3, 10, 16);
     }
 
-    // Distant Parallax Clouds
     const cloudOff = (bgOffset * 0.12) % 160;
     ctx.fillStyle = silT > 0.4 ? '#231A42' : '#FFFFFF';
     for (let cx = -160; cx < VIEW_W + 160; cx += 160) {
@@ -2178,16 +2134,14 @@
       ctx.fillRect(Math.round(cx - cloudOff + 24), playTop + 2, 14, 2);
     }
 
-    // 2. Riverbank Horizon (Opens at 1330-1450, closes naturally at North Shore 2530-2650!)
+    // 2. Riverbank Horizon
     if (!isLakeOpen) {
       let bankStartX = 0;
       let bankWidth = VIEW_W;
       if (mouthOpenT > 0 && mouthOpenT < 1) {
-        // Opening lake mouth: bank tapers off to the left
         bankStartX = 0;
         bankWidth = Math.round(VIEW_W * (1 - mouthOpenT));
       } else if (lakeCloseT > 0 && lakeCloseT < 1) {
-        // Closing North Shore: snowy northern bank closes in from the right!
         bankWidth = Math.round(VIEW_W * lakeCloseT);
         bankStartX = VIEW_W - bankWidth;
       }
@@ -2205,7 +2159,6 @@
         }
       }
 
-      // Open water horizon line on whichever side is still open
       ctx.fillStyle = env.watFoam;
       if (bankStartX > 0) {
         ctx.fillRect(0, horizonY, bankStartX, 1);
@@ -2215,7 +2168,6 @@
       }
 
       if (score >= DIST.LAKE_CLOSE_START) {
-        // North Shore closing snowy pines & shield outcrops
         const propSpacing = 170;
         const propOff = (bgOffset * 0.38) % propSpacing;
         for (let px = -propSpacing; px < VIEW_W + propSpacing; px += propSpacing) {
@@ -2733,7 +2685,7 @@
   }
 
   // ==========================================
-  // 8. COLLISIONS, ISLAND COMMITMENT, & UPDATE LOOP
+  // 9. COLLISIONS, ISLAND COMMITMENT, & UPDATE LOOP
   // ==========================================
   function isCommittedToIslandFork(targetLane) {
     const pLeft = 20;
@@ -2844,12 +2796,17 @@
     }
 
     if (gameMode === 'OPENING_CUTSCENE') {
-      openingFrame++;
-      if (openingFrame === 85 || openingFrame === 105 || openingFrame === 125) {
-        playTone(660, 'square', 0.08, 0.08); // Exclamation alert ping
-      }
-      if (openingFrame === 215) {
-        playTone(392, 'triangle', 0.12, 0.10);
+      if (!awaitingOpeningConfirm) {
+        openingFrame++;
+        if (openingFrame === 125 || openingFrame === 153 || openingFrame === 181) {
+          playTone(660, 'square', 0.08, 0.08);
+        }
+        if (openingFrame === 315) {
+          playTone(392, 'triangle', 0.12, 0.10);
+        }
+        if (openingFrame === OPENING_DIALOGUE_FRAME) {
+          awaitingOpeningConfirm = true;
+        }
       }
       if (openingFrame >= OPENING_TOTAL) {
         gameMode = 'PLAYING';
@@ -2872,7 +2829,6 @@
         playTone(440, 'triangle', 0.14, 0.12);
       }
       if (closingFrame === 320) {
-        // Ship bell chime as suited factor boards the HBC barque
         playTone(587.33, 'sine', 0.25, 0.14);
         setTimeout(() => playTone(783.99, 'sine', 0.40, 0.14), 160);
       }
@@ -2888,7 +2844,6 @@
 
     if (gameMode !== 'PLAYING') return;
 
-    // Mid-Game North Shore Landing & Dogsled Deployment Cutscene (2650 - 2770)
     if (score >= DIST.LAKE_MIDNIGHT_END && score < DIST.DEPLOY_END) {
       if (!isDeployingSled) {
         isDeployingSled = true;
@@ -2934,7 +2889,6 @@
       scoreDisplay.innerText = 'DIST: ' + score;
     }
 
-    // Trigger Closing Cutscene at York Factory & Hudson Bay (4000)
     if (score >= DIST.VICTORY_YORK) {
       gameMode = 'CLOSING_CUTSCENE';
       closingFrame = 0;
@@ -2997,7 +2951,7 @@
   }
 
   // ==========================================
-  // 9. CHIPTUNE AUDIO & WATER SFX ENGINE
+  // 10. CHIPTUNE AUDIO & WATER SFX ENGINE
   // ==========================================
   let audioCtx = null;
   let audioTimer = null;
@@ -3044,7 +2998,6 @@
     osc.stop(audioCtx.currentTime + duration);
   }
 
-  // Subtle (~25% volume) soft paddle splash on every second paddle stroke
   function playPaddleSplashSound() {
     if (!audioCtx) return;
     const dur = 0.14;
@@ -3066,7 +3019,7 @@
 
     const gain = audioCtx.createGain();
     gain.gain.setValueAtTime(0.005, audioCtx.currentTime);
-    gain.gain.linearRampToValueAtTime(0.06, audioCtx.currentTime + 0.025); // ~25% relative volume
+    gain.gain.linearRampToValueAtTime(0.06, audioCtx.currentTime + 0.025);
     gain.gain.exponentialRampToValueAtTime(0.0005, audioCtx.currentTime + dur);
 
     noise.connect(filter);
@@ -3076,13 +3029,11 @@
     noise.stop(audioCtx.currentTime + dur);
   }
 
-  // More noticeable (65% vol) subtle water ripple sound when changing tracks
   function playTrackRippleSound() {
     if (!audioCtx) return;
     const now = audioCtx.currentTime;
     const dur = 0.18;
 
-    // Soft filtered water swish
     const bufferSize = Math.floor(audioCtx.sampleRate * dur);
     const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
     const data = buffer.getChannelData(0);
@@ -3100,7 +3051,7 @@
 
     const nGain = audioCtx.createGain();
     nGain.gain.setValueAtTime(0.01, now);
-    nGain.gain.linearRampToValueAtTime(0.16, now + 0.03); // ~65% relative volume
+    nGain.gain.linearRampToValueAtTime(0.16, now + 0.03);
     nGain.gain.exponentialRampToValueAtTime(0.001, now + dur);
 
     noise.connect(filter);
@@ -3109,7 +3060,6 @@
     noise.start(now);
     noise.stop(now + dur);
 
-    // Subtle double liquid droplet ripple overtone
     const osc = audioCtx.createOscillator();
     const oGain = audioCtx.createGain();
     osc.type = 'sine';
@@ -3207,7 +3157,7 @@
   }
 
   // ==========================================
-  // 10. GAME STATE & ARCADE POSTMESSAGE BRIDGE
+  // 11. GAME STATE & ARCADE POSTMESSAGE BRIDGE
   // ==========================================
   function triggerStartFromTitle() {
     initAudio();
@@ -3238,6 +3188,7 @@
 
     gameMode = 'OPENING_CUTSCENE';
     openingFrame = 0;
+    awaitingOpeningConfirm = false;
     headerBar.style.display = 'none';
     msg.style.display = 'none';
     msg.style.background = '#4A0C10';
@@ -3292,7 +3243,11 @@
 
     if (cmd === 'BUTTON_A' && now - lastA > 110) {
       lastA = now;
-      if (gameMode === 'TITLE' || gameMode === 'GAME_OVER' || gameMode === 'VICTORY') {
+      if (gameMode === 'OPENING_CUTSCENE' && awaitingOpeningConfirm) {
+        awaitingOpeningConfirm = false;
+        openingFrame = OPENING_DIALOGUE_FRAME + 1;
+        playTone(493.88, 'triangle', 0.12, 0.14);
+      } else if (gameMode === 'TITLE' || gameMode === 'GAME_OVER' || gameMode === 'VICTORY') {
         triggerStartFromTitle();
       }
     }
