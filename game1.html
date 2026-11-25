@@ -204,9 +204,6 @@
   };
 
   // Geographic Stage Milestones
-  // - Upper Fort Garry (0) -> St Johns Church (155) -> Preset Log Village (195..385) -> Battle of Seven Oaks (460)
-  // - Long open plains after Seven Oaks (460..1160) -> St Andrews on the Red (1160) -> Village background past Lower Fort Garry (1360)
-  // - Sugar Island (1660) -> St. Peter's sparse wigwams/fires & Dynevor (1870) -> Mouth of Lake Winnipeg (2010..2150)
   const DIST = {
     FORKS_END: 600,
     PLAINS_END: 1160,
@@ -1451,6 +1448,22 @@
   // ==========================================
   // 6B. REGIONAL SCENERY PROPS & UNIQUE LANDMARKS
   // ==========================================
+  // Subtle tall grasses & ground-level prairie atmosphere along the Red River Settlement bank
+  function drawTallPrairieGrasses(x, y) {
+    ctx.fillStyle = PAL.MID_PINE;
+    ctx.fillRect(x, y - 3, 1, 4);
+    ctx.fillRect(x + 2, y - 4, 1, 5);
+    ctx.fillRect(x + 5, y - 2, 1, 3);
+    ctx.fillRect(x + 9, y - 4, 1, 5);
+    ctx.fillRect(x + 12, y - 3, 1, 4);
+    ctx.fillStyle = PAL.CHARTREUSE_L;
+    ctx.fillRect(x + 1, y - 3, 1, 4);
+    ctx.fillRect(x + 4, y - 4, 1, 5);
+    ctx.fillRect(x + 10, y - 3, 1, 4);
+    ctx.fillStyle = PAL.GOLD_LIGHT;
+    ctx.fillRect(x + 7, y - 2, 1, 3);
+  }
+
   function drawShadedGrayRock(x, y, isWinter, isSil) {
     if (isSil) {
       ctx.fillStyle = PAL.SILHOUETTE;
@@ -1577,11 +1590,9 @@
     ctx.fillRect(x + 22, y, 4, 2);
   }
 
-  // Preset non-repeating Red River log village (past St Johns Church until just before Battle of Seven Oaks)
   function drawPresetLogVillage(x, y) {
     drawShadedPine(x, y - 11, false, false);
     drawSettlerLogHouse(x + 18, y - 6);
-    // Stacked firewood & split-rail garden plot
     ctx.fillStyle = PAL.WOOD_DARK;
     ctx.fillRect(x + 41, y + 4, 10, 5);
     ctx.fillStyle = PAL.WOOD_LIGHT;
@@ -2603,7 +2614,6 @@
   }
 
   function scheduleDeepLakeWaves() {
-    // Waves slightly less often on Lake Winnipeg (~780 to 1220px spacing)
     if (score < DIST.MOUTH_BAS_END + 90 || score >= DIST.LAKE_CLOSE_START - 40) return;
 
     if (!lakeWaveArmed) {
@@ -2698,7 +2708,7 @@
     ctx.fillStyle = env.skyTop;
     ctx.fillRect(0, 0, VIEW_W, horizonY);
     ctx.fillStyle = env.skyBot;
-    ctx.fillRect(0, Math.floor(horizonY * 0.55), VIEW_W, horizonY);
+    ctx.fillRect(0, Math.floor(horizonY * 0.55), VIEW_W, horizonY - Math.floor(horizonY * 0.55));
 
     if (score >= DIST.MANIGOTAGAN_END + 160 && score < DIST.NORWAY_HOUSE_END) {
       const celestT = Math.min(1, (score - (DIST.MANIGOTAGAN_END + 160)) / 240);
@@ -2719,11 +2729,18 @@
       }
     }
 
+    // Parallax Sky Clouds (constrained cleanly to upper sky band above horizonY so they never form a white band across the horizon)
     const cloudOff = (bgOffset * 0.12) % 180;
-    ctx.fillStyle = silT > 0.4 ? '#281D4D' : '#FFFFFF';
+    ctx.fillStyle = silT > 0.4 ? '#281D4D' : 'rgba(255, 255, 255, 0.78)';
     for (let cx = -180; cx < VIEW_W + 180; cx += 180) {
-      ctx.fillRect(Math.round(cx - cloudOff + 24), playTop + 5, 28, 3);
-      ctx.fillRect(Math.round(cx - cloudOff + 30), playTop + 3, 16, 2);
+      const c1x = Math.round(cx - cloudOff + 24);
+      const c2x = Math.round(cx - cloudOff + 104);
+      if (playTop + 8 < horizonY - 4) {
+        ctx.fillRect(c1x + 4, playTop + 4, 14, 2);
+        ctx.fillRect(c1x, playTop + 6, 24, 2);
+        ctx.fillRect(c2x + 3, playTop + 7, 12, 2);
+        ctx.fillRect(c2x, playTop + 9, 20, 2);
+      }
     }
 
     // 2. Top Horizon
@@ -2767,6 +2784,22 @@
           }
         }
       } else {
+        // Subtle tall grasses & ground-level atmosphere across the Red River Settlement (Upper Fort Garry to Lower Fort Garry)
+        if (score < DIST.SETTLER_FARMS_END) {
+          const grassSpacing = 54;
+          const grassOff = (bgOffset * 0.38) % grassSpacing;
+          for (let gx = -grassSpacing; gx < bankWidth + grassSpacing; gx += grassSpacing) {
+            const tx = Math.round(gx - grassOff);
+            if (tx > bankWidth - 14) continue;
+            if (!isNearUniqueLandmark(tx, 14, landmarks)) {
+              drawTallPrairieGrasses(tx, horizonY + 2);
+            }
+            if (!isNearUniqueLandmark(tx + 26, 14, landmarks)) {
+              drawTallPrairieGrasses(tx + 26, horizonY + 5);
+            }
+          }
+        }
+
         // Red River Scenery Rules:
         // - 0..460 (Upper Fort Garry -> St Johns -> Preset Log Village -> Battle of Seven Oaks): NO repeating background!
         // - 520..1080 (Long Plains after Seven Oaks until St Andrews on the Red): Open plains with occasional buffalo
@@ -2809,7 +2842,6 @@
                 drawMarshReeds(baseX + 28, horizonY - 3);
               }
               if (!isNearUniqueLandmark(baseX + 52, 14, landmarks)) drawShadedPine(baseX + 52, horizonY - 11, false, false);
-              // Only a few rare wigwams / wolf campfires in St. Peter's before reaching Lake Winnipeg
               if (!isNearUniqueLandmark(baseX + 82, 16, landmarks)) {
                 if (Math.abs(worldTileIdx) === 7 || Math.abs(worldTileIdx) === 10) {
                   drawWigwamLodge(baseX + 82, horizonY - 6);
