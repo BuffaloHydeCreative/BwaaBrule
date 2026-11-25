@@ -102,7 +102,6 @@
   const ctx = cvs.getContext('2d');
   const headerBar = document.getElementById('header');
 
-  // Upgraded 320x180 logical resolution for sharp, legible pixel typography & SNES detail
   let VIEW_W = 320;
   let VIEW_H = 180;
 
@@ -171,9 +170,11 @@
     WOOD_DARK: '#4D280E',
     SAND_LIGHT: '#E2CCA2',
     SAND_MID: '#B59B6D',
-    GRANITE_PINK: '#C8928C',
-    GRANITE_GREY: '#8A8E94',
-    GRANITE_DARK: '#4C4E54',
+    // Classic 16-bit Arcade Shaded Gray Canadian Shield Rock Palette
+    ROCK_OUTLINE: '#252830',
+    ROCK_DARK: '#4A4F5A',
+    ROCK_MID: '#7E8594',
+    ROCK_LIGHT: '#B8C0CF',
     OCHRE_RED: '#A63A28',
     STONE_LIGHT: '#B5B8B4',
     STONE_MID: '#7A7E7A',
@@ -199,28 +200,36 @@
     DAY_SKY_B: '#E6DFCE'
   };
 
-  // Geographic Stage Milestones (Total 5000 distance voyage)
+  // Re-Spaced Red River & Properly Daisy-Chained Lake Winnipeg Milestones (Total 5350 distance)
   const DIST = {
-    // Red River Section (0 - 1650)
-    FORKS_END: 450,           // Upper Fort Garry -> St Johns Church -> Battle of Seven Oaks
-    SETTLER_FARMS_END: 1180,  // Meandering distance -> St Andrews on the Red -> 3x Lower Fort Garry -> Settler homes -> Sugar Island Rapids
-    ST_PETERS_END: 1650,      // St. Peter's (wigwams, wolf, parked canoe) + St. Peter's Dynevor backside steeple -> Mouth opening (1510-1650)
+    // Red River Section (0 - 1900):
+    // Upper Fort (0) -> short paddle -> St Johns (165) -> spacing -> Seven Oaks (420)
+    // -> large meandering spacing -> St Andrews (920) -> short-moderate spacing -> Lower Fort (1120)
+    // -> settler houses -> Sugar Island (1420) -> St. Peter's & Dynevor (1640) -> Mouth opening (1760-1900)
+    FORKS_END: 560,
+    SETTLER_FARMS_END: 1410,
+    MOUTH_OPEN_START: 1760,
+    ST_PETERS_END: 1900,
 
-    // East Shore of Lake Winnipeg (1650 - 3750)
-    MOUTH_BAS_END: 1950,      // Shortest leg: Mouth of Lake Winnipeg -> Fort Bas de la Rivière (Brokenhead River mouth on bottom bank, no waves)
-    MANIGOTAGAN_END: 2370,    // Slightly longer leg: Fort Bas de la Rivière -> Manigotagan (waves introduced on top track)
-    BERENS_END: 3060,         // Much longer leg: Manigotagan -> Berens River House (sunset -> DKC Tropical Freeze backlit silhouette)
-    NORWAY_HOUSE_END: 3750,   // Equal long leg: Berens River House -> Norway House (midnight silhouette -> dawn & snowfall -> daylit Norway House)
+    // East Shore of Lake Winnipeg Daisy Chain (1900 - 4100):
+    // 1. Mouth of Lake Winnipeg (1900 - 2220) -> culminates in Fort Bas de la Rivière (2170)
+    MOUTH_BAS_END: 2220,
+    // 2. Fort Bas -> Manigotagan (2220 - 2660, slightly longer) -> culminates in Manigotagan (2610)
+    MANIGOTAGAN_END: 2660,
+    // 3. Manigotagan -> Berens River House (2660 - 3380, much longer, sunset -> silhouette) -> culminates in Berens River House (3330)
+    BERENS_END: 3380,
+    // 4. Berens River House -> Norway House (3380 - 4100, equal long leg, midnight silhouette -> dawn & snow) -> culminates in daylit Norway House (4050)
+    LAKE_CLOSE_START: 3980,
+    NORWAY_HOUSE_END: 4100,
 
-    // Dogsled Deployment & Boreal Blizzard to York Factory (3750 - 5000)
-    DEPLOY_END: 3870,
-    BLIZZARD_PEAK: 4350,
-    VICTORY_YORK: 5000
+    // Dogsled Deployment & Boreal Blizzard to York Factory (4100 - 5350)
+    DEPLOY_END: 4220,
+    BLIZZARD_PEAK: 4700,
+    VICTORY_YORK: 5350
   };
 
   const TILE_PX = 18;
 
-  // Screen & Cutscene Modes
   let gameMode = 'TITLE'; // 'TITLE' | 'OPENING_CUTSCENE' | 'PLAYING' | 'CLOSING_CUTSCENE' | 'GAME_OVER' | 'VICTORY'
   let titleStartTime = performance.now();
   let titleFadeOutAlpha = 0;
@@ -230,7 +239,7 @@
   let score = 0, frame = 0, speed = 1.5;
   let bgOffset = 0;
 
-  // 3 Persistent Tracks: 0 (Top), 1 (Middle), 2 (Bottom)
+  // 3 Persistent Tracks: 0 (Top / Open Lake), 1 (Middle), 2 (Bottom / East Shoreline)
   let playerLane = 1;
   let playerVisualY = 0;
   let shakeTimer = 0;
@@ -241,18 +250,18 @@
   let crashReason = "RUN AGROUND!";
   let lastSplashStrokeId = -1;
 
-  // Opening Cutscene State (Upper Fort Garry & Assiniboine Forward Approach)
+  // Opening Cutscene State
   let openingFrame = 0;
   let awaitingOpeningConfirm = false;
   const OPENING_DIALOGUE_FRAME = 390;
   const OPENING_TOTAL = 620;
 
-  // Mid-Game Dogsled Deployment Cutscene at Norway House (3750 - 3870)
+  // Mid-Game Dogsled Deployment Cutscene at Norway House (4100 - 4220)
   let isDeployingSled = false;
   let deployProgress = 0;
   let isSledMode = false;
 
-  // Closing Cutscene State (York Factory -> Suited Factor -> Hudson Bay Barque -> Fade to Black)
+  // Closing Cutscene State
   let closingFrame = 0;
   const CLOSING_TOTAL = 420;
 
@@ -264,10 +273,10 @@
   let lakeWaveArmed = false;
   let lastFeatureType = 'NONE';
 
-  // Unique One-Off Landmarks & Historical Vignettes
+  // Unique One-Off Landmarks
   let spawnedFlags = {};
-  let landmarks = [];
-  let nearBankLandmarks = []; // Bottom/near bank unique features (e.g. St. Peter's Dynevor backside steeple, Brokenhead River mouth)
+  let landmarks = [];         // North/far riverbank landmarks (Red River & Winter Boreal sections)
+  let nearBankLandmarks = []; // Bottom/near shoreline landmarks (St. Peter's Dynevor & ALL Lake Winnipeg unique objects!)
 
   // Parallax Snow / Blizzard Particles
   let snowParticles = [];
@@ -307,14 +316,13 @@
 
   // Smoothly returns 0..1 silhouette factor across the sunset -> Berens River House -> Norway House leg
   function getSilhouetteFactor() {
-    // Ramps up across the second half of Manigotagan -> Berens River House (2720 -> 3060)
-    if (score < 2720 || score >= DIST.NORWAY_HOUSE_END) return 0;
+    if (score < 3020 || score >= DIST.NORWAY_HOUSE_END) return 0;
     if (score < DIST.BERENS_END) {
-      return (score - 2720) / (DIST.BERENS_END - 2720);
+      return (score - 3020) / (DIST.BERENS_END - 3020);
     }
-    // Stays in full backlit midnight silhouette across Berens -> Norway House, then dawn breaks near Norway House (3550 -> 3750)
-    if (score >= 3550) {
-      return Math.max(0, 1 - (score - 3550) / (DIST.NORWAY_HOUSE_END - 3550));
+    // Dawn breaks near Norway House (3880 -> 4100) culminating in a bright, winter daylit Norway House!
+    if (score >= 3880) {
+      return Math.max(0, 1 - (score - 3880) / (DIST.NORWAY_HOUSE_END - 3880));
     }
     return 1;
   }
@@ -332,7 +340,7 @@
       gndMid = lerpColor(PAL.GOLD_MID, PAL.CHARTREUSE_D, t);
       gndDark = lerpColor(PAL.GOLD_DARK, PAL.MID_PINE, t);
     } else if (score < DIST.SETTLER_FARMS_END) {
-      title = score >= 760 ? "LOWER FORT GARRY" : "RED RIVER SETTLEMENT";
+      title = score >= 1060 ? "LOWER FORT GARRY" : "RED RIVER SETTLEMENT";
       const t = (score - DIST.FORKS_END) / (DIST.SETTLER_FARMS_END - DIST.FORKS_END);
       gndTop = lerpColor(PAL.CHARTREUSE_L, PAL.MARSH_LIGHT, t);
       gndMid = lerpColor(PAL.CHARTREUSE_D, PAL.MARSH_MID, t);
@@ -341,7 +349,7 @@
       watMid = lerpColor(PAL.MAROON_MID, '#47333C', t);
       watFoam = lerpColor(PAL.MAROON_FOAM, '#8FA89B', t);
     } else if (score < DIST.ST_PETERS_END) {
-      title = score >= 1510 ? "MOUTH OF LAKE WINNIPEG" : "ST. PETER'S";
+      title = score >= DIST.MOUTH_OPEN_START ? "MOUTH OF LAKE WINNIPEG" : "ST. PETER'S";
       const t = (score - DIST.SETTLER_FARMS_END) / (DIST.ST_PETERS_END - DIST.SETTLER_FARMS_END);
       gndTop = lerpColor(PAL.MARSH_LIGHT, PAL.LIGHT_PINE, t);
       gndMid = lerpColor(PAL.MARSH_MID, PAL.MID_PINE, t);
@@ -367,27 +375,25 @@
       watMid = PAL.LAKE_MID;
       watFoam = PAL.LAKE_FOAM;
     } else if (score < DIST.BERENS_END) {
-      title = score >= 2820 ? "BERENS RIVER HOUSE" : "CANADIAN SHIELD COAST";
-      // Sun slowly sets across this leg, transitioning into DKC Tropical Freeze backlit silhouette!
-      const sunsetT = Math.min(1, (score - DIST.MANIGOTAGAN_END) / 340);
-      const nightT = Math.max(0, (score - 2720) / (DIST.BERENS_END - 2720));
+      title = score >= 3120 ? "BERENS RIVER HOUSE" : "CANADIAN SHIELD COAST";
+      const sunsetT = Math.min(1, (score - DIST.MANIGOTAGAN_END) / 360);
+      const nightT = Math.max(0, (score - 3020) / (DIST.BERENS_END - 3020));
 
       const dayToSunsetSkyT = lerpColor(PAL.DAY_SKY_T, PAL.SUNSET_TOP, sunsetT);
       const dayToSunsetSkyB = lerpColor(PAL.DAY_SKY_B, PAL.SUNSET_BOT, sunsetT);
       skyTop = lerpColor(dayToSunsetSkyT, PAL.NIGHT_SKY_T, nightT);
       skyBot = lerpColor(dayToSunsetSkyB, PAL.NIGHT_SKY_B, nightT);
 
-      gndTop = lerpColor(PAL.GRANITE_PINK, '#191C30', nightT);
+      gndTop = lerpColor(PAL.ROCK_LIGHT, '#191C30', nightT);
       gndMid = lerpColor(PAL.MID_PINE, '#0D101E', nightT);
       gndDark = lerpColor(PAL.DARK_PINE, '#070A14', nightT);
       watDeep = lerpColor(PAL.LAKE_DEEP, PAL.INDIGO_DEEP, nightT);
       watMid = lerpColor(PAL.LAKE_MID, PAL.INDIGO_MID, nightT);
       watFoam = lerpColor(PAL.LAKE_FOAM, '#4F72B8', nightT);
     } else if (score < DIST.NORWAY_HOUSE_END) {
-      // Full midnight backlit silhouette leg -> dawn breaks & snowfall begins near Norway House (3500 -> 3750)
-      title = score >= 3620 ? "NORWAY HOUSE" : "MIDNIGHT LAKE WINNIPEG";
-      const dawnT = score >= 3500
-        ? Math.min(1, (score - 3500) / (DIST.NORWAY_HOUSE_END - 3500))
+      title = score >= 3960 ? "NORWAY HOUSE" : "MIDNIGHT LAKE WINNIPEG";
+      const dawnT = score >= 3880
+        ? Math.min(1, (score - 3880) / (DIST.NORWAY_HOUSE_END - 3880))
         : 0;
 
       skyTop = lerpColor(PAL.NIGHT_SKY_T, PAL.DAY_SKY_T, dawnT);
@@ -408,11 +414,11 @@
       watDeep = PAL.ICE_DEEP;
       watMid = PAL.ICE_MID;
       watFoam = PAL.SNOW_LIGHT;
-    } else if (score < 4650) {
-      title = (score >= 4150 && score <= 4500) ? "BOREAL BLIZZARD" : "BOREAL WINTER TRAIL";
-      const blizT = score < 4350
-        ? Math.min(1, Math.max(0, (score - 3920) / 430))
-        : Math.max(0, 1 - (score - 4350) / 450);
+    } else if (score < 5000) {
+      title = (score >= 4500 && score <= 4850) ? "BOREAL BLIZZARD" : "BOREAL WINTER TRAIL";
+      const blizT = score < 4700
+        ? Math.min(1, Math.max(0, (score - 4270) / 430))
+        : Math.max(0, 1 - (score - 4700) / 450);
       skyTop = lerpColor('#7C9EB2', '#B8C8D4', blizT);
       skyBot = lerpColor('#D6E2E8', '#E4EDF2', blizT);
       gndTop = PAL.SNOW_LIGHT;
@@ -423,7 +429,7 @@
       watFoam = PAL.SNOW_LIGHT;
     } else {
       title = "HUDSON BAY - YORK FACTORY";
-      const t = Math.min(1, (score - 4650) / 250);
+      const t = Math.min(1, (score - 5000) / 250);
       skyTop = lerpColor('#7C9EB2', '#6BA3C4', t);
       skyBot = lerpColor('#D6E2E8', '#F2E8D5', t);
       gndTop = PAL.SNOW_LIGHT;
@@ -440,13 +446,11 @@
   // ==========================================
   // 4. CRISP PIXEL LABEL HELPER & WOODLAND TITLE CARD
   // ==========================================
-  // Unboxed high-contrast pixel text above unique landmarks
   function drawUnboxedLabel(text, centerX, y, isSil = false) {
     const tx = Math.round(centerX);
     const ty = Math.round(y);
     ctx.font = 'bold 8px monospace';
     ctx.textAlign = 'center';
-    // Crisp 1px dark outline for readability against any sky or parallax backdrop
     ctx.fillStyle = PAL.OUTLINE;
     ctx.fillText(text, tx - 1, ty);
     ctx.fillText(text, tx + 1, ty);
@@ -523,7 +527,6 @@
     drawShadedTipi(62, farHorizonY - 10);
     drawShadedPine(VIEW_W - 42, farHorizonY - 12, false, false);
 
-    // Close-up of the Red River (pure river & riverbank scenery)
     const riverStartY = farHorizonY + 5;
     const lowerBankY = Math.floor(VIEW_H * 0.72);
     ctx.fillStyle = PAL.MAROON_DEEP;
@@ -541,7 +544,6 @@
       }
     }
 
-    // Close-up Lower Riverbank
     ctx.fillStyle = PAL.MAROON_FOAM;
     ctx.fillRect(0, lowerBankY - 2, VIEW_W, 2);
     ctx.fillStyle = PAL.SAND_MID;
@@ -560,17 +562,15 @@
       ctx.fillStyle = PAL.CHARTREUSE_L;
       ctx.fillRect(gx + 1, lowerBankY + 2, 2, 4);
     }
-    drawShieldOutcrop(14, lowerBankY + 2, false, false);
+    drawShadedGrayRock(14, lowerBankY + 2, false, false);
     drawShadedPine(VIEW_W - 32, lowerBankY - 9, false, false);
 
-    // Stylized "Woodland" Pixel Title Banner
     const titleScale = VIEW_W >= 320 ? 3 : 2;
     const topWordY = Math.floor(VIEW_H * 0.18);
     const botWordY = topWordY + 9 * titleScale + 8;
     drawWoodlandWord('RED RIVER', Math.floor(VIEW_W / 2), topWordY, titleScale);
     drawWoodlandWord('RUN', Math.floor(VIEW_W / 2), botWordY, titleScale);
 
-    // "PRESS A TO START" fades in smoothly after 2.0 seconds on the lower banking
     if (elapsedSec >= 2.0) {
       const fadeInT = Math.min(1, (elapsedSec - 2.0) / 0.85);
       const pulse = 0.75 + Math.sin(tAnim * 2.2) * 0.25;
@@ -660,18 +660,15 @@
     }
   }
 
-  // Forward-facing canoe & voyageur coming down the Assiniboine River toward the camera!
   function drawFrontFacingCanoe(cx, cy, frameCount, hasPackage = false) {
     const bob = Math.sin(frameCount * 0.14) * 1;
     const py = Math.round(cy + bob);
     const strokePhase = Math.floor(frameCount / 7) % 4;
 
-    // Water wake ripples widening behind the bow
     ctx.fillStyle = PAL.MAROON_FOAM;
     ctx.fillRect(cx - 10, py + 11, 20, 1);
     ctx.fillRect(cx - 7, py + 13, 14, 1);
 
-    // Front-facing birchbark canoe bow (pointed prow facing viewer)
     ctx.fillStyle = PAL.OUTLINE;
     ctx.fillRect(cx - 6, py + 5, 12, 6);
     ctx.fillRect(cx - 4, py + 3, 8, 9);
@@ -681,12 +678,10 @@
     ctx.fillRect(cx - 5, py + 6, 10, 4);
     ctx.fillRect(cx - 3, py + 4, 6, 7);
 
-    // Rim highlight & bow prow highlight
     ctx.fillStyle = PAL.HIDE_LIGHT;
     ctx.fillRect(cx - 5, py + 5, 10, 1);
     ctx.fillRect(cx - 1, py + 2, 2, 9);
 
-    // Red bow decoration
     ctx.fillStyle = PAL.SASH_RED;
     ctx.fillRect(cx - 2, py + 7, 4, 1);
 
@@ -697,7 +692,6 @@
       ctx.fillRect(cx - 2, py + 3, 4, 1);
     }
 
-    // Voyageur seated facing forward toward camera
     const hx = cx - 4;
     const hy = py - 5;
     ctx.fillStyle = PAL.OUTLINE;
@@ -709,7 +703,6 @@
     ctx.fillStyle = PAL.SASH_RED;
     ctx.fillRect(hx + 1, hy + 7, 6, 1);
 
-    // Head & Dark Hair facing forward
     ctx.fillStyle = PAL.OUTLINE;
     ctx.fillRect(hx + 1, hy - 1, 6, 5);
     ctx.fillStyle = '#14110F';
@@ -717,7 +710,6 @@
     ctx.fillStyle = '#C98E63';
     ctx.fillRect(hx + 2, hy + 1, 4, 3);
 
-    // Paddle sweeping along the right side of the bow
     const paddleDip = (strokePhase === 1 || strokePhase === 2) ? 2 : 0;
     ctx.fillStyle = PAL.WOOD_MID;
     ctx.fillRect(cx + 4, hy + 3 + paddleDip, 2, 10);
@@ -790,7 +782,6 @@
     ctx.fillRect(hx + 2, hy - 1, 5, 2);
     ctx.fillRect(hx + 1, hy + 1, 4, 4);
 
-    // Animated Paddling Cycle (Solid, straight wooden paddle)
     const strokeIdx = Math.floor(frameCount / 7);
     const strokePhase = strokeIdx % 4;
     const cycleNum = Math.floor(strokeIdx / 4);
@@ -961,10 +952,6 @@
     }
   }
 
-  // Opening Cutscene at Upper Fort Garry & The Forks:
-  // - Single nudge when cartman enters fort (f ~ 132) and single nudge when voyageur enters fort (f ~ 322)
-  // - Canoe approaches forward-facing toward camera down the Assiniboine River, stops on Assiniboine bank,
-  //   voyageur enters & returns with package, then paddles around The Forks bend into the Red River!
   function drawOpeningCutscene() {
     const f = openingFrame;
     const animTick = awaitingOpeningConfirm ? frame : f;
@@ -975,13 +962,11 @@
     const laneH = Math.floor(riverH / 3);
     const midY = riverTopY + laneH + Math.floor((laneH - 15) / 2);
 
-    // Sky
     ctx.fillStyle = PAL.DAY_SKY_T;
     ctx.fillRect(0, 0, VIEW_W, horizonY);
     ctx.fillStyle = PAL.DAY_SKY_B;
     ctx.fillRect(0, Math.floor(horizonY * 0.55), VIEW_W, horizonY);
 
-    // Golden Prairie Bank at The Forks
     ctx.fillStyle = PAL.GOLD_LIGHT;
     ctx.fillRect(0, horizonY, VIEW_W, 6);
     ctx.fillStyle = PAL.GOLD_MID;
@@ -989,13 +974,11 @@
     ctx.fillStyle = PAL.GOLD_DARK;
     ctx.fillRect(0, horizonY + 12, VIEW_W, 6);
 
-    // Red River body
     ctx.fillStyle = PAL.MAROON_DEEP;
     ctx.fillRect(0, riverTopY, VIEW_W, riverH);
     ctx.fillStyle = PAL.MAROON_MID;
     ctx.fillRect(0, riverTopY, VIEW_W, 6);
 
-    // Assiniboine River flowing forward from the horizon down into The Forks junction
     const assiniTopX = 42;
     const forksJoinX = 68;
     fillPixelPoly([
@@ -1014,8 +997,6 @@
     drawShadedPine(14, horizonY - 12, false, false);
     drawShadedPine(VIEW_W - 32, horizonY - 12, false, false);
 
-    // Upper Fort Garry locked beside The Forks (x = 92)
-    // Single nudge when cartman enters (f: 128..136) and single nudge when main character enters (f: 318..326)
     const fortX = 92;
     const fortY = horizonY - 10;
     let fortNudgeX = 0;
@@ -1026,14 +1007,12 @@
     }
     drawFortLandmark(fortX + fortNudgeX, fortY, 'UPPER_FORT', false, false);
 
-    // 1. Red River Cart rolls in from the right (f: 0..120) and parks beside Upper Fort Garry
     const cartTargetX = fortX + 54;
     const cartX = f < 120
       ? Math.round(VIEW_W + 24 - (f / 120) * (VIEW_W + 24 - cartTargetX))
       : cartTargetX;
     drawRedRiverCart(cartX, horizonY - 9, animTick, f < 120);
 
-    // Cartman walks from cart into Upper Fort Garry gate (f: 112..132)
     const gateX = fortX + 15;
     const gateY = horizonY - 3;
     if (f >= 112 && f <= 132) {
@@ -1042,7 +1021,6 @@
       drawWalkingVoyageur(cmX, gateY, animTick, true);
     }
 
-    // 2. Exclamation mark pops up and flashes 3 times above Upper Fort Garry (f: 136..214)
     if (f >= 136 && f <= 214) {
       const flashIdx = Math.floor((f - 136) / 13);
       if (flashIdx % 2 === 0) {
@@ -1058,8 +1036,6 @@
       }
     }
 
-    // 3. Canoe comes forward-facing toward the camera down the Assiniboine River (f: 185..275),
-    //    stopping on the Assiniboine bank opposite Upper Fort Garry (dockX = 56, dockY = horizonY + 8)
     const assiniDockX = 56;
     const assiniDockY = horizonY + 7;
     if (f >= 185 && f < 275) {
@@ -1068,12 +1044,9 @@
       const cy = Math.round((horizonY - 4) + (assiniDockY - (horizonY - 4)) * ct);
       drawFrontFacingCanoe(cx, cy, animTick, false);
     } else if (f >= 275 && f < 475) {
-      // Forward-facing canoe parked along the Assiniboine bank while voyageur enters & returns from fort
       drawFrontFacingCanoeEmpty(assiniDockX, assiniDockY, animTick);
     }
 
-    // 4. Voyageur walks from Assiniboine canoe to Upper Fort Garry (f: 275..320), enters fort (nudge!),
-    //    and returns back to his forward-facing Assiniboine canoe with the package (f: 420..475)
     if (f >= 275 && f < 320) {
       const wt = (f - 275) / 45;
       const wx = Math.round(assiniDockX + 6 + (gateX - (assiniDockX + 6)) * wt);
@@ -1086,7 +1059,6 @@
       drawWalkingVoyageur(wx, wy, animTick, true);
     }
 
-    // 5. Crisp, High-Legibility Urgent Dispatch Dialogue Box above the fort (f: 325..420, holds at 390 until 'A')
     if (f >= 325 && f <= 420) {
       const boxW = Math.min(VIEW_W - 18, 296);
       const boxX = Math.floor((VIEW_W - boxW) / 2);
@@ -1117,24 +1089,20 @@
       ctx.textAlign = 'left';
     }
 
-    // 6. Voyageur boards canoe with package, paddles down the Assiniboine & turns right around The Forks bend (f: 475..620)
     if (f >= 475) {
       const pt = Math.min(1, (f - 475) / (OPENING_TOTAL - 475));
       if (pt < 0.42) {
-        // Paddling forward-facing down the final stretch of the Assiniboine into The Forks bend
         const st = pt / 0.42;
         const cx = Math.round(assiniDockX + (forksJoinX - assiniDockX) * st);
         const cy = Math.round(assiniDockY + (midY - assiniDockY) * st);
         drawFrontFacingCanoe(cx, cy, animTick, true);
       } else {
-        // Turns right around The Forks bend into the Red River to start the game!
         const rt = (pt - 0.42) / 0.58;
         const cx = Math.round((forksJoinX - 18) * (1 - rt) + 20 * rt);
         drawCanoeAndHunter(cx, midY, animTick, true);
       }
     }
 
-    // Smooth fade-in from black on first 30 frames
     if (f < 30) {
       const alpha = 1 - f / 30;
       ctx.fillStyle = `rgba(5, 10, 8, ${alpha.toFixed(3)})`;
@@ -1185,18 +1153,8 @@
     const bob = Math.sin(frameCount * 0.06) * 1;
     const sy = Math.round(waterY + bob);
 
-    fillPixelPoly([
-      [x, sy - 6],
-      [x + 68, sy - 6],
-      [x + 62, sy + 4],
-      [x + 8, sy + 4]
-    ], PAL.OUTLINE);
-    fillPixelPoly([
-      [x + 2, sy - 5],
-      [x + 66, sy - 5],
-      [x + 60, sy + 3],
-      [x + 9, sy + 3]
-    ], PAL.WOOD_DARK);
+    fillPixelPoly([[x, sy - 6],[x + 68, sy - 6],[x + 62, sy + 4],[x + 8, sy + 4]], PAL.OUTLINE);
+    fillPixelPoly([[x + 2, sy - 5],[x + 66, sy - 5],[x + 60, sy + 3],[x + 9, sy + 3]], PAL.WOOD_DARK);
     ctx.fillStyle = PAL.HIDE_LIGHT;
     ctx.fillRect(x + 5, sy - 2, 56, 2);
     ctx.fillStyle = PAL.WOOD_MID;
@@ -1355,29 +1313,12 @@
     const shoreTopY = riverTopY;
     const shoreBotY = VIEW_H;
 
-    fillPixelPoly([
-      [beachX + 24, shoreTopY],
-      [VIEW_W, shoreTopY],
-      [VIEW_W, shoreBotY],
-      [beachX - 10, shoreBotY]
-    ], PAL.SNOW_MID);
-
-    fillPixelPoly([
-      [beachX + 32, shoreTopY],
-      [VIEW_W, shoreTopY],
-      [VIEW_W, shoreBotY],
-      [beachX, shoreBotY]
-    ], PAL.SNOW_LIGHT);
-
-    fillPixelPoly([
-      [beachX + 20, shoreTopY],
-      [beachX + 25, shoreTopY],
-      [beachX - 9, shoreBotY],
-      [beachX - 14, shoreBotY]
-    ], PAL.ICE_MID);
+    fillPixelPoly([[beachX + 24, shoreTopY],[VIEW_W, shoreTopY],[VIEW_W, shoreBotY],[beachX - 10, shoreBotY]], PAL.SNOW_MID);
+    fillPixelPoly([[beachX + 32, shoreTopY],[VIEW_W, shoreTopY],[VIEW_W, shoreBotY],[beachX, shoreBotY]], PAL.SNOW_LIGHT);
+    fillPixelPoly([[beachX + 20, shoreTopY],[beachX + 25, shoreTopY],[beachX - 9, shoreBotY],[beachX - 14, shoreBotY]], PAL.ICE_MID);
 
     drawShadedPine(beachX + 55, shoreTopY + 6, true, false);
-    drawShieldOutcrop(beachX + 75, shoreTopY + 18, true, false);
+    drawShadedGrayRock(beachX + 75, shoreTopY + 18, true, false);
     drawShadedPine(beachX + 45, shoreTopY + laneH * 2 - 4, true, false);
 
     const midY = riverTopY + laneH + Math.floor((laneH - 15) / 2);
@@ -1418,6 +1359,36 @@
   // ==========================================
   // 6B. REGIONAL SCENERY PROPS & UNIQUE LANDMARKS
   // ==========================================
+  // Arcade Cliche Shaded Gray Canadian Shield Rock Outcrop
+  function drawShadedGrayRock(x, y, isWinter, isSil) {
+    if (isSil) {
+      ctx.fillStyle = PAL.SILHOUETTE;
+      ctx.fillRect(x + 3, y + 1, 14, 3);
+      ctx.fillRect(x + 1, y + 3, 18, 5);
+      ctx.fillRect(x, y + 6, 20, 3);
+      ctx.fillStyle = PAL.SIL_RIM_BRIGHT;
+      ctx.fillRect(x + 4, y + 1, 11, 1);
+      ctx.fillRect(x + 2, y + 3, 4, 1);
+      return;
+    }
+    // 16-bit SNES 3-tone shaded gray granite boulder
+    ctx.fillStyle = PAL.ROCK_OUTLINE;
+    ctx.fillRect(x + 3, y + 1, 14, 3);
+    ctx.fillRect(x + 1, y + 3, 18, 5);
+    ctx.fillRect(x, y + 6, 20, 3);
+
+    // Dark shadow base
+    ctx.fillStyle = PAL.ROCK_DARK;
+    ctx.fillRect(x + 1, y + 5, 18, 3);
+    // Mid gray rock facet
+    ctx.fillStyle = PAL.ROCK_MID;
+    ctx.fillRect(x + 2, y + 2, 15, 4);
+    // Crisp top-left highlight bevel
+    ctx.fillStyle = isWinter ? PAL.SNOW_LIGHT : PAL.ROCK_LIGHT;
+    ctx.fillRect(x + 3, y + 2, 10, 2);
+    ctx.fillRect(x + 2, y + 4, 5, 1);
+  }
+
   function drawShadedPine(x, y, isWinter, isSil) {
     if (isSil) {
       ctx.fillStyle = PAL.SILHOUETTE;
@@ -1481,9 +1452,7 @@
     ctx.fillRect(x + 1, y + 8, 7, 1);
   }
 
-  // Early Red River Settler Log House & Early Model Farm Plot (Selkirk Settlers)
   function drawSettlerLogHouse(x, y) {
-    // Squared oak log cabin
     ctx.fillStyle = PAL.OUTLINE;
     ctx.fillRect(x, y + 2, 20, 10);
     ctx.fillStyle = PAL.WOOD_MID;
@@ -1491,12 +1460,10 @@
     ctx.fillStyle = PAL.WOOD_LIGHT;
     ctx.fillRect(x + 1, y + 4, 18, 1);
     ctx.fillRect(x + 1, y + 7, 18, 1);
-    // Thatch / timber gable roof & stone chimney
     ctx.fillStyle = PAL.GOLD_DARK;
     ctx.fillRect(x - 1, y, 22, 3);
     ctx.fillStyle = PAL.STONE_MID;
     ctx.fillRect(x + 15, y - 3, 3, 4);
-    // Door & glowing window
     ctx.fillStyle = PAL.WOOD_DARK;
     ctx.fillRect(x + 4, y + 6, 3, 5);
     ctx.fillStyle = PAL.GOLD_LIGHT;
@@ -1504,14 +1471,12 @@
   }
 
   function drawSettlerModelFarm(x, y) {
-    // Split-rail fence & plowed golden wheat/barley rows + haycock
     ctx.fillStyle = PAL.GOLD_DARK;
     ctx.fillRect(x, y + 6, 28, 5);
     ctx.fillStyle = PAL.GOLD_LIGHT;
     for (let rx = 2; rx < 26; rx += 4) {
       ctx.fillRect(x + rx, y + 6, 2, 4);
     }
-    // Split-rail wooden fence
     ctx.fillStyle = PAL.WOOD_MID;
     ctx.fillRect(x - 1, y + 4, 30, 1);
     ctx.fillRect(x - 1, y + 7, 30, 1);
@@ -1519,36 +1484,32 @@
       ctx.fillStyle = PAL.WOOD_DARK;
       ctx.fillRect(x + fx, y + 3, 1, 7);
     }
-    // Haystack
     ctx.fillStyle = PAL.GOLD_MID;
     ctx.fillRect(x + 21, y + 1, 6, 5);
     ctx.fillStyle = PAL.GOLD_LIGHT;
     ctx.fillRect(x + 22, y, 4, 2);
   }
 
-  // Mouth of Lake Winnipeg props: Cattail & bulrush stalks, pulled-up canoe, wooden fish trap
   function drawMarshReeds(x, y) {
     ctx.fillStyle = PAL.MARSH_DARK;
-    ctx.fillRect(x + 1, y + 2, 1, 6);
-    ctx.fillRect(x + 5, y + 1, 1, 7);
-    ctx.fillRect(x + 9, y + 3, 1, 5);
+    ctx.fillRect(x + 1, y + 1, 1, 7);
+    ctx.fillRect(x + 5, y, 1, 8);
+    ctx.fillRect(x + 9, y + 2, 1, 6);
     ctx.fillStyle = PAL.MARSH_LIGHT;
-    ctx.fillRect(x + 3, y + 2, 1, 6);
-    ctx.fillRect(x + 7, y + 2, 1, 6);
+    ctx.fillRect(x + 3, y + 1, 1, 7);
+    ctx.fillRect(x + 7, y + 1, 1, 7);
     ctx.fillStyle = PAL.WOOD_DARK;
-    ctx.fillRect(x + 1, y + 1, 1, 2);
-    ctx.fillRect(x + 5, y, 1, 2);
+    ctx.fillRect(x + 1, y, 1, 2);
+    ctx.fillRect(x + 5, y - 1, 1, 2);
     ctx.fillStyle = PAL.REED_GOLD;
-    ctx.fillRect(x + 3, y + 1, 1, 2);
+    ctx.fillRect(x + 3, y, 1, 2);
   }
 
   function drawPulledUpCanoeAndTrap(x, y) {
-    // Pulled-up birchbark canoe on muddy bank
     ctx.fillStyle = PAL.HIDE_DARK;
     ctx.fillRect(x, y + 4, 16, 4);
     ctx.fillStyle = PAL.HIDE_LIGHT;
     ctx.fillRect(x + 1, y + 3, 14, 2);
-    // Woven wooden weir fish trap beside shore
     ctx.fillStyle = PAL.WOOD_MID;
     ctx.fillRect(x + 19, y + 5, 8, 4);
     ctx.fillStyle = PAL.WOOD_LIGHT;
@@ -1557,9 +1518,7 @@
     ctx.fillRect(x + 26, y + 5, 1, 4);
   }
 
-  // Fort Bas -> Manigotagan props: Sandy beach lodge with smoke wisp, wooden fish-drying rack, driftwood
   function drawBirchbarkLodgeAndRack(x, y) {
-    // Dispersed birchbark lodge with rising smoke wisp
     ctx.fillStyle = PAL.HIDE_DARK;
     ctx.beginPath();
     ctx.moveTo(x + 6, y);
@@ -1575,7 +1534,6 @@
     ctx.fillStyle = PAL.SNOW_MID;
     ctx.fillRect(x + 6, y - 3 - (Math.floor(frame / 14) % 2), 2, 2);
 
-    // Wooden fish-drying rack with hanging whitefish
     ctx.fillStyle = PAL.WOOD_DARK;
     ctx.fillRect(x + 16, y + 2, 1, 8);
     ctx.fillRect(x + 27, y + 2, 1, 8);
@@ -1587,28 +1545,20 @@
     ctx.fillRect(x + 24, y + 3, 2, 4);
   }
 
-  // Manigotagan -> Berens River props: Pink/grey Canadian Shield granite rocks, wind-swept pine, red-ochre outcrop
+  // Shaded Gray Canadian Shield Granite Rocks + Red-Ochre Outcrop (Manigotagan -> Berens River)
   function drawGraniteAndOchreOutcrop(x, y, isSil) {
+    drawShadedGrayRock(x, y, false, isSil);
     if (isSil) {
       ctx.fillStyle = PAL.SILHOUETTE;
-      ctx.fillRect(x + 2, y + 1, 18, 8);
-      ctx.fillRect(x, y + 4, 22, 5);
-      ctx.fillStyle = PAL.SIL_RIM_BRIGHT;
-      ctx.fillRect(x + 3, y + 1, 14, 1);
+      ctx.fillRect(x + 18, y + 3, 9, 6);
+      ctx.fillStyle = PAL.SIL_RIM;
+      ctx.fillRect(x + 19, y + 3, 6, 1);
       return;
     }
-    // Rounded pink/grey Canadian Shield granite dome
-    ctx.fillStyle = PAL.GRANITE_DARK;
-    ctx.fillRect(x, y + 4, 16, 5);
-    ctx.fillStyle = PAL.GRANITE_GREY;
-    ctx.fillRect(x + 1, y + 2, 13, 5);
-    ctx.fillStyle = PAL.GRANITE_PINK;
-    ctx.fillRect(x + 2, y + 1, 9, 3);
-    // Red-ochre rock outcrop beside it
     ctx.fillStyle = PAL.OCHRE_RED;
-    ctx.fillRect(x + 15, y + 3, 8, 6);
+    ctx.fillRect(x + 18, y + 3, 9, 6);
     ctx.fillStyle = PAL.GOLD_MID;
-    ctx.fillRect(x + 16, y + 3, 5, 2);
+    ctx.fillRect(x + 19, y + 3, 5, 2);
   }
 
   function drawWindsweptPine(x, y, isSil) {
@@ -1617,7 +1567,6 @@
     ctx.fillStyle = isSil ? PAL.SILHOUETTE : PAL.WOOD_DARK;
     ctx.fillRect(x + 3, y + 6, 2, 8);
     ctx.fillRect(x + 4, y + 2, 2, 5);
-    // Wind-swept boughs trailing right
     ctx.fillStyle = cMain;
     ctx.fillRect(x + 3, y, 8, 3);
     ctx.fillRect(x + 2, y + 4, 11, 3);
@@ -1627,9 +1576,7 @@
     ctx.fillRect(x + 2, y + 4, 6, 1);
   }
 
-  // Berens River -> Norway House props: Low mossy clay banks with dense black spruce tips & voyageur cordwood piles
   function drawBlackSpruceAndCordwood(x, y, isSil, isSnow) {
-    // Dense black spruce spire tips
     const cBody = isSil ? PAL.SILHOUETTE : (isSnow ? PAL.SNOW_MID : PAL.DARK_PINE);
     const cRim = isSil ? PAL.SIL_RIM_BRIGHT : (isSnow ? PAL.SNOW_LIGHT : PAL.MID_PINE);
     ctx.fillStyle = cBody;
@@ -1641,7 +1588,6 @@
     ctx.fillRect(x + 3, y - 2, 1, 8);
     ctx.fillRect(x + 10, y, 1, 7);
 
-    // Stacked voyageur cordwood pile
     ctx.fillStyle = isSil ? PAL.SILHOUETTE : PAL.WOOD_DARK;
     ctx.fillRect(x + 17, y + 4, 10, 6);
     ctx.fillStyle = isSil ? PAL.SIL_RIM : PAL.WOOD_LIGHT;
@@ -1769,28 +1715,6 @@
     ctx.fillRect(x + 7, y + 6, 1, 2);
   }
 
-  function drawShieldOutcrop(x, y, isWinter, isSil) {
-    if (isSil) {
-      ctx.fillStyle = PAL.SILHOUETTE;
-      ctx.fillRect(x + 2, y + 2, 14, 7);
-      ctx.fillRect(x, y + 5, 18, 4);
-      ctx.fillStyle = PAL.SIL_RIM_BRIGHT;
-      ctx.fillRect(x + 3, y + 2, 11, 1);
-      return;
-    }
-    ctx.fillStyle = PAL.STONE_DARK;
-    ctx.fillRect(x + 1, y + 2, 16, 7);
-    ctx.fillRect(x, y + 5, 18, 4);
-    ctx.fillStyle = isWinter ? PAL.SNOW_MID : PAL.STONE_MID;
-    ctx.fillRect(x + 2, y + 2, 12, 4);
-    ctx.fillStyle = isWinter ? PAL.SNOW_LIGHT : PAL.STONE_LIGHT;
-    ctx.fillRect(x + 3, y + 2, 8, 2);
-  }
-
-  // Battle of Seven Oaks Replay:
-  // - Red River carts to the left of the NWC men
-  // - 4 oaks to the immediate left and 3 oaks to the immediate right acting as scenic buffers
-  // - Plays ONCE after user x-axis passes by, with unboxed "Battle of Seven Oaks" title above
   function drawBattleOfSevenOaks(lm, y, frameCount) {
     const x = Math.round(lm.x);
     if (!lm.triggered && x <= 78) {
@@ -1804,13 +1728,13 @@
     const isHit = (elapsed >= 12 && elapsed <= 18);
     const isFallen = (elapsed >= 17);
 
-    // 4 Oaks to the immediate left of the scene (acting as scenic buffer)
+    // 4 Oaks to the immediate left of the scene (scenic buffer)
     drawShadedPine(x - 46, y - 12, false, false);
     drawShadedPine(x - 34, y - 11, false, false);
     drawShadedPine(x - 22, y - 13, false, false);
     drawShadedPine(x - 10, y - 11, false, false);
 
-    // Red River Carts parked to the left of the NWC men
+    // Red River Carts to the left of the NWC men
     drawRedRiverCart(x + 16, y - 4, frameCount, false);
 
     // Mounted NWC Rider 1 & 2
@@ -1878,7 +1802,6 @@
       ctx.fillRect(shotX + 2, y + 7, 3, 1);
     }
 
-    // Footed / Standing HBC Men (All hit & drop once!)
     const hbcPositions = [x + 96, x + 103, x + 110, x + 117];
     for (let i = 0; i < hbcPositions.length; i++) {
       const hx = hbcPositions[i];
@@ -1900,19 +1823,17 @@
       }
     }
 
-    // 3 Oaks to the immediate right of the animation (acting as scenic buffer)
+    // 3 Oaks to the immediate right of the scene (scenic buffer)
     drawShadedPine(x + 128, y - 12, false, false);
     drawShadedPine(x + 140, y - 11, false, false);
     drawShadedPine(x + 152, y - 13, false, false);
 
-    // Simple unboxed text above
     drawUnboxedLabel("Battle of Seven Oaks", x + 56, y - 18, false);
   }
 
-  // Unique Historical Landmarks (All include unboxed common-name text above)
+  // Unique Historical Landmarks (Red River North/Far Bank & Boreal Winter Trail)
   function drawFortLandmark(x, y, type, showLabel = true, isSil = false) {
     if (type === 'ST_JOHNS_CHURCH') {
-      // Early timber & stone parish church of St. John's
       ctx.fillStyle = PAL.OUTLINE;
       ctx.fillRect(x, y + 2, 24, 12);
       ctx.fillStyle = PAL.WOOD_MID;
@@ -1921,7 +1842,6 @@
       ctx.fillRect(x + 1, y + 3, 22, 2);
       ctx.fillStyle = PAL.DARK_PINE;
       ctx.fillRect(x - 1, y, 26, 3);
-      // Bell steeple on left gable
       ctx.fillStyle = PAL.HIDE_LIGHT;
       ctx.fillRect(x + 3, y - 6, 5, 6);
       fillPixelPoly([[x + 2, y - 6], [x + 5, y - 12], [x + 9, y - 6]], PAL.STONE_DARK);
@@ -1957,7 +1877,6 @@
     }
 
     if (type === 'LOWER_FORT_GARRY') {
-      // Close to 3x the width of Upper Fort Garry (~96px wide limestone curtain walls, bastions & Big House)
       const fw = 96;
       ctx.fillStyle = PAL.STONE_DARK;
       ctx.fillRect(x, y + 4, fw, 10);
@@ -1966,7 +1885,6 @@
       ctx.fillStyle = PAL.STONE_LIGHT;
       ctx.fillRect(x + 1, y + 4, fw - 2, 2);
 
-      // Interior Big House & Stone Warehouses peeking over curtain wall
       ctx.fillStyle = PAL.HIDE_LIGHT;
       ctx.fillRect(x + 22, y - 3, 24, 7);
       ctx.fillStyle = PAL.MAROON_MID;
@@ -1976,7 +1894,6 @@
       ctx.fillStyle = PAL.DARK_PINE;
       ctx.fillRect(x + 57, y - 4, 22, 2);
 
-      // Corner & Mid Bastion Towers
       const bastions = [x - 2, x + 44, x + fw - 5];
       for (let b = 0; b < bastions.length; b++) {
         const bx = bastions[b];
@@ -1986,7 +1903,6 @@
         ctx.fillRect(bx - 1, y - 2, 9, 2);
       }
 
-      // Main River Gate & Flagpole
       ctx.fillStyle = PAL.WOOD_DARK;
       ctx.fillRect(x + 31, y + 7, 6, 7);
       ctx.fillStyle = PAL.WOOD_LIGHT;
@@ -1994,98 +1910,6 @@
       ctx.fillStyle = PAL.SASH_RED;
       ctx.fillRect(x + 35, y - 9, 6, 3);
       if (showLabel) drawUnboxedLabel("Lower Fort Garry", x + Math.floor(fw / 2), y - 14, false);
-      return;
-    }
-
-    if (type === 'FORT_BAS') {
-      // Fort Bas de la Rivière: Timber palisade, log storehouses & busy Winnipeg River mouth
-      ctx.fillStyle = PAL.OUTLINE;
-      ctx.fillRect(x, y + 2, 44, 12);
-      ctx.fillStyle = PAL.WOOD_DARK;
-      ctx.fillRect(x + 1, y + 3, 42, 10);
-      ctx.fillStyle = PAL.WOOD_MID;
-      for (let px = 2; px < 41; px += 3) {
-        ctx.fillRect(x + px, y + 2, 2, 11);
-      }
-      // Log storehouses inside
-      ctx.fillStyle = PAL.WOOD_LIGHT;
-      ctx.fillRect(x + 7, y - 2, 14, 6);
-      ctx.fillRect(x + 24, y - 1, 13, 5);
-      ctx.fillStyle = PAL.MAROON_MID;
-      ctx.fillRect(x + 6, y - 4, 16, 2);
-      ctx.fillRect(x + 23, y - 3, 15, 2);
-      if (showLabel) drawUnboxedLabel("Fort Bas de la Rivière", x + 22, y - 10, false);
-      return;
-    }
-
-    if (type === 'MANIGOTAGAN') {
-      // Manigotagan (Bad Throat River rocky gorge mouth & small seasonal outpost)
-      drawGraniteAndOchreOutcrop(x, y + 3, false);
-      drawGraniteAndOchreOutcrop(x + 22, y + 3, false);
-      // Small seasonal timber outpost nestled in the gorge
-      ctx.fillStyle = PAL.WOOD_DARK;
-      ctx.fillRect(x + 12, y + 1, 14, 8);
-      ctx.fillStyle = PAL.WOOD_LIGHT;
-      ctx.fillRect(x + 13, y + 2, 12, 6);
-      ctx.fillStyle = PAL.MAROON_MID;
-      ctx.fillRect(x + 11, y - 1, 16, 2);
-      if (showLabel) drawUnboxedLabel("Manigotagan", x + 19, y - 8, false);
-      return;
-    }
-
-    if (type === 'BERENS_RIVER') {
-      // Berens River House (Omaskosihk low-slung whitewashed log post, pelt press & rocky point — backlit silhouette!)
-      const cWall = isSil ? PAL.SILHOUETTE : PAL.HIDE_LIGHT;
-      const cRoof = isSil ? PAL.SILHOUETTE : PAL.MAROON_MID;
-      const cRim = isSil ? PAL.SIL_RIM_BRIGHT : PAL.GOLD_LIGHT;
-      drawGraniteAndOchreOutcrop(x - 4, y + 3, isSil);
-      drawGraniteAndOchreOutcrop(x + 28, y + 3, isSil);
-
-      // Low-slung whitewashed log post
-      ctx.fillStyle = PAL.OUTLINE;
-      ctx.fillRect(x + 4, y + 2, 26, 9);
-      ctx.fillStyle = cWall;
-      ctx.fillRect(x + 5, y + 3, 24, 7);
-      ctx.fillStyle = cRoof;
-      ctx.fillRect(x + 3, y, 28, 3);
-      ctx.fillStyle = cRim;
-      ctx.fillRect(x + 4, y, 26, 1);
-
-      // Wooden pelt press frame beside post
-      ctx.fillStyle = isSil ? PAL.SILHOUETTE : PAL.WOOD_DARK;
-      ctx.fillRect(x + 33, y + 1, 1, 9);
-      ctx.fillRect(x + 38, y + 1, 1, 9);
-      ctx.fillRect(x + 33, y + 2, 6, 2);
-      if (showLabel) drawUnboxedLabel("Berens River House", x + 20, y - 8, isSil);
-      return;
-    }
-
-    if (type === 'NORWAY_HOUSE') {
-      // Norway House (Kinosao-sipi snow-covered whitewashed HBC warehouses with red roofs, wooden wharves & moored York boats)
-      ctx.fillStyle = PAL.OUTLINE;
-      ctx.fillRect(x, y, 52, 13);
-      // Whitewashed HBC warehouses
-      ctx.fillStyle = PAL.HIDE_LIGHT;
-      ctx.fillRect(x + 2, y + 1, 22, 11);
-      ctx.fillRect(x + 27, y + 2, 23, 10);
-      // Red roofs with snow cover
-      ctx.fillStyle = PAL.MAROON_MID;
-      ctx.fillRect(x + 1, y - 2, 24, 3);
-      ctx.fillRect(x + 26, y - 1, 25, 3);
-      ctx.fillStyle = PAL.SNOW_LIGHT;
-      ctx.fillRect(x + 1, y - 3, 24, 2);
-      ctx.fillRect(x + 26, y - 2, 25, 2);
-      // Flagpole & HBC ensign
-      ctx.fillStyle = PAL.WOOD_DARK;
-      ctx.fillRect(x + 25, y - 10, 1, 12);
-      ctx.fillStyle = PAL.SASH_RED;
-      ctx.fillRect(x + 26, y - 10, 6, 3);
-      // Wooden wharf & moored York boat at water edge
-      ctx.fillStyle = PAL.WOOD_MID;
-      ctx.fillRect(x + 8, y + 12, 34, 3);
-      ctx.fillStyle = PAL.WOOD_LIGHT;
-      ctx.fillRect(x + 12, y + 14, 16, 3);
-      if (showLabel) drawUnboxedLabel("Norway House", x + 26, y - 14, false);
       return;
     }
 
@@ -2118,7 +1942,7 @@
       return;
     }
 
-    // Upper Fort Garry (Default Stone Fort)
+    // Upper Fort Garry
     ctx.fillStyle = PAL.STONE_DARK;
     ctx.fillRect(x, y + 4, 34, 10);
     ctx.fillStyle = PAL.STONE_MID;
@@ -2142,13 +1966,17 @@
     if (showLabel) drawUnboxedLabel("Upper Fort Garry", x + 17, y - 10, false);
   }
 
-  // Near-Bank (Bottom Shoreline) Unique Features:
-  // - St. Peter's Dynevor (just the backside of the steeple rendered on the close side of the riverbank + unboxed text)
-  // - Brokenhead River mouth (non-navigable tributary opening along the bottom bank midway through Mouth -> Fort Bas)
-  function drawNearBankLandmark(lm, bottomBankY) {
+  // Near-Bank / East-Shoreline Unique Objects (Bottom third shoreline overhanging onto the bottom track!):
+  // - St. Peter's Dynevor (backside of steeple on close riverbank)
+  // - Brokenhead River mouth (non-navigable tributary opening midway through Mouth -> Fort Bas)
+  // - Fort Bas de la Rivière (timber palisade, log storehouses & busy Winnipeg River mouth)
+  // - Manigotagan (Bad Throat River rocky gorge mouth & small seasonal outpost)
+  // - Berens River House (Omaskosihk low-slung whitewashed log post, pelt press & rocky point — backlit silhouette)
+  // - Norway House (Kinosao-sipi snow-covered whitewashed HBC warehouses with red roofs, wooden wharves & moored York boats)
+  function drawNearBankLandmark(lm, bottomBankY, isSil = false) {
     const x = Math.round(lm.x);
+
     if (lm.type === 'ST_PETERS_DYNEVOR') {
-      // Backside of the church gable & stone tower steeple rising from the near riverbank
       const sy = bottomBankY - 12;
       ctx.fillStyle = PAL.OUTLINE;
       ctx.fillRect(x + 2, sy + 6, 22, 12);
@@ -2157,44 +1985,169 @@
       ctx.fillStyle = PAL.STONE_MID;
       ctx.fillRect(x + 4, sy + 7, 18, 3);
 
-      // Rear steeple tower & pointed spire
       ctx.fillStyle = PAL.OUTLINE;
       ctx.fillRect(x + 9, sy - 4, 8, 12);
       ctx.fillStyle = PAL.STONE_MID;
       ctx.fillRect(x + 10, sy - 3, 6, 11);
       ctx.fillStyle = PAL.SNOW_LIGHT;
       ctx.fillRect(x + 11, sy - 7, 4, 4);
-      fillPixelPoly([
-        [x + 10, sy - 7],
-        [x + 13, sy - 15],
-        [x + 16, sy - 7]
-      ], PAL.STONE_DARK);
+      fillPixelPoly([[x + 10, sy - 7], [x + 13, sy - 15], [x + 16, sy - 7]], PAL.STONE_DARK);
       ctx.fillStyle = PAL.GOLD_LIGHT;
       ctx.fillRect(x + 13, sy - 17, 1, 3);
 
       drawUnboxedLabel("St. Peter's Dynevor", x + 13, sy - 20, false);
-    } else if (lm.type === 'BROKENHEAD_MOUTH') {
-      // Non-navigable mouth of the Brokenhead River opening along the bottom bank
+      return;
+    }
+
+    if (lm.type === 'BROKENHEAD_MOUTH') {
       fillPixelPoly([
-        [x, bottomBankY],
-        [x + 34, bottomBankY],
-        [x + 26, VIEW_H],
+        [x, bottomBankY - 2],
+        [x + 36, bottomBankY - 2],
+        [x + 28, VIEW_H],
         [x + 8, VIEW_H]
       ], PAL.LAKE_DEEP);
       fillPixelPoly([
-        [x - 2, bottomBankY],
-        [x + 2, bottomBankY],
-        [x + 10, VIEW_H],
-        [x + 6, VIEW_H]
+        [x - 2, bottomBankY - 2],[x + 2, bottomBankY - 2],[x + 10, VIEW_H],[x + 6, VIEW_H]
       ], PAL.LAKE_FOAM);
       fillPixelPoly([
-        [x + 32, bottomBankY],
-        [x + 36, bottomBankY],
-        [x + 28, VIEW_H],
-        [x + 24, VIEW_H]
+        [x + 34, bottomBankY - 2],[x + 38, bottomBankY - 2],[x + 30, VIEW_H],[x + 26, VIEW_H]
       ], PAL.LAKE_FOAM);
-      drawMarshReeds(x - 8, bottomBankY - 5);
-      drawMarshReeds(x + 36, bottomBankY - 5);
+      drawMarshReeds(x - 8, bottomBankY - 7);
+      drawMarshReeds(x + 38, bottomBankY - 7);
+      return;
+    }
+
+    if (lm.type === 'FORT_BAS') {
+      // Positioned on the bottom shoreline and overhanging slightly onto the bottom track (y = bottomBankY - 12)
+      const fy = bottomBankY - 12;
+      // Busy Winnipeg River mouth opening right beside the fort
+      fillPixelPoly([
+        [x + 44, bottomBankY - 2],
+        [x + 70, bottomBankY - 2],
+        [x + 64, VIEW_H],
+        [x + 48, VIEW_H]
+      ], PAL.LAKE_DEEP);
+      ctx.fillStyle = PAL.LAKE_FOAM;
+      ctx.fillRect(x + 43, bottomBankY - 2, 28, 2);
+
+      // Timber palisade & log storehouses
+      ctx.fillStyle = PAL.OUTLINE;
+      ctx.fillRect(x, fy + 2, 44, 15);
+      ctx.fillStyle = PAL.WOOD_DARK;
+      ctx.fillRect(x + 1, fy + 3, 42, 13);
+      ctx.fillStyle = PAL.WOOD_MID;
+      for (let px = 2; px < 41; px += 3) {
+        ctx.fillRect(x + px, fy + 2, 2, 14);
+      }
+      ctx.fillStyle = PAL.WOOD_LIGHT;
+      ctx.fillRect(x + 7, fy - 3, 14, 7);
+      ctx.fillRect(x + 24, fy - 2, 13, 6);
+      ctx.fillStyle = PAL.MAROON_MID;
+      ctx.fillRect(x + 6, fy - 5, 16, 2);
+      ctx.fillRect(x + 23, fy - 4, 15, 2);
+      // Moored trading canoe at river mouth
+      ctx.fillStyle = PAL.HIDE_LIGHT;
+      ctx.fillRect(x + 48, fy + 6, 14, 3);
+
+      drawUnboxedLabel("Fort Bas de la Rivière", x + 26, fy - 9, false);
+      return;
+    }
+
+    if (lm.type === 'MANIGOTAGAN') {
+      // Bad Throat River rocky gorge mouth & small seasonal outpost overhanging the bottom track
+      const fy = bottomBankY - 12;
+      fillPixelPoly([
+        [x + 14, bottomBankY - 2],
+        [x + 30, bottomBankY - 2],
+        [x + 26, VIEW_H],
+        [x + 18, VIEW_H]
+      ], PAL.LAKE_DEEP);
+      drawShadedGrayRock(x - 2, fy + 5, false, false);
+      drawShadedGrayRock(x + 28, fy + 5, false, false);
+
+      ctx.fillStyle = PAL.OUTLINE;
+      ctx.fillRect(x + 13, fy, 16, 10);
+      ctx.fillStyle = PAL.WOOD_MID;
+      ctx.fillRect(x + 14, fy + 1, 14, 8);
+      ctx.fillStyle = PAL.WOOD_LIGHT;
+      ctx.fillRect(x + 14, fy + 2, 14, 2);
+      ctx.fillStyle = PAL.MAROON_MID;
+      ctx.fillRect(x + 12, fy - 2, 18, 2);
+
+      drawUnboxedLabel("Manigotagan", x + 21, fy - 7, false);
+      return;
+    }
+
+    if (lm.type === 'BERENS_RIVER') {
+      // Omaskosihk low-slung whitewashed log post, pelt press & rocky point overhanging bottom track (backlit silhouette!)
+      const fy = bottomBankY - 12;
+      const cWall = isSil ? PAL.SILHOUETTE : PAL.HIDE_LIGHT;
+      const cRoof = isSil ? PAL.SILHOUETTE : PAL.MAROON_MID;
+      const cRim = isSil ? PAL.SIL_RIM_BRIGHT : PAL.GOLD_LIGHT;
+
+      drawShadedGrayRock(x - 6, fy + 6, false, isSil);
+      drawShadedGrayRock(x + 30, fy + 6, false, isSil);
+
+      ctx.fillStyle = PAL.OUTLINE;
+      ctx.fillRect(x + 4, fy + 2, 28, 12);
+      ctx.fillStyle = cWall;
+      ctx.fillRect(x + 5, fy + 3, 26, 10);
+      ctx.fillStyle = cRoof;
+      ctx.fillRect(x + 3, fy, 30, 3);
+      ctx.fillStyle = cRim;
+      ctx.fillRect(x + 4, fy, 28, 1);
+
+      // Wooden pelt press frame on rocky point
+      ctx.fillStyle = isSil ? PAL.SILHOUETTE : PAL.WOOD_DARK;
+      ctx.fillRect(x + 35, fy + 1, 1, 11);
+      ctx.fillRect(x + 41, fy + 1, 1, 11);
+      ctx.fillRect(x + 35, fy + 3, 7, 2);
+      if (isSil) {
+        ctx.fillStyle = PAL.SIL_RIM_BRIGHT;
+        ctx.fillRect(x + 35, fy + 1, 7, 1);
+      }
+
+      drawUnboxedLabel("Berens River House", x + 20, fy - 6, isSil);
+      return;
+    }
+
+    if (lm.type === 'NORWAY_HOUSE') {
+      // Kinosao-sipi snow-covered whitewashed HBC warehouses with red roofs, wooden wharves & moored York boats
+      // Overhangs onto the bottom track in bright winter daylight!
+      const fy = bottomBankY - 14;
+      ctx.fillStyle = PAL.OUTLINE;
+      ctx.fillRect(x, fy + 1, 56, 15);
+      // Whitewashed HBC warehouses
+      ctx.fillStyle = PAL.HIDE_LIGHT;
+      ctx.fillRect(x + 2, fy + 2, 24, 13);
+      ctx.fillRect(x + 29, fy + 3, 25, 12);
+      // Red roofs topped with bright snow
+      ctx.fillStyle = PAL.MAROON_MID;
+      ctx.fillRect(x + 1, fy - 1, 26, 3);
+      ctx.fillRect(x + 28, fy, 27, 3);
+      ctx.fillStyle = PAL.SNOW_LIGHT;
+      ctx.fillRect(x + 1, fy - 3, 26, 2);
+      ctx.fillRect(x + 28, fy - 2, 27, 2);
+      // Flagpole & HBC ensign
+      ctx.fillStyle = PAL.WOOD_DARK;
+      ctx.fillRect(x + 27, fy - 10, 1, 13);
+      ctx.fillStyle = PAL.SASH_RED;
+      ctx.fillRect(x + 28, fy - 10, 7, 4);
+
+      // Wooden wharf extending into the water & moored York boats overhanging onto bottom track
+      ctx.fillStyle = PAL.WOOD_DARK;
+      ctx.fillRect(x + 6, fy - 2, 38, 3);
+      ctx.fillStyle = PAL.WOOD_LIGHT;
+      ctx.fillRect(x + 8, fy - 2, 34, 2);
+      // Moored York boat hull beside wharf
+      ctx.fillStyle = PAL.OUTLINE;
+      ctx.fillRect(x + 12, fy - 6, 20, 4);
+      ctx.fillStyle = PAL.WOOD_MID;
+      ctx.fillRect(x + 13, fy - 5, 18, 3);
+      ctx.fillStyle = PAL.HIDE_LIGHT;
+      ctx.fillRect(x + 14, fy - 5, 16, 1);
+
+      drawUnboxedLabel("Norway House", x + 28, fy - 14, false);
     }
   }
 
@@ -2214,7 +2167,6 @@
     isSledMode = false;
     lastFeatureType = 'NONE';
 
-    // Upper Fort Garry at the start
     landmarks.push({ x: 38, type: 'UPPER_FORT' });
     spawnedFlags.UPPER_FORT = true;
 
@@ -2238,36 +2190,37 @@
   }
 
   function scheduleNextRiverFeature() {
-    if (score >= 3640 && score < 3890) {
+    // Pause feature spawns around Norway House landing & dogsled deployment (3990 - 4240)
+    if (score >= 3990 && score < 4240) {
       nextFeatureX += 90;
       return;
     }
 
-    // --- Unique Historical Landmarks Along the Voyage ---
-    // 1. St Johns Church (~score 135)
-    if (!spawnedFlags.ST_JOHNS && score >= 135) {
+    // --- Red River Section Landmarks (Spaced as requested) ---
+    // 1. Upper Fort Garry (0) -> short paddle -> St Johns Church (165)
+    if (!spawnedFlags.ST_JOHNS && score >= 165) {
       landmarks.push({ x: VIEW_W + 30, type: 'ST_JOHNS_CHURCH' });
       spawnedFlags.ST_JOHNS = true;
     }
-    // 2. Battle of Seven Oaks (~score 285, with 4 oaks left & 3 oaks right buffer)
-    if (!spawnedFlags.SEVEN_OAKS && score >= 285) {
+    // 2. St Johns -> moderate spacing -> Battle of Seven Oaks (420)
+    if (!spawnedFlags.SEVEN_OAKS && score >= 420) {
       landmarks.push({ x: VIEW_W + 60, type: 'SEVEN_OAKS', triggered: false, triggerFrame: 0 });
       spawnedFlags.SEVEN_OAKS = true;
     }
-    // 3. St Andrews on the Red (after meandering settler farm stretch, ~score 650)
-    if (!spawnedFlags.ST_ANDREWS && score >= 650) {
+    // 3. Seven Oaks -> large meandering spacing -> St Andrews on the Red (920)
+    if (!spawnedFlags.ST_ANDREWS && score >= 920) {
       landmarks.push({ x: VIEW_W + 35, type: 'ST_ANDREWS_CHURCH' });
       spawnedFlags.ST_ANDREWS = true;
     }
-    // 4. Lower Fort Garry (3x width stone fort, keeping same spacing from St Andrews, ~score 810)
-    if (!spawnedFlags.LOWER_FORT && score >= 810) {
+    // 4. St Andrews -> short-to-moderate spacing -> 3x Lower Fort Garry (1120)
+    if (!spawnedFlags.LOWER_FORT && score >= 1120) {
       landmarks.push({ x: VIEW_W + 40, type: 'LOWER_FORT_GARRY' });
       spawnedFlags.LOWER_FORT = true;
     }
-    // 5. Sugar Island Rapids (signals start of St. Peter's section, ~score 1140)
-    if (!spawnedFlags.SUGAR_ISLAND && score >= 1140) {
+    // 5. Lower Fort -> settler houses -> Sugar Island Rapids (1420)
+    if (!spawnedFlags.SUGAR_ISLAND && score >= 1420) {
       spawnedFlags.SUGAR_ISLAND = true;
-      const w = 175;
+      const w = 180;
       const taperW = 48;
       const chuteSide = 0;
       riverFeatures.push({
@@ -2285,34 +2238,36 @@
       nextFeatureX += w + 145;
       return;
     }
-    // 6. St. Peter's Dynevor (backside of steeple on the near/bottom riverbank, ~score 1360)
-    if (!spawnedFlags.ST_PETERS_DYNEVOR && score >= 1360) {
+    // 6. St. Peter's Dynevor (backside of steeple on near riverbank, ~score 1630)
+    if (!spawnedFlags.ST_PETERS_DYNEVOR && score >= 1630) {
       nearBankLandmarks.push({ x: VIEW_W + 35, type: 'ST_PETERS_DYNEVOR' });
       spawnedFlags.ST_PETERS_DYNEVOR = true;
     }
-    // 7. Brokenhead River Mouth (non-navigable mouth along bottom bank midway through Mouth -> Fort Bas, ~score 1790)
-    if (!spawnedFlags.BROKENHEAD && score >= 1790) {
+
+    // --- East Shore of Lake Winnipeg Daisy Chain (All unique objects on bottom shoreline!) ---
+    // 7. Brokenhead River Mouth (non-navigable mouth along bottom bank midway through Mouth -> Fort Bas, ~score 2030)
+    if (!spawnedFlags.BROKENHEAD && score >= 2030) {
       nearBankLandmarks.push({ x: VIEW_W + 35, type: 'BROKENHEAD_MOUTH' });
       spawnedFlags.BROKENHEAD = true;
     }
-    // 8. Fort Bas de la Rivière (end of shortest lake leg, ~score 1910)
-    if (!spawnedFlags.FORT_BAS && score >= 1910) {
-      landmarks.push({ x: VIEW_W + 35, type: 'FORT_BAS' });
+    // 8. Fort Bas de la Rivière (culminating unique object of Mouth -> Fort Bas leg, ~score 2160)
+    if (!spawnedFlags.FORT_BAS && score >= 2160) {
+      nearBankLandmarks.push({ x: VIEW_W + 35, type: 'FORT_BAS' });
       spawnedFlags.FORT_BAS = true;
     }
-    // 9. Manigotagan (~score 2320)
-    if (!spawnedFlags.MANIGOTAGAN && score >= 2320) {
-      landmarks.push({ x: VIEW_W + 35, type: 'MANIGOTAGAN' });
+    // 9. Manigotagan (culminating unique object of Fort Bas -> Manigotagan leg, ~score 2600)
+    if (!spawnedFlags.MANIGOTAGAN && score >= 2600) {
+      nearBankLandmarks.push({ x: VIEW_W + 35, type: 'MANIGOTAGAN' });
       spawnedFlags.MANIGOTAGAN = true;
     }
-    // 10. Berens River House (~score 3010, backlit silhouette)
-    if (!spawnedFlags.BERENS && score >= 3010) {
-      landmarks.push({ x: VIEW_W + 35, type: 'BERENS_RIVER' });
+    // 10. Berens River House (culminating unique object of Manigotagan -> Berens leg, ~score 3320)
+    if (!spawnedFlags.BERENS && score >= 3320) {
+      nearBankLandmarks.push({ x: VIEW_W + 35, type: 'BERENS_RIVER' });
       spawnedFlags.BERENS = true;
     }
-    // 11. Norway House (bright winter daylit post triggering dogsled transition, ~score 3700)
-    if (!spawnedFlags.NORWAY_HOUSE && score >= 3700) {
-      landmarks.push({ x: VIEW_W + 35, type: 'NORWAY_HOUSE' });
+    // 11. Norway House (culminating bright winter daylit object of Berens -> Norway House leg, ~score 4030)
+    if (!spawnedFlags.NORWAY_HOUSE && score >= 4030) {
+      nearBankLandmarks.push({ x: VIEW_W + 35, type: 'NORWAY_HOUSE' });
       spawnedFlags.NORWAY_HOUSE = true;
     }
 
@@ -2330,7 +2285,7 @@
     if (isRedRiver) {
       chosen = lastFeatureType === 'TOP_MEANDER' ? 'BOT_MEANDER' : 'TOP_MEANDER';
       depthFactor = Math.random() < 0.55 ? 0.5 : 1.0;
-      gapAfter = 180;
+      gapAfter = 185;
     } else if (isStPeters) {
       const pool = isMouthOpening
         ? ['ISLAND', 'BOT_MEANDER']
@@ -2338,16 +2293,16 @@
       chosen = pool[Math.floor(Math.random() * pool.length)];
       isMarshIsland = (chosen === 'ISLAND');
       depthFactor = chosen === 'ISLAND' ? 1.0 : 0.5;
-      gapAfter = 125;
+      gapAfter = 130;
     } else if (isLakeEastShore) {
-      // East Shore of Lake Winnipeg: Top track (Lane 0) is open lake; bottom track (Lane 2) has shoreline points + islands
+      // Lake Winnipeg East Shore: NO meanders or objects on the top lake horizon (Lane 0)!
+      // Only bottom shoreline meanders (Lane 2) and mid-channel islands (Lane 1)
       const pool = ['BOT_MEANDER', 'BOT_MEANDER', 'ISLAND'];
       chosen = pool[Math.floor(Math.random() * pool.length)];
       if (lastFeatureType === 'ISLAND' && chosen === 'ISLAND') chosen = 'BOT_MEANDER';
       depthFactor = chosen === 'ISLAND' ? 1.0 : (Math.random() < 0.52 ? 0.5 : 1.0);
       gapAfter = 145;
     } else {
-      // Boreal Winter Dogsled Trail (3870 - 5000)
       const pool = ['TOP_MEANDER', 'BOT_MEANDER', 'ISLAND'];
       chosen = pool[Math.floor(Math.random() * pool.length)];
       if (chosen === lastFeatureType && chosen !== 'ISLAND') {
@@ -2472,8 +2427,8 @@
   }
 
   function scheduleDeepLakeWaves() {
-    // No large waves during Mouth of Lake Winnipeg -> Fort Bas de la Rivière (1650 - 1950);
-    // Waves are introduced starting in the Fort Bas -> Manigotagan leg (score >= 2020)!
+    // No waves during Mouth of Lake Winnipeg -> Fort Bas de la Rivière (1900 - 2220);
+    // Waves are introduced in the Fort Bas -> Manigotagan leg (score >= 2290)
     if (score < DIST.MOUTH_BAS_END + 70 || score >= DIST.LAKE_CLOSE_START - 40) return;
 
     if (!lakeWaveArmed) {
@@ -2506,9 +2461,6 @@
     ctx.fill();
   }
 
-  // Smooth Parallax Scenery Transition Helper:
-  // Computes a 0..1 visibility weight for each regional scenery set with generous fade/dead-space buffers
-  // so no background prop set ever pops or switches abruptly on-screen!
   function getRegionSceneryWeight(startScore, endScore, fadeSpan = 75) {
     if (score < startScore || score > endScore) return 0;
     const inW = Math.min(1, (score - startScore) / fadeSpan);
@@ -2545,15 +2497,15 @@
     const silT = getSilhouetteFactor();
     const isSil = silT > 0.55;
 
-    // 1. Mouth opening of Lake Winnipeg (1510 -> 1650: 0 -> 1)
-    const mouthOpenT = score < 1510
+    // 1. Mouth opening of Lake Winnipeg (1760 -> 1900: 0 -> 1)
+    const mouthOpenT = score < DIST.MOUTH_OPEN_START
       ? 0
-      : Math.min(1, (score - 1510) / (DIST.ST_PETERS_END - 1510));
+      : Math.min(1, (score - DIST.MOUTH_OPEN_START) / (DIST.ST_PETERS_END - DIST.MOUTH_OPEN_START));
 
-    // 2. Natural North Shore lake closing (3630 -> 3750: 0 -> 1)
-    const lakeCloseT = score < 3630
+    // 2. Natural North Shore lake closing at Norway House (3980 -> 4100: 0 -> 1)
+    const lakeCloseT = score < DIST.LAKE_CLOSE_START
       ? 0
-      : Math.min(1, (score - 3630) / (DIST.NORWAY_HOUSE_END - 3630));
+      : Math.min(1, (score - DIST.LAKE_CLOSE_START) / (DIST.NORWAY_HOUSE_END - DIST.LAKE_CLOSE_START));
 
     const lakeOpenFactor = Math.max(0, mouthOpenT * (1 - lakeCloseT));
     const isLakeOpen = lakeOpenFactor >= 1;
@@ -2561,7 +2513,8 @@
     const horizonY = playTop + Math.floor(playH * 0.21);
     const northBankH = Math.round(14 * (1 - lakeOpenFactor));
     const riverTopY = horizonY + northBankH;
-    const bottomShoreH = Math.round(12 * mouthOpenT);
+    // Thicker bottom/east shoreline strip on Lake Winnipeg (18px) so all objects & unique posts sit on the bottom third and overhang onto Lane 2
+    const bottomShoreH = Math.round(18 * mouthOpenT);
     const riverH = VIEW_H - riverTopY - bottomShoreH;
     const laneH = Math.floor(riverH / 3);
 
@@ -2583,9 +2536,9 @@
     ctx.fillRect(0, Math.floor(horizonY * 0.55), VIEW_W, horizonY);
 
     // DKC Tropical Freeze-Style Backlit Sun / Moon Disc during Sunset & Midnight Silhouette Leg
-    if (score >= DIST.MANIGOTAGAN_END + 140 && score < DIST.NORWAY_HOUSE_END) {
-      const celestT = Math.min(1, (score - (DIST.MANIGOTAGAN_END + 140)) / 240);
-      const dawnFade = score >= 3550 ? Math.max(0, 1 - (score - 3550) / 200) : 1;
+    if (score >= DIST.MANIGOTAGAN_END + 160 && score < DIST.NORWAY_HOUSE_END) {
+      const celestT = Math.min(1, (score - (DIST.MANIGOTAGAN_END + 160)) / 240);
+      const dawnFade = score >= 3880 ? Math.max(0, 1 - (score - 3880) / 220) : 1;
       const alpha = celestT * dawnFade;
       if (alpha > 0.05) {
         const moonX = Math.floor(VIEW_W * 0.72);
@@ -2609,7 +2562,10 @@
       ctx.fillRect(Math.round(cx - cloudOff + 30), playTop + 3, 16, 2);
     }
 
-    // 2. Riverbank Horizon with Smooth Dead-Space / Tapered Transitions Between Repeating Backgrounds
+    // 2. Top Horizon:
+    // - On Red River (0 - 1900): Full north riverbank with smooth dead-space transitions between regional sets
+    // - On Lake Winnipeg (1900 - 4100): Pure open lake water horizon (NO objects or background floating on the lake horizon!)
+    // - On Boreal Winter Trail (4100+): Snowy northern pine & cedar riverbank
     if (!isLakeOpen) {
       let bankStartX = 0;
       let bankWidth = VIEW_W;
@@ -2638,22 +2594,23 @@
       if (bankStartX > 0) ctx.fillRect(0, horizonY, bankStartX, 1);
       if (bankStartX + bankWidth < VIEW_W) ctx.fillRect(bankStartX + bankWidth, horizonY, VIEW_W - (bankStartX + bankWidth), 1);
 
-      if (score >= 3630) {
+      if (score >= DIST.LAKE_CLOSE_START) {
+        // Snowy north shore closing in from right (3980 - 4100)
         const propSpacing = 180;
         const propOff = (bgOffset * 0.38) % propSpacing;
         for (let px = -propSpacing; px < VIEW_W + propSpacing; px += propSpacing) {
           const baseX = Math.round(px - propOff);
           if (baseX >= bankStartX && baseX <= bankStartX + bankWidth - 14) {
             drawEasternCedar(baseX + 12, horizonY - 11, true, false);
-            drawShieldOutcrop(baseX + 46, horizonY - 3, true, false);
+            drawShadedGrayRock(baseX + 46, horizonY - 3, true, false);
             drawShadedPine(baseX + 86, horizonY - 11, true, false);
           }
         }
       } else {
-        // Non-overlapping regional scenery bands with dead-space buffers so backgrounds never switch abruptly!
-        const wPrairie = getRegionSceneryWeight(0, 395, 55);         // 0 - 395: Golden prairie, buffalo & tipis
-        const wSettler = getRegionSceneryWeight(465, 1105, 65);      // 465 - 1105: Selkirk settler log houses & model farms
-        const wStPeters = getRegionSceneryWeight(1185, 1560, 65);    // 1185 - 1560: St. Peter's wigwams, wolf campfire & marsh reeds
+        // Red River regional scenery with dead-space buffers so backgrounds never switch abruptly
+        const wPrairie = getRegionSceneryWeight(0, 355, 55);         // 0 - 355: Golden prairie, buffalo & tipis
+        const wSettler = getRegionSceneryWeight(580, 1340, 65);      // 580 - 1340: Selkirk settler log houses & model farms
+        const wStPeters = getRegionSceneryWeight(1430, 1810, 65);    // 1430 - 1810: St. Peter's wigwams, wolf campfire & marsh reeds
 
         const propSpacing = 250;
         const propOff = (bgOffset * 0.38) % propSpacing;
@@ -2705,7 +2662,7 @@
         }
       }
 
-      // Unique One-Off Landmarks (Red River Leg)
+      // Unique One-Off Landmarks (Red River Leg ONLY — Lake Winnipeg unique objects are strictly on the bottom shoreline!)
       for (let i = 0; i < landmarks.length; i++) {
         const lm = landmarks[i];
         if (lm.type === 'SEVEN_OAKS') {
@@ -2715,7 +2672,7 @@
         }
       }
     } else {
-      // Open Lake Winnipeg & Boreal Winter Horizon
+      // Open Lake Winnipeg (no floating horizon objects!) OR Boreal Winter Trail (4100+)
       ctx.fillStyle = env.watFoam;
       ctx.fillRect(0, horizonY, VIEW_W, 1);
 
@@ -2733,7 +2690,7 @@
 
           drawEasternCedar(baseX + 10, horizonY - 11, true, false);
           drawShadedPine(baseX + 36, horizonY - 11, true, false);
-          drawShieldOutcrop(baseX + 64, horizonY - 3, true, false);
+          drawShadedGrayRock(baseX + 64, horizonY - 3, true, false);
           drawEasternCedar(baseX + 96, horizonY - 12, true, false);
           drawShadedPine(baseX + 124, horizonY - 11, true, false);
 
@@ -2745,16 +2702,11 @@
           drawShadedPine(baseX + 188, horizonY - 12, true, false);
         }
       } else {
+        // Pure open water horizon shimmer lines on Lake Winnipeg (zero objects/landmarks floating on the horizon!)
         const waveOff = (bgOffset * 0.25) % 60;
         for (let wx = -60; wx < VIEW_W + 60; wx += 60) {
           ctx.fillRect(Math.round(wx - waveOff + 12), horizonY + 3, 10, 1);
         }
-      }
-
-      // Unique One-Off Landmarks along East Shore of Lake Winnipeg (Fort Bas, Manigotagan, Berens River House, Norway House)
-      for (let i = 0; i < landmarks.length; i++) {
-        const lm = landmarks[i];
-        drawFortLandmark(Math.round(lm.x), horizonY - 10, lm.type, true, isSil);
       }
     }
 
@@ -2762,7 +2714,6 @@
     ctx.fillStyle = env.watDeep;
     ctx.fillRect(0, riverTopY, VIEW_W, VIEW_H - riverTopY);
 
-    // Moonlit / Sunset Backlit Reflection Path across Lake Winnipeg
     if (silT > 0.05) {
       const moonX = Math.floor(VIEW_W * 0.72);
       ctx.fillStyle = `rgba(165, 175, 240, ${(silT * 0.30).toFixed(2)})`;
@@ -2795,7 +2746,7 @@
         ctx.fillRect(fx, baseBandY + waveY, 9, 1);
       }
 
-      // Drifting lily pad clusters during Mouth of Lake Winnipeg -> Fort Bas de la Rivière (1650 - 1950)
+      // Drifting lily pad clusters during Mouth of Lake Winnipeg -> Fort Bas de la Rivière (1900 - 2220)
       if (score >= DIST.ST_PETERS_END && score < DIST.MOUTH_BAS_END) {
         const lilySpacing = 120;
         const lilyOff = (bgOffset * 0.65) % lilySpacing;
@@ -2806,7 +2757,7 @@
           ctx.fillRect(px, py, 5, 2);
           ctx.fillRect(px + 7, py + 2, 4, 2);
           ctx.fillStyle = PAL.SNOW_LIGHT;
-          ctx.fillRect(px + 2, py - 1, 1, 1); // Lily blossom
+          ctx.fillRect(px + 2, py - 1, 1, 1);
         }
       }
     } else {
@@ -2821,31 +2772,31 @@
       }
     }
 
-    // Continuous Bottom Shoreline Strip & Smooth Regional East-Shore Scenery (1650 - 3750)
+    // 4. Thicker Bottom/East Shoreline Strip (18px) & Overhanging East-Shore Objects + Unique Outposts
     if (bottomShoreH > 0) {
       const sy = VIEW_H - bottomShoreH;
       ctx.fillStyle = env.watFoam;
       ctx.fillRect(0, sy - 1, VIEW_W, 1);
       ctx.fillStyle = env.gndTop;
-      ctx.fillRect(0, sy, VIEW_W, Math.min(4, bottomShoreH));
-      if (bottomShoreH > 4) {
+      ctx.fillRect(0, sy, VIEW_W, Math.min(6, bottomShoreH));
+      if (bottomShoreH > 6) {
         ctx.fillStyle = env.gndMid;
-        ctx.fillRect(0, sy + 4, VIEW_W, Math.min(4, bottomShoreH - 4));
+        ctx.fillRect(0, sy + 6, VIEW_W, Math.min(6, bottomShoreH - 6));
       }
-      if (bottomShoreH > 8) {
+      if (bottomShoreH > 12) {
         ctx.fillStyle = env.gndDark;
-        ctx.fillRect(0, sy + 8, VIEW_W, bottomShoreH - 8);
+        ctx.fillRect(0, sy + 12, VIEW_W, bottomShoreH - 12);
       }
 
-      // Smoothly faded East-Shore bottom-bank background art with dead-space buffers between sections:
-      // 1. Mouth -> Fort Bas (1650 - 1900): Cattails, bulrushes, muddy banks, pulled-up canoes & fish traps
-      // 2. Fort Bas -> Manigotagan (1980 - 2310): Sandy beach points, dispersed birchbark lodges & smoke, fish-drying racks, driftwood & jack pines
-      // 3. Manigotagan -> Berens River (2390 - 2990): Rounded pink/grey Canadian Shield granite rocks, wind-swept pine silhouettes & red-ochre outcrops
-      // 4. Berens River -> Norway House (3070 - 3670): Low mossy clay banks, dense black spruce tips, granite reefs & voyageur cordwood piles
-      const wLeg1 = getRegionSceneryWeight(1650, 1900, 45);
-      const wLeg2 = getRegionSceneryWeight(1980, 2310, 55);
-      const wLeg3 = getRegionSceneryWeight(2390, 2990, 65);
-      const wLeg4 = getRegionSceneryWeight(3070, 3670, 65);
+      // Properly Daisy-Chained East-Shore Bottom-Bank Scenery (Overhanging upward onto Lane 2!):
+      // Leg 1 (1900 - 2160): Mouth of Lake Winnipeg -> Fort Bas de la Rivière
+      // Leg 2 (2240 - 2590): Fort Bas de la Rivière -> Manigotagan
+      // Leg 3 (2680 - 3300): Manigotagan -> Berens River House
+      // Leg 4 (3390 - 4020): Berens River House -> Norway House
+      const wLeg1 = getRegionSceneryWeight(1900, 2160, 45);
+      const wLeg2 = getRegionSceneryWeight(2240, 2590, 55);
+      const wLeg3 = getRegionSceneryWeight(2680, 3300, 65);
+      const wLeg4 = getRegionSceneryWeight(3390, 4020, 65);
 
       const shoreSpacing = 220;
       const shoreOff = (bgOffset * 0.85) % shoreSpacing;
@@ -2855,52 +2806,51 @@
         if (wLeg1 > 0.05) {
           ctx.save();
           ctx.globalAlpha = wLeg1;
-          drawMarshReeds(bx + 12, sy - 6);
-          drawPulledUpCanoeAndTrap(bx + 36, sy - 5);
-          drawMarshReeds(bx + 76, sy - 6);
-          drawMarshReeds(bx + 114, sy - 5);
-          drawPulledUpCanoeAndTrap(bx + 144, sy - 5);
+          drawMarshReeds(bx + 12, sy - 7);
+          drawPulledUpCanoeAndTrap(bx + 36, sy - 7);
+          drawMarshReeds(bx + 76, sy - 7);
+          drawMarshReeds(bx + 114, sy - 6);
+          drawPulledUpCanoeAndTrap(bx + 144, sy - 7);
           ctx.restore();
         } else if (wLeg2 > 0.05) {
           ctx.save();
           ctx.globalAlpha = wLeg2;
-          drawBirchbarkLodgeAndRack(bx + 14, sy - 8);
-          // Driftwood log on sandy beach
+          drawBirchbarkLodgeAndRack(bx + 14, sy - 10);
           ctx.fillStyle = PAL.WOOD_LIGHT;
-          ctx.fillRect(bx + 56, sy - 1, 14, 2);
-          drawWindsweptPine(bx + 84, sy - 11, false);
-          drawBirchbarkLodgeAndRack(bx + 122, sy - 8);
-          drawWindsweptPine(bx + 168, sy - 11, false);
+          ctx.fillRect(bx + 56, sy - 3, 14, 2);
+          drawWindsweptPine(bx + 84, sy - 13, false);
+          drawBirchbarkLodgeAndRack(bx + 122, sy - 10);
+          drawWindsweptPine(bx + 168, sy - 13, false);
           ctx.restore();
         } else if (wLeg3 > 0.05) {
           ctx.save();
           ctx.globalAlpha = wLeg3;
-          drawGraniteAndOchreOutcrop(bx + 14, sy - 6, isSil);
-          drawWindsweptPine(bx + 48, sy - 11, isSil);
-          drawGraniteAndOchreOutcrop(bx + 82, sy - 6, isSil);
-          drawWindsweptPine(bx + 120, sy - 11, isSil);
-          drawGraniteAndOchreOutcrop(bx + 156, sy - 6, isSil);
+          drawGraniteAndOchreOutcrop(bx + 14, sy - 8, isSil);
+          drawWindsweptPine(bx + 48, sy - 13, isSil);
+          drawGraniteAndOchreOutcrop(bx + 82, sy - 8, isSil);
+          drawWindsweptPine(bx + 120, sy - 13, isSil);
+          drawGraniteAndOchreOutcrop(bx + 156, sy - 8, isSil);
           ctx.restore();
         } else if (wLeg4 > 0.05) {
-          const isSnowShore = score >= 3520;
+          const isSnowShore = score >= 3900;
           ctx.save();
           ctx.globalAlpha = wLeg4;
-          drawBlackSpruceAndCordwood(bx + 14, sy - 8, isSil, isSnowShore);
-          drawShieldOutcrop(bx + 54, sy - 5, isSnowShore, isSil);
-          drawBlackSpruceAndCordwood(bx + 92, sy - 8, isSil, isSnowShore);
-          drawShieldOutcrop(bx + 134, sy - 5, isSnowShore, isSil);
-          drawBlackSpruceAndCordwood(bx + 168, sy - 8, isSil, isSnowShore);
+          drawBlackSpruceAndCordwood(bx + 14, sy - 10, isSil, isSnowShore);
+          drawShadedGrayRock(bx + 54, sy - 7, isSnowShore, isSil);
+          drawBlackSpruceAndCordwood(bx + 92, sy - 10, isSil, isSnowShore);
+          drawShadedGrayRock(bx + 134, sy - 7, isSnowShore, isSil);
+          drawBlackSpruceAndCordwood(bx + 168, sy - 10, isSil, isSnowShore);
           ctx.restore();
         }
       }
 
-      // Near-bank unique features (St. Peter's Dynevor backside steeple & Brokenhead River mouth)
+      // Near-bank / East-Shoreline unique landmarks (St. Peter's Dynevor, Brokenhead Mouth, Fort Bas, Manigotagan, Berens River House, Norway House)
       for (let i = 0; i < nearBankLandmarks.length; i++) {
-        drawNearBankLandmark(nearBankLandmarks[i], sy);
+        drawNearBankLandmark(nearBankLandmarks[i], sy, isSil);
       }
     }
 
-    // 4. Long Variable-Length Tapered Meandering Riverbanks & Forked Islands
+    // 5. Long Variable-Length Tapered Meandering Riverbanks & Forked Islands
     for (let i = 0; i < riverFeatures.length; i++) {
       const f = riverFeatures[i];
       const x0 = f.x;
@@ -2936,15 +2886,15 @@
         const peakY = baseY - reachH;
 
         fillPixelPoly([[x0 - 3, baseY],[x1, peakY - 2],[x2, peakY - 2],[x3 + 3, baseY]], env.watFoam);
-        fillPixelPoly([[x0, baseY],[x1 + 2, peakY],[x2 - 2, peakY],[x3, baseY]], isWinter ? PAL.SNOW_DARK : (isSil ? PAL.SILHOUETTE : (isLakeOpen ? PAL.STONE_MID : PAL.SAND_MID)));
+        fillPixelPoly([[x0, baseY],[x1 + 2, peakY],[x2 - 2, peakY],[x3, baseY]], isWinter ? PAL.SNOW_DARK : (isSil ? PAL.SILHOUETTE : (isLakeOpen ? PAL.ROCK_MID : PAL.SAND_MID)));
         fillPixelPoly([[x0 + 5, baseY],[x1 + 5, peakY + 2],[x2 - 5, peakY + 2],[x3 - 5, baseY]], env.gndMid);
 
         if (f.depthFactor >= 1.0) {
           fillPixelPoly([[x0 + 10, baseY],[x1 + 9, peakY + 5],[x2 - 9, peakY + 5],[x3 - 10, baseY]], env.gndTop);
           let propStep = 0;
           for (let tx = x1 + 8; tx <= x2 - 18; tx += 46) {
-            if (isLakeOpen && propStep % 3 === 0) {
-              drawShieldOutcrop(Math.round(tx), peakY + 2, isWinter, isSil);
+            if (isLakeOpen && propStep % 2 === 0) {
+              drawShadedGrayRock(Math.round(tx), peakY + 2, isWinter, isSil);
             } else if (isWinter && propStep % 3 === 1) {
               drawEasternCedar(Math.round(tx), peakY - 5, true, false);
             } else {
@@ -3003,14 +2953,14 @@
           }
           if (f.isSugarIsland) {
             drawShadedPine(Math.round(x2 - 18), topY - 6, isWinter, isSil);
-            drawShieldOutcrop(Math.round((x1 + x2) / 2 - 8), midY - 2, isWinter, isSil);
+            drawShadedGrayRock(Math.round((x1 + x2) / 2 - 8), midY - 2, isWinter, isSil);
             drawUnboxedLabel("Sugar Island", Math.round((x1 + x2) / 2), topY - 12, isSil);
           }
         }
       }
     }
 
-    // 5. Hazards
+    // 6. Hazards
     for (let i = 0; i < hazards.length; i++) {
       const h = hazards[i];
       const hx = Math.round(h.x);
@@ -3041,29 +2991,29 @@
         ctx.fillRect(hx - 2, hy + 6, 20, 3);
         ctx.fillRect(hx + 2, hy + 4, 12, 5);
 
-        ctx.fillStyle = PAL.OUTLINE;
+        ctx.fillStyle = PAL.ROCK_OUTLINE;
         ctx.fillRect(hx - 1, hy + 4, 5, 4);
-        ctx.fillStyle = isSil ? PAL.SILHOUETTE : PAL.STONE_MID;
+        ctx.fillStyle = isSil ? PAL.SILHOUETTE : PAL.ROCK_MID;
         ctx.fillRect(hx, hy + 4, 3, 3);
 
-        ctx.fillStyle = PAL.OUTLINE;
+        ctx.fillStyle = PAL.ROCK_OUTLINE;
         ctx.fillRect(hx + 12, hy + 5, 5, 4);
-        ctx.fillStyle = isSil ? PAL.SILHOUETTE : PAL.STONE_DARK;
+        ctx.fillStyle = isSil ? PAL.SILHOUETTE : PAL.ROCK_DARK;
         ctx.fillRect(hx + 13, hy + 5, 3, 3);
 
-        ctx.fillStyle = PAL.OUTLINE;
+        ctx.fillStyle = PAL.ROCK_OUTLINE;
         ctx.fillRect(hx + 3, hy + 6, 5, 3);
-        ctx.fillStyle = isSil ? PAL.SILHOUETTE : PAL.STONE_MID;
+        ctx.fillStyle = isSil ? PAL.SILHOUETTE : PAL.ROCK_MID;
         ctx.fillRect(hx + 4, hy + 6, 3, 2);
 
-        ctx.fillStyle = PAL.OUTLINE;
+        ctx.fillStyle = PAL.ROCK_OUTLINE;
         ctx.fillRect(hx + 4, hy, 9, 7);
         ctx.fillRect(hx + 5, hy - 1, 7, 1);
-        ctx.fillStyle = isSil ? PAL.SILHOUETTE : PAL.STONE_DARK;
+        ctx.fillStyle = isSil ? PAL.SILHOUETTE : PAL.ROCK_DARK;
         ctx.fillRect(hx + 5, hy + 3, 7, 4);
-        ctx.fillStyle = isSil ? PAL.SILHOUETTE : PAL.STONE_MID;
+        ctx.fillStyle = isSil ? PAL.SILHOUETTE : PAL.ROCK_MID;
         ctx.fillRect(hx + 5, hy + 1, 7, 3);
-        ctx.fillStyle = isSil ? PAL.SIL_RIM_BRIGHT : PAL.STONE_LIGHT;
+        ctx.fillStyle = isSil ? PAL.SIL_RIM_BRIGHT : PAL.ROCK_LIGHT;
         ctx.fillRect(hx + 5, hy, 5, 2);
         ctx.fillStyle = isSil ? '#B8E4FF' : PAL.SNOW_LIGHT;
         ctx.fillRect(hx + 6, hy, 3, 1);
@@ -3104,12 +3054,8 @@
         ctx.fillStyle = env.watFoam;
         ctx.fillRect(hx - 2, waveBotY - 1, waveW + 2, 1);
       } else if (h.type === 'SNOW_DRIFT') {
-        fillPixelPoly([
-          [hx, hy + 8],[hx + 5, hy + 2],[hx + 15, hy + 1],[hx + 22, hy + 8]
-        ], PAL.SNOW_DARK);
-        fillPixelPoly([
-          [hx + 2, hy + 8],[hx + 6, hy + 2],[hx + 14, hy + 2],[hx + 20, hy + 8]
-        ], PAL.SNOW_LIGHT);
+        fillPixelPoly([[hx, hy + 8],[hx + 5, hy + 2],[hx + 15, hy + 1],[hx + 22, hy + 8]], PAL.SNOW_DARK);
+        fillPixelPoly([[hx + 2, hy + 8],[hx + 6, hy + 2],[hx + 14, hy + 2],[hx + 20, hy + 8]], PAL.SNOW_LIGHT);
       } else if (h.type === 'ICE_PATCH') {
         ctx.fillStyle = PAL.GLARE_ICE_M;
         ctx.fillRect(hx, hy + 1, 24, 8);
@@ -3121,29 +3067,29 @@
       }
     }
 
-    // 6. Player Sprite OR Norway House Dogsled Deployment Cutscene
+    // 7. Player Sprite OR Norway House Dogsled Deployment Cutscene
     if (isDeployingSled) {
       drawDeploymentSequence(riverTopY, laneH);
     } else {
       drawCanoeAndHunter(16, playerVisualY, frame, true);
     }
 
-    // 7. Progressive Parallax Snow & Blizzard Overlay (Begins near snowy north shore at 3520 -> peak 4350 -> fades into York Factory 5000)
-    if (score >= 3520 && score <= DIST.VICTORY_YORK) {
+    // 8. Progressive Parallax Snow & Blizzard Overlay (Begins near Norway House at 3880 -> peak 4700 -> fades into York Factory 5350)
+    if (score >= 3880 && score <= DIST.VICTORY_YORK) {
       let intensity = 0;
       if (score < DIST.DEPLOY_END) {
-        intensity = ((score - 3520) / (DIST.DEPLOY_END - 3520)) * 0.22;
-      } else if (score < 4100) {
-        intensity = 0.22 + ((score - DIST.DEPLOY_END) / (4100 - DIST.DEPLOY_END)) * 0.22;
-      } else if (score < 4280) {
-        intensity = 0.44 + ((score - 4100) / 180) * 0.25;
-      } else if (score < 4500) {
-        intensity = 0.69 + Math.min(1, (score - 4280) / 200) * 0.31;
+        intensity = ((score - 3880) / (DIST.DEPLOY_END - 3880)) * 0.22;
+      } else if (score < 4450) {
+        intensity = 0.22 + ((score - DIST.DEPLOY_END) / (4450 - DIST.DEPLOY_END)) * 0.22;
+      } else if (score < 4630) {
+        intensity = 0.44 + ((score - 4450) / 180) * 0.25;
+      } else if (score < 4850) {
+        intensity = 0.69 + Math.min(1, (score - 4630) / 200) * 0.31;
       } else {
-        intensity = Math.max(0.05, 1.0 - ((score - 4500) / 500) * 0.95);
+        intensity = Math.max(0.05, 1.0 - ((score - 4850) / 500) * 0.95);
       }
 
-      const gustBreak = (score >= 4250 && score < 4580) ? (Math.sin(frame * 0.045) * 0.5 + 0.5) : 0;
+      const gustBreak = (score >= 4600 && score < 4930) ? (Math.sin(frame * 0.045) * 0.5 + 0.5) : 0;
       const effectiveWhiteout = Math.max(0, intensity - gustBreak * 0.36);
 
       if (effectiveWhiteout > 0.24) {
@@ -3341,7 +3287,7 @@
 
     if (gameMode !== 'PLAYING') return;
 
-    // Mid-Game Norway House Landing & Dogsled Deployment Cutscene (3750 - 3870)
+    // Mid-Game Norway House Landing & Dogsled Deployment Cutscene (4100 - 4220)
     if (score >= DIST.NORWAY_HOUSE_END && score < DIST.DEPLOY_END) {
       if (!isDeployingSled) {
         isDeployingSled = true;
