@@ -171,7 +171,6 @@
     WOOD_DARK: '#4D280E',
     SAND_LIGHT: '#E2CCA2',
     SAND_MID: '#B59B6D',
-    // Darker shaded gray Canadian Shield rock palette for smooth transition from forest green
     ROCK_OUTLINE: '#181B22',
     ROCK_DARK: '#303540',
     ROCK_MID: '#525A68',
@@ -205,19 +204,23 @@
   };
 
   // Geographic Stage Milestones
+  // - Upper Fort Garry (0) -> St Johns Church (155) -> Preset Log Village (195..385) -> Battle of Seven Oaks (460)
+  // - Long open plains after Seven Oaks (460..1160) -> St Andrews on the Red (1160) -> Village background past Lower Fort Garry (1360)
+  // - Sugar Island (1660) -> St. Peter's sparse wigwams/fires & Dynevor (1870) -> Mouth of Lake Winnipeg (2010..2150)
   const DIST = {
-    FORKS_END: 560,
-    SETTLER_FARMS_END: 1410,
-    MOUTH_OPEN_START: 1760,
-    ST_PETERS_END: 1900,
-    MOUTH_BAS_END: 2220,
-    MANIGOTAGAN_END: 2660,
-    BERENS_END: 3380,
-    LAKE_CLOSE_START: 3980,
-    NORWAY_HOUSE_END: 4100,
-    DEPLOY_END: 4220,
-    BLIZZARD_PEAK: 4950,
-    VICTORY_YORK: 6200
+    FORKS_END: 600,
+    PLAINS_END: 1160,
+    SETTLER_FARMS_END: 1650,
+    MOUTH_OPEN_START: 2010,
+    ST_PETERS_END: 2150,
+    MOUTH_BAS_END: 2470,
+    MANIGOTAGAN_END: 2910,
+    BERENS_END: 3630,
+    LAKE_CLOSE_START: 4230,
+    NORWAY_HOUSE_END: 4350,
+    DEPLOY_END: 4470,
+    BLIZZARD_PEAK: 5200,
+    VICTORY_YORK: 6450
   };
 
   const TILE_PX = 18;
@@ -248,7 +251,7 @@
   const OPENING_DIALOGUE_FRAME = 390;
   const OPENING_TOTAL = 620;
 
-  // Mid-Game Dogsled Deployment Cutscene at Norway House (4100 - 4220)
+  // Mid-Game Dogsled Deployment Cutscene at Norway House (4350 - 4470)
   let isDeployingSled = false;
   let deployProgress = 0;
   let isSledMode = false;
@@ -322,12 +325,12 @@
   }
 
   function getSilhouetteFactor() {
-    if (score < 3020 || score >= DIST.NORWAY_HOUSE_END) return 0;
+    if (score < 3270 || score >= DIST.NORWAY_HOUSE_END) return 0;
     if (score < DIST.BERENS_END) {
-      return (score - 3020) / (DIST.BERENS_END - 3020);
+      return (score - 3270) / (DIST.BERENS_END - 3270);
     }
-    if (score >= 3880) {
-      return Math.max(0, 1 - (score - 3880) / (DIST.NORWAY_HOUSE_END - 3880));
+    if (score >= 4130) {
+      return Math.max(0, 1 - (score - 4130) / (DIST.NORWAY_HOUSE_END - 4130));
     }
     return 1;
   }
@@ -344,15 +347,24 @@
       gndTop = lerpColor(PAL.GOLD_LIGHT, PAL.CHARTREUSE_L, t);
       gndMid = lerpColor(PAL.GOLD_MID, PAL.CHARTREUSE_D, t);
       gndDark = lerpColor(PAL.GOLD_DARK, PAL.MID_PINE, t);
+    } else if (score < DIST.PLAINS_END) {
+      title = "RED RIVER PLAINS";
+      const t = (score - DIST.FORKS_END) / (DIST.PLAINS_END - DIST.FORKS_END);
+      gndTop = lerpColor(PAL.CHARTREUSE_L, PAL.GOLD_LIGHT, t * 0.45);
+      gndMid = lerpColor(PAL.CHARTREUSE_D, PAL.GOLD_MID, t * 0.45);
+      gndDark = PAL.MID_PINE;
+      watDeep = lerpColor(PAL.MAROON_DEEP, '#321419', t);
+      watMid = lerpColor(PAL.MAROON_MID, '#52242B', t);
+      watFoam = lerpColor(PAL.MAROON_FOAM, '#B59084', t);
     } else if (score < DIST.SETTLER_FARMS_END) {
-      title = score >= 1060 ? "LOWER FORT GARRY" : "RED RIVER SETTLEMENT";
-      const t = (score - DIST.FORKS_END) / (DIST.SETTLER_FARMS_END - DIST.FORKS_END);
+      title = score >= 1300 ? "LOWER FORT GARRY" : "RED RIVER SETTLEMENT";
+      const t = (score - DIST.PLAINS_END) / (DIST.SETTLER_FARMS_END - DIST.PLAINS_END);
       gndTop = lerpColor(PAL.CHARTREUSE_L, PAL.MARSH_LIGHT, t);
       gndMid = lerpColor(PAL.CHARTREUSE_D, PAL.MARSH_MID, t);
       gndDark = lerpColor(PAL.MID_PINE, PAL.MARSH_DARK, t);
-      watDeep = lerpColor(PAL.MAROON_DEEP, '#281C24', t);
-      watMid = lerpColor(PAL.MAROON_MID, '#47333C', t);
-      watFoam = lerpColor(PAL.MAROON_FOAM, '#8FA89B', t);
+      watDeep = lerpColor('#321419', '#281C24', t);
+      watMid = lerpColor('#52242B', '#47333C', t);
+      watFoam = lerpColor('#B59084', '#8FA89B', t);
     } else if (score < DIST.ST_PETERS_END) {
       title = score >= DIST.MOUTH_OPEN_START ? "MOUTH OF LAKE WINNIPEG" : "ST. PETER'S";
       const t = (score - DIST.SETTLER_FARMS_END) / (DIST.ST_PETERS_END - DIST.SETTLER_FARMS_END);
@@ -380,17 +392,16 @@
       watMid = PAL.LAKE_MID;
       watFoam = PAL.LAKE_FOAM;
     } else if (score < DIST.BERENS_END) {
-      title = score >= 3120 ? "BERENS RIVER HOUSE" : "CANADIAN SHIELD COAST";
+      title = score >= 3370 ? "BERENS RIVER HOUSE" : "CANADIAN SHIELD COAST";
       const shieldT = Math.min(1, (score - DIST.MANIGOTAGAN_END) / 220);
       const sunsetT = Math.min(1, (score - DIST.MANIGOTAGAN_END) / 360);
-      const nightT = Math.max(0, (score - 3020) / (DIST.BERENS_END - 3020));
+      const nightT = Math.max(0, (score - 3270) / (DIST.BERENS_END - 3270));
 
       const dayToSunsetSkyT = lerpColor(PAL.DAY_SKY_T, PAL.SUNSET_TOP, sunsetT);
       const dayToSunsetSkyB = lerpColor(PAL.DAY_SKY_B, PAL.SUNSET_BOT, sunsetT);
       skyTop = lerpColor(dayToSunsetSkyT, PAL.NIGHT_SKY_T, nightT);
       skyBot = lerpColor(dayToSunsetSkyB, PAL.NIGHT_SKY_B, nightT);
 
-      // Smooth transition from forest green to darker gray Canadian Shield rock
       const dayGndTop = lerpColor(PAL.MID_PINE, PAL.ROCK_MID, shieldT);
       const dayGndMid = lerpColor(lerpColor(PAL.MID_PINE, PAL.DARK_PINE, 0.6), PAL.ROCK_DARK, shieldT);
       const dayGndDark = lerpColor(PAL.DARK_PINE, PAL.ROCK_OUTLINE, shieldT);
@@ -402,9 +413,9 @@
       watMid = lerpColor(PAL.LAKE_MID, PAL.INDIGO_MID, nightT);
       watFoam = lerpColor(PAL.LAKE_FOAM, '#28457A', nightT);
     } else if (score < DIST.NORWAY_HOUSE_END) {
-      title = score >= 3960 ? "NORWAY HOUSE" : "MIDNIGHT LAKE WINNIPEG";
-      const dawnT = score >= 3880
-        ? Math.min(1, (score - 3880) / (DIST.NORWAY_HOUSE_END - 3880))
+      title = score >= 4210 ? "NORWAY HOUSE" : "MIDNIGHT LAKE WINNIPEG";
+      const dawnT = score >= 4130
+        ? Math.min(1, (score - 4130) / (DIST.NORWAY_HOUSE_END - 4130))
         : 0;
 
       skyTop = lerpColor(PAL.NIGHT_SKY_T, PAL.DAY_SKY_T, dawnT);
@@ -425,11 +436,11 @@
       watDeep = PAL.ICE_DEEP;
       watMid = PAL.ICE_MID;
       watFoam = PAL.SNOW_LIGHT;
-    } else if (score < 5750) {
-      title = (score >= 4600 && score <= 5450) ? "BOREAL BLIZZARD" : "BOREAL WINTER TRAIL";
-      const blizT = score < 4950
-        ? Math.min(1, Math.max(0, (score - 4320) / 630))
-        : Math.max(0, 1 - (score - 4950) / 650);
+    } else if (score < 6000) {
+      title = (score >= 4850 && score <= 5700) ? "BOREAL BLIZZARD" : "BOREAL WINTER TRAIL";
+      const blizT = score < 5200
+        ? Math.min(1, Math.max(0, (score - 4570) / 630))
+        : Math.max(0, 1 - (score - 5200) / 650);
       skyTop = lerpColor('#7C9EB2', '#B8C8D4', blizT);
       skyBot = lerpColor('#D6E2E8', '#E4EDF2', blizT);
       gndTop = PAL.SNOW_LIGHT;
@@ -440,7 +451,7 @@
       watFoam = PAL.SNOW_LIGHT;
     } else {
       title = "HUDSON BAY - YORK FACTORY";
-      const t = Math.min(1, (score - 5750) / 350);
+      const t = Math.min(1, (score - 6000) / 350);
       skyTop = lerpColor('#7C9EB2', '#6BA3C4', t);
       skyBot = lerpColor('#D6E2E8', '#F2E8D5', t);
       gndTop = PAL.SNOW_LIGHT;
@@ -562,7 +573,6 @@
     ctx.fillRect(moonX - 7, moonY - 5, 11, 14);
     ctx.fillRect(moonX - 8, moonY - 3, 12, 10);
 
-    // Clearly three words: "RED RIVER" (wide space between Red and River) <line break> "RUN"
     const titleScale = 2;
     const topWordY = 8;
     const botWordY = topWordY + 9 * titleScale + 5;
@@ -1567,6 +1577,23 @@
     ctx.fillRect(x + 22, y, 4, 2);
   }
 
+  // Preset non-repeating Red River log village (past St Johns Church until just before Battle of Seven Oaks)
+  function drawPresetLogVillage(x, y) {
+    drawShadedPine(x, y - 11, false, false);
+    drawSettlerLogHouse(x + 18, y - 6);
+    // Stacked firewood & split-rail garden plot
+    ctx.fillStyle = PAL.WOOD_DARK;
+    ctx.fillRect(x + 41, y + 4, 10, 5);
+    ctx.fillStyle = PAL.WOOD_LIGHT;
+    ctx.fillRect(x + 42, y + 4, 8, 2);
+    drawSettlerLogHouse(x + 56, y - 6);
+    drawSettlerModelFarm(x + 80, y - 3);
+    drawSettlerLogHouse(x + 114, y - 6);
+    drawShadedPine(x + 138, y - 12, false, false);
+    drawSettlerLogHouse(x + 156, y - 6);
+    drawSettlerModelFarm(x + 180, y - 3);
+  }
+
   function drawMarshReeds(x, y) {
     ctx.fillStyle = PAL.MARSH_DARK;
     ctx.fillRect(x + 1, y + 1, 1, 7);
@@ -1903,6 +1930,11 @@
   }
 
   function drawFortLandmark(x, y, type, showLabel = true, isSil = false) {
+    if (type === 'PRESET_LOG_VILLAGE') {
+      drawPresetLogVillage(x, y);
+      return;
+    }
+
     if (type === 'ST_JOHNS_CHURCH') {
       ctx.fillStyle = PAL.OUTLINE;
       ctx.fillRect(x, y + 2, 26, 12);
@@ -2342,28 +2374,38 @@
   }
 
   function scheduleNextRiverFeature() {
-    if (score >= 3990 && score < 4240) {
+    if (score >= 4240 && score < 4490) {
       nextFeatureX += 90;
       return;
     }
 
-    if (!spawnedFlags.ST_JOHNS && score >= 165) {
+    // 1. St Johns Church (~score 155)
+    if (!spawnedFlags.ST_JOHNS && score >= 155) {
       landmarks.push({ x: VIEW_W + 30, type: 'ST_JOHNS_CHURCH', clearW: 54 });
       spawnedFlags.ST_JOHNS = true;
     }
-    if (!spawnedFlags.SEVEN_OAKS && score >= 420) {
+    // 2. Preset non-repeating log village past St Johns Church until just before Battle of Seven Oaks (~score 235)
+    if (!spawnedFlags.PRESET_VILLAGE && score >= 235) {
+      landmarks.push({ x: VIEW_W + 30, type: 'PRESET_LOG_VILLAGE', clearW: 215 });
+      spawnedFlags.PRESET_VILLAGE = true;
+    }
+    // 3. Battle of Seven Oaks (~score 460)
+    if (!spawnedFlags.SEVEN_OAKS && score >= 460) {
       landmarks.push({ x: VIEW_W + 60, type: 'SEVEN_OAKS', triggered: false, triggerFrame: 0, clearW: 195 });
       spawnedFlags.SEVEN_OAKS = true;
     }
-    if (!spawnedFlags.ST_ANDREWS && score >= 920) {
+    // 4. St Andrews on the Red after long open plains (~score 1160)
+    if (!spawnedFlags.ST_ANDREWS && score >= 1160) {
       landmarks.push({ x: VIEW_W + 35, type: 'ST_ANDREWS_CHURCH', clearW: 58 });
       spawnedFlags.ST_ANDREWS = true;
     }
-    if (!spawnedFlags.LOWER_FORT && score >= 1120) {
+    // 5. Lower Fort Garry (~score 1360)
+    if (!spawnedFlags.LOWER_FORT && score >= 1360) {
       landmarks.push({ x: VIEW_W + 40, type: 'LOWER_FORT_GARRY', clearW: 124 });
       spawnedFlags.LOWER_FORT = true;
     }
-    if (!spawnedFlags.SUGAR_ISLAND && score >= 1420) {
+    // 6. Sugar Island Rapids (~score 1660)
+    if (!spawnedFlags.SUGAR_ISLAND && score >= 1660) {
       spawnedFlags.SUGAR_ISLAND = true;
       const w = 180;
       const taperW = 48;
@@ -2383,24 +2425,26 @@
       nextFeatureX += w + 145;
       return;
     }
-    if (!spawnedFlags.ST_PETERS_DYNEVOR && score >= 1630) {
+    // 7. St. Peter's Dynevor (~score 1870)
+    if (!spawnedFlags.ST_PETERS_DYNEVOR && score >= 1870) {
       nearBankLandmarks.push({ x: VIEW_W + 35, type: 'ST_PETERS_DYNEVOR', clearW: 64 });
       spawnedFlags.ST_PETERS_DYNEVOR = true;
     }
 
-    if (!spawnedFlags.BROKENHEAD && score >= 2030) {
+    // --- East Shore of Lake Winnipeg Daisy Chain ---
+    if (!spawnedFlags.BROKENHEAD && score >= 2280) {
       nearBankLandmarks.push({ x: VIEW_W + 35, type: 'BROKENHEAD_MOUTH', clearW: 64 });
       spawnedFlags.BROKENHEAD = true;
     }
-    if (!spawnedFlags.FORT_BAS && score >= 2160) {
+    if (!spawnedFlags.FORT_BAS && score >= 2410) {
       nearBankLandmarks.push({ x: VIEW_W + 35, type: 'FORT_BAS', clearW: 118 });
       spawnedFlags.FORT_BAS = true;
     }
-    if (!spawnedFlags.MANIGOTAGAN && score >= 2600) {
+    if (!spawnedFlags.MANIGOTAGAN && score >= 2850) {
       nearBankLandmarks.push({ x: VIEW_W + 35, type: 'MANIGOTAGAN', clearW: 84 });
       spawnedFlags.MANIGOTAGAN = true;
     }
-    if (!spawnedFlags.BERENS && score >= 3320) {
+    if (!spawnedFlags.BERENS && score >= 3570) {
       nearBankLandmarks.push({ x: VIEW_W + 35, type: 'BERENS_RIVER', clearW: 92 });
       spawnedFlags.BERENS = true;
     }
@@ -2559,14 +2603,15 @@
   }
 
   function scheduleDeepLakeWaves() {
-    if (score < DIST.MOUTH_BAS_END + 70 || score >= DIST.LAKE_CLOSE_START - 40) return;
+    // Waves slightly less often on Lake Winnipeg (~780 to 1220px spacing)
+    if (score < DIST.MOUTH_BAS_END + 90 || score >= DIST.LAKE_CLOSE_START - 40) return;
 
     if (!lakeWaveArmed) {
       lakeWaveArmed = true;
-      nextDeepWaveX = VIEW_W + 90;
+      nextDeepWaveX = VIEW_W + 140;
     }
 
-    if (nextDeepWaveX <= VIEW_W + 90) {
+    if (nextDeepWaveX <= VIEW_W + 140) {
       hazards.push({
         x: nextDeepWaveX,
         lane: 0,
@@ -2576,7 +2621,7 @@
         passSoundPlayed: false
       });
       playWaveWarningSound();
-      nextDeepWaveX += 560 + Math.floor(Math.random() * 340);
+      nextDeepWaveX += 780 + Math.floor(Math.random() * 440);
     }
   }
 
@@ -2657,7 +2702,7 @@
 
     if (score >= DIST.MANIGOTAGAN_END + 160 && score < DIST.NORWAY_HOUSE_END) {
       const celestT = Math.min(1, (score - (DIST.MANIGOTAGAN_END + 160)) / 240);
-      const dawnFade = score >= 3880 ? Math.max(0, 1 - (score - 3880) / 220) : 1;
+      const dawnFade = score >= 4130 ? Math.max(0, 1 - (score - 4130) / 220) : 1;
       const alpha = celestT * dawnFade;
       if (alpha > 0.05) {
         const moonX = Math.floor(VIEW_W * 0.72);
@@ -2722,11 +2767,16 @@
           }
         }
       } else {
-        const activeRedRiverSet = (score < 340)
-          ? 'PRAIRIE'
-          : (score >= 560 && score < 1300)
+        // Red River Scenery Rules:
+        // - 0..460 (Upper Fort Garry -> St Johns -> Preset Log Village -> Battle of Seven Oaks): NO repeating background!
+        // - 520..1080 (Long Plains after Seven Oaks until St Andrews on the Red): Open plains with occasional buffalo
+        // - 1140..1620 (St Andrews on the Red -> Lower Fort Garry -> past Lower Fort): Settler village background
+        // - 1700..2010 (St. Peter's): Marsh reeds & oaks with only a few rare wigwams/fires before Lake Winnipeg
+        const activeRedRiverSet = (score >= 520 && score < 1080)
+          ? 'PLAINS'
+          : (score >= 1140 && score < 1620)
             ? 'SETTLER'
-            : (score >= 1510 && score < 1760)
+            : (score >= 1700 && score < 2010)
               ? 'ST_PETERS'
               : 'NONE';
 
@@ -2738,14 +2788,14 @@
             if (baseX > bankWidth - 14) continue;
             const worldTileIdx = Math.floor((px + bgOffset * 0.38) / propSpacing);
 
-            if (activeRedRiverSet === 'PRAIRIE') {
-              if (!isNearUniqueLandmark(baseX + 18, 14, landmarks)) drawShadedPine(baseX + 18, horizonY - 11, false, false);
-              if (!isNearUniqueLandmark(baseX + 68, 24, landmarks)) {
-                drawShadedBuffalo(baseX + 68, horizonY, false);
-                drawShadedBuffalo(baseX + 82, horizonY + 2, false);
+            if (activeRedRiverSet === 'PLAINS') {
+              if (!isNearUniqueLandmark(baseX + 55, 24, landmarks) && Math.abs(worldTileIdx) % 2 === 0) {
+                drawShadedBuffalo(baseX + 55, horizonY, false);
+                drawShadedBuffalo(baseX + 69, horizonY + 2, false);
               }
-              if (!isNearUniqueLandmark(baseX + 135, 16, landmarks)) drawShadedTipi(baseX + 135, horizonY - 8);
-              if (!isNearUniqueLandmark(baseX + 190, 14, landmarks)) drawShadedPine(baseX + 190, horizonY - 11, false, false);
+              if (!isNearUniqueLandmark(baseX + 175, 14, landmarks) && Math.abs(worldTileIdx) % 3 === 1) {
+                drawShadedPine(baseX + 175, horizonY - 11, false, false);
+              }
             } else if (activeRedRiverSet === 'SETTLER') {
               if (!isNearUniqueLandmark(baseX + 14, 14, landmarks)) drawShadedPine(baseX + 14, horizonY - 11, false, false);
               if (!isNearUniqueLandmark(baseX + 42, 22, landmarks)) drawSettlerLogHouse(baseX + 42, horizonY - 6);
@@ -2759,8 +2809,9 @@
                 drawMarshReeds(baseX + 28, horizonY - 3);
               }
               if (!isNearUniqueLandmark(baseX + 52, 14, landmarks)) drawShadedPine(baseX + 52, horizonY - 11, false, false);
+              // Only a few rare wigwams / wolf campfires in St. Peter's before reaching Lake Winnipeg
               if (!isNearUniqueLandmark(baseX + 82, 16, landmarks)) {
-                if (Math.abs(worldTileIdx) % 2 === 0) {
+                if (Math.abs(worldTileIdx) === 7 || Math.abs(worldTileIdx) === 10) {
                   drawWigwamLodge(baseX + 82, horizonY - 6);
                 } else {
                   drawMarshReeds(baseX + 84, horizonY - 3);
@@ -2768,7 +2819,7 @@
               }
               if (!isNearUniqueLandmark(baseX + 116, 12, landmarks)) drawMarshReeds(baseX + 116, horizonY - 4);
               if (!isNearUniqueLandmark(baseX + 136, 20, landmarks)) {
-                if (Math.abs(worldTileIdx) % 3 === 1) {
+                if (Math.abs(worldTileIdx) === 8) {
                   drawWolfCampfire(baseX + 142, horizonY - 2, frame);
                 } else {
                   drawMarshReeds(baseX + 144, horizonY - 3);
@@ -2905,13 +2956,13 @@
         ctx.fillRect(0, sy + 12, VIEW_W, bottomShoreH - 12);
       }
 
-      const activeShoreSet = (score >= 1900 && score < 2110)
+      const activeShoreSet = (score >= 2150 && score < 2360)
         ? 'LEG_1'
-        : (score >= 2310 && score < 2550)
+        : (score >= 2560 && score < 2800)
           ? 'LEG_2'
-          : (score >= 2750 && score < 3260)
+          : (score >= 3000 && score < 3510)
             ? 'LEG_3'
-            : (score >= 3460 && score < 3960)
+            : (score >= 3710 && score < 4210)
               ? 'LEG_4'
               : 'NONE';
 
@@ -2943,7 +2994,7 @@
             if (!isNearUniqueLandmark(bx + 120, 16, nearBankLandmarks)) drawWindsweptPine(bx + 120, sy - 13, isSil);
             if (!isNearUniqueLandmark(bx + 156, 28, nearBankLandmarks)) drawGraniteAndOchreOutcrop(bx + 156, sy - 8, isSil);
           } else if (activeShoreSet === 'LEG_4') {
-            const isSnowShore = score >= 3900;
+            const isSnowShore = score >= 4150;
             if (!isNearUniqueLandmark(bx + 14, 28, nearBankLandmarks)) drawBlackSpruceAndCordwood(bx + 14, sy - 10, isSil, isSnowShore);
             if (!isNearUniqueLandmark(bx + 54, 20, nearBankLandmarks)) drawShadedGrayRock(bx + 54, sy - 7, isSnowShore, isSil);
             if (!isNearUniqueLandmark(bx + 92, 28, nearBankLandmarks)) drawBlackSpruceAndCordwood(bx + 92, sy - 10, isSil, isSnowShore);
@@ -3184,21 +3235,21 @@
     }
 
     // 9. Extended Progressive Parallax Snow & Blizzard Overlay
-    if (score >= 4150 && score <= DIST.VICTORY_YORK) {
+    if (score >= 4400 && score <= DIST.VICTORY_YORK) {
       let intensity = 0;
       if (score < DIST.DEPLOY_END) {
-        intensity = ((score - 4150) / (DIST.DEPLOY_END - 4150)) * 0.22;
-      } else if (score < 4600) {
-        intensity = 0.22 + ((score - DIST.DEPLOY_END) / (4600 - DIST.DEPLOY_END)) * 0.25;
+        intensity = ((score - 4400) / (DIST.DEPLOY_END - 4400)) * 0.22;
       } else if (score < 4850) {
-        intensity = 0.47 + ((score - 4600) / 250) * 0.25;
-      } else if (score < 5450) {
-        intensity = 0.72 + Math.min(1, (score - 4850) / 250) * 0.28;
+        intensity = 0.22 + ((score - DIST.DEPLOY_END) / (4850 - DIST.DEPLOY_END)) * 0.25;
+      } else if (score < 5100) {
+        intensity = 0.47 + ((score - 4850) / 250) * 0.25;
+      } else if (score < 5700) {
+        intensity = 0.72 + Math.min(1, (score - 5100) / 250) * 0.28;
       } else {
-        intensity = Math.max(0.05, 1.0 - ((score - 5450) / 750) * 0.95);
+        intensity = Math.max(0.05, 1.0 - ((score - 5700) / 750) * 0.95);
       }
 
-      const gustBreak = (score >= 4850 && score < 5500) ? (Math.sin(frame * 0.045) * 0.5 + 0.5) : 0;
+      const gustBreak = (score >= 5100 && score < 5750) ? (Math.sin(frame * 0.045) * 0.5 + 0.5) : 0;
       const effectiveWhiteout = Math.max(0, intensity - gustBreak * 0.36);
 
       if (effectiveWhiteout > 0.24) {
@@ -3478,7 +3529,7 @@
     for (let i = 0; i < landmarks.length; i++) {
       landmarks[i].x -= currentSpeed * 0.38;
     }
-    landmarks = landmarks.filter(lm => lm.x > -180);
+    landmarks = landmarks.filter(lm => lm.x > -240);
 
     for (let i = 0; i < nearBankLandmarks.length; i++) {
       nearBankLandmarks[i].x -= currentSpeed * 0.85;
@@ -3751,7 +3802,6 @@
     msg.style.background = '#4A0C10';
   }
 
-  // Direct restart into active gameplay after crash or victory
   function restartActiveGame() {
     initAudio();
     score = 0;
@@ -3870,7 +3920,6 @@
     }
   });
 
-  // Start continuous render loop on the Midnight Lake Winnipeg title screen
   resetWorld();
   titleStartTime = performance.now();
   requestAnimationFrame(update);
