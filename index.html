@@ -1039,7 +1039,7 @@
     let daylightLevel = 0.0;   // 0.0 = Indigo Twilight Moon, 1.0 = Bright Daytime Sunrise Settlement
     let daylightTarget = 0.0;
 
-    // 4-Step Master Volume State: 0 = MUTE, 1 = MIN, 2 = MID, 3 = MAX
+    // Global 4-Step Master Volume State: 0 = MUTE, 1 = MIN, 2 = MID, 3 = MAX
     let volumeLevel = 3;
     const VOLUME_GAINS = [0.0, 0.30, 0.65, 1.0];
     const VOLUME_LABELS = ['MUTE', 'MIN', 'MID', 'MAX'];
@@ -1167,28 +1167,126 @@
     let warningStartTime = 0;
     let lastInfinityStep = -1;
 
-    /* --- MASTER VOLUME SYNC (CABINET + ACTIVE GAME IFRAME) --- */
+    /* --- GLOBAL MASTER VOLUME OVERRIDE (CABINET + ALL IN-GAME AUDIO ENGINES) --- */
     function getMasterGain() {
       return VOLUME_GAINS[volumeLevel];
     }
 
-    function applyVolumeToGameFrame() {
-      const gainVal = getMasterGain();
-      postToGame(`VOLUME_${volumeLevel}`);
-      postToGame(volumeLevel === 0 ? 'MUTE' : 'UNMUTE');
+    function attachFrameAudioHook() {
       try {
         const win = gameFrame.contentWindow;
         if (!win) return;
-        const mediaEls = win.document.querySelectorAll('audio, video');
-        mediaEls.forEach(el => {
-          el.muted = (volumeLevel === 0);
-          el.volume = gainVal;
-        });
-        if (win.masterGain && win.masterGain.gain) {
-          win.masterGain.gain.value = gainVal;
+
+        if (!win.__masterAudioHooked) {
+          win.__masterAudioHooked = true;
+          win.__frameMasterNodes = [];
+
+          const OrigAudioCtx = win.AudioContext || win.webkitAudioContext;
+          if (OrigAudioCtx) {
+            const PatchedAudioContext = function(...args) {
+              const ctx = new OrigAudioCtx(...args);
+              const masterNode = ctx.createGain();
+              masterNode.gain.setValueAtTime(getMasterGain(), ctx.currentTime);
+
+              // Route the game's master gain node directly to hardware output
+              const origDest = ctx.destination;
+              const origConnect = masterNode.connect.bind(masterNode);
+              origConnect(origDest);
+
+              // Intercept any node connecting to ctx.destination so it routes through masterNode instead
+              const origAudioNodeConnect = win.AudioNode.prototype.connect;
+              if (!win.__audioNodeConnectPatched) {
+                win.__audioNodeConnectPatched = true;
+                win.AudioNode.prototype.connect = function(target, ...rest) {
+                  if (target && target.__bwaaMasterNode) {
+                    return origAudioNodeConnect.call(this, target.__bwaaMasterNode, ...rest);
+                  }
+                  return origAudioNodeConnect.call(this, target, ...rest);
+                };
+              }
+
+              try {
+                origDest.__bwaaMasterNode = masterNode;
+              } catch (e) {}
+
+              win.__frameMasterNodes.push({ ctx, masterNode });
+              return ctx;
+            };
+            PatchedAudioContext.prototype = OrigAudioCtx.prototype;
+            win.AudioContext = PatchedAudioContext;
+            if (win.webkitAudioContext) win.webkitAudioContext = PatchedAudioContext;
+          }
+
+          // Intercept new Audio() constructor so HTML5 Audio instances respect global volume
+          const OrigAudio = win.Audio;
+          if (OrigAudio) {
+            win.Audio = function(...args) {
+              const el = new OrigAudio(...args);
+              el.muted = (volumeLevel === 0);
+              el.volume = getMasterGain();
+              return el;
+            };
+            win.Audio.prototype = OrigAudio.prototype;
+          }
         }
       } catch (err) {}
     }
+
+    function applyVolumeToGameFrame() {
+      const gainVal = getMasterGain();
+      const isMuted = (volumeLevel === 0);
+
+      // Broadcast both string and structured object messages for any game listener
+      postToGame(`VOLUME_${volumeLevel}`);
+      postToGame(isMuted ? 'MUTE' : 'UNMUTE');
+      if (isPlaying && gameFrame.contentWindow) {
+        try {
+          gameFrame.contentWindow.postMessage({
+            type: 'SET_VOLUME',
+            level: volumeLevel,
+            volume: gainVal,
+            muted: isMuted
+          }, '*');
+        } catch (err) {}
+      }
+
+      try {
+        const win = gameFrame.contentWindow;
+        if (!win) return;
+
+        // 1. Override all intercepted Web Audio master gain nodes in the active game
+        if (Array.isArray(win.__frameMasterNodes)) {
+          win.__frameMasterNodes.forEach(({ ctx, masterNode }) => {
+            try {
+              masterNode.gain.cancelScheduledValues(ctx.currentTime);
+              masterNode.gain.setValueAtTime(gainVal, ctx.currentTime);
+            } catch (e) {}
+          });
+        }
+
+        // 2. Override any game-exposed gain variables
+        if (win.masterGain && win.masterGain.gain) {
+          win.masterGain.gain.value = gainVal;
+        }
+        if (typeof win.setMasterVolume === 'function') {
+          win.setMasterVolume(gainVal, isMuted);
+        }
+
+        // 3. Override all HTML5 <audio> and <video> tags inside the game
+        const mediaEls = win.document.querySelectorAll('audio, video');
+        mediaEls.forEach(el => {
+          el.muted = isMuted;
+          el.volume = gainVal;
+        });
+      } catch (err) {}
+    }
+
+    // Continuous watchdog enforces global master volume on any dynamically created game audio elements
+    setInterval(() => {
+      if (isPlaying) {
+        applyVolumeToGameFrame();
+      }
+    }, 350);
 
     function updateVolumeUI() {
       volMuteBadge.classList.toggle('is-muted', volumeLevel === 0);
@@ -1204,7 +1302,7 @@
       volumeLevel = Math.max(0, Math.min(3, volumeLevel + delta));
       updateVolumeUI();
       if (volumeLevel > 0) {
-        playPulseCall(440 + volumeLevel * 110, 0, 0.05, 0.07);
+        playPulseCall(440 + volumeLevel * 110, 0, 0.05, 0.06);
       }
     }
 
@@ -1212,7 +1310,7 @@
       volumeLevel = (volumeLevel + 1) % 4;
       updateVolumeUI();
       if (volumeLevel > 0) {
-        playPulseCall(440 + volumeLevel * 110, 0, 0.05, 0.07);
+        playPulseCall(440 + volumeLevel * 110, 0, 0.05, 0.06);
       }
     }
 
@@ -1299,6 +1397,7 @@
     gameFrame.addEventListener('load', () => {
       isFramePaused = false;
       pausedRAFCallbacks = [];
+      attachFrameAudioHook();
       attachFramePauseHook();
       applyVolumeToGameFrame();
       try {
@@ -1392,7 +1491,7 @@
       if (!audioCtx) return;
       const scale = [293.66, 329.63, 369.99, 440.00, 493.88, 587.33, 659.25, 739.99];
       const freq = scale[stepIdx % scale.length];
-      playPulseCall(freq, 0, 0.045, 0.025);
+      playPulseCall(freq, 0, 0.045, 0.022);
     }
 
     function transitionToWarning() {
@@ -1496,7 +1595,7 @@
         : '&#9664;/&#9654; BROWSE &bull; &#9660; VIEW SETTLEMENT &bull; A: PLAY';
       if (audioCtx) {
         const f = minimized ? 659.25 : 493.88;
-        playPulseCall(f, 0, 0.055, 0.045);
+        playPulseCall(f, 0, 0.055, 0.04);
       }
     }
 
@@ -1533,6 +1632,7 @@
       gameFrame.style.display = 'block';
       gameFrame.src = GAME_CATALOG[currentIndex].file;
       isPlaying = true;
+      applyVolumeToGameFrame();
     }
 
     function sendSignal(command) {
@@ -1704,6 +1804,7 @@
       } else {
         machineState = 'PLAYING';
         setFramePaused(false);
+        applyVolumeToGameFrame();
       }
     }
 
@@ -1718,6 +1819,7 @@
       gameFrame.src = 'about:blank';
       setTimeout(() => {
         gameFrame.src = GAME_CATALOG[currentIndex].file;
+        applyVolumeToGameFrame();
       }, 20);
     }
 
@@ -2549,11 +2651,10 @@
     }
 
     // 360-Degree Panoramic Sweep of the 1860s Forks:
-    // Exact Geographical Clockwise Order:
-    // 1. St. Boniface Cathedral & Convent (x = 180)
+    // 1. St. Boniface Cathedral & Convent (x = 180) — Sun ALWAYS rises and stays between the twin towers!
     // 2. Red River Facing South (x = 520)
     // 3. Fort Rouge — Forks with Assiniboine River on RIGHT frame (x = 880)
-    // 4. Upper Fort Garry — Assiniboine just to the left off-frame (x = 1220)
+    // 4. Upper Fort Garry (x = 1220) — Crescent Moon rises and falls cleanly under Upper Fort Garry!
     // 5. Early "Winnipeg" Settlement — Saloon, Shop & Watermill immediate right of Fort Garry (x = 1520)
     // 6. Red River Facing North / Point Douglas (x = 1880)
     // 7. St. Boniface Village — Log Houses & Townsfolk returning to St. Boniface Cathedral (x = 2200)
@@ -2617,15 +2718,17 @@
         }
       }
 
-      // 3. Crescent Moon with Full Dark Lunar Disc Occlusion (Stars never shine through the dark moon body)
-      const moonX = worldToScreenX(1180);
-      const moonY = Math.round(44 + dayT * (bankY + 26));
-      if (moonX > -80 && moonX < W + 80 && moonY < bankY + 20) {
+      // 3. Crescent Moon Anchored Over Upper Fort Garry (x = 1220) — Rises & Falls Under Fort Garry!
+      const moonX = worldToScreenX(1220);
+      const moonBob = Math.sin(tick * 0.015) * 4;
+      const moonY = Math.round(42 + moonBob + dayT * (bankY + 28));
+      if (moonX > -80 && moonX < W + 80 && moonY < bankY + 18) {
         ctx.fillStyle = `rgba(255, 244, 194, ${(0.20 * (1 - dayT * 0.6)).toFixed(3)})`;
         ctx.beginPath();
         ctx.arc(moonX, moonY, 20, 0, Math.PI * 2);
         ctx.fill();
 
+        // Dark lunar disc filled with sky color so stars never shine through the unlit side of the moon
         ctx.fillStyle = lerpRgb(nightSky[1], daySky[1], dayT);
         ctx.beginPath();
         ctx.arc(moonX, moonY, 13, 0, Math.PI * 2);
@@ -2648,16 +2751,26 @@
         ctx.restore();
       }
 
-      // 4. Rising Golden Morning Sun during Sunrise (dayT > 0.12)
-      if (dayT > 0.12) {
-        const sunScreenX = Math.round(W * 0.72);
-        const sunScreenY = Math.round(bankY + 22 - dayT * (bankY * 0.68));
-        ctx.fillStyle = `rgba(247, 200, 68, ${(0.28 * dayT).toFixed(3)})`;
-        ctx.fillRect(sunScreenX - 36, sunScreenY - 36, 72, 72);
+      // 4. Morning Sun Anchored Between the Twin Towers of St. Boniface Cathedral (x = 180)!
+      //    Rises directly between the twin tin spires during sunrise and stays framed between them.
+      const stbCenterX = worldToScreenX(180);
+      if (dayT > 0.06 && stbCenterX > -120 && stbCenterX < W + 120) {
+        // Rises from behind the nave roof (bankY - 44) up into the space between the twin belfries (bankY - 82)
+        const sunTowerY = Math.round((bankY - 38) - dayT * 46);
+        ctx.fillStyle = `rgba(247, 200, 68, ${(0.34 * dayT).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(stbCenterX, sunTowerY, 26, 0, Math.PI * 2);
+        ctx.fill();
+
         ctx.fillStyle = '#F7C844';
-        ctx.fillRect(sunScreenX - 20, sunScreenY - 20, 40, 40);
+        ctx.beginPath();
+        ctx.arc(stbCenterX, sunTowerY, 15, 0, Math.PI * 2);
+        ctx.fill();
+
         ctx.fillStyle = '#fff8d6';
-        ctx.fillRect(sunScreenX - 13, sunScreenY - 13, 26, 26);
+        ctx.beginPath();
+        ctx.arc(stbCenterX, sunTowerY, 9, 0, Math.PI * 2);
+        ctx.fill();
       }
 
       // 5. Forks River Waters
@@ -2921,33 +3034,29 @@
         const jigStep = Math.floor(tick / 6) % 4;
         const bowSlide = Math.round(Math.sin(tick * 0.24) * 5);
 
-        // Cozy Log Cabin Timber Walls & Warm Plank Floor
         ctx.fillStyle = '#29150b';
         ctx.fillRect(0, 0, W, 144);
         ctx.fillStyle = '#422312';
         for (let ly = 10; ly < 140; ly += 24) {
           ctx.fillRect(0, ly, W, 16);
         }
-        // Timber Floorboards
         ctx.fillStyle = '#5c3419';
         ctx.fillRect(0, 144, W, H - 144);
         ctx.fillStyle = '#3b200e';
         ctx.fillRect(0, 154, W, 3);
         ctx.fillRect(0, 168, W, 3);
 
-        // Cozy Stone Fireplace / Hearth on Far Left with Flickering Firelight
+        // Stone Fireplace / Hearth on Left
         ctx.fillStyle = '#5a6275';
         ctx.fillRect(10, 56, 62, 88);
         ctx.fillStyle = '#3b4152';
         ctx.fillRect(14, 60, 54, 6);
         ctx.fillStyle = '#14100e';
         ctx.fillRect(22, 96, 38, 48);
-        // Flickering hearth flames
         ctx.fillStyle = beat === 0 ? '#FB6604' : '#F7C844';
         ctx.fillRect(28, 114, 26, 26);
         ctx.fillStyle = '#AD1C21';
         ctx.fillRect(32, 124, 18, 16);
-        // Warm hearth & lantern glow pool across the cabin room
         ctx.fillStyle = 'rgba(247, 200, 68, 0.14)';
         ctx.fillRect(68, 36, W - 76, 122);
 
@@ -2961,7 +3070,7 @@
 
         const floorY = 148;
 
-        // --- BAND MEMBER 1 (Left-Back): Lead Métis Fiddler (Blue Capote, Red Sash & Violin) ---
+        // Band Member 1: Lead Métis Fiddler
         const f1X = 104;
         const f1Y = floorY - 2;
         ctx.fillStyle = '#1e1b18';
@@ -2975,13 +3084,12 @@
         ctx.fillRect(f1X - 5, f1Y - 48, 11, 10);
         ctx.fillStyle = '#1e1b18';
         ctx.fillRect(f1X - 6, f1Y - 51, 13, 4);
-        // Fiddle & animated bow
         ctx.fillStyle = '#d96b14';
         ctx.fillRect(f1X + 4, f1Y - 41, 18, 7);
         ctx.fillStyle = '#f2efe9';
         ctx.fillRect(f1X + 10 + bowSlide, f1Y - 47, 2, 20);
 
-        // --- BAND MEMBER 2 (Left-Center): Second Métis Fiddler (Red Shirt, Dark Vest & Violin) ---
+        // Band Member 2: Second Métis Fiddler
         const f2X = 160;
         const f2Y = floorY;
         ctx.fillStyle = '#252830';
@@ -2997,63 +3105,56 @@
         ctx.fillRect(f2X - 5, f2Y - 48, 11, 10);
         ctx.fillStyle = '#3a2311';
         ctx.fillRect(f2X - 8, f2Y - 52, 17, 4);
-        // Second fiddle & opposite bow stroke
         ctx.fillStyle = '#FB6604';
         ctx.fillRect(f2X + 4, f2Y - 41, 18, 7);
         ctx.fillStyle = '#f2efe9';
         ctx.fillRect(f2X + 10 - bowSlide, f2Y - 47, 2, 20);
 
-        // --- BAND MEMBER 3 (Right-Center): Wooden Spoons Player Seated on Crate ---
+        // Band Member 3: Wooden Spoons Player Seated on Crate
         const spX = 294;
         const spY = floorY;
-        // Wooden apple/cargo crate seat
         ctx.fillStyle = '#7a4b26';
         ctx.fillRect(spX - 11, spY - 16, 22, 16);
         ctx.fillStyle = '#252830';
         ctx.fillRect(spX - 9, spY - 14, 7, 14);
-        // Teal shirt & sashed waist
         ctx.fillStyle = '#12AEA2';
         ctx.fillRect(spX - 8, spY - 36, 17, 21);
         ctx.fillStyle = '#AD1C21';
         ctx.fillRect(spX - 8, spY - 22, 17, 4);
         ctx.fillStyle = '#8c5332';
         ctx.fillRect(spX - 4, spY - 46, 10, 10);
-        // Clacking wooden spoons tapping knee & hand
         const spoonY = beat === 0 ? -24 : -31;
         ctx.fillStyle = '#F7C844';
         ctx.fillRect(spX - 14, spY + spoonY, 9, 4);
         ctx.fillRect(spX - 15, spY + spoonY + 5, 9, 4);
 
-        // --- BAND MEMBER 4 (Far Right): Buffalo Rib-Bones Percussionist ---
+        // Band Member 4: Buffalo Rib-Bones Percussionist
         const bnX = 358;
         const bnY = floorY - 2;
         ctx.fillStyle = '#1e1b18';
         ctx.fillRect(bnX - 7, bnY - 16, 6, 16);
         ctx.fillRect(bnX + 2, bnY - 16, 6, 16);
-        ctx.fillStyle = '#b5783a'; // Buckskin shirt
+        ctx.fillStyle = '#b5783a';
         ctx.fillRect(bnX - 9, bnY - 38, 19, 23);
-        ctx.fillStyle = '#0038A8'; // Blue sash
+        ctx.fillStyle = '#0038A8';
         ctx.fillRect(bnX - 9, bnY - 23, 19, 4);
         ctx.fillStyle = '#8c5332';
         ctx.fillRect(bnX - 5, bnY - 48, 11, 10);
         ctx.fillStyle = '#1e1b18';
         ctx.fillRect(bnX - 6, bnY - 51, 13, 4);
-        // Clacking curved white buffalo rib bones held in hand
         const boneTilt = beat === 0 ? -3 : 3;
         ctx.fillStyle = '#f2efe9';
         ctx.fillRect(bnX - 16, bnY - 38 + boneTilt, 4, 16);
         ctx.fillRect(bnX - 11, bnY - 36 - boneTilt, 4, 16);
 
-        // --- CENTER SPOTLIGHT: 1 Lively Sashed Métis Jigger Stepping on the Floorboards ---
+        // Center Spotlight: 1 Lively Sashed Métis Jigger
         const jX = 228;
         const hopY = (jigStep === 1 || jigStep === 3) ? -5 : 0;
         const jY = floorY + 4 + hopY;
 
-        // Floorboard rhythm scuff marks under jigger's moccasins
         ctx.fillStyle = '#F7C844';
         ctx.fillRect(jX - 18, floorY + 5, 36, 2);
 
-        // High-stepping jigging legs & beaded moccasins
         ctx.fillStyle = '#1b263b';
         if (jigStep === 0) {
           ctx.fillRect(jX - 9, jY - 18, 7, 18);
@@ -3069,12 +3170,10 @@
           ctx.fillRect(jX + 2, jY - 21, 7, 15);
         }
 
-        // Jigger Torso (Crisp white shirt, dark vest & vibrant flying Ceinture Fléchée sash)
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(jX - 10, jY - 41, 21, 23);
         ctx.fillStyle = '#252830';
         ctx.fillRect(jX - 8, jY - 41, 17, 16);
-        // Flowing Red, Gold & Blue Métis Sash with swinging fringed tails
         ctx.fillStyle = '#AD1C21';
         ctx.fillRect(jX - 10, jY - 25, 21, 5);
         ctx.fillStyle = '#F7C844';
@@ -3085,7 +3184,6 @@
         ctx.fillStyle = '#0038A8';
         ctx.fillRect(jX + 12, jY - 22, 4 + tailSwing, 11);
 
-        // Arms raised in lively jig balance + smiling face + voyageur hat
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(jX - 16, jY - 38 - (jigStep % 2) * 3, 6, 12);
         ctx.fillRect(jX + 11, jY - 38 + (jigStep % 2) * 3, 6, 12);
@@ -3468,27 +3566,22 @@
         // Handmade Wooden Bonspiel Stone with Forged Iron Band & Kettle Handle (Right-Center)
         const rockX = cx + 22;
         const rockY = Math.round(136 + bob * 0.5);
-        // Turned oak/birch timber stone body
         ctx.fillStyle = '#7a4b26';
         ctx.fillRect(rockX - 24, rockY - 6, 48, 22);
-        // Warm wood grain stripes & beveled top shoulder
         ctx.fillStyle = '#a36836';
         ctx.fillRect(rockX - 20, rockY - 6, 40, 6);
         ctx.fillStyle = '#5c3419';
         ctx.fillRect(rockX - 22, rockY + 11, 44, 5);
-        // Vertical wood stave / grain lines
         ctx.fillStyle = '#472613';
         ctx.fillRect(rockX - 12, rockY - 5, 2, 20);
         ctx.fillRect(rockX, rockY - 5, 2, 20);
         ctx.fillRect(rockX + 12, rockY - 5, 2, 20);
-        // Heavy Forged Wrought-Iron Striking Band with Rivets
         ctx.fillStyle = '#252830';
         ctx.fillRect(rockX - 26, rockY + 2, 52, 7);
         ctx.fillStyle = '#8a95ad';
         ctx.fillRect(rockX - 20, rockY + 4, 3, 3);
         ctx.fillRect(rockX - 2, rockY + 4, 3, 3);
         ctx.fillRect(rockX + 17, rockY + 4, 3, 3);
-        // Arched Wrought-Iron Kettle Handle bolted atop the wooden block
         ctx.fillStyle = '#1e1b18';
         ctx.fillRect(rockX - 13, rockY - 14, 4, 8);
         ctx.fillRect(rockX + 9, rockY - 14, 4, 8);
@@ -3571,8 +3664,8 @@
     function playCarouselTick(dir) {
       if (!audioCtx) return;
       const baseFreq = dir >= 0 ? 587.33 : 440.0;
-      playPulseCall(baseFreq, 0, 0.055, 0.055);
-      playPulseCall(baseFreq * 1.25, 0.04, 0.075, 0.065);
+      playPulseCall(baseFreq, 0, 0.055, 0.045);
+      playPulseCall(baseFreq * 1.25, 0.04, 0.075, 0.052);
     }
 
     function drawMatrix(context, matrix, palette, startX, startY, pixelSize, alpha = 1.0) {
@@ -3589,7 +3682,7 @@
         context.globalAlpha = 1.0;
     }
 
-    /* --- 1-FOR-1 RED RIVER JIG FIDDLE ENGINE (GENTLE FADE-IN + MASTER VOLUME) --- */
+    /* --- 1-FOR-1 RED RIVER JIG FIDDLE ENGINE (SOFTENED MENU VOLUME + MASTER VOLUME) --- */
     let jigInterval = null;
     let jigLoopRunning = false;
     let jigStepIndex = 0;
@@ -3709,8 +3802,9 @@
         oscBow.frequency.setValueAtTime(noteObj.f, now);
       }
 
-      const mainVol = 0.042 * volScale;
-      const bowVol = 0.013 * volScale;
+      // Slightly decreased overall menu music volume so it sits gently in the background
+      const mainVol = 0.030 * volScale;
+      const bowVol = 0.009 * volScale;
 
       mainGain.gain.setValueAtTime(0.0001, now);
       mainGain.gain.linearRampToValueAtTime(mainVol, now + 0.016);
@@ -3737,7 +3831,7 @@
         droneOsc.type = 'triangle';
         droneOsc.frequency.setValueAtTime(noteObj.drone, now);
         droneGain.gain.setValueAtTime(0.0001, now);
-        droneGain.gain.linearRampToValueAtTime(0.024 * volScale, now + 0.015);
+        droneGain.gain.linearRampToValueAtTime(0.016 * volScale, now + 0.015);
         droneGain.gain.exponentialRampToValueAtTime(0.0001, now + dur * 1.15);
         droneOsc.connect(droneGain);
         droneGain.connect(audioCtx.destination);
