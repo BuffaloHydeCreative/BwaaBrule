@@ -156,12 +156,12 @@
     LAKE_MID: '#16688F',
     LAKE_FOAM: '#48D8CC',
     WAVE_CREST: '#E8FAFF',
-    INDIGO_DEEP: '#0E203D',
-    INDIGO_MID: '#1F3F70',
+    INDIGO_DEEP: '#071022',
+    INDIGO_MID: '#10203E',
     SUNSET_TOP: '#2A1B4E',
     SUNSET_BOT: '#D96B43',
-    NIGHT_SKY_T: '#0E0B24',
-    NIGHT_SKY_B: '#362466',
+    NIGHT_SKY_T: '#09071A',
+    NIGHT_SKY_B: '#2A1B52',
     HIDE_LIGHT: '#F2ECDC',
     HIDE_MID: '#CBBFA4',
     HIDE_DARK: '#8F8268',
@@ -202,7 +202,7 @@
     DAY_SKY_B: '#E6DFCE'
   };
 
-  // Geographic Stage Milestones (Extended Boreal Blizzard leg between Norway House and York Factory -> Total 6200)
+  // Geographic Stage Milestones
   const DIST = {
     FORKS_END: 560,
     SETTLER_FARMS_END: 1410,
@@ -265,8 +265,8 @@
 
   // Unique One-Off Landmarks
   let spawnedFlags = {};
-  let landmarks = [];         // North/far riverbank landmarks (including Norway House on the North Shore!)
-  let nearBankLandmarks = []; // Bottom/near shoreline priority foreground landmarks
+  let landmarks = [];
+  let nearBankLandmarks = [];
 
   // Parallax Snow / Blizzard Particles
   let snowParticles = [];
@@ -281,6 +281,21 @@
     }
   }
   initSnow();
+
+  // Twilight Stars for Midnight Lake Winnipeg Title Screen
+  let titleStars = [];
+  function initTitleStars() {
+    titleStars = [];
+    for (let i = 0; i < 38; i++) {
+      titleStars.push({
+        x: ((i * 73 + 19) % 480) / 480,
+        y: ((i * 37 + 11) % 100) / 100,
+        size: i % 5 === 0 ? 2 : 1,
+        phase: i * 0.7
+      });
+    }
+  }
+  initTitleStars();
 
   // ==========================================
   // 3. COLOR INTERPOLATION & SILHOUETTE HELPERS
@@ -377,7 +392,7 @@
       gndDark = lerpColor(PAL.DARK_PINE, '#070A14', nightT);
       watDeep = lerpColor(PAL.LAKE_DEEP, PAL.INDIGO_DEEP, nightT);
       watMid = lerpColor(PAL.LAKE_MID, PAL.INDIGO_MID, nightT);
-      watFoam = lerpColor(PAL.LAKE_FOAM, '#4F72B8', nightT);
+      watFoam = lerpColor(PAL.LAKE_FOAM, '#28457A', nightT);
     } else if (score < DIST.NORWAY_HOUSE_END) {
       title = score >= 3960 ? "NORWAY HOUSE" : "MIDNIGHT LAKE WINNIPEG";
       const dawnT = score >= 3880
@@ -391,7 +406,7 @@
       gndDark = lerpColor('#070A14', PAL.SNOW_DARK, dawnT);
       watDeep = lerpColor(PAL.INDIGO_DEEP, PAL.ICE_DEEP, dawnT);
       watMid = lerpColor(PAL.INDIGO_MID, PAL.ICE_MID, dawnT);
-      watFoam = lerpColor('#4F72B8', PAL.SNOW_LIGHT, dawnT);
+      watFoam = lerpColor('#28457A', PAL.SNOW_LIGHT, dawnT);
     } else if (score < DIST.DEPLOY_END) {
       title = "NORWAY HOUSE - DOGSLED";
       skyTop = PAL.DAY_SKY_T;
@@ -432,7 +447,7 @@
   }
 
   // ==========================================
-  // 4. CRISP PIXEL LABEL HELPER & WOODLAND TITLE CARD
+  // 4. CRISP PIXEL LABEL HELPER & MIDNIGHT LAKE TITLE CARD
   // ==========================================
   function drawUnboxedLabel(text, centerX, y, isSil = false) {
     const tx = Math.round(centerX);
@@ -499,81 +514,168 @@
     }
   }
 
+  // Midnight on Lake Winnipeg Title Screen:
+  // - Top third of the screen holds the stylized Woodland title over soft twilight glowing stars & faded crescent moon
+  // - Dark indigo water matching the midnight theme (with animated dark indigo waves & zero debris)
+  // - Midnight silhouette canoe & voyageur paddling on the middle track as waves pass by
+  // - Shoreline meandering in and out on the bottom track
   function drawTitleCardScreen() {
     const elapsedSec = (performance.now() - titleStartTime) / 1000;
     const tAnim = frame * 0.04;
+    const scrollPx = frame * 1.15;
 
-    ctx.fillStyle = PAL.DAY_SKY_T;
-    ctx.fillRect(0, 0, VIEW_W, Math.floor(VIEW_H * 0.24));
-    ctx.fillStyle = PAL.DAY_SKY_B;
-    ctx.fillRect(0, Math.floor(VIEW_H * 0.12), VIEW_W, Math.floor(VIEW_H * 0.14));
+    // 1. Top Third: Twilight-to-Midnight Sky Band (y = 0 .. horizonY)
+    const horizonY = Math.floor(VIEW_H * 0.36);
+    ctx.fillStyle = '#070614';
+    ctx.fillRect(0, 0, VIEW_W, horizonY);
+    ctx.fillStyle = '#141133';
+    ctx.fillRect(0, Math.floor(horizonY * 0.42), VIEW_W, horizonY - Math.floor(horizonY * 0.42));
+    ctx.fillStyle = '#241B52';
+    ctx.fillRect(0, Math.floor(horizonY * 0.74), VIEW_W, horizonY - Math.floor(horizonY * 0.74));
 
-    const farHorizonY = Math.floor(VIEW_H * 0.22);
-    ctx.fillStyle = PAL.GOLD_MID;
-    ctx.fillRect(0, farHorizonY, VIEW_W, 6);
-    drawShadedPine(22, farHorizonY - 12, false, false);
-    drawShadedTipi(62, farHorizonY - 10);
-    drawShadedPine(VIEW_W - 42, farHorizonY - 12, false, false);
-
-    const riverStartY = farHorizonY + 5;
-    const lowerBankY = Math.floor(VIEW_H * 0.72);
-    ctx.fillStyle = PAL.MAROON_DEEP;
-    ctx.fillRect(0, riverStartY, VIEW_W, lowerBankY - riverStartY);
-
-    for (let ry = riverStartY + 5; ry < lowerBankY - 4; ry += 7) {
-      const waveOff = Math.round(((frame * 0.5) + ry * 7) % 60);
-      ctx.fillStyle = PAL.MAROON_MID;
-      for (let wx = -60; wx < VIEW_W + 60; wx += 60) {
-        ctx.fillRect(wx + waveOff, ry, 34, 3);
+    // Soft Twilight Glowing Stars
+    for (let i = 0; i < titleStars.length; i++) {
+      const st = titleStars[i];
+      const sx = Math.round(st.x * VIEW_W);
+      const sy = Math.round(st.y * (horizonY - 6)) + 3;
+      const twinkle = 0.35 + 0.55 * (Math.sin(tAnim * 1.6 + st.phase) * 0.5 + 0.5);
+      // Soft halo on brighter stars
+      if (st.size === 2) {
+        ctx.fillStyle = `rgba(175, 185, 245, ${(twinkle * 0.28).toFixed(2)})`;
+        ctx.fillRect(sx - 1, sy - 1, 4, 4);
       }
-      ctx.fillStyle = PAL.MAROON_FOAM;
-      for (let wx = -60; wx < VIEW_W + 60; wx += 60) {
-        ctx.fillRect(wx + waveOff + 8, ry + 1, 14, 1);
-      }
+      ctx.fillStyle = `rgba(235, 238, 255, ${twinkle.toFixed(2)})`;
+      ctx.fillRect(sx, sy, st.size, st.size);
     }
 
-    ctx.fillStyle = PAL.MAROON_FOAM;
-    ctx.fillRect(0, lowerBankY - 2, VIEW_W, 2);
-    ctx.fillStyle = PAL.SAND_MID;
-    ctx.fillRect(0, lowerBankY, VIEW_W, 4);
-    ctx.fillStyle = PAL.GOLD_LIGHT;
-    ctx.fillRect(0, lowerBankY + 4, VIEW_W, 8);
-    ctx.fillStyle = PAL.GOLD_MID;
-    ctx.fillRect(0, lowerBankY + 12, VIEW_W, 14);
-    ctx.fillStyle = PAL.GOLD_DARK;
-    ctx.fillRect(0, lowerBankY + 26, VIEW_W, VIEW_H - (lowerBankY + 26));
+    // Faded Crescent Moon in the sky behind the title text
+    const moonX = Math.floor(VIEW_W * 0.76);
+    const moonY = Math.floor(horizonY * 0.34);
+    ctx.fillStyle = 'rgba(170, 175, 235, 0.14)';
+    ctx.fillRect(moonX - 10, moonY - 9, 24, 24);
+    ctx.fillStyle = 'rgba(225, 228, 252, 0.36)';
+    ctx.fillRect(moonX - 4, moonY - 5, 13, 16);
+    ctx.fillRect(moonX - 6, moonY - 3, 16, 12);
+    // Cutout shadow circle to form crescent silhouette
+    ctx.fillStyle = '#110E2B';
+    ctx.fillRect(moonX - 7, moonY - 5, 11, 14);
+    ctx.fillRect(moonX - 8, moonY - 3, 12, 10);
 
-    for (let gx = 8; gx < VIEW_W; gx += 20) {
-      ctx.fillStyle = PAL.MID_PINE;
-      ctx.fillRect(gx, lowerBankY + 2, 1, 5);
-      ctx.fillRect(gx + 3, lowerBankY + 1, 1, 6);
-      ctx.fillStyle = PAL.CHARTREUSE_L;
-      ctx.fillRect(gx + 1, lowerBankY + 2, 2, 4);
-    }
-    drawShadedGrayRock(14, lowerBankY + 2, false, false);
-    drawShadedPine(VIEW_W - 32, lowerBankY - 9, false, false);
-
-    const titleScale = VIEW_W >= 320 ? 3 : 2;
-    const topWordY = Math.floor(VIEW_H * 0.18);
-    const botWordY = topWordY + 9 * titleScale + 8;
+    // 2. Stylized "Woodland" Pixel Title centered in the top third of the screen
+    const titleScale = 2;
+    const topWordY = 8;
+    const botWordY = topWordY + 9 * titleScale + 5;
     drawWoodlandWord('RED RIVER', Math.floor(VIEW_W / 2), topWordY, titleScale);
     drawWoodlandWord('RUN', Math.floor(VIEW_W / 2), botWordY, titleScale);
 
+    // 3. Dark Indigo Midnight Lake Winnipeg Body (from horizonY to VIEW_H)
+    const bottomShoreH = 14;
+    const lakeH = VIEW_H - horizonY - bottomShoreH;
+    const laneH = Math.floor(lakeH / 3);
+
+    ctx.fillStyle = PAL.INDIGO_DEEP;
+    ctx.fillRect(0, horizonY, VIEW_W, VIEW_H - horizonY);
+
+    // Subtle twilight horizon rim & faint moon reflection on the dark indigo water
+    ctx.fillStyle = '#1D2D59';
+    ctx.fillRect(0, horizonY, VIEW_W, 1);
+    ctx.fillStyle = 'rgba(120, 135, 205, 0.14)';
+    for (let ry = horizonY + 4; ry < VIEW_H - bottomShoreH - 4; ry += 6) {
+      const shimmerW = 10 + Math.round(Math.sin((ry + frame * 0.18) * 0.5) * 6);
+      const shimmerX = moonX - Math.floor(shimmerW / 2) + Math.round(Math.cos(ry * 0.35 + frame * 0.06) * 3);
+      ctx.fillRect(shimmerX, ry, shimmerW, 2);
+    }
+
+    // Animated Dark Indigo Waves & Swells passing by across the lake (no debris!)
+    const waveCycle = 240;
+    for (let wIdx = 0; wIdx < 4; wIdx++) {
+      const wx = Math.round(VIEW_W + 40 - ((scrollPx * (0.95 + (wIdx % 2) * 0.25) + wIdx * 95) % (VIEW_W + 120)));
+      const wy = horizonY + 8 + ((wIdx * 29) % Math.max(20, lakeH - 16));
+      const waveW = 46;
+
+      // Dark indigo swell body
+      fillPixelPoly([
+        [wx, wy + 7],
+        [wx + 12, wy + 2],
+        [wx + 22, wy],
+        [wx + 35, wy + 3],
+        [wx + waveW, wy + 7]
+      ], PAL.INDIGO_MID);
+
+      // Subtle midnight-blue crest highlight
+      fillPixelPoly([
+        [wx + 10, wy + 3],
+        [wx + 15, wy],
+        [wx + 24, wy],
+        [wx + 29, wy + 2],
+        [wx + 18, wy + 2]
+      ], '#25427A');
+
+      ctx.fillStyle = '#1B3463';
+      ctx.fillRect(wx - 2, wy + 6, waveW + 4, 1);
+    }
+
+    // Subtle ambient current ripples in dark indigo
+    ctx.fillStyle = PAL.INDIGO_MID;
+    const rippleCount = Math.ceil(VIEW_W / 38) + 2;
+    for (let i = 0; i < rippleCount; i++) {
+      const rx = Math.round(((scrollPx * 0.65) + i * 38) % (VIEW_W + 40)) - 20;
+      const ry = horizonY + 10 + ((i * 23) % Math.max(14, lakeH - 12));
+      ctx.fillRect(rx, ry, 18, 2);
+      ctx.fillStyle = '#1B3463';
+      ctx.fillRect(rx + 4, ry, 7, 1);
+      ctx.fillStyle = PAL.INDIGO_MID;
+    }
+
+    // 4. Midnight Silhouette Canoe & Voyageur on the Middle Track (Lane 1, zero debris)
+    const midTrackY = horizonY + laneH + Math.floor((laneH - 15) / 2);
+    drawCanoeAndHunter(Math.floor(VIEW_W * 0.24), midTrackY, frame, true, 1.0);
+
+    // 5. Continuous Bottom Shoreline + Meandering Points In & Out on the Bottom Track (Lane 2)
+    const sy = VIEW_H - bottomShoreH;
+    ctx.fillStyle = '#1D2D59';
+    ctx.fillRect(0, sy - 1, VIEW_W, 1);
+    ctx.fillStyle = '#13182B';
+    ctx.fillRect(0, sy, VIEW_W, 5);
+    ctx.fillStyle = '#0B0E1A';
+    ctx.fillRect(0, sy + 5, VIEW_W, 5);
+    ctx.fillStyle = PAL.SILHOUETTE;
+    ctx.fillRect(0, sy + 10, VIEW_W, bottomShoreH - 10);
+
+    // Tapered shoreline points meandering in and out along the bottom track
+    const meanderPeriod = 340;
+    const meanderW = 148;
+    const taperW = 42;
+    const reachH = Math.round(laneH * 0.88);
+    for (let mBase = -meanderPeriod; mBase < VIEW_W + meanderPeriod; mBase += meanderPeriod) {
+      const x0 = Math.round(mBase - ((scrollPx * 0.85) % meanderPeriod));
+      const x1 = x0 + taperW;
+      const x2 = x0 + meanderW - taperW;
+      const x3 = x0 + meanderW;
+      const peakY = sy - reachH;
+
+      // Subtle indigo shoreline foam rim
+      fillPixelPoly([[x0 - 3, sy],[x1, peakY - 2],[x2, peakY - 2],[x3 + 3, sy]], '#223A6B');
+      // Dark silhouette headland body
+      fillPixelPoly([[x0, sy],[x1 + 2, peakY],[x2 - 2, peakY],[x3, sy]], '#121629');
+      fillPixelPoly([[x0 + 6, sy],[x1 + 6, peakY + 3],[x2 - 6, peakY + 3],[x3 - 6, sy]], PAL.SILHOUETTE);
+
+      // Silhouetted pines & Canadian Shield rocks along the bottom shoreline point
+      drawShadedPine(x1 + 10, peakY - 6, false, true);
+      drawShadedGrayRock(x1 + 32, peakY + 1, false, true);
+      drawShadedPine(x2 - 18, peakY - 5, false, true);
+    }
+
+    // 6. "PRESS A TO START" fades in smoothly after 2.0 seconds along the lower shoreline
     if (elapsedSec >= 2.0) {
       const fadeInT = Math.min(1, (elapsedSec - 2.0) / 0.85);
       const pulse = 0.75 + Math.sin(tAnim * 2.2) * 0.25;
       const alpha = fadeInT * pulse;
 
-      const promptY = lowerBankY + Math.floor((VIEW_H - lowerBankY) * 0.56);
+      const promptY = VIEW_H - 9;
       ctx.save();
       ctx.globalAlpha = alpha;
-      ctx.fillStyle = PAL.OUTLINE;
-      ctx.fillRect(Math.floor(VIEW_W / 2) - 72, promptY - 9, 144, 15);
-      ctx.fillStyle = PAL.GOLD_LIGHT;
-      ctx.font = 'bold 10px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText("PRESS 'A' TO START", Math.floor(VIEW_W / 2), promptY + 2);
-      ctx.textAlign = 'left';
+      drawUnboxedLabel("PRESS 'A' TO START", Math.floor(VIEW_W / 2), promptY, false);
       ctx.restore();
     }
 
@@ -709,13 +811,13 @@
     }
   }
 
-  function drawCanoeAndHunter(x, y, frameCount, hasPackage = true) {
-    if (isSledMode) {
+  function drawCanoeAndHunter(x, y, frameCount, hasPackage = true, forcedSilT = null) {
+    if (isSledMode && forcedSilT === null) {
       drawDogSledAndHunter(x, y, frameCount, false, true);
       return;
     }
 
-    const silT = gameMode === 'TITLE' ? 0 : getSilhouetteFactor();
+    const silT = forcedSilT !== null ? forcedSilT : (gameMode === 'TITLE' ? 1.0 : getSilhouetteFactor());
     const bob = Math.sin(frameCount * 0.14) * 1;
     const py = Math.round(y + bob);
 
@@ -824,7 +926,7 @@
     }
 
     if (strokePhase !== 3) {
-      ctx.fillStyle = lerpColor(PAL.SNOW_LIGHT, '#8AD0FF', silT);
+      ctx.fillStyle = lerpColor(PAL.SNOW_LIGHT, '#4C78BD', silT);
       ctx.fillRect(bladeX - 2, py + 14, 5, 1);
       if (cycleNum % 2 === 1 && (strokePhase === 1 || strokePhase === 2)) {
         ctx.fillRect(bladeX - 4, py + 13, 2, 1);
@@ -1091,7 +1193,6 @@
       }
     }
 
-    // Priority foreground: St. Boniface Cathedral twin tin steeples on the right side of Frame 0
     drawStBonifaceTwinSteeples(VIEW_W - 66, VIEW_H);
 
     if (f < 30) {
@@ -1299,18 +1400,15 @@
     }
   }
 
-  // North Shore Landing & Dogsled Deployment right at Norway House on the North Bank (4100 - 4220)
   function drawDeploymentSequence(horizonY, riverTopY, laneH) {
     const beachX = Math.round(VIEW_W * 0.44 - deployProgress * 26);
     const shoreTopY = riverTopY;
     const shoreBotY = VIEW_H;
 
-    // Snow-covered North Shore landing beach
     fillPixelPoly([[beachX + 24, shoreTopY],[VIEW_W, shoreTopY],[VIEW_W, shoreBotY],[beachX - 10, shoreBotY]], PAL.SNOW_MID);
     fillPixelPoly([[beachX + 32, shoreTopY],[VIEW_W, shoreTopY],[VIEW_W, shoreBotY],[beachX, shoreBotY]], PAL.SNOW_LIGHT);
     fillPixelPoly([[beachX + 20, shoreTopY],[beachX + 25, shoreTopY],[beachX - 9, shoreBotY],[beachX - 14, shoreBotY]], PAL.ICE_MID);
 
-    // Large Norway House trading post sitting prominently on the North Shore bank right above the player!
     const postX = Math.max(24, beachX - 12);
     drawFortLandmark(postX, horizonY - 11, 'NORWAY_HOUSE', true, false);
 
@@ -1719,16 +1817,13 @@
     const isHit = (elapsed >= 12 && elapsed <= 18);
     const isFallen = (elapsed >= 17);
 
-    // 4 Oaks to the immediate left of the scene
     drawShadedPine(x - 46, y - 12, false, false);
     drawShadedPine(x - 34, y - 11, false, false);
     drawShadedPine(x - 22, y - 13, false, false);
     drawShadedPine(x - 10, y - 11, false, false);
 
-    // Red River Carts to the left of the NWC men
     drawRedRiverCart(x + 16, y - 4, frameCount, false);
 
-    // Mounted NWC Rider 1 & 2
     const mx1 = x + 36;
     const my1 = y - 1;
     ctx.fillStyle = '#3B2314';
@@ -1813,7 +1908,6 @@
       }
     }
 
-    // 3 Oaks to the immediate right of the scene
     drawShadedPine(x + 128, y - 12, false, false);
     drawShadedPine(x + 140, y - 11, false, false);
     drawShadedPine(x + 152, y - 13, false, false);
@@ -1821,7 +1915,6 @@
     drawUnboxedLabel("Battle of Seven Oaks", x + 56, y - 18, false);
   }
 
-  // Unique Historical Landmarks on the North/Far Bank (Upper Fort, St Johns, St Andrews, Lower Fort, Norway House, York Factory)
   function drawFortLandmark(x, y, type, showLabel = true, isSil = false) {
     if (type === 'ST_JOHNS_CHURCH') {
       ctx.fillStyle = PAL.OUTLINE;
@@ -1913,13 +2006,10 @@
     }
 
     if (type === 'NORWAY_HOUSE') {
-      // Large North Shore HBC Post (68px wide) sitting on the banks of the North Shore
-      // where the canoe lands and transitions to the dogsled team!
       const nw = 68;
       ctx.fillStyle = PAL.OUTLINE;
       ctx.fillRect(x - 1, y + 1, nw + 2, 14);
 
-      // Left & Right Whitewashed HBC Factor's House & Fur Warehouses
       ctx.fillStyle = PAL.HIDE_MID;
       ctx.fillRect(x, y + 2, 30, 12);
       ctx.fillRect(x + 34, y + 3, 34, 11);
@@ -1927,7 +2017,6 @@
       ctx.fillRect(x + 1, y + 2, 28, 4);
       ctx.fillRect(x + 35, y + 3, 32, 3);
 
-      // Red Pitched Roofs capped with Heavy Winter Snow
       ctx.fillStyle = PAL.MAROON_MID;
       ctx.fillRect(x - 2, y - 1, 34, 3);
       ctx.fillRect(x + 32, y, 38, 3);
@@ -1935,7 +2024,6 @@
       ctx.fillRect(x - 2, y - 3, 34, 2);
       ctx.fillRect(x + 32, y - 2, 38, 2);
 
-      // Windows & Doors
       ctx.fillStyle = PAL.INDIGO_DEEP;
       for (let wx = 4; wx <= 24; wx += 7) {
         ctx.fillRect(x + wx, y + 5, 3, 3);
@@ -1947,7 +2035,6 @@
       ctx.fillRect(x + 13, y + 9, 5, 5);
       ctx.fillRect(x + 48, y + 9, 5, 5);
 
-      // Tall Flagpole & HBC Red Ensign
       ctx.fillStyle = PAL.WOOD_DARK;
       ctx.fillRect(x + 31, y - 11, 2, 15);
       ctx.fillStyle = PAL.SASH_RED;
@@ -1955,7 +2042,6 @@
       ctx.fillStyle = PAL.SNOW_LIGHT;
       ctx.fillRect(x + 36, y - 10, 3, 2);
 
-      // Timber Wharf & Moored York Boat along the North Shore Bank
       ctx.fillStyle = PAL.WOOD_DARK;
       ctx.fillRect(x + 8, y + 13, 46, 3);
       ctx.fillStyle = PAL.WOOD_LIGHT;
@@ -2018,7 +2104,6 @@
     if (showLabel) drawUnboxedLabel("Upper Fort Garry", x + 17, y - 10, false);
   }
 
-  // Close-to-viewer Backside & Overhang of St. Boniface Cathedral's Twin Tin Steeples (Right side of Frame 0)
   function drawStBonifaceTwinSteeples(x, bottomEdgeY) {
     const roofY = bottomEdgeY - 22;
 
@@ -2068,8 +2153,6 @@
     }
   }
 
-  // Priority Foreground Bottom-Shore Unique Objects (Rendered AFTER player & debris so player paddles behind them!)
-  // Enlarged forts & outposts matching the visual prominence of the upper-bank forts
   function drawNearBankLandmark(lm, bottomBankY, isSil = false) {
     const x = Math.round(lm.x);
 
@@ -2079,7 +2162,6 @@
     }
 
     if (lm.type === 'ST_PETERS_DYNEVOR') {
-      // Larger backside church gable & stone steeple rising from the close riverbank (player paddles behind steeple)
       const sy = bottomBankY - 18;
       ctx.fillStyle = PAL.OUTLINE;
       ctx.fillRect(x, sy + 8, 34, 18);
@@ -2121,9 +2203,7 @@
     }
 
     if (lm.type === 'FORT_BAS') {
-      // Much larger Fort Bas de la Rivière (68px wide palisade, tall log storehouses, corner bastions & Winnipeg River mouth)
       const fy = bottomBankY - 18;
-      // Busy Winnipeg River mouth opening along bottom shore
       fillPixelPoly([
         [x + 68, bottomBankY - 2],
         [x + 98, bottomBankY - 2],
@@ -2133,7 +2213,6 @@
       ctx.fillStyle = PAL.LAKE_FOAM;
       ctx.fillRect(x + 67, bottomBankY - 2, 32, 2);
 
-      // Tall timber stockade wall
       ctx.fillStyle = PAL.OUTLINE;
       ctx.fillRect(x, fy + 3, 68, 22);
       ctx.fillStyle = PAL.WOOD_DARK;
@@ -2143,7 +2222,6 @@
         ctx.fillRect(x + px, fy + 3, 2, 21);
       }
 
-      // Corner timber blockhouses
       ctx.fillStyle = PAL.WOOD_MID;
       ctx.fillRect(x - 2, fy, 10, 24);
       ctx.fillRect(x + 60, fy, 10, 24);
@@ -2151,7 +2229,6 @@
       ctx.fillRect(x - 3, fy - 2, 12, 2);
       ctx.fillRect(x + 59, fy - 2, 12, 2);
 
-      // Large interior log storehouses rising above palisade
       ctx.fillStyle = PAL.WOOD_LIGHT;
       ctx.fillRect(x + 12, fy - 5, 22, 10);
       ctx.fillRect(x + 37, fy - 4, 20, 9);
@@ -2159,7 +2236,6 @@
       ctx.fillRect(x + 11, fy - 7, 24, 2);
       ctx.fillRect(x + 36, fy - 6, 22, 2);
 
-      // Moored trading canoe at Winnipeg River mouth
       ctx.fillStyle = PAL.HIDE_LIGHT;
       ctx.fillRect(x + 73, fy + 10, 18, 4);
 
@@ -2168,7 +2244,6 @@
     }
 
     if (lm.type === 'MANIGOTAGAN') {
-      // Larger Manigotagan rocky gorge outpost (56px wide) overhanging onto bottom track
       const fy = bottomBankY - 17;
       fillPixelPoly([
         [x + 20, bottomBankY - 2],
@@ -2179,7 +2254,6 @@
       drawShadedGrayRock(x - 4, fy + 9, false, false);
       drawShadedGrayRock(x + 40, fy + 9, false, false);
 
-      // Larger timber outpost & store shed
       ctx.fillStyle = PAL.OUTLINE;
       ctx.fillRect(x + 14, fy - 1, 28, 15);
       ctx.fillStyle = PAL.WOOD_MID;
@@ -2197,7 +2271,6 @@
     }
 
     if (lm.type === 'BERENS_RIVER') {
-      // Much larger Berens River House (Omaskosihk 64px wide post, warehouse & pelt press in backlit silhouette)
       const fy = bottomBankY - 18;
       const cWall = isSil ? PAL.SILHOUETTE : PAL.HIDE_LIGHT;
       const cRoof = isSil ? PAL.SILHOUETTE : PAL.MAROON_MID;
@@ -2206,7 +2279,6 @@
       drawShadedGrayRock(x - 6, fy + 10, false, isSil);
       drawShadedGrayRock(x + 48, fy + 10, false, isSil);
 
-      // Main whitewashed post building & adjoining fur store
       ctx.fillStyle = PAL.OUTLINE;
       ctx.fillRect(x + 6, fy, 42, 16);
       ctx.fillStyle = cWall;
@@ -2216,7 +2288,6 @@
       ctx.fillStyle = cRim;
       ctx.fillRect(x + 6, fy - 3, 42, 1);
 
-      // Tall timber pelt press frame & flagpole on rocky point
       ctx.fillStyle = isSil ? PAL.SILHOUETTE : PAL.WOOD_DARK;
       ctx.fillRect(x + 51, fy - 2, 2, 16);
       ctx.fillRect(x + 59, fy - 2, 2, 16);
@@ -2284,13 +2355,11 @@
   }
 
   function scheduleNextRiverFeature() {
-    // Pause feature spawns around Norway House North Shore landing & dogsled deployment (3990 - 4240)
     if (score >= 3990 && score < 4240) {
       nextFeatureX += 90;
       return;
     }
 
-    // --- Red River Section Landmarks ---
     if (!spawnedFlags.ST_JOHNS && score >= 165) {
       landmarks.push({ x: VIEW_W + 30, type: 'ST_JOHNS_CHURCH', clearW: 54 });
       spawnedFlags.ST_JOHNS = true;
@@ -2332,7 +2401,6 @@
       spawnedFlags.ST_PETERS_DYNEVOR = true;
     }
 
-    // --- East Shore of Lake Winnipeg Daisy Chain (Priority foreground bottom-shore outposts) ---
     if (!spawnedFlags.BROKENHEAD && score >= 2030) {
       nearBankLandmarks.push({ x: VIEW_W + 35, type: 'BROKENHEAD_MOUTH', clearW: 64 });
       spawnedFlags.BROKENHEAD = true;
@@ -2565,12 +2633,10 @@
     const silT = getSilhouetteFactor();
     const isSil = silT > 0.55;
 
-    // 1. Mouth opening of Lake Winnipeg (1760 -> 1900: 0 -> 1)
     const mouthOpenT = score < DIST.MOUTH_OPEN_START
       ? 0
       : Math.min(1, (score - DIST.MOUTH_OPEN_START) / (DIST.ST_PETERS_END - DIST.MOUTH_OPEN_START));
 
-    // 2. Natural North Shore lake closing at Norway House (3980 -> 4100: 0 -> 1)
     const lakeCloseT = score < DIST.LAKE_CLOSE_START
       ? 0
       : Math.min(1, (score - DIST.LAKE_CLOSE_START) / (DIST.NORWAY_HOUSE_END - DIST.LAKE_CLOSE_START));
@@ -3126,7 +3192,6 @@
     }
 
     // 8. PRIORITY FOREGROUND: Unique Objects on the Bottom Shore!
-    // Drawn AFTER player, hazards, and river features so the player & objects visually "flow" behind them!
     const bottomAnchorY = bottomShoreH > 0 ? (VIEW_H - bottomShoreH) : VIEW_H;
     for (let i = 0; i < nearBankLandmarks.length; i++) {
       drawNearBankLandmark(nearBankLandmarks[i], bottomAnchorY, isSil);
@@ -3345,7 +3410,6 @@
 
     if (gameMode !== 'PLAYING') return;
 
-    // Mid-Game Norway House North Shore Landing & Dogsled Deployment Cutscene (4100 - 4220)
     if (score >= DIST.NORWAY_HOUSE_END && score < DIST.DEPLOY_END) {
       if (!isDeployingSled) {
         isDeployingSled = true;
@@ -3775,7 +3839,7 @@
     }
   });
 
-  // Start continuous render loop on the stylized Woodland title screen
+  // Start continuous render loop on the Midnight Lake Winnipeg title screen
   resetWorld();
   titleStartTime = performance.now();
   requestAnimationFrame(update);
