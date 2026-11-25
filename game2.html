@@ -54,7 +54,7 @@ function resizeViewport() {
 window.addEventListener('resize', resizeViewport);
 resizeViewport();
 
-// --- 1855 RED RIVER MICHIF KITCHEN PARTY PALETTE ---
+// --- 1855 RED RIVER MICHIF KITCHEN PARTY PALETTE (WITH HIGHLIGHTS & SHADOWS) ---
 const PAL = {
   INK: '#0E0705',
   PANEL_BG: '#160B07',
@@ -70,16 +70,35 @@ const PAL = {
   FIRE_ORANGE: '#FB6604',
   FIRE_GOLD: '#F7C844',
   CAPOTE_BLUE: '#1A3E6C',
+  CAPOTE_BLUE_HI: '#2E62A3',
+  CAPOTE_BLUE_SH: '#0F2542',
   CAPOTE_CREAM: '#E8DEC8',
+  CAPOTE_CREAM_HI: '#FAF5EB',
+  CAPOTE_CREAM_SH: '#B8AA8E',
   CAPOTE_RED: '#9E1B20',
+  CAPOTE_RED_HI: '#D42C33',
+  CAPOTE_RED_SH: '#610E12',
   CAPOTE_GREEN: '#1D5E43',
   SASH_RED: '#C51E40',
   SASH_TEAL: '#12AEA2',
+  SASH_TEAL_HI: '#3CE0D3',
   SASH_GOLD: '#F2A922',
   SHAWL_PURPLE: '#6B2D5C',
+  SHAWL_PURPLE_HI: '#994685',
+  SHAWL_PURPLE_SH: '#421938',
   SKIN: '#E5B288',
+  SKIN_HI: '#F5CCA8',
+  SKIN_SH: '#B57D54',
   HAIR_DARK: '#1C110B',
+  BEARD_BROWN: '#3A2316',
+  BEARD_HI: '#593825',
   BUFFALO_FUR: '#3B2314',
+  BUFFALO_FUR_HI: '#5C3822',
+  BUFFALO_FUR_SH: '#21120A',
+  WOOD_LIGHT: '#C68642',
+  WOOD_DARK: '#7D4E1D',
+  BONE_WHITE: '#F4EFE6',
+  BONE_SHADE: '#C7BFB2',
   IRON_DARK: '#2E343B',
   IRON_LIGHT: '#8D99A6',
   WHITE: '#FFFFFF',
@@ -87,7 +106,7 @@ const PAL = {
 };
 
 // ============================================================================
-// PHASE 1 & PHASE 2 ROSTERS (3 FIDDLE SLOTS COMPOSE 1 UNIFIED SCORE: X / Y / Z)
+// PHASE 1 & PHASE 2 ROSTERS
 // ============================================================================
 const FIDDLE_ROSTER = [
   {
@@ -146,15 +165,43 @@ const FIDDLE_ROSTER = [
   }
 ];
 
+// Expanded Hand Percussion Roster (4 Distinct Players + Empty)
 const HAND_PERC_ROSTER = [
-  { id: 'SPOONS', name: 'SPOONS', style: 'GALLOP', desc: 'Wooden/metal lap & knee gallop' },
-  { id: 'BONES',  name: 'RIB BONES', style: 'CLACK', desc: 'Crisp buffalo rib bone snare clack' },
-  { id: 'NONE',   name: 'EMPTY', style: 'RESTING', desc: 'No hand percussion' }
+  {
+    id: 'SPOONS_GALLOP',
+    name: 'SPOONS 1',
+    style: 'GALLOP',
+    desc: 'Carved wooden double-spoon triplet gallop'
+  },
+  {
+    id: 'SPOONS_LIFT',
+    name: 'SPOONS 2',
+    style: '1-2-3-LIFT',
+    desc: 'Wooden double-spoon 1-2-3 bounce & upward lift'
+  },
+  {
+    id: 'BONES_CLACK',
+    name: 'HUNTER 1',
+    style: 'BONES CLACK',
+    desc: 'Buffalo hunter clacking rib bones on backbeats'
+  },
+  {
+    id: 'BONES_ROLL',
+    name: 'HUNTER 2',
+    style: 'BONES ROLL',
+    desc: 'Buffalo hunter rapid-fire rib bone tremolo roll'
+  },
+  {
+    id: 'NONE',
+    name: 'EMPTY',
+    style: 'RESTING',
+    desc: 'No hand percussion'
+  }
 ];
 
 const BIG_PERC_ROSTER = [
   { id: 'DRUM',  name: 'HAND DRUM', style: 'HEARTBEAT', desc: 'Deep hide frame drum thump' },
-  { id: 'ANVIL', name: 'ANVIL', style: 'IRON RING', desc: 'Red River blacksmith iron clang' },
+  { id: 'ANVIL', name: 'ANVIL', style: 'HALF-TIME RING', desc: 'Slow half-time Red River iron clang' },
   { id: 'NONE',  name: 'EMPTY', style: 'RESTING', desc: 'No big percussion' }
 ];
 
@@ -162,10 +209,12 @@ const DANCER_ROSTER = [
   {
     id: 'M1',
     name: 'DANCER 1 (M)',
-    outfit: 'BLUE CAPOTE & SASH',
+    outfit: 'BLUE CAPOTE & CEINTURE',
     styleTitle: 'ST. BONIFACE SHUFFLE',
     gender: 'M',
     topCol: PAL.CAPOTE_BLUE,
+    topHi: PAL.CAPOTE_BLUE_HI,
+    topSh: PAL.CAPOTE_BLUE_SH,
     botCol: PAL.LOG_DARK,
     sashCol: PAL.SASH_RED,
     hatCol: PAL.SASH_RED,
@@ -187,7 +236,11 @@ const DANCER_ROSTER = [
     styleTitle: 'RED RIVER CROSS-STEP',
     gender: 'F',
     topCol: PAL.CAPOTE_CREAM,
+    topHi: PAL.CAPOTE_CREAM_HI,
+    topSh: PAL.CAPOTE_CREAM_SH,
     botCol: PAL.CAPOTE_RED,
+    botHi: PAL.CAPOTE_RED_HI,
+    botSh: PAL.CAPOTE_RED_SH,
     sashCol: PAL.SASH_TEAL,
     hatCol: PAL.SHAWL_PURPLE,
     stepPattern: [
@@ -204,10 +257,12 @@ const DANCER_ROSTER = [
   {
     id: 'M2',
     name: 'DANCER 3 (M)',
-    outfit: 'RED SHIRT & TOQUE',
+    outfit: 'RED CAPOTE & WOOL TOQUE',
     styleTitle: 'PORTAGE HEEL STOMP',
     gender: 'M',
     topCol: PAL.CAPOTE_RED,
+    topHi: PAL.CAPOTE_RED_HI,
+    topSh: PAL.CAPOTE_RED_SH,
     botCol: PAL.CAPOTE_BLUE,
     sashCol: PAL.FIRE_ORANGE,
     hatCol: PAL.SASH_TEAL,
@@ -225,11 +280,15 @@ const DANCER_ROSTER = [
   {
     id: 'F2',
     name: 'DANCER 4 (F)',
-    outfit: 'RIBBON SKIRT & VEST',
+    outfit: 'RIBBON SKIRT & BEADED VEST',
     styleTitle: 'WHITE HORSE FANCY',
     gender: 'F',
     topCol: PAL.CAPOTE_BLUE,
+    topHi: PAL.CAPOTE_BLUE_HI,
+    topSh: PAL.CAPOTE_BLUE_SH,
     botCol: PAL.SHAWL_PURPLE,
+    botHi: PAL.SHAWL_PURPLE_HI,
+    botSh: PAL.SHAWL_PURPLE_SH,
     sashCol: PAL.SASH_GOLD,
     hatCol: PAL.SASH_RED,
     stepPattern: [
@@ -304,11 +363,7 @@ const RRJ_PART_B = [
 ];
 
 // ============================================================================
-// UNIFIED ALGORITHMIC SCORE COMPILER
-// Slot 1 -> X (Harmonic Mapping)
-// Slot 2 -> Y (Rhythmic Engine)
-// Slot 3 -> Z (Structural Macro)
-// All 3 slots combine into ONE unified algorithmic score!
+// UNIFIED ALGORITHMIC SCORE COMPILER (X / Y / Z -> 1 UNIFIED SONG)
 // ============================================================================
 function computeXYZProfile() {
   const f1 = FIDDLE_ROSTER[bandSlots[0]];
@@ -425,7 +480,6 @@ function computeXYZProfile() {
     ];
   }
 
-  // Compile ONE unified algorithmic score from X, Y, Z parameters
   const unifiedScore = rawSequence.map((ev, idx) => {
     const baseLead = ev.tri ? (waltzSmooth ? ev.tri[0] : null) : ev.n;
     const shiftedLead = baseLead ? baseLead + semitoneShift : 0;
@@ -476,10 +530,10 @@ let animFrame = 0;
 
 // Phase 1 Selections (5 Band Slots + Slot 5 = Next Button)
 const bandSlots = [
-  0, // Slot 1 [X]: FIDDLER 1 (0, 0, 0)
-  4, // Slot 2 [Y]: FIDDLER 5 (+1, +2, +1)
-  5, // Slot 3 [Z]: EMPTY (0, 0, 0)
-  0, // Hand Perc: SPOONS
+  0, // Slot 1 [X]: FIDDLER 1
+  4, // Slot 2 [Y]: FIDDLER 5 (SPOON-CORDING)
+  5, // Slot 3 [Z]: EMPTY
+  0, // Hand Perc: SPOONS 1 (GALLOP)
   0  // Big Perc: HAND DRUM
 ];
 let bandCursor = 0;
@@ -502,6 +556,11 @@ let maxCombo = 0;
 let jiggerPose = 'IDLE';
 let jiggerPoseTimer = 0;
 
+// Hitbox Zoom Pulse Timers (when A or B is pressed)
+let zoomPulseA = 0;
+let zoomPulseB = 0;
+let zoomPulseBox = 0;
+
 const LOOKAHEAD = 25.0;
 const SCHEDULE_AHEAD_TIME = 2.0;
 const TOLERANCE_PERFECT = 0.11;
@@ -517,7 +576,7 @@ function getSongPhaseIndex(stepIdx) {
 }
 
 // ============================================================================
-// WEB AUDIO ENGINE (PLAYS ONE UNIFIED ALGORITHMIC SCORE)
+// WEB AUDIO ENGINE (PLAYS ONE UNIFIED ALGORITHMIC SCORE + EXPANDED PERCUSSION)
 // ============================================================================
 const AudioContext = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
@@ -638,48 +697,73 @@ function playFootTap(time, gainScale = 1.0) {
   registerNode(osc);
 }
 
+function playSingleSpoonHit(t, freqStart, vol) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(freqStart, t);
+  osc.frequency.exponentialRampToValueAtTime(68, t + 0.07);
+  gain.gain.setValueAtTime(vol, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.075);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(t);
+  osc.stop(t + 0.08);
+  registerNode(osc);
+}
+
+function playSingleBoneHit(t, freqCenter, vol) {
+  const noise = audioCtx.createBufferSource();
+  noise.buffer = noiseBuffer;
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.frequency.setValueAtTime(freqCenter, t);
+  filter.Q.setValueAtTime(3.2, t);
+  const gain = audioCtx.createGain();
+  gain.gain.setValueAtTime(vol, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.052);
+  noise.connect(filter);
+  filter.connect(gain);
+  gain.connect(audioCtx.destination);
+  noise.start(t);
+  noise.stop(t + 0.058);
+  registerNode(noise);
+}
+
 function playHandPerc(percId, time, stepDur, stepIdx, gainScale = 1.0) {
   if (percId === 'NONE' || activeProfile.soloMode || !audioCtx || !noiseBuffer) return;
 
-  if (percId === 'SPOONS') {
+  if (percId === 'SPOONS_GALLOP') {
     if (stepIdx % 2 === 0) {
       const pairDur = stepDur * 2;
       const hits = activeProfile.waltzSmooth ? [0] : [0, 0.33, 0.66];
       hits.forEach((h, i) => {
-        const t = time + pairDur * h;
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(i === 0 ? 165 : 135, t);
-        osc.frequency.exponentialRampToValueAtTime(68, t + 0.07);
-        gain.gain.setValueAtTime((i === 0 ? 0.22 : 0.14) * gainScale, t);
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.075);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start(t);
-        osc.stop(t + 0.08);
-        registerNode(osc);
+        playSingleSpoonHit(time + pairDur * h, i === 0 ? 165 : 135, (i === 0 ? 0.22 : 0.14) * gainScale);
       });
     }
-  } else if (percId === 'BONES') {
+  } else if (percId === 'SPOONS_LIFT') {
+    // 1-2-3-Lift: Three crisp knee/palm taps followed by a bright upward lift click on beat 4
+    const barStep = stepIdx % 4;
+    if (barStep === 0) {
+      playSingleSpoonHit(time, 155, 0.20 * gainScale);
+    } else if (barStep === 1) {
+      playSingleSpoonHit(time, 140, 0.16 * gainScale);
+    } else if (barStep === 2) {
+      playSingleSpoonHit(time, 175, 0.23 * gainScale);
+    } else if (barStep === 3) {
+      // High upward spoon-bowl lift snap
+      playSingleSpoonHit(time + stepDur * 0.35, 295, 0.17 * gainScale);
+    }
+  } else if (percId === 'BONES_CLACK') {
     if (stepIdx % 2 === 1 || stepIdx % 4 === 0) {
       const accent = (stepIdx % 4 === 2);
-      const noise = audioCtx.createBufferSource();
-      noise.buffer = noiseBuffer;
-      const filter = audioCtx.createBiquadFilter();
-      filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(accent ? 2150 : 1850, time);
-      filter.Q.setValueAtTime(3.2, time);
-      const gain = audioCtx.createGain();
-      gain.gain.setValueAtTime((accent ? 0.22 : 0.13) * gainScale, time);
-      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.055);
-      noise.connect(filter);
-      filter.connect(gain);
-      gain.connect(audioCtx.destination);
-      noise.start(time);
-      noise.stop(time + 0.06);
-      registerNode(noise);
+      playSingleBoneHit(time, accent ? 2150 : 1850, (accent ? 0.22 : 0.13) * gainScale);
     }
+  } else if (percId === 'BONES_ROLL') {
+    // Rapid-fire 32nd-note rib-bone roll across the bar
+    const accent = (stepIdx % 4 === 0);
+    playSingleBoneHit(time, accent ? 2250 : 1900, (accent ? 0.20 : 0.13) * gainScale);
+    playSingleBoneHit(time + stepDur * 0.5, 1780, 0.11 * gainScale);
   }
 }
 
@@ -708,20 +792,21 @@ function playBigPerc(bigId, time, stepIdx, gainScale = 1.0) {
       registerNode(osc);
     }
   } else if (bigId === 'ANVIL') {
-    if (stepIdx % 4 === 2) {
+    // Slowed to half-speed (every 8 sixteenth steps = half-note blacksmith ring)
+    if (stepIdx % 8 === 4) {
       const freqs = [1174.66, 1760.0, 2637.02];
       freqs.forEach((f, idx) => {
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = idx === 0 ? 'triangle' : 'sine';
         osc.frequency.setValueAtTime(f, time);
-        const vol = (idx === 0 ? 0.14 : 0.06) * gainScale;
+        const vol = (idx === 0 ? 0.15 : 0.065) * gainScale;
         gain.gain.setValueAtTime(vol, time);
-        gain.gain.exponentialRampToValueAtTime(0.0008, time + 0.24);
+        gain.gain.exponentialRampToValueAtTime(0.0008, time + 0.34);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.start(time);
-        osc.stop(time + 0.25);
+        osc.stop(time + 0.35);
         registerNode(osc);
       });
     }
@@ -765,6 +850,9 @@ function startJiggingPhase() {
   maxCombo = 0;
   jiggerPose = 'IDLE';
   jiggerPoseTimer = 0;
+  zoomPulseA = 0;
+  zoomPulseB = 0;
+  zoomPulseBox = 0;
 
   phase = 'JIGGING';
   nextStepTime = audioCtx.currentTime + 0.75;
@@ -791,7 +879,6 @@ function returnToBandBuilder() {
   startBandPreviewIfNeeded();
 }
 
-// Plays ONE unified algorithmic score (never 3 stacked competing fiddle melodies)
 function scheduleUnifiedSongAudio(stepIdx, time, stepDur, gainScale) {
   const scoreArr = activeProfile.score;
   const ev = scoreArr[stepIdx % scoreArr.length];
@@ -805,7 +892,6 @@ function scheduleUnifiedSongAudio(stepIdx, time, stepDur, gainScale) {
     const baseDur = ev.tie ? stepDur * 1.85 : stepDur * 0.92;
     const dur = ev.legato ? baseDur * 1.35 : baseDur;
 
-    // 1. Single Unified Lead Voice
     if (ev.tri) {
       const subDur = stepDur / 3;
       for (let t = 0; t < ev.tri.length; t++) {
@@ -821,12 +907,10 @@ function scheduleUnifiedSongAudio(stepIdx, time, stepDur, gainScale) {
       playFiddleTone(ev.lead, playTime, dur, 0.115 * gainScale, 0);
     }
 
-    // 2. Unified Drone / Double-Stop Harmony Voice (when multiple fiddlers or double-stops are active)
     if (ev.drone && (!activeProfile.soloMode || activeProfile.X <= -4)) {
       playFiddleTone(ev.drone, playTime, dur, 0.085 * gainScale, +4);
     }
 
-    // 3. Spoon-Cording accent if Fiddler 5 is in the ensemble
     if (activeProfile.hasSpoonCording && !activeProfile.soloMode) {
       playSpoonCordAccent(ev.drone || ev.lead || 62, playTime, stepDur, stepIdx, gainScale);
     }
@@ -846,7 +930,6 @@ function scheduleJigStep(stepIdx, time, stepDur) {
   const playTime = scheduleUnifiedSongAudio(stepIdx, time, stepDur, 1.0);
   const dancer = DANCER_ROSTER[selectedDancerIdx];
 
-  // Half-tempo quarter-note rhythm prompts (every 4 sixteenth steps)
   if (stepIdx % 4 === 0 && stepIdx < totalSongSteps - 8) {
     const halfTempoBeat = Math.floor(stepIdx / 4) % dancer.stepPattern.length;
     const pat = dancer.stepPattern[halfTempoBeat];
@@ -926,6 +1009,10 @@ function handleJigTap(btnPressed) {
   if (phase !== 'JIGGING' || !audioCtx || isPaused) return;
   const now = audioCtx.currentTime;
 
+  zoomPulseBox = 1.0;
+  if (btnPressed === 'A') zoomPulseA = 1.0;
+  if (btnPressed === 'B') zoomPulseB = 1.0;
+
   let closest = null;
   let minDiff = Infinity;
   for (let i = 0; i < expectedBeats.length; i++) {
@@ -942,7 +1029,6 @@ function handleJigTap(btnPressed) {
   if (closest && minDiff <= TOLERANCE_GOOD) {
     const exactBtn = (closest.btn === btnPressed);
     if (!exactBtn) {
-      // Pressed A when B was required (or vice versa)
       closest.missed = true;
       combo = 0;
       jiggerPose = 'FALL';
@@ -964,7 +1050,7 @@ function handleJigTap(btnPressed) {
     if (combo > maxCombo) maxCombo = combo;
     jiggerPose = (btnPressed === 'B') ? 'JIG_R' : 'JIG_L';
     jiggerPoseTimer = now + 0.28;
-    spawnFloatingText(label, btnPressed === 'B' ? PAL.FIRE_ORANGE : PAL.SASH_TEAL);
+    spawnFloatingText(label, btnPressed === 'B' ? PAL.WHITE : PAL.SASH_RED);
   } else {
     combo = 0;
     jiggerPose = 'FALL';
@@ -1199,7 +1285,7 @@ window.addEventListener('message', function(event) {
 });
 
 // ============================================================================
-// HIGH-READABILITY PIXEL ART & TEXT HELPERS
+// HIGH-DETAIL SHADED PIXEL ART & TEXT HELPERS
 // ============================================================================
 function pxRect(x, y, w, h, color) {
   ctx.fillStyle = color;
@@ -1235,6 +1321,8 @@ function drawWrappedText(txt, cx, startY, maxWidth, lineHeight, size, color) {
   });
 }
 
+// Musicians: Fiddlers, Wooden Double-Spoon Player (1 handle, 2 connected bowls),
+// and Burly Buffalo Hunter Rib-Bone Players (buffalo robes, brimmed wool hats, bushy beards)
 function drawMusicianMini(type, id, cx, cy, scale = 4, beatPulse = false, isMuted = false) {
   const s = scale;
   const bob = (id !== 'NONE' && !isMuted && beatPulse) ? -s : 0;
@@ -1256,6 +1344,8 @@ function drawMusicianMini(type, id, cx, cy, scale = 4, beatPulse = false, isMute
     pxRect(x + 3 * s, y, 6 * s, 2 * s, fObj.hat);
     pxRect(x + 2 * s, y + 2 * s, 8 * s, s, PAL.SASH_GOLD);
     pxRect(x + 3 * s, y + 3 * s, 6 * s, 3 * s, PAL.SKIN);
+    pxRect(x + 3 * s, y + 4 * s, s, s, PAL.INK);
+    pxRect(x + 7 * s, y + 4 * s, s, s, PAL.INK);
     pxRect(x + 2 * s, y + 6 * s, 8 * s, 5 * s, fObj.coat);
     pxRect(x + 2 * s, y + 9 * s, 8 * s, s, PAL.SASH_RED);
     pxRect(x + 3 * s, y + 11 * s, 2 * s, 3 * s, PAL.LOG_DARK);
@@ -1263,25 +1353,85 @@ function drawMusicianMini(type, id, cx, cy, scale = 4, beatPulse = false, isMute
     pxRect(x + 8 * s, y + 5 * s, 4 * s, 2 * s, '#B85D19');
     if (id === 'SPOON_CORD') {
       const tapY = (!isMuted && beatPulse) ? y + 3 * s : y + 5 * s;
-      pxRect(x + 8 * s, tapY, 4 * s, 2, PAL.SASH_GOLD);
+      pxRect(x + 8 * s, tapY, 4 * s, 2, PAL.WOOD_LIGHT);
     } else {
       const bowShift = (!isMuted && beatPulse) ? -s : s;
       pxRect(x + 7 * s, y + 4 * s + bowShift, 6 * s, 2, PAL.WHITE);
     }
   } else if (type === 'HAND') {
-    pxRect(x + 3 * s, y, 6 * s, 2 * s, PAL.SASH_TEAL);
-    pxRect(x + 3 * s, y + 2 * s, 6 * s, 4 * s, PAL.SKIN);
-    pxRect(x + 2 * s, y + 6 * s, 8 * s, 5 * s, PAL.CAPOTE_RED);
-    pxRect(x + 2 * s, y + 9 * s, 8 * s, s, PAL.SASH_GOLD);
-    pxRect(x + 3 * s, y + 11 * s, 2 * s, 3 * s, PAL.CAPOTE_BLUE);
-    pxRect(x + 7 * s, y + 11 * s, 2 * s, 3 * s, PAL.CAPOTE_BLUE);
-    const handY = (!isMuted && beatPulse) ? y + 6 * s : y + 8 * s;
-    const toolCol = (id === 'BONES') ? PAL.CAPOTE_CREAM : '#A8B2BD';
-    pxRect(x + s, handY, 2 * s, s, toolCol);
-    pxRect(x + 9 * s, handY, 2 * s, s, toolCol);
+    if (id === 'SPOONS_GALLOP' || id === 'SPOONS_LIFT') {
+      // Métis Wooden Spoon Player: Wool toque, red capote, holding ONE wooden handle with TWO connected spoons
+      pxRect(x + 3 * s, y, 6 * s, 2 * s, PAL.SASH_TEAL);
+      pxRect(x + 2 * s, y + 2 * s, 8 * s, s, PAL.SASH_GOLD);
+      pxRect(x + 3 * s, y + 3 * s, 6 * s, 3 * s, PAL.SKIN);
+      pxRect(x + 4 * s, y + 4 * s, s, s, PAL.INK);
+      pxRect(x + 7 * s, y + 4 * s, s, s, PAL.INK);
+      pxRect(x + 2 * s, y + 6 * s, 8 * s, 5 * s, PAL.CAPOTE_RED);
+      pxRect(x + 2 * s, y + 9 * s, 8 * s, s, PAL.SASH_GOLD);
+      pxRect(x + 3 * s, y + 11 * s, 2 * s, 3 * s, PAL.CAPOTE_BLUE);
+      pxRect(x + 7 * s, y + 11 * s, 2 * s, 3 * s, PAL.CAPOTE_BLUE);
+
+      // Single carved wooden double-spoon held in right hand, bouncing on knee/left palm!
+      const isLiftStyle = (id === 'SPOONS_LIFT');
+      const liftPhase = (Math.floor(animFrame / 8) % 4 === 3);
+      const spoonY = (!isMuted && beatPulse)
+        ? (isLiftStyle && liftPhase ? y + 4 * s : y + 7 * s)
+        : y + 9 * s;
+
+      // Left palm receiving the tap
+      pxRect(x + 2 * s, y + 9 * s, 2 * s, s, PAL.SKIN);
+      // Right hand gripping the single wooden handle
+      pxRect(x + 7 * s, spoonY, 2 * s, s, PAL.SKIN);
+      // Single carved wooden handle
+      pxRect(x + 5 * s, spoonY, 3 * s, s, PAL.WOOD_DARK);
+      // Two connected wooden spoon bowls back-to-back at the tip of the handle
+      pxRect(x + 3 * s, spoonY - Math.floor(s * 0.6), 2 * s, Math.floor(s * 0.8), PAL.WOOD_LIGHT);
+      pxRect(x + 3 * s, spoonY + Math.floor(s * 0.7), 2 * s, Math.floor(s * 0.8), PAL.WOOD_LIGHT);
+    } else {
+      // Burly Buffalo Hunter Rib-Bone Player:
+      // Wide-brimmed dark wool hat, big bushy beard, heavy shaggy buffalo-fur robe,
+      // and curved white buffalo rib bones held in BOTH hands like crash cymbals!
+      // Wide-brimmed wool hat
+      pxRect(x + 3 * s, y - s, 6 * s, 2 * s, PAL.HAIR_DARK);
+      pxRect(x + s, y + s, 10 * s, s, PAL.HAIR_DARK);
+      pxRect(x + 3 * s, y + s, 6 * s, Math.floor(s * 0.5), PAL.SASH_RED);
+      // Face & Eyes
+      pxRect(x + 3 * s, y + 2 * s, 6 * s, 2 * s, PAL.SKIN);
+      pxRect(x + 4 * s, y + 2 * s, s, s, PAL.INK);
+      pxRect(x + 7 * s, y + 2 * s, s, s, PAL.INK);
+      // Big Bushy Beard covering lower face & chest
+      pxRect(x + 2 * s, y + 4 * s, 8 * s, 3 * s, PAL.BEARD_BROWN);
+      pxRect(x + 3 * s, y + 5 * s, 6 * s, 2 * s, PAL.BEARD_HI);
+      // Broad, burly shaggy buffalo-fur robe
+      pxRect(x + s, y + 6 * s, 10 * s, 6 * s, PAL.BUFFALO_FUR);
+      pxRect(x + s, y + 6 * s, 2 * s, 5 * s, PAL.BUFFALO_FUR_HI);
+      pxRect(x + 9 * s, y + 6 * s, 2 * s, 5 * s, PAL.BUFFALO_FUR_SH);
+      // Sash belt & sturdy boots
+      pxRect(x + s, y + 10 * s, 10 * s, s, PAL.SASH_RED);
+      pxRect(x + 2 * s, y + 12 * s, 3 * s, 2 * s, PAL.LOG_DARK);
+      pxRect(x + 7 * s, y + 12 * s, 3 * s, 2 * s, PAL.LOG_DARK);
+
+      // Curved white buffalo rib bones in EACH hand clashing together like crash cymbals
+      const clash = (!isMuted && beatPulse);
+      const leftBoneX = clash ? x + 4 * s : x + s;
+      const rightBoneX = clash ? x + 6 * s : x + 9 * s;
+      const boneY = clash ? y + 6 * s : y + 7 * s;
+
+      // Left hand + curved rib bone
+      pxRect(leftBoneX, boneY + 2 * s, 2 * s, s, PAL.SKIN);
+      pxRect(leftBoneX, boneY, s, 3 * s, PAL.BONE_WHITE);
+      pxRect(leftBoneX + Math.floor(s * 0.5), boneY - s, s, s, PAL.BONE_SHADE);
+
+      // Right hand + curved rib bone
+      pxRect(rightBoneX, boneY + 2 * s, 2 * s, s, PAL.SKIN);
+      pxRect(rightBoneX + s, boneY, s, 3 * s, PAL.BONE_WHITE);
+      pxRect(rightBoneX + Math.floor(s * 0.5), boneY - s, s, s, PAL.BONE_SHADE);
+    }
   } else if (type === 'BIG') {
     pxRect(x + 3 * s, y, 6 * s, 2 * s, PAL.SASH_RED);
     pxRect(x + 3 * s, y + 2 * s, 6 * s, 4 * s, PAL.SKIN);
+    pxRect(x + 4 * s, y + 3 * s, s, s, PAL.INK);
+    pxRect(x + 7 * s, y + 3 * s, s, s, PAL.INK);
     pxRect(x + 2 * s, y + 6 * s, 8 * s, 5 * s, PAL.BUFFALO_FUR);
     pxRect(x + 3 * s, y + 11 * s, 2 * s, 3 * s, PAL.LOG_DARK);
     pxRect(x + 7 * s, y + 11 * s, 2 * s, 3 * s, PAL.LOG_DARK);
@@ -1298,63 +1448,157 @@ function drawMusicianMini(type, id, cx, cy, scale = 4, beatPulse = false, isMute
   ctx.restore();
 }
 
+// ============================================================================
+// HIGH-DETAIL SHADED PIXEL ART FOR ALL 4 MÉTIS DANCERS (24x28 SUB-PIXEL GRID)
+// ============================================================================
 function drawDancerSprite(dancer, cx, cy, scale = 5, pose = 'IDLE') {
-  const s = scale;
-  const x = Math.floor(cx - 6 * s);
-  const y = Math.floor(cy - 13 * s);
+  // Use half-step sub-pixels (p = scale / 2) for 2x sharper shading, faces, sashes, ribbons & moccasins
+  const p = Math.max(2, Math.floor(scale * 0.55));
+  const x = Math.floor(cx - 12 * p);
+  const y = Math.floor(cy - 26 * p);
 
-  pxRect(cx - 26, cy - 2, 52, 7, 'rgba(0,0,0,0.45)');
+  // Layered floor shadow on the braided rug
+  pxRect(cx - 13 * p, cy - p, 26 * p, 3 * p, 'rgba(0,0,0,0.45)');
+  pxRect(cx - 10 * p, cy - Math.floor(p * 0.5), 20 * p, 2 * p, 'rgba(0,0,0,0.35)');
 
   if (pose === 'FALL') {
-    pxRect(x + 2 * s, y + 7 * s, 8 * s, 4 * s, dancer.topCol);
-    pxRect(x + s, y + 6 * s, 3 * s, 3 * s, PAL.SKIN);
-    pxRect(x + 9 * s, y + 8 * s, 3 * s, 2 * s, PAL.SASH_TEAL);
+    pxRect(x + 3 * p, y + 15 * p, 18 * p, 7 * p, dancer.topCol);
+    pxRect(x + 4 * p, y + 15 * p, 16 * p, 2 * p, dancer.topHi);
+    pxRect(x + 2 * p, y + 13 * p, 6 * p, 6 * p, PAL.SKIN);
+    pxRect(x + 18 * p, y + 17 * p, 5 * p, 4 * p, dancer.sashCol);
     return;
   }
 
-  if (dancer.gender === 'F') {
-    pxRect(x + 3 * s, y, 6 * s, 2 * s, dancer.hatCol);
-    pxRect(x + 2 * s, y + 2 * s, s, 4 * s, PAL.HAIR_DARK);
-    pxRect(x + 9 * s, y + 2 * s, s, 4 * s, PAL.HAIR_DARK);
+  // 1. HEADWEAR & HAIR (Distinct for each of the 4 Métis Dancers)
+  if (dancer.id === 'M1') {
+    // Dancer 1 (M): Red & Gold Beaded Voyageur Cap + Dark Hair
+    pxRect(x + 8 * p, y, 8 * p, 2 * p, PAL.SASH_RED);
+    pxRect(x + 7 * p, y + 2 * p, 10 * p, 2 * p, PAL.FIRE_RED);
+    pxRect(x + 6 * p, y + 4 * p, 12 * p, p, PAL.SASH_GOLD);
+    pxRect(x + 6 * p, y + 5 * p, 2 * p, 4 * p, PAL.HAIR_DARK);
+    pxRect(x + 16 * p, y + 5 * p, 2 * p, 4 * p, PAL.HAIR_DARK);
+  } else if (dancer.id === 'F1') {
+    // Dancer 2 (F): Purple Floral Headscarf with Gold Rosette & Long Dark Braids
+    pxRect(x + 7 * p, y, 10 * p, 3 * p, PAL.SHAWL_PURPLE);
+    pxRect(x + 8 * p, y + p, 8 * p, p, PAL.SHAWL_PURPLE_HI);
+    pxRect(x + 14 * p, y + 2 * p, 2 * p, 2 * p, PAL.FIRE_GOLD); // Beaded flower rosette
+    pxRect(x + 5 * p, y + 4 * p, 2 * p, 10 * p, PAL.HAIR_DARK); // Left braid
+    pxRect(x + 17 * p, y + 4 * p, 2 * p, 10 * p, PAL.HAIR_DARK); // Right braid
+    pxRect(x + 5 * p, y + 13 * p, 2 * p, p, PAL.SASH_TEAL); // Braid tie
+    pxRect(x + 17 * p, y + 13 * p, 2 * p, p, PAL.SASH_TEAL);
+  } else if (dancer.id === 'M2') {
+    // Dancer 3 (M): Knit Teal Wool Toque with Folded Brim & Tassel
+    pxRect(x + 8 * p, y - p, 8 * p, 3 * p, PAL.SASH_TEAL);
+    pxRect(x + 15 * p, y, 3 * p, 2 * p, PAL.FIRE_ORANGE); // Toque pom/tassel
+    pxRect(x + 6 * p, y + 2 * p, 12 * p, 2 * p, PAL.SASH_TEAL_HI);
+    pxRect(x + 6 * p, y + 4 * p, 12 * p, p, PAL.SASH_GOLD);
+    pxRect(x + 6 * p, y + 5 * p, 2 * p, 3 * p, PAL.HAIR_DARK);
+    pxRect(x + 16 * p, y + 5 * p, 2 * p, 3 * p, PAL.HAIR_DARK);
   } else {
-    pxRect(x + 4 * s, y, 4 * s, s, dancer.hatCol);
-    pxRect(x + 3 * s, y + s, 6 * s, s, dancer.hatCol);
+    // Dancer 4 (F): Crimson Beaded Headband, Dark Hair & Side Braids
+    pxRect(x + 7 * p, y + p, 10 * p, 2 * p, PAL.HAIR_DARK);
+    pxRect(x + 6 * p, y + 3 * p, 12 * p, 2 * p, PAL.SASH_RED);
+    pxRect(x + 8 * p, y + 3 * p, 2 * p, p, PAL.SASH_GOLD);
+    pxRect(x + 14 * p, y + 3 * p, 2 * p, p, PAL.SASH_TEAL);
+    pxRect(x + 5 * p, y + 5 * p, 2 * p, 9 * p, PAL.HAIR_DARK);
+    pxRect(x + 17 * p, y + 5 * p, 2 * p, 9 * p, PAL.HAIR_DARK);
   }
 
-  pxRect(x + 3 * s, y + s, 6 * s, 2 * s, PAL.SKIN);
+  // 2. EXPRESSIVE SHADED FACE
+  pxRect(x + 7 * p, y + 4 * p, 10 * p, 5 * p, PAL.SKIN);
+  pxRect(x + 8 * p, y + 4 * p, 8 * p, p, PAL.SKIN_HI); // Forehead highlight
+  pxRect(x + 7 * p, y + 8 * p, 10 * p, p, PAL.SKIN_SH); // Chin shadow
+  // Eyes & warm smile
+  pxRect(x + 9 * p, y + 6 * p, p, p, PAL.INK);
+  pxRect(x + 14 * p, y + 6 * p, p, p, PAL.INK);
+  pxRect(x + 11 * p, y + 7 * p, 2 * p, p, PAL.CAPOTE_RED);
 
-  // Motionless Upper Torso & Sash
-  pxRect(x + 3 * s, y + 3 * s, 6 * s, 3 * s, dancer.topCol);
-  pxRect(x + 4 * s, y + 5 * s, 4 * s, s, dancer.sashCol);
-  pxRect(x + s, y + 4 * s, 2 * s, s, dancer.topCol);
-  pxRect(x + 9 * s, y + 4 * s, 2 * s, s, dancer.topCol);
-  pxRect(x, y + 5 * s, s, s, PAL.SKIN);
-  pxRect(x + 11 * s, y + 5 * s, s, s, PAL.SKIN);
+  // 3. MOTIONLESS UPPER TORSO, CAPOTE / SHAWL / VEST & WOVEN CEINTURE FLÉCHÉE SASH
+  pxRect(x + 6 * p, y + 9 * p, 12 * p, 7 * p, dancer.topCol);
+  // Left highlight & right shadow fold for 3D depth
+  pxRect(x + 6 * p, y + 9 * p, 3 * p, 6 * p, dancer.topHi);
+  pxRect(x + 15 * p, y + 9 * p, 3 * p, 6 * p, dancer.topSh);
 
+  if (dancer.id === 'F1') {
+    // Embroidered floral shawl V-drape & fringe
+    pxRect(x + 7 * p, y + 9 * p, 10 * p, 2 * p, PAL.SHAWL_PURPLE);
+    pxRect(x + 9 * p, y + 11 * p, 6 * p, 2 * p, PAL.SHAWL_PURPLE_HI);
+    pxRect(x + 11 * p, y + 11 * p, 2 * p, p, PAL.FIRE_GOLD);
+  } else if (dancer.id === 'F2') {
+    // Beaded Métis floral vest over white blouse
+    pxRect(x + 10 * p, y + 9 * p, 4 * p, 5 * p, PAL.CAPOTE_CREAM_HI);
+    pxRect(x + 7 * p, y + 11 * p, 2 * p, 2 * p, PAL.FIRE_RED); // Floral beadwork
+    pxRect(x + 15 * p, y + 11 * p, 2 * p, 2 * p, PAL.SASH_TEAL_HI);
+  } else {
+    // Traditional Capote lapel & brass buttons
+    pxRect(x + 11 * p, y + 9 * p, 2 * p, 5 * p, dancer.topHi);
+    pxRect(x + 11 * p, y + 10 * p, p, p, PAL.FIRE_GOLD);
+    pxRect(x + 11 * p, y + 12 * p, p, p, PAL.FIRE_GOLD);
+  }
+
+  // Woven Ceinture Fléchée Sash with chevron stripes & hanging fringe
+  pxRect(x + 6 * p, y + 14 * p, 12 * p, 2 * p, dancer.sashCol);
+  pxRect(x + 8 * p, y + 14 * p, 2 * p, 2 * p, PAL.SASH_GOLD);
+  pxRect(x + 12 * p, y + 14 * p, 2 * p, 2 * p, PAL.SASH_TEAL_HI);
+  pxRect(x + 16 * p, y + 15 * p, 2 * p, 4 * p, dancer.sashCol); // Hanging sash fringe
+
+  // Steady Balancing Arms & Hands
+  pxRect(x + 3 * p, y + 10 * p, 3 * p, 2 * p, dancer.topCol);
+  pxRect(x + 18 * p, y + 10 * p, 3 * p, 2 * p, dancer.topCol);
+  pxRect(x + 2 * p, y + 12 * p, 2 * p, 2 * p, PAL.SKIN);
+  pxRect(x + 20 * p, y + 12 * p, 2 * p, 2 * p, PAL.SKIN);
+
+  // 4. SKIRT / TROUSERS & LIVELY JIGGING FOOTWORK WITH BEADED MOCCASINS
   if (dancer.gender === 'F') {
-    pxRect(x + 2 * s, y + 6 * s, 8 * s, 3 * s, dancer.botCol);
-    pxRect(x + 2 * s, y + 8 * s, 8 * s, s, dancer.sashCol);
+    // Multi-layered Ribbon Skirt with pleats & satin ribbons
+    pxRect(x + 5 * p, y + 16 * p, 14 * p, 5 * p, dancer.botCol);
+    pxRect(x + 5 * p, y + 16 * p, 3 * p, 5 * p, dancer.botHi || dancer.botCol);
+    pxRect(x + 16 * p, y + 16 * p, 3 * p, 5 * p, dancer.botSh || dancer.botCol);
+    // Horizontal Métis ribbon stripes along hem
+    pxRect(x + 5 * p, y + 19 * p, 14 * p, p, PAL.SASH_GOLD);
+    pxRect(x + 5 * p, y + 20 * p, 14 * p, p, PAL.SASH_TEAL_HI);
+  } else {
+    // Tailored wool trousers with beaded garter ties
+    pxRect(x + 7 * p, y + 16 * p, 10 * p, 3 * p, dancer.botCol);
   }
+
+  const legTopY = dancer.gender === 'F' ? y + 21 * p : y + 19 * p;
 
   if (pose === 'JIG_R') {
-    pxRect(x + 3 * s, y + 8 * s, 2 * s, 3 * s, PAL.LOG_DARK);
-    pxRect(x + 3 * s, y + 11 * s, 2 * s, s, PAL.SASH_TEAL);
-    pxRect(x + 7 * s, y + 8 * s, 3 * s, 2 * s, PAL.LOG_DARK);
-    pxRect(x + 9 * s, y + 9 * s, 2 * s, s, PAL.FIRE_GOLD);
+    // Left standing leg + Right foot kicked briskly forward with gold-beaded moccasin
+    pxRect(x + 7 * p, legTopY, 4 * p, 4 * p, dancer.botCol);
+    pxRect(x + 6 * p, y + 24 * p, 5 * p, 2 * p, PAL.WOOD_LIGHT); // Moccasin
+    pxRect(x + 7 * p, y + 24 * p, 2 * p, p, PAL.SASH_TEAL_HI); // Beadwork
+
+    pxRect(x + 13 * p, legTopY, 5 * p, 2 * p, dancer.botCol);
+    pxRect(x + 16 * p, y + 21 * p, 5 * p, 2 * p, PAL.WOOD_LIGHT); // Kicked right moccasin
+    pxRect(x + 18 * p, y + 21 * p, 2 * p, p, PAL.FIRE_GOLD);
   } else if (pose === 'JIG_L') {
-    pxRect(x + 2 * s, y + 8 * s, 3 * s, 2 * s, PAL.LOG_DARK);
-    pxRect(x + s, y + 9 * s, 2 * s, s, PAL.FIRE_GOLD);
-    pxRect(x + 7 * s, y + 8 * s, 2 * s, 3 * s, PAL.LOG_DARK);
-    pxRect(x + 7 * s, y + 11 * s, 2 * s, s, PAL.SASH_TEAL);
+    // Left foot kicked briskly forward + Right standing leg
+    pxRect(x + 6 * p, legTopY, 5 * p, 2 * p, dancer.botCol);
+    pxRect(x + 3 * p, y + 21 * p, 5 * p, 2 * p, PAL.WOOD_LIGHT); // Kicked left moccasin
+    pxRect(x + 4 * p, y + 21 * p, 2 * p, p, PAL.FIRE_GOLD);
+
+    pxRect(x + 13 * p, legTopY, 4 * p, 4 * p, dancer.botCol);
+    pxRect(x + 13 * p, y + 24 * p, 5 * p, 2 * p, PAL.WOOD_LIGHT);
+    pxRect(x + 15 * p, y + 24 * p, 2 * p, p, PAL.SASH_TEAL_HI);
   } else if (pose === 'LIFT') {
-    pxRect(x + 4 * s, y + 8 * s, 2 * s, 3 * s, PAL.LOG_DARK);
-    pxRect(x + 4 * s, y + 11 * s, 2 * s, s, PAL.SASH_TEAL);
-    pxRect(x + 7 * s, y + 8 * s, 2 * s, 2 * s, PAL.LOG_DARK);
-    pxRect(x + 8 * s, y + 8 * s, 2 * s, s, PAL.SASH_RED);
+    // 3rd-shuffle backward foot lift (missing a beat of music)
+    pxRect(x + 8 * p, legTopY, 4 * p, 4 * p, dancer.botCol);
+    pxRect(x + 7 * p, y + 24 * p, 5 * p, 2 * p, PAL.WOOD_LIGHT);
+    pxRect(x + 8 * p, y + 24 * p, 2 * p, p, PAL.SASH_TEAL_HI);
+
+    pxRect(x + 13 * p, legTopY, 4 * p, 2 * p, dancer.botCol);
+    pxRect(x + 15 * p, y + 19 * p, 4 * p, 2 * p, PAL.WOOD_LIGHT); // Lifted behind
+    pxRect(x + 16 * p, y + 19 * p, 2 * p, p, PAL.SASH_RED);
   } else {
-    pxRect(x + 4 * s, y + 8 * s, 4 * s, 3 * s, PAL.LOG_DARK);
-    pxRect(x + 3 * s, y + 11 * s, 2 * s, s, PAL.SASH_TEAL);
-    pxRect(x + 7 * s, y + 11 * s, 2 * s, s, PAL.SASH_TEAL);
+    // Ready stance
+    pxRect(x + 7 * p, legTopY, 4 * p, 4 * p, dancer.botCol);
+    pxRect(x + 13 * p, legTopY, 4 * p, 4 * p, dancer.botCol);
+    pxRect(x + 6 * p, y + 24 * p, 5 * p, 2 * p, PAL.WOOD_LIGHT);
+    pxRect(x + 13 * p, y + 24 * p, 5 * p, 2 * p, PAL.WOOD_LIGHT);
+    pxRect(x + 7 * p, y + 24 * p, 2 * p, p, PAL.SASH_TEAL_HI);
+    pxRect(x + 15 * p, y + 24 * p, 2 * p, p, PAL.SASH_TEAL_HI);
   }
 }
 
@@ -1369,7 +1613,6 @@ function drawKitchenBackdrop(floorY) {
   pxRect(0, 48, 18, floorY - 48, PAL.LOG_DARK);
   pxRect(VIEW_W - 18, 48, 18, floorY - 48, PAL.LOG_DARK);
 
-  // Hearth
   const hearthX = Math.max(28, Math.floor(VIEW_W * 0.1));
   const hearthW = 84;
   const hearthTop = floorY - 108;
@@ -1382,7 +1625,6 @@ function drawKitchenBackdrop(floorY) {
   pxRect(hearthX + 27, floorY - 22 - flicker * 0.7, 30, 22 + flicker * 0.7, PAL.FIRE_ORANGE);
   pxRect(hearthX + 33, floorY - 12, 18, 12, PAL.FIRE_GOLD);
 
-  // Window
   const winX = Math.min(VIEW_W - 104, Math.floor(VIEW_W * 0.78));
   const winY = floorY - 110;
   pxRect(winX, winY, 60, 54, PAL.LOG_DARK);
@@ -1391,7 +1633,6 @@ function drawKitchenBackdrop(floorY) {
   pxRect(winX + 28, winY + 4, 4, 46, PAL.LOG_DARK);
   pxRect(winX + 4, winY + 24, 52, 4, PAL.LOG_DARK);
 
-  // Floor & Braided Rug
   pxRect(0, floorY, VIEW_W, VIEW_H - floorY, PAL.FLOOR_MID);
   pxRect(0, floorY, VIEW_W, 4, PAL.LOG_DARK);
   for (let py = floorY + 16; py < VIEW_H; py += 18) {
@@ -1405,10 +1646,10 @@ function drawKitchenBackdrop(floorY) {
 }
 
 // ============================================================================
-// PHASE RENDERERS (CRISP, LARGE, HIGH-CONTRAST TYPOGRAPHY)
+// PHASE RENDERERS
 // ============================================================================
 
-// PHASE 1: BAND BUILDER PAGE (3 FIDDLE PARTS COMPOSE 1 UNIFIED ALGORITHMIC SCORE)
+// PHASE 1: BAND BUILDER PAGE
 function drawBandBuilderPhase() {
   pxRect(0, 0, VIEW_W, VIEW_H, PAL.PANEL_BG);
 
@@ -1518,10 +1759,10 @@ function drawDancerSelectPhase() {
   drawText(`DANCER ${selectedDancerIdx + 1} OF 4 • ${dancer.styleTitle}`, VIEW_W / 2, row0Y + 24, 9, PAL.SASH_TEAL, 'center');
 
   const midX = Math.floor(VIEW_W / 2);
-  pxRect(midX - 68, row0Y + 124, 136, 16, PAL.SASH_RED);
-  pxRect(midX - 56, row0Y + 126, 112, 12, PAL.SASH_GOLD);
+  pxRect(midX - 72, row0Y + 124, 144, 16, PAL.SASH_RED);
+  pxRect(midX - 60, row0Y + 126, 120, 12, PAL.SASH_GOLD);
   const demoPose = ['IDLE', 'JIG_R', 'JIG_L', 'LIFT'][Math.floor(animFrame / 16) % 4];
-  drawDancerSprite(dancer, midX, row0Y + 126, 5, demoPose);
+  drawDancerSprite(dancer, midX, row0Y + 126, 6, demoPose);
 
   drawText(`<   ${dancer.name}   >`, midX, row0Y + 162, 12, row0Sel ? PAL.FIRE_GOLD : PAL.WHITE, 'center');
   drawText(dancer.outfit, midX, row0Y + 184, 9, PAL.CAPOTE_CREAM, 'center');
@@ -1541,10 +1782,10 @@ function drawDancerSelectPhase() {
   drawText("L/R: DANCER  •  U/D: ROW  •  A: START  •  B: BACK", VIEW_W / 2, VIEW_H - 10, 9, PAL.SASH_GOLD, 'center');
 }
 
-// PHASE 3: STAGGERED A/B CONTROLLER-MATCHED RHYTHM TRACK
+// PHASE 3: CROSS-HAIRED STAGGERED B (BOTTOM-LEFT, WHITE) & A (TOP-RIGHT, RED)
 function drawJiggingPhase() {
   const topBarH = 52;
-  const bottomBarH = 114;
+  const bottomBarH = 122;
   const bottomBarTop = VIEW_H - bottomBarH;
   const floorY = bottomBarTop - 52;
   const beatPulse = (Math.floor(currentStep / 2) % 2 === 0);
@@ -1554,7 +1795,6 @@ function drawJiggingPhase() {
 
   drawKitchenBackdrop(floorY);
 
-  // Top HUD Bar (y = 0)
   pxRect(0, 0, VIEW_W, topBarH, PAL.INK);
   pxRect(0, topBarH - 2, VIEW_W, 2, PAL.FIRE_ORANGE);
 
@@ -1562,12 +1802,10 @@ function drawJiggingPhase() {
   drawText(`COMBO:${combo}x`, VIEW_W - 14, 22, 12, combo >= 5 ? PAL.FIRE_ORANGE : PAL.SASH_TEAL, 'right');
   drawText(`${activeProfile.trackTitle} • ${activeProfile.boundaries[activeSongPhaseIdx].label}`, VIEW_W / 2, 43, 8, PAL.FIRE_GOLD, 'center');
 
-  // Song Progress Bar
   const prog = totalSongSteps > 0 ? Math.min(1, currentStep / totalSongSteps) : 0;
   pxRect(0, topBarH, VIEW_W, 5, PAL.LOG_DARK);
   pxRect(0, topBarH, Math.floor(VIEW_W * prog), 5, PAL.SASH_TEAL);
 
-  // 5 Band Members on Back Stage
   const colW = VIEW_W / 5;
   const backY = floorY + 14;
   const frontY = floorY + 40;
@@ -1595,85 +1833,134 @@ function drawJiggingPhase() {
     drawMusicianMini(sc.type, sc.id, sc.x, backY, 4, beatPulse, sc.muted);
   }
 
-  // Central Selected Métis Dancer
-  drawDancerSprite(dancer, VIEW_W * 0.48, frontY, 5, jiggerPose);
+  // Central High-Detail Shaded Métis Dancer
+  drawDancerSprite(dancer, VIEW_W * 0.48, frontY, 6, jiggerPose);
 
-  // Bottom HUD: Dual-Lane Staggered B (Top-Right) & A (Bottom-Left) Controller Layout
+  // Bottom HUD: Dual-Lane Staggered A (Top-Right, Red) & B (Bottom-Left, White)
   pxRect(0, bottomBarTop, VIEW_W, bottomBarH, PAL.INK);
   pxRect(0, bottomBarTop, VIEW_W, 3, PAL.SASH_TEAL);
 
   const trackX = 14;
   const trackW = VIEW_W - 28;
   const trackTop = bottomBarTop + 8;
-  const trackH = 82;
+  const trackH = 90;
   pxRect(trackX, trackTop, trackW, trackH, '#0D2A3A');
 
-  // Subtle horizontal divider separating Upper B Lane and Lower A Lane
   const midTrackY = trackTop + Math.floor(trackH / 2);
-  pxRect(trackX, midTrackY, trackW, 2, 'rgba(255, 255, 255, 0.12)');
 
-  // Staggered Target Rings matching physical arcade cabinet A (bottom-left) & B (top-right):
-  // A Ring sits lower-left; B Ring sits upper-right!
-  const hitAX = trackX + 42;
-  const hitAY = trackTop + 60;
-  const hitBX = trackX + 86;
-  const hitBY = trackTop + 22;
-  const ringR = 17;
+  // Staggered Target Positions: B (White) bottom-left, A (Red) top-right
+  const hitBX = trackX + 46;
+  const hitBY = trackTop + 66;
+  const hitAX = trackX + 94;
+  const hitAY = trackTop + 24;
+  const baseRingR = 17;
 
-  // Draw A Target Ring (Bottom-Left, Light Sea Green)
-  ctx.beginPath();
-  ctx.arc(hitAX, hitAY, ringR, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(18, 174, 162, 0.22)';
-  ctx.fill();
+  // Cross-Haired Hit Box spanning both B and A rows
+  const boxScale = 1 + zoomPulseBox * 0.08;
+  const boxCenterX = (hitBX + hitAX) / 2;
+  const boxCenterY = midTrackY;
+  const rawBoxW = 94;
+  const rawBoxH = trackH - 4;
+  const boxW = rawBoxW * boxScale;
+  const boxH = rawBoxH * boxScale;
+  const boxLeft = boxCenterX - boxW / 2;
+  const boxTop = boxCenterY - boxH / 2;
+
+  pxRect(boxLeft, boxTop, boxW, boxH, zoomPulseBox > 0.1 ? 'rgba(247, 200, 68, 0.16)' : 'rgba(255, 255, 255, 0.05)');
+  ctx.strokeStyle = zoomPulseBox > 0.1 ? PAL.WHITE : PAL.FIRE_GOLD;
   ctx.lineWidth = 3;
+  ctx.strokeRect(boxLeft, boxTop, boxW, boxH);
+
+  const brk = 10;
   ctx.strokeStyle = PAL.SASH_TEAL;
-  ctx.stroke();
-  drawText("A", hitAX, hitAY + 5, 11, PAL.SASH_TEAL, 'center');
-
-  // Draw B Target Ring (Top-Right, Blaze Orange)
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.arc(hitBX, hitBY, ringR, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(251, 102, 4, 0.22)';
+  ctx.moveTo(boxLeft - 4, boxTop + brk); ctx.lineTo(boxLeft - 4, boxTop - 4); ctx.lineTo(boxLeft + brk, boxTop - 4);
+  ctx.moveTo(boxLeft + boxW - brk, boxTop + boxH + 4); ctx.lineTo(boxLeft + boxW + 4, boxTop + boxH + 4); ctx.lineTo(boxLeft + boxW + 4, boxTop + boxH - brk);
+  ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(247, 200, 68, 0.42)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(trackX, midTrackY);
+  ctx.lineTo(trackX + trackW, midTrackY);
+  ctx.moveTo(hitBX, boxTop);
+  ctx.lineTo(hitBX, boxTop + boxH);
+  ctx.moveTo(hitAX, boxTop);
+  ctx.lineTo(hitAX, boxTop + boxH);
+  ctx.stroke();
+
+  // B Target Ring (Bottom-Left, White)
+  const rB = baseRingR * (1 + zoomPulseB * 0.18);
+  ctx.beginPath();
+  ctx.arc(hitBX, hitBY, rB, 0, Math.PI * 2);
+  ctx.fillStyle = zoomPulseB > 0.1 ? 'rgba(255, 255, 255, 0.45)' : 'rgba(255, 255, 255, 0.16)';
   ctx.fill();
   ctx.lineWidth = 3;
-  ctx.strokeStyle = PAL.FIRE_ORANGE;
+  ctx.strokeStyle = PAL.WHITE;
   ctx.stroke();
-  drawText("B", hitBX, hitBY + 5, 11, PAL.FIRE_ORANGE, 'center');
+  drawText("B", hitBX, hitBY + 5, 11, PAL.WHITE, 'center');
 
-  // Scrolling Notes aligned to their respective staggered target ring
+  // A Target Ring (Top-Right, Red)
+  const rA = baseRingR * (1 + zoomPulseA * 0.18);
+  ctx.beginPath();
+  ctx.arc(hitAX, hitAY, rA, 0, Math.PI * 2);
+  ctx.fillStyle = zoomPulseA > 0.1 ? 'rgba(197, 30, 64, 0.55)' : 'rgba(197, 30, 64, 0.22)';
+  ctx.fill();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = PAL.SASH_RED;
+  ctx.stroke();
+  drawText("A", hitAX, hitAY + 5, 11, PAL.SASH_RED, 'center');
+
   if (audioCtx) {
     const now = audioCtx.currentTime;
     for (let i = 0; i < expectedBeats.length; i++) {
       const b = expectedBeats[i];
       if (b.btn === 'LIFT') {
-        const lx = hitAX + 22 + (b.time - now) * NOTE_SPEED;
-        if (lx > trackX && lx < VIEW_W + 30) {
+        const lx = boxCenterX + (b.time - now) * NOTE_SPEED;
+        if (lx > trackX - 20 && lx < VIEW_W + 30) {
           ctx.strokeStyle = 'rgba(247, 200, 68, 0.45)';
           ctx.lineWidth = 2;
-          ctx.strokeRect(lx - 10, midTrackY - 12, 20, 24);
+          ctx.strokeRect(lx - 11, midTrackY - 12, 22, 24);
           drawText("LIFT", lx, midTrackY + 4, 5, 'rgba(247, 200, 68, 0.8)', 'center');
         }
-      } else if (!b.hit && !b.missed) {
+      } else {
         const isB = (b.btn === 'B');
         const targetX = isB ? hitBX : hitAX;
         const targetY = isB ? hitBY : hitAY;
         const nx = targetX + (b.time - now) * NOTE_SPEED;
 
-        if (nx > trackX - 18 && nx < VIEW_W + 30) {
+        if (nx > trackX - 24 && nx < VIEW_W + 30) {
+          const noteR = baseRingR - 2;
           ctx.beginPath();
-          ctx.arc(nx, targetY, ringR - 2, 0, Math.PI * 2);
-          ctx.fillStyle = isB ? PAL.FIRE_ORANGE : PAL.SASH_TEAL;
-          ctx.fill();
-          ctx.lineWidth = 2;
-          ctx.strokeStyle = PAL.WHITE;
-          ctx.stroke();
-          drawText(b.btn, nx, targetY + 5, 11, PAL.INK, 'center');
+          ctx.arc(nx, targetY, noteR, 0, Math.PI * 2);
+
+          if (b.missed) {
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+            ctx.stroke();
+            drawText(b.btn, nx, targetY + 5, 10, 'rgba(255, 255, 255, 0.4)', 'center');
+          } else if (b.hit) {
+            ctx.fillStyle = isB ? PAL.WHITE : PAL.SASH_RED;
+            ctx.fill();
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = PAL.FIRE_GOLD;
+            ctx.stroke();
+            drawText(b.btn, nx, targetY + 5, 11, isB ? PAL.INK : PAL.WHITE, 'center');
+          } else {
+            ctx.fillStyle = isB ? 'rgba(255, 255, 255, 0.45)' : 'rgba(197, 30, 64, 0.50)';
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = isB ? 'rgba(255, 255, 255, 0.85)' : 'rgba(255, 120, 140, 0.85)';
+            ctx.stroke();
+            drawText(b.btn, nx, targetY + 5, 11, PAL.WHITE, 'center');
+          }
         }
       }
     }
   }
 
-  drawText("TAP B (TOP-RIGHT) & A (BOTTOM-LEFT) ON THE BEAT • UP: MENU", VIEW_W / 2, VIEW_H - 8, 8, PAL.CAPOTE_CREAM, 'center');
+  drawText("TAP A (TOP-RIGHT RED) & B (BOTTOM-LEFT WHITE) • UP: MENU", VIEW_W / 2, VIEW_H - 8, 8, PAL.CAPOTE_CREAM, 'center');
 
   for (const ft of floatingTexts) {
     ctx.save();
@@ -1691,7 +1978,7 @@ function drawResultsPhase() {
   drawText("PERFORMANCE COMPLETE!", VIEW_W / 2, 34, 14, PAL.FIRE_GOLD, 'center');
 
   const dancer = DANCER_ROSTER[selectedDancerIdx];
-  drawDancerSprite(dancer, VIEW_W / 2, 210, 5, 'JIG_R');
+  drawDancerSprite(dancer, VIEW_W / 2, 210, 6, 'JIG_R');
 
   drawText(activeProfile.trackTitle, VIEW_W / 2, 252, 11, PAL.SASH_TEAL, 'center');
   drawText(dancer.styleTitle, VIEW_W / 2, 276, 9, PAL.CAPOTE_CREAM, 'center');
@@ -1708,6 +1995,10 @@ function drawResultsPhase() {
 function update() {
   animFrame++;
   processHeldInputs(performance.now());
+
+  if (zoomPulseA > 0) zoomPulseA = Math.max(0, zoomPulseA - 0.12);
+  if (zoomPulseB > 0) zoomPulseB = Math.max(0, zoomPulseB - 0.12);
+  if (zoomPulseBox > 0) zoomPulseBox = Math.max(0, zoomPulseBox - 0.12);
 
   if (phase === 'JIGGING' && audioCtx && !isPaused) {
     const now = audioCtx.currentTime;
@@ -1734,7 +2025,7 @@ function update() {
         playStumbleClonk();
         spawnFloatingText("MISS!", PAL.FIRE_RED);
       }
-      if ((b.hit || b.missed) && now > b.time + 0.9) {
+      if ((b.hit || b.missed) && now > b.time + 1.35) {
         expectedBeats.splice(i, 1);
       }
     }
