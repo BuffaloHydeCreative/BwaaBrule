@@ -78,6 +78,7 @@
     text-align: center;
     z-index: 25;
     font-family: 'Courier New', Courier, monospace;
+    cursor: pointer;
   }
 </style>
 </head>
@@ -170,10 +171,11 @@
     WOOD_DARK: '#4D280E',
     SAND_LIGHT: '#E2CCA2',
     SAND_MID: '#B59B6D',
-    ROCK_OUTLINE: '#252830',
-    ROCK_DARK: '#4A4F5A',
-    ROCK_MID: '#7E8594',
-    ROCK_LIGHT: '#B8C0CF',
+    // Darker shaded gray Canadian Shield rock palette for smooth transition from forest green
+    ROCK_OUTLINE: '#181B22',
+    ROCK_DARK: '#303540',
+    ROCK_MID: '#525A68',
+    ROCK_LIGHT: '#7E8899',
     TIN_DARK: '#6A7582',
     TIN_MID: '#A8B6C4',
     TIN_LIGHT: '#E6F2FA',
@@ -371,14 +373,15 @@
     } else if (score < DIST.MANIGOTAGAN_END) {
       title = "MANIGOTAGAN SHORE";
       const t = (score - DIST.MOUTH_BAS_END) / (DIST.MANIGOTAGAN_END - DIST.MOUTH_BAS_END);
-      gndTop = lerpColor(PAL.LIGHT_PINE, PAL.SAND_LIGHT, t * 0.45);
-      gndMid = PAL.MID_PINE;
+      gndTop = lerpColor(PAL.LIGHT_PINE, PAL.MID_PINE, t);
+      gndMid = lerpColor(PAL.MID_PINE, PAL.DARK_PINE, t * 0.6);
       gndDark = PAL.DARK_PINE;
       watDeep = PAL.LAKE_DEEP;
       watMid = PAL.LAKE_MID;
       watFoam = PAL.LAKE_FOAM;
     } else if (score < DIST.BERENS_END) {
       title = score >= 3120 ? "BERENS RIVER HOUSE" : "CANADIAN SHIELD COAST";
+      const shieldT = Math.min(1, (score - DIST.MANIGOTAGAN_END) / 220);
       const sunsetT = Math.min(1, (score - DIST.MANIGOTAGAN_END) / 360);
       const nightT = Math.max(0, (score - 3020) / (DIST.BERENS_END - 3020));
 
@@ -387,9 +390,14 @@
       skyTop = lerpColor(dayToSunsetSkyT, PAL.NIGHT_SKY_T, nightT);
       skyBot = lerpColor(dayToSunsetSkyB, PAL.NIGHT_SKY_B, nightT);
 
-      gndTop = lerpColor(PAL.ROCK_LIGHT, '#191C30', nightT);
-      gndMid = lerpColor(PAL.MID_PINE, '#0D101E', nightT);
-      gndDark = lerpColor(PAL.DARK_PINE, '#070A14', nightT);
+      // Smooth transition from forest green to darker gray Canadian Shield rock
+      const dayGndTop = lerpColor(PAL.MID_PINE, PAL.ROCK_MID, shieldT);
+      const dayGndMid = lerpColor(lerpColor(PAL.MID_PINE, PAL.DARK_PINE, 0.6), PAL.ROCK_DARK, shieldT);
+      const dayGndDark = lerpColor(PAL.DARK_PINE, PAL.ROCK_OUTLINE, shieldT);
+
+      gndTop = lerpColor(dayGndTop, '#191C30', nightT);
+      gndMid = lerpColor(dayGndMid, '#0D101E', nightT);
+      gndDark = lerpColor(dayGndDark, '#070A14', nightT);
       watDeep = lerpColor(PAL.LAKE_DEEP, PAL.INDIGO_DEEP, nightT);
       watMid = lerpColor(PAL.LAKE_MID, PAL.INDIGO_MID, nightT);
       watFoam = lerpColor(PAL.LAKE_FOAM, '#28457A', nightT);
@@ -465,6 +473,7 @@
   }
 
   const WOODLAND_GLYPHS = {
+    ' ': ['00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000'],
     'R': ['1111100','0110110','0110011','0110011','0111110','0110110','0110011','0110011','1111011'],
     'E': ['1111111','0110001','0110100','0111100','0110100','0110000','0110001','0110011','1111111'],
     'D': ['1111100','0110110','0110011','0110011','0110011','0110011','0110011','0110110','1111100'],
@@ -489,23 +498,25 @@
       const gw = g[0].length;
       const gh = g.length;
 
-      ctx.fillStyle = PAL.OUTLINE;
-      for (let r = 0; r < gh; r++) {
-        for (let c = 0; c < gw; c++) {
-          if (g[r][c] === '1') {
-            ctx.fillRect(curX + c * scale - 1, startY + r * scale - 1, scale + 2, scale + 2);
-            ctx.fillRect(curX + c * scale + 2, startY + r * scale + 2, scale, scale);
+      if (word[i] !== ' ') {
+        ctx.fillStyle = PAL.OUTLINE;
+        for (let r = 0; r < gh; r++) {
+          for (let c = 0; c < gw; c++) {
+            if (g[r][c] === '1') {
+              ctx.fillRect(curX + c * scale - 1, startY + r * scale - 1, scale + 2, scale + 2);
+              ctx.fillRect(curX + c * scale + 2, startY + r * scale + 2, scale, scale);
+            }
           }
         }
-      }
 
-      for (let r = 0; r < gh; r++) {
-        for (let c = 0; c < gw; c++) {
-          if (g[r][c] === '1') {
-            if (r <= 2) ctx.fillStyle = PAL.SNOW_LIGHT;
-            else if (r <= 5) ctx.fillStyle = PAL.GOLD_LIGHT;
-            else ctx.fillStyle = PAL.GOLD_MID;
-            ctx.fillRect(curX + c * scale, startY + r * scale, scale, scale);
+        for (let r = 0; r < gh; r++) {
+          for (let c = 0; c < gw; c++) {
+            if (g[r][c] === '1') {
+              if (r <= 2) ctx.fillStyle = PAL.SNOW_LIGHT;
+              else if (r <= 5) ctx.fillStyle = PAL.GOLD_LIGHT;
+              else ctx.fillStyle = PAL.GOLD_MID;
+              ctx.fillRect(curX + c * scale, startY + r * scale, scale, scale);
+            }
           }
         }
       }
@@ -514,17 +525,11 @@
     }
   }
 
-  // Midnight on Lake Winnipeg Title Screen:
-  // - Top third of the screen holds the stylized Woodland title over soft twilight glowing stars & faded crescent moon
-  // - Dark indigo water matching the midnight theme (with animated dark indigo waves & zero debris)
-  // - Midnight silhouette canoe & voyageur paddling on the middle track as waves pass by
-  // - Shoreline meandering in and out on the bottom track
   function drawTitleCardScreen() {
     const elapsedSec = (performance.now() - titleStartTime) / 1000;
     const tAnim = frame * 0.04;
     const scrollPx = frame * 1.15;
 
-    // 1. Top Third: Twilight-to-Midnight Sky Band (y = 0 .. horizonY)
     const horizonY = Math.floor(VIEW_H * 0.36);
     ctx.fillStyle = '#070614';
     ctx.fillRect(0, 0, VIEW_W, horizonY);
@@ -533,13 +538,11 @@
     ctx.fillStyle = '#241B52';
     ctx.fillRect(0, Math.floor(horizonY * 0.74), VIEW_W, horizonY - Math.floor(horizonY * 0.74));
 
-    // Soft Twilight Glowing Stars
     for (let i = 0; i < titleStars.length; i++) {
       const st = titleStars[i];
       const sx = Math.round(st.x * VIEW_W);
       const sy = Math.round(st.y * (horizonY - 6)) + 3;
       const twinkle = 0.35 + 0.55 * (Math.sin(tAnim * 1.6 + st.phase) * 0.5 + 0.5);
-      // Soft halo on brighter stars
       if (st.size === 2) {
         ctx.fillStyle = `rgba(175, 185, 245, ${(twinkle * 0.28).toFixed(2)})`;
         ctx.fillRect(sx - 1, sy - 1, 4, 4);
@@ -548,7 +551,6 @@
       ctx.fillRect(sx, sy, st.size, st.size);
     }
 
-    // Faded Crescent Moon in the sky behind the title text
     const moonX = Math.floor(VIEW_W * 0.76);
     const moonY = Math.floor(horizonY * 0.34);
     ctx.fillStyle = 'rgba(170, 175, 235, 0.14)';
@@ -556,19 +558,17 @@
     ctx.fillStyle = 'rgba(225, 228, 252, 0.36)';
     ctx.fillRect(moonX - 4, moonY - 5, 13, 16);
     ctx.fillRect(moonX - 6, moonY - 3, 16, 12);
-    // Cutout shadow circle to form crescent silhouette
     ctx.fillStyle = '#110E2B';
     ctx.fillRect(moonX - 7, moonY - 5, 11, 14);
     ctx.fillRect(moonX - 8, moonY - 3, 12, 10);
 
-    // 2. Stylized "Woodland" Pixel Title centered in the top third of the screen
+    // Clearly three words: "RED RIVER" (wide space between Red and River) <line break> "RUN"
     const titleScale = 2;
     const topWordY = 8;
     const botWordY = topWordY + 9 * titleScale + 5;
     drawWoodlandWord('RED RIVER', Math.floor(VIEW_W / 2), topWordY, titleScale);
     drawWoodlandWord('RUN', Math.floor(VIEW_W / 2), botWordY, titleScale);
 
-    // 3. Dark Indigo Midnight Lake Winnipeg Body (from horizonY to VIEW_H)
     const bottomShoreH = 14;
     const lakeH = VIEW_H - horizonY - bottomShoreH;
     const laneH = Math.floor(lakeH / 3);
@@ -576,7 +576,6 @@
     ctx.fillStyle = PAL.INDIGO_DEEP;
     ctx.fillRect(0, horizonY, VIEW_W, VIEW_H - horizonY);
 
-    // Subtle twilight horizon rim & faint moon reflection on the dark indigo water
     ctx.fillStyle = '#1D2D59';
     ctx.fillRect(0, horizonY, VIEW_W, 1);
     ctx.fillStyle = 'rgba(120, 135, 205, 0.14)';
@@ -586,14 +585,11 @@
       ctx.fillRect(shimmerX, ry, shimmerW, 2);
     }
 
-    // Animated Dark Indigo Waves & Swells passing by across the lake (no debris!)
-    const waveCycle = 240;
     for (let wIdx = 0; wIdx < 4; wIdx++) {
       const wx = Math.round(VIEW_W + 40 - ((scrollPx * (0.95 + (wIdx % 2) * 0.25) + wIdx * 95) % (VIEW_W + 120)));
       const wy = horizonY + 8 + ((wIdx * 29) % Math.max(20, lakeH - 16));
       const waveW = 46;
 
-      // Dark indigo swell body
       fillPixelPoly([
         [wx, wy + 7],
         [wx + 12, wy + 2],
@@ -602,7 +598,6 @@
         [wx + waveW, wy + 7]
       ], PAL.INDIGO_MID);
 
-      // Subtle midnight-blue crest highlight
       fillPixelPoly([
         [wx + 10, wy + 3],
         [wx + 15, wy],
@@ -615,7 +610,6 @@
       ctx.fillRect(wx - 2, wy + 6, waveW + 4, 1);
     }
 
-    // Subtle ambient current ripples in dark indigo
     ctx.fillStyle = PAL.INDIGO_MID;
     const rippleCount = Math.ceil(VIEW_W / 38) + 2;
     for (let i = 0; i < rippleCount; i++) {
@@ -627,11 +621,9 @@
       ctx.fillStyle = PAL.INDIGO_MID;
     }
 
-    // 4. Midnight Silhouette Canoe & Voyageur on the Middle Track (Lane 1, zero debris)
     const midTrackY = horizonY + laneH + Math.floor((laneH - 15) / 2);
     drawCanoeAndHunter(Math.floor(VIEW_W * 0.24), midTrackY, frame, true, 1.0);
 
-    // 5. Continuous Bottom Shoreline + Meandering Points In & Out on the Bottom Track (Lane 2)
     const sy = VIEW_H - bottomShoreH;
     ctx.fillStyle = '#1D2D59';
     ctx.fillRect(0, sy - 1, VIEW_W, 1);
@@ -642,7 +634,6 @@
     ctx.fillStyle = PAL.SILHOUETTE;
     ctx.fillRect(0, sy + 10, VIEW_W, bottomShoreH - 10);
 
-    // Tapered shoreline points meandering in and out along the bottom track
     const meanderPeriod = 340;
     const meanderW = 148;
     const taperW = 42;
@@ -654,19 +645,15 @@
       const x3 = x0 + meanderW;
       const peakY = sy - reachH;
 
-      // Subtle indigo shoreline foam rim
       fillPixelPoly([[x0 - 3, sy],[x1, peakY - 2],[x2, peakY - 2],[x3 + 3, sy]], '#223A6B');
-      // Dark silhouette headland body
       fillPixelPoly([[x0, sy],[x1 + 2, peakY],[x2 - 2, peakY],[x3, sy]], '#121629');
       fillPixelPoly([[x0 + 6, sy],[x1 + 6, peakY + 3],[x2 - 6, peakY + 3],[x3 - 6, sy]], PAL.SILHOUETTE);
 
-      // Silhouetted pines & Canadian Shield rocks along the bottom shoreline point
       drawShadedPine(x1 + 10, peakY - 6, false, true);
       drawShadedGrayRock(x1 + 32, peakY + 1, false, true);
       drawShadedPine(x2 - 18, peakY - 5, false, true);
     }
 
-    // 6. "PRESS A TO START" fades in smoothly after 2.0 seconds along the lower shoreline
     if (elapsedSec >= 2.0) {
       const fadeInT = Math.min(1, (elapsedSec - 2.0) / 0.85);
       const pulse = 0.75 + Math.sin(tAnim * 2.2) * 0.25;
@@ -1189,7 +1176,7 @@
       } else {
         const rt = (pt - 0.42) / 0.58;
         const cx = Math.round((forksJoinX - 18) * (1 - rt) + 20 * rt);
-        drawCanoeAndHunter(cx, midY, animTick, true);
+        drawCanoeAndHunter(cx, midY, animTick, true, 0);
       }
     }
 
@@ -2605,7 +2592,7 @@
   }
 
   // ==========================================
-  // 8. MAIN RENDERING PIPELINE (FOREGROUND PRIORITY FOR BOTTOM SHORE)
+  // 8. MAIN RENDERING PIPELINE
   // ==========================================
   function drawScene() {
     if (gameMode === 'TITLE') {
@@ -2794,7 +2781,6 @@
         }
       }
 
-      // Unique One-Off Landmarks on North/Far Bank
       for (let i = 0; i < landmarks.length; i++) {
         const lm = landmarks[i];
         if (lm.type === 'SEVEN_OAKS') {
@@ -2903,7 +2889,7 @@
       }
     }
 
-    // 4. Bottom/East Shoreline Strip & Repeating Shoreline Scenery (drawn BEFORE player & unique foreground objects)
+    // 4. Bottom/East Shoreline Strip & Repeating Shoreline Scenery
     if (bottomShoreH > 0) {
       const sy = VIEW_H - bottomShoreH;
       ctx.fillStyle = env.watFoam;
@@ -3197,7 +3183,7 @@
       drawNearBankLandmark(nearBankLandmarks[i], bottomAnchorY, isSil);
     }
 
-    // 9. Extended Progressive Parallax Snow & Blizzard Overlay (4150 -> 4950 peak -> clears at 5750 -> York Factory at 6200)
+    // 9. Extended Progressive Parallax Snow & Blizzard Overlay
     if (score >= 4150 && score <= DIST.VICTORY_YORK) {
       let intensity = 0;
       if (score < DIST.DEPLOY_END) {
@@ -3737,7 +3723,7 @@
       titleFadeOutAlpha = 0;
       playTone(392, 'triangle', 0.14, 0.14);
     } else if (gameMode === 'GAME_OVER' || gameMode === 'VICTORY') {
-      beginOpeningCutscene();
+      restartActiveGame();
     }
   }
 
@@ -3763,6 +3749,38 @@
     headerBar.style.display = 'none';
     msg.style.display = 'none';
     msg.style.background = '#4A0C10';
+  }
+
+  // Direct restart into active gameplay after crash or victory
+  function restartActiveGame() {
+    initAudio();
+    score = 0;
+    frame = 0;
+    speed = 1.5;
+    bgOffset = 0;
+    playerLane = 1;
+    playerVisualY = 0;
+    shakeTimer = 0;
+    slowTimer = 0;
+    boostTimer = 0;
+    isIceSlip = false;
+    lastSplashStrokeId = -1;
+
+    resetWorld();
+    initSnow();
+
+    gameMode = 'PLAYING';
+    scoreDisplay.innerText = 'DIST: 0';
+    titleDisplay.innerText = 'THE FORKS';
+    headerBar.style.display = 'flex';
+    msg.style.display = 'none';
+    msg.style.background = '#4A0C10';
+
+    if (!audioTimer) {
+      currentStepAudio = 0;
+      audioTimer = setInterval(sequenceTrack, noteLength * 1000);
+    }
+    requestAnimationFrame(update);
   }
 
   function gameOver() {
@@ -3791,6 +3809,25 @@
   let lastB = 0;
   let dpadHolds = { UP: 0, DOWN: 0, LEFT: 0, RIGHT: 0 };
 
+  function handleActionA() {
+    if (gameMode === 'OPENING_CUTSCENE' && awaitingOpeningConfirm) {
+      awaitingOpeningConfirm = false;
+      openingFrame = OPENING_DIALOGUE_FRAME + 1;
+      playTone(493.88, 'triangle', 0.12, 0.14);
+    } else if (gameMode === 'TITLE') {
+      triggerStartFromTitle();
+    } else if (gameMode === 'GAME_OVER' || gameMode === 'VICTORY') {
+      restartActiveGame();
+    }
+  }
+
+  msg.addEventListener('click', function() {
+    if (isPaused) return;
+    if (gameMode === 'GAME_OVER' || gameMode === 'VICTORY') {
+      restartActiveGame();
+    }
+  });
+
   window.addEventListener('message', function(event) {
     let cmd = event.data;
     if (typeof cmd === 'object' && cmd.type) cmd = cmd.type;
@@ -3812,17 +3849,11 @@
     if (isPaused) return;
     const now = Date.now();
 
-    if (cmd === 'BUTTON_A' && now - lastA > 110) {
+    if ((cmd === 'BUTTON_A' || cmd === 'BUTTON_A_PRESS') && now - lastA > 110) {
       lastA = now;
-      if (gameMode === 'OPENING_CUTSCENE' && awaitingOpeningConfirm) {
-        awaitingOpeningConfirm = false;
-        openingFrame = OPENING_DIALOGUE_FRAME + 1;
-        playTone(493.88, 'triangle', 0.12, 0.14);
-      } else if (gameMode === 'TITLE' || gameMode === 'GAME_OVER' || gameMode === 'VICTORY') {
-        triggerStartFromTitle();
-      }
+      handleActionA();
     }
-    if (cmd === 'BUTTON_B' && now - lastB > 110) {
+    if ((cmd === 'BUTTON_B' || cmd === 'BUTTON_B_PRESS') && now - lastB > 110) {
       lastB = now;
     }
 
