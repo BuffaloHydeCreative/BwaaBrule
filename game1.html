@@ -699,10 +699,11 @@
     ctx.fillStyle = PAL.SILHOUETTE;
     ctx.fillRect(0, sy + 10, VIEW_W, bottomShoreH - 10);
 
+    // Bottom shoreline meanders rendered at 0.25 track width so paddler stays in water
     const meanderPeriod = 340;
     const meanderW = 148;
     const taperW = 42;
-    const reachH = Math.round(laneH * 0.88);
+    const reachH = Math.round(laneH * 0.25);
     for (let mBase = -meanderPeriod; mBase < VIEW_W + meanderPeriod; mBase += meanderPeriod) {
       const x0 = Math.round(mBase - ((scrollPx * 0.85) % meanderPeriod));
       const x1 = x0 + taperW;
@@ -1603,7 +1604,6 @@
     ctx.fillRect(x + 1, y + 8, 7, 1);
   }
 
-  // Grounded Red River Log Cabin (spills forward onto the riverbank toward the river)
   function drawSettlerLogHouse(x, y) {
     ctx.fillStyle = PAL.OUTLINE;
     ctx.fillRect(x, y + 4, 20, 10);
@@ -1642,7 +1642,6 @@
     ctx.fillRect(x + 22, y + 1, 4, 2);
   }
 
-  // Leveled Preset Log Village past St. Johns Church spilling forward toward the Red River shoreline
   function drawPresetLogVillage(x, y) {
     drawShadedPine(x, y - 6, false, false);
     drawSettlerLogHouse(x + 18, y);
@@ -2518,7 +2517,7 @@
 
     if (isRedRiver) {
       chosen = lastFeatureType === 'TOP_MEANDER' ? 'BOT_MEANDER' : 'TOP_MEANDER';
-      depthFactor = Math.random() < 0.55 ? 0.5 : 1.0;
+      depthFactor = Math.random() < 0.55 ? (chosen === 'BOT_MEANDER' ? 0.25 : 0.5) : 1.0;
       gapAfter = 185;
     } else if (isStPeters) {
       const pool = isMouthOpening
@@ -2526,13 +2525,13 @@
         : ['ISLAND', 'ISLAND', 'BOT_MEANDER', 'TOP_MEANDER'];
       chosen = pool[Math.floor(Math.random() * pool.length)];
       isMarshIsland = (chosen === 'ISLAND');
-      depthFactor = chosen === 'ISLAND' ? 1.0 : 0.5;
+      depthFactor = chosen === 'ISLAND' ? 1.0 : (chosen === 'BOT_MEANDER' ? 0.25 : 0.5);
       gapAfter = 130;
     } else if (isLakeEastShore) {
       const pool = ['BOT_MEANDER', 'BOT_MEANDER', 'ISLAND'];
       chosen = pool[Math.floor(Math.random() * pool.length)];
       if (lastFeatureType === 'ISLAND' && chosen === 'ISLAND') chosen = 'BOT_MEANDER';
-      depthFactor = chosen === 'ISLAND' ? 1.0 : (Math.random() < 0.52 ? 0.5 : 1.0);
+      depthFactor = chosen === 'ISLAND' ? 1.0 : (Math.random() < 0.52 ? 0.25 : 1.0);
       gapAfter = 145;
     } else {
       const pool = ['TOP_MEANDER', 'BOT_MEANDER', 'ISLAND'];
@@ -2540,7 +2539,7 @@
       if (chosen === lastFeatureType && chosen !== 'ISLAND') {
         chosen = chosen === 'TOP_MEANDER' ? 'BOT_MEANDER' : 'TOP_MEANDER';
       }
-      depthFactor = chosen === 'ISLAND' ? 1.0 : (Math.random() < 0.5 ? 0.5 : 1.0);
+      depthFactor = chosen === 'ISLAND' ? 1.0 : (Math.random() < 0.5 ? (chosen === 'BOT_MEANDER' ? 0.25 : 0.5) : 1.0);
       gapAfter = 145;
     }
 
@@ -2574,8 +2573,8 @@
 
       if ((chosen === 'TOP_MEANDER' || chosen === 'BOT_MEANDER') && Math.random() < 0.52) {
         const jamLane = chosen === 'TOP_MEANDER'
-          ? (depthFactor === 0.5 ? 0 : 1)
-          : (depthFactor === 0.5 ? 2 : 1);
+          ? (depthFactor < 1.0 ? 0 : 1)
+          : (depthFactor < 1.0 ? 2 : 1);
         hazards.push({
           x: nextFeatureX + Math.floor(taperW * 0.55),
           lane: jamLane,
@@ -2596,7 +2595,7 @@
         });
       }
 
-      if (depthFactor === 0.5 && chosen === 'BOT_MEANDER') {
+      if (depthFactor < 1.0 && chosen === 'BOT_MEANDER') {
         if (Math.random() < 0.35) {
           hazards.push({
             x: nextFeatureX + Math.floor(w * 0.45),
@@ -2643,7 +2642,7 @@
         });
       }
 
-      if (depthFactor === 0.5 && (chosen === 'TOP_MEANDER' || chosen === 'BOT_MEANDER') && Math.random() < 0.60) {
+      if (depthFactor < 1.0 && (chosen === 'TOP_MEANDER' || chosen === 'BOT_MEANDER') && Math.random() < 0.60) {
         const shelfLane = chosen === 'TOP_MEANDER' ? 0 : 2;
         hazards.push({
           x: nextFeatureX + Math.floor(w * 0.48),
@@ -3066,7 +3065,8 @@
       const x1 = f.x + f.taperW;
       const x2 = f.x + f.w - f.taperW;
       const x3 = f.x + f.w;
-      const reachH = Math.round(laneH * f.depthFactor);
+      const effectiveDepth = (f.type === 'BOT_MEANDER' && f.depthFactor < 1.0) ? 0.25 : f.depthFactor;
+      const reachH = Math.round(laneH * effectiveDepth);
 
       if (f.type === 'TOP_MEANDER') {
         const topY = riverTopY;
@@ -3076,7 +3076,7 @@
         fillPixelPoly([[x0, topY],[x1 + 2, botY],[x2 - 2, botY],[x3, topY]], isWinter ? PAL.SNOW_DARK : PAL.SAND_MID);
         fillPixelPoly([[x0 + 5, topY],[x1 + 5, botY - 2],[x2 - 5, botY - 2],[x3 - 5, topY]], env.gndMid);
 
-        if (f.depthFactor >= 1.0) {
+        if (effectiveDepth >= 1.0) {
           fillPixelPoly([[x0 + 10, topY],[x1 + 9, botY - 5],[x2 - 9, botY - 5],[x3 - 10, topY]], env.gndTop);
           let step = 0;
           for (let tx = x1 + 8; tx <= x2 - 18; tx += 46) {
@@ -3096,9 +3096,11 @@
 
         fillPixelPoly([[x0 - 3, baseY],[x1, peakY - 2],[x2, peakY - 2],[x3 + 3, baseY]], env.watFoam);
         fillPixelPoly([[x0, baseY],[x1 + 2, peakY],[x2 - 2, peakY],[x3, baseY]], isWinter ? PAL.SNOW_DARK : (isSil ? PAL.SILHOUETTE : (isLakeOpen ? PAL.ROCK_MID : PAL.SAND_MID)));
-        fillPixelPoly([[x0 + 5, baseY],[x1 + 5, peakY + 2],[x2 - 5, peakY + 2],[x3 - 5, baseY]], env.gndMid);
+        if (reachH >= 5) {
+          fillPixelPoly([[x0 + 5, baseY],[x1 + 5, peakY + 2],[x2 - 5, peakY + 2],[x3 - 5, baseY]], env.gndMid);
+        }
 
-        if (f.depthFactor >= 1.0) {
+        if (effectiveDepth >= 1.0) {
           fillPixelPoly([[x0 + 10, baseY],[x1 + 9, peakY + 5],[x2 - 9, peakY + 5],[x3 - 10, baseY]], env.gndTop);
           let propStep = 0;
           for (let tx = x1 + 8; tx <= x2 - 18; tx += 46) {
@@ -3622,12 +3624,11 @@
   const noteLength = 60 / AUDIO_BPM / 4;
 
   const NOTES = {
-    'E3': 164.81, 'F#3': 185.00, 'G3': 196.00, 'A3': 220.00, 'B3': 246.94,
-    'D4': 293.66, 'E4': 329.63, 'F#4': 369.99, 'G4': 392.00, 'A4': 440.00, 'B4': 493.88,
+    'E3': 164.81, 'F#3': 185.00, 'G3': 196.00, 'A3': 220.00, 'B3': 246.94, 'D4': 293.66,
+    'E4': 329.63, 'F#4': 369.99, 'G4': 392.00, 'A4': 440.00, 'B4': 493.88,
     'D5': 587.33, 'E5': 659.25, 'F#5': 739.99, 'G5': 783.99, 'A5': 880.00, 'B5': 987.77, 'D6': 1174.66
   };
 
-  // Full chorus lead melody (enters at Lake Winnipeg daylight)
   const wilyLead = [
     'E4', 'E5', 'B4', 'E5', 'D5', 'B4', 'D5', 'E5',
     'G4', 'G5', 'D5', 'G5', 'F#5', 'D5', 'F#5', 'G5',
@@ -3635,7 +3636,6 @@
     'B5', 'A5', 'G5', 'F#5', 'E5', 'D5', 'B4', 'D5'
   ];
 
-  // Counter-melody harmony (enters on Red River Plains)
   const riverHarmony = [
     'B3', null, 'G4', null, 'F#4', null, 'G4', null,
     'D4', null, 'B4', null, 'A4', null, 'B4', null,
@@ -3643,7 +3643,6 @@
     'F#4', null, 'E4', null, 'D4', null, 'B3', null
   ];
 
-  // Rhythmic staccato accompaniment (enters in Red River Settlement & St. Peter's)
   const settlementRhythm = [
     null, 'E4', null, 'B3', null, 'E4', null, 'G4',
     null, 'G4', null, 'D4', null, 'G4', null, 'B4',
@@ -3651,7 +3650,6 @@
     null, 'B4', null, 'F#4', null, 'G4', null, 'F#4'
   ];
 
-  // Steady heartbeat Pow-Wow Drum bassline
   const powWowDrum = [
     'E3', 'E3', null, 'E3', 'E3', 'E3', null, 'E3',
     'G3', 'G3', null, 'G3', 'G3', 'G3', null, 'G3',
@@ -3659,7 +3657,6 @@
     'B3', null, 'B3', null, 'D4', 'B3', 'G3', 'F#3'
   ];
 
-  // Haunting Northern people's pentatonic calls & songs (for the icy frozen north)
   const northernCallMelody = [
     'B4', null, null, null, 'D5', 'B4', 'A4', null,
     'G4', null, null, null, null, null, 'A4', 'B4',
@@ -3693,7 +3690,6 @@
     osc.stop(audioCtx.currentTime + duration);
   }
 
-  // Haunting vocal-like Northern song note with slow attack, vibrato & lingering release
   function playNorthernCallTone(freq, duration, volume) {
     if (!freq || !audioCtx) return;
     const now = audioCtx.currentTime;
@@ -3724,7 +3720,6 @@
     vibrato.stop(now + duration);
   }
 
-  // Frozen gusty arctic wind burst for the Boreal North
   function playArcticWindGust(intensity = 0.5) {
     if (!audioCtx) return;
     const now = audioCtx.currentTime;
@@ -3902,13 +3897,6 @@
     noise.stop(audioCtx.currentTime + dur);
   }
 
-  // Progressive Chiptune & Northern Soundscape Sequencer:
-  // 1. The Forks (0..600): Instrument 1 — Steady Pow-Wow Drum pulse
-  // 2. Red River Plains (600..1160): + Instrument 2 — Voyageur counter-melody harmony
-  // 3. Settlement & St. Peter's (1160..2150): + Instrument 3 — Rhythmic accompaniment chords
-  // 4. Lake Winnipeg Daylight (2150..3270): + Instrument 4 — Full Chiptune Chorus!
-  // 5. Midnight Lake Winnipeg (3270..4350): Strips back to JUST the steady Pow-Wow Drum across the lake
-  // 6. Icy Frozen North (4350+): Haunting cold calls & songs of the Northern people + frozen gusty winds
   function sequenceTrack() {
     if (isPaused || gameMode !== 'PLAYING') return;
 
@@ -3918,12 +3906,10 @@
     const leadNote = wilyLead[currentStepAudio];
 
     if (score < DIST.FORKS_END) {
-      // Stage 1: Drum alone
       if (bassNote && NOTES[bassNote]) {
         playTone(NOTES[bassNote], 'triangle', noteLength * 2.2, 0.24);
       }
     } else if (score < DIST.PLAINS_END) {
-      // Stage 2: Drum + Harmony
       if (bassNote && NOTES[bassNote]) {
         playTone(NOTES[bassNote], 'triangle', noteLength * 2.2, 0.24);
       }
@@ -3931,7 +3917,6 @@
         playTone(NOTES[harmNote], 'sine', noteLength * 1.8, 0.065);
       }
     } else if (score < DIST.ST_PETERS_END) {
-      // Stage 3: Drum + Harmony + Rhythm Chords
       if (bassNote && NOTES[bassNote]) {
         playTone(NOTES[bassNote], 'triangle', noteLength * 2.2, 0.24);
       }
@@ -3942,7 +3927,6 @@
         playTone(NOTES[rhyNote], 'sawtooth', noteLength * 0.75, 0.024);
       }
     } else if (score < 3270) {
-      // Stage 4 (Lake Winnipeg Entry -> Sunset): FULL CHORUS!
       if (bassNote && NOTES[bassNote]) {
         playTone(NOTES[bassNote], 'triangle', noteLength * 2.2, 0.25);
       }
@@ -3956,13 +3940,10 @@
         playTone(NOTES[leadNote], 'square', noteLength * 0.95, 0.032);
       }
     } else if (score < DIST.NORWAY_HOUSE_END) {
-      // Stage 5 (Midnight Lake Winnipeg): Back to JUST the steady Pow-Wow Drum across the lake
       if (bassNote && NOTES[bassNote]) {
         playTone(NOTES[bassNote], 'triangle', noteLength * 2.4, 0.26);
       }
     } else {
-      // Stage 6 (Icy Frozen North: Norway House -> York Factory):
-      // Haunting cold calls & songs of the Northern people + frozen gusty winds
       const callNote = northernCallMelody[currentStepAudio];
       const droneNote = northernThroatDrone[currentStepAudio];
 
