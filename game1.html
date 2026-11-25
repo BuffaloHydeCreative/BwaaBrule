@@ -159,10 +159,12 @@
     WAVE_CREST: '#E8FAFF',
     INDIGO_DEEP: '#071022',
     INDIGO_MID: '#10203E',
-    SUNSET_TOP: '#2A1B4E',
-    SUNSET_BOT: '#D96B43',
+    SUNSET_TOP: '#26174A',
+    SUNSET_MID: '#7D3559',
+    SUNSET_BOT: '#DF6E42',
     NIGHT_SKY_T: '#09071A',
-    NIGHT_SKY_B: '#2A1B52',
+    NIGHT_SKY_M: '#19133D',
+    NIGHT_SKY_B: '#2E1E59',
     HIDE_LIGHT: '#F2ECDC',
     HIDE_MID: '#CBBFA4',
     HIDE_DARK: '#8F8268',
@@ -199,8 +201,9 @@
     BAY_DEEP: '#0B496B',
     BAY_MID: '#18749E',
     BAY_FOAM: '#7CE4EC',
-    DAY_SKY_T: '#87B5C9',
-    DAY_SKY_B: '#E6DFCE'
+    DAY_SKY_T: '#6FA6C4',
+    DAY_SKY_M: '#9BC4D8',
+    DAY_SKY_B: '#C7DFEA'
   };
 
   // Geographic Stage Milestones
@@ -300,7 +303,7 @@
   initTitleStars();
 
   // ==========================================
-  // 3. COLOR INTERPOLATION & SILHOUETTE HELPERS
+  // 3. COLOR INTERPOLATION & PARALLAX SKY ENGINE
   // ==========================================
   function hexToRgb(hex) {
     const res = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -333,7 +336,7 @@
   }
 
   function getEnvColors() {
-    let skyTop = PAL.DAY_SKY_T, skyBot = PAL.DAY_SKY_B;
+    let skyTop = PAL.DAY_SKY_T, skyMid = PAL.DAY_SKY_M, skyBot = PAL.DAY_SKY_B;
     let gndTop = PAL.GOLD_LIGHT, gndMid = PAL.GOLD_MID, gndDark = PAL.GOLD_DARK;
     let watDeep = PAL.MAROON_DEEP, watMid = PAL.MAROON_MID, watFoam = PAL.MAROON_FOAM;
     let title = "THE FORKS";
@@ -341,12 +344,18 @@
     if (score < DIST.FORKS_END) {
       title = "THE FORKS";
       const t = score / DIST.FORKS_END;
+      skyTop = lerpColor('#6FA6C4', '#68A4C7', t);
+      skyMid = lerpColor('#9BC4D8', '#99C7DE', t);
+      skyBot = lerpColor('#C7DFEA', '#CBE3EE', t);
       gndTop = lerpColor(PAL.GOLD_LIGHT, PAL.CHARTREUSE_L, t);
       gndMid = lerpColor(PAL.GOLD_MID, PAL.CHARTREUSE_D, t);
       gndDark = lerpColor(PAL.GOLD_DARK, PAL.MID_PINE, t);
     } else if (score < DIST.PLAINS_END) {
       title = "RED RIVER PLAINS";
       const t = (score - DIST.FORKS_END) / (DIST.PLAINS_END - DIST.FORKS_END);
+      skyTop = lerpColor('#68A4C7', '#74A9C7', t);
+      skyMid = lerpColor('#99C7DE', '#A6CADB', t);
+      skyBot = lerpColor('#CBE3EE', '#D6E5EC', t);
       gndTop = lerpColor(PAL.CHARTREUSE_L, PAL.GOLD_LIGHT, t * 0.45);
       gndMid = lerpColor(PAL.CHARTREUSE_D, PAL.GOLD_MID, t * 0.45);
       gndDark = PAL.MID_PINE;
@@ -356,6 +365,9 @@
     } else if (score < DIST.SETTLER_FARMS_END) {
       title = score >= 1300 ? "LOWER FORT GARRY" : "RED RIVER SETTLEMENT";
       const t = (score - DIST.PLAINS_END) / (DIST.SETTLER_FARMS_END - DIST.PLAINS_END);
+      skyTop = lerpColor('#74A9C7', '#669EBF', t);
+      skyMid = lerpColor('#A6CADB', '#94BFD6', t);
+      skyBot = lerpColor('#D6E5EC', '#C4DCE8', t);
       gndTop = lerpColor(PAL.CHARTREUSE_L, PAL.MARSH_LIGHT, t);
       gndMid = lerpColor(PAL.CHARTREUSE_D, PAL.MARSH_MID, t);
       gndDark = lerpColor(PAL.MID_PINE, PAL.MARSH_DARK, t);
@@ -365,6 +377,9 @@
     } else if (score < DIST.ST_PETERS_END) {
       title = score >= DIST.MOUTH_OPEN_START ? "MOUTH OF LAKE WINNIPEG" : "ST. PETER'S";
       const t = (score - DIST.SETTLER_FARMS_END) / (DIST.ST_PETERS_END - DIST.SETTLER_FARMS_END);
+      skyTop = lerpColor('#669EBF', '#5E98BD', t);
+      skyMid = lerpColor('#94BFD6', '#8DBBD6', t);
+      skyBot = lerpColor('#C4DCE8', '#BEDAE8', t);
       gndTop = lerpColor(PAL.MARSH_LIGHT, PAL.LIGHT_PINE, t);
       gndMid = lerpColor(PAL.MARSH_MID, PAL.MID_PINE, t);
       gndDark = lerpColor(PAL.MARSH_DARK, PAL.DARK_PINE, t);
@@ -373,6 +388,9 @@
       watFoam = lerpColor('#8FA89B', PAL.LAKE_FOAM, t);
     } else if (score < DIST.MOUTH_BAS_END) {
       title = "FORT BAS DE LA RIVIÈRE";
+      skyTop = '#5E98BD';
+      skyMid = '#8DBBD6';
+      skyBot = '#BEDAE8';
       gndTop = PAL.LIGHT_PINE;
       gndMid = PAL.MID_PINE;
       gndDark = PAL.DARK_PINE;
@@ -382,6 +400,9 @@
     } else if (score < DIST.MANIGOTAGAN_END) {
       title = "MANIGOTAGAN SHORE";
       const t = (score - DIST.MOUTH_BAS_END) / (DIST.MANIGOTAGAN_END - DIST.MOUTH_BAS_END);
+      skyTop = lerpColor('#5E98BD', '#6B8AB5', t);
+      skyMid = lerpColor('#8DBBD6', '#A1A6C7', t);
+      skyBot = lerpColor('#BEDAE8', '#D4C2D6', t);
       gndTop = lerpColor(PAL.LIGHT_PINE, PAL.MID_PINE, t);
       gndMid = lerpColor(PAL.MID_PINE, PAL.DARK_PINE, t * 0.6);
       gndDark = PAL.DARK_PINE;
@@ -394,9 +415,11 @@
       const sunsetT = Math.min(1, (score - DIST.MANIGOTAGAN_END) / 360);
       const nightT = Math.max(0, (score - 3270) / (DIST.BERENS_END - 3270));
 
-      const dayToSunsetSkyT = lerpColor(PAL.DAY_SKY_T, PAL.SUNSET_TOP, sunsetT);
-      const dayToSunsetSkyB = lerpColor(PAL.DAY_SKY_B, PAL.SUNSET_BOT, sunsetT);
+      const dayToSunsetSkyT = lerpColor('#6B8AB5', PAL.SUNSET_TOP, sunsetT);
+      const dayToSunsetSkyM = lerpColor('#A1A6C7', PAL.SUNSET_MID, sunsetT);
+      const dayToSunsetSkyB = lerpColor('#D4C2D6', PAL.SUNSET_BOT, sunsetT);
       skyTop = lerpColor(dayToSunsetSkyT, PAL.NIGHT_SKY_T, nightT);
+      skyMid = lerpColor(dayToSunsetSkyM, PAL.NIGHT_SKY_M, nightT);
       skyBot = lerpColor(dayToSunsetSkyB, PAL.NIGHT_SKY_B, nightT);
 
       const dayGndTop = lerpColor(PAL.MID_PINE, PAL.ROCK_MID, shieldT);
@@ -415,8 +438,9 @@
         ? Math.min(1, (score - 4130) / (DIST.NORWAY_HOUSE_END - 4130))
         : 0;
 
-      skyTop = lerpColor(PAL.NIGHT_SKY_T, PAL.DAY_SKY_T, dawnT);
-      skyBot = lerpColor(PAL.NIGHT_SKY_B, PAL.DAY_SKY_B, dawnT);
+      skyTop = lerpColor(PAL.NIGHT_SKY_T, '#6391B0', dawnT);
+      skyMid = lerpColor(PAL.NIGHT_SKY_M, '#94B8CE', dawnT);
+      skyBot = lerpColor(PAL.NIGHT_SKY_B, '#C6DCE8', dawnT);
       gndTop = lerpColor('#191C30', PAL.SNOW_LIGHT, dawnT);
       gndMid = lerpColor('#0D101E', PAL.SNOW_MID, dawnT);
       gndDark = lerpColor('#070A14', PAL.SNOW_DARK, dawnT);
@@ -425,8 +449,9 @@
       watFoam = lerpColor('#28457A', PAL.SNOW_LIGHT, dawnT);
     } else if (score < DIST.DEPLOY_END) {
       title = "NORWAY HOUSE - DOGSLED";
-      skyTop = PAL.DAY_SKY_T;
-      skyBot = PAL.DAY_SKY_B;
+      skyTop = '#6391B0';
+      skyMid = '#94B8CE';
+      skyBot = '#C6DCE8';
       gndTop = PAL.SNOW_LIGHT;
       gndMid = PAL.SNOW_MID;
       gndDark = PAL.SNOW_DARK;
@@ -438,8 +463,9 @@
       const blizT = score < 5200
         ? Math.min(1, Math.max(0, (score - 4570) / 630))
         : Math.max(0, 1 - (score - 5200) / 650);
-      skyTop = lerpColor('#7C9EB2', '#B8C8D4', blizT);
-      skyBot = lerpColor('#D6E2E8', '#E4EDF2', blizT);
+      skyTop = lerpColor('#6391B0', '#8FA4B5', blizT);
+      skyMid = lerpColor('#94B8CE', '#B4C4D1', blizT);
+      skyBot = lerpColor('#C6DCE8', '#D3DFE8', blizT);
       gndTop = PAL.SNOW_LIGHT;
       gndMid = PAL.SNOW_MID;
       gndDark = PAL.SNOW_DARK;
@@ -449,8 +475,9 @@
     } else {
       title = "HUDSON BAY - YORK FACTORY";
       const t = Math.min(1, (score - 6000) / 350);
-      skyTop = lerpColor('#7C9EB2', '#6BA3C4', t);
-      skyBot = lerpColor('#D6E2E8', '#F2E8D5', t);
+      skyTop = lerpColor('#6391B0', '#5E9AC2', t);
+      skyMid = lerpColor('#94B8CE', '#94C2DE', t);
+      skyBot = lerpColor('#C6DCE8', '#C9E2F0', t);
       gndTop = PAL.SNOW_LIGHT;
       gndMid = PAL.SNOW_MID;
       gndDark = PAL.SNOW_DARK;
@@ -459,7 +486,41 @@
       watFoam = PAL.SNOW_LIGHT;
     }
 
-    return { skyTop, skyBot, gndTop, gndMid, gndDark, watDeep, watMid, watFoam, title };
+    return { skyTop, skyMid, skyBot, gndTop, gndMid, gndDark, watDeep, watMid, watFoam, title };
+  }
+
+  // Smooth multi-band parallax sky renderer (zero solid white bands!)
+  function drawParallaxSky(horizonY, skyTop, skyMid, skyBot, silT, scrollPx) {
+    const grad = ctx.createLinearGradient(0, 0, 0, horizonY);
+    grad.addColorStop(0, skyTop);
+    grad.addColorStop(0.52, skyMid);
+    grad.addColorStop(1, skyBot);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, VIEW_W, horizonY);
+
+    // Distant slow-drifting upper cloud layer
+    const farCloudSpacing = 210;
+    const farOff = (scrollPx * 0.08) % farCloudSpacing;
+    ctx.fillStyle = silT > 0.45 ? '#1D153D' : lerpColor(skyBot, '#FFFFFF', 0.45);
+    for (let cx = -farCloudSpacing; cx < VIEW_W + farCloudSpacing; cx += farCloudSpacing) {
+      const fx = Math.round(cx - farOff + 30);
+      if (44 < horizonY - 6) {
+        ctx.fillRect(fx + 6, 40, 18, 2);
+        ctx.fillRect(fx, 42, 30, 2);
+      }
+    }
+
+    // Mid-distance parallax cloud layer
+    const midCloudSpacing = 175;
+    const midOff = (scrollPx * 0.16) % midCloudSpacing;
+    ctx.fillStyle = silT > 0.45 ? '#2B1F57' : lerpColor(skyBot, '#FFFFFF', 0.65);
+    for (let cx = -midCloudSpacing; cx < VIEW_W + midCloudSpacing; cx += midCloudSpacing) {
+      const mx = Math.round(cx - midOff + 85);
+      if (54 < horizonY - 4) {
+        ctx.fillRect(mx + 4, 49, 14, 2);
+        ctx.fillRect(mx, 51, 22, 2);
+      }
+    }
   }
 
   // ==========================================
@@ -539,12 +600,12 @@
     const scrollPx = frame * 1.15;
 
     const horizonY = Math.floor(VIEW_H * 0.36);
-    ctx.fillStyle = '#070614';
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, horizonY);
+    skyGrad.addColorStop(0, '#070614');
+    skyGrad.addColorStop(0.5, '#141133');
+    skyGrad.addColorStop(1, '#241B52');
+    ctx.fillStyle = skyGrad;
     ctx.fillRect(0, 0, VIEW_W, horizonY);
-    ctx.fillStyle = '#141133';
-    ctx.fillRect(0, Math.floor(horizonY * 0.42), VIEW_W, horizonY - Math.floor(horizonY * 0.42));
-    ctx.fillStyle = '#241B52';
-    ctx.fillRect(0, Math.floor(horizonY * 0.74), VIEW_W, horizonY - Math.floor(horizonY * 0.74));
 
     for (let i = 0; i < titleStars.length; i++) {
       const st = titleStars[i];
@@ -1046,10 +1107,7 @@
     const laneH = Math.floor(riverH / 3);
     const midY = riverTopY + laneH + Math.floor((laneH - 15) / 2);
 
-    ctx.fillStyle = PAL.DAY_SKY_T;
-    ctx.fillRect(0, 0, VIEW_W, horizonY);
-    ctx.fillStyle = PAL.DAY_SKY_B;
-    ctx.fillRect(0, Math.floor(horizonY * 0.55), VIEW_W, horizonY);
+    drawParallaxSky(horizonY, PAL.DAY_SKY_T, PAL.DAY_SKY_M, PAL.DAY_SKY_B, 0, animTick * 0.4);
 
     ctx.fillStyle = PAL.GOLD_LIGHT;
     ctx.fillRect(0, horizonY, VIEW_W, 6);
@@ -1291,10 +1349,7 @@
     const panT = f <= 170 ? 0 : Math.min(1, (f - 170) / 145);
     const camX = Math.round(panT * 155);
 
-    ctx.fillStyle = '#6BA3C4';
-    ctx.fillRect(0, 0, VIEW_W, horizonY);
-    ctx.fillStyle = '#F2E8D5';
-    ctx.fillRect(0, Math.floor(horizonY * 0.55), VIEW_W, horizonY);
+    drawParallaxSky(horizonY, '#5E9AC2', '#94C2DE', '#C9E2F0', 0, camX + f * 0.35);
 
     const coastSplitWorldX = 185;
     const coastSplitScreenX = coastSplitWorldX - camX;
@@ -1448,7 +1503,6 @@
   // ==========================================
   // 6B. REGIONAL SCENERY PROPS & UNIQUE LANDMARKS
   // ==========================================
-  // Subtle tall grasses & ground-level prairie atmosphere along the Red River Settlement bank
   function drawTallPrairieGrasses(x, y) {
     ctx.fillStyle = PAL.MID_PINE;
     ctx.fillRect(x, y - 3, 1, 4);
@@ -2390,32 +2444,26 @@
       return;
     }
 
-    // 1. St Johns Church (~score 155)
     if (!spawnedFlags.ST_JOHNS && score >= 155) {
       landmarks.push({ x: VIEW_W + 30, type: 'ST_JOHNS_CHURCH', clearW: 54 });
       spawnedFlags.ST_JOHNS = true;
     }
-    // 2. Preset non-repeating log village past St Johns Church until just before Battle of Seven Oaks (~score 235)
     if (!spawnedFlags.PRESET_VILLAGE && score >= 235) {
       landmarks.push({ x: VIEW_W + 30, type: 'PRESET_LOG_VILLAGE', clearW: 215 });
       spawnedFlags.PRESET_VILLAGE = true;
     }
-    // 3. Battle of Seven Oaks (~score 460)
     if (!spawnedFlags.SEVEN_OAKS && score >= 460) {
       landmarks.push({ x: VIEW_W + 60, type: 'SEVEN_OAKS', triggered: false, triggerFrame: 0, clearW: 195 });
       spawnedFlags.SEVEN_OAKS = true;
     }
-    // 4. St Andrews on the Red after long open plains (~score 1160)
     if (!spawnedFlags.ST_ANDREWS && score >= 1160) {
       landmarks.push({ x: VIEW_W + 35, type: 'ST_ANDREWS_CHURCH', clearW: 58 });
       spawnedFlags.ST_ANDREWS = true;
     }
-    // 5. Lower Fort Garry (~score 1360)
     if (!spawnedFlags.LOWER_FORT && score >= 1360) {
       landmarks.push({ x: VIEW_W + 40, type: 'LOWER_FORT_GARRY', clearW: 124 });
       spawnedFlags.LOWER_FORT = true;
     }
-    // 6. Sugar Island Rapids (~score 1660)
     if (!spawnedFlags.SUGAR_ISLAND && score >= 1660) {
       spawnedFlags.SUGAR_ISLAND = true;
       const w = 180;
@@ -2436,13 +2484,11 @@
       nextFeatureX += w + 145;
       return;
     }
-    // 7. St. Peter's Dynevor (~score 1870)
     if (!spawnedFlags.ST_PETERS_DYNEVOR && score >= 1870) {
       nearBankLandmarks.push({ x: VIEW_W + 35, type: 'ST_PETERS_DYNEVOR', clearW: 64 });
       spawnedFlags.ST_PETERS_DYNEVOR = true;
     }
 
-    // --- East Shore of Lake Winnipeg Daisy Chain ---
     if (!spawnedFlags.BROKENHEAD && score >= 2280) {
       nearBankLandmarks.push({ x: VIEW_W + 35, type: 'BROKENHEAD_MOUTH', clearW: 64 });
       spawnedFlags.BROKENHEAD = true;
@@ -2704,11 +2750,8 @@
       ctx.translate(Math.round(sx), Math.round(sy));
     }
 
-    // 1. Shaded Sky Band
-    ctx.fillStyle = env.skyTop;
-    ctx.fillRect(0, 0, VIEW_W, horizonY);
-    ctx.fillStyle = env.skyBot;
-    ctx.fillRect(0, Math.floor(horizonY * 0.55), VIEW_W, horizonY - Math.floor(horizonY * 0.55));
+    // 1. Full Color-Changing Spectrum Parallax Sky
+    drawParallaxSky(horizonY, env.skyTop, env.skyMid, env.skyBot, silT, bgOffset);
 
     if (score >= DIST.MANIGOTAGAN_END + 160 && score < DIST.NORWAY_HOUSE_END) {
       const celestT = Math.min(1, (score - (DIST.MANIGOTAGAN_END + 160)) / 240);
@@ -2726,20 +2769,6 @@
           : `rgba(255, 224, 150, ${(alpha * 0.88).toFixed(2)})`;
         ctx.fillRect(moonX - 4, moonY - 2, 16, 14);
         ctx.fillRect(moonX - 2, moonY - 4, 12, 18);
-      }
-    }
-
-    // Parallax Sky Clouds (constrained cleanly to upper sky band above horizonY so they never form a white band across the horizon)
-    const cloudOff = (bgOffset * 0.12) % 180;
-    ctx.fillStyle = silT > 0.4 ? '#281D4D' : 'rgba(255, 255, 255, 0.78)';
-    for (let cx = -180; cx < VIEW_W + 180; cx += 180) {
-      const c1x = Math.round(cx - cloudOff + 24);
-      const c2x = Math.round(cx - cloudOff + 104);
-      if (playTop + 8 < horizonY - 4) {
-        ctx.fillRect(c1x + 4, playTop + 4, 14, 2);
-        ctx.fillRect(c1x, playTop + 6, 24, 2);
-        ctx.fillRect(c2x + 3, playTop + 7, 12, 2);
-        ctx.fillRect(c2x, playTop + 9, 20, 2);
       }
     }
 
@@ -2784,7 +2813,6 @@
           }
         }
       } else {
-        // Subtle tall grasses & ground-level atmosphere across the Red River Settlement (Upper Fort Garry to Lower Fort Garry)
         if (score < DIST.SETTLER_FARMS_END) {
           const grassSpacing = 54;
           const grassOff = (bgOffset * 0.38) % grassSpacing;
@@ -2800,11 +2828,6 @@
           }
         }
 
-        // Red River Scenery Rules:
-        // - 0..460 (Upper Fort Garry -> St Johns -> Preset Log Village -> Battle of Seven Oaks): NO repeating background!
-        // - 520..1080 (Long Plains after Seven Oaks until St Andrews on the Red): Open plains with occasional buffalo
-        // - 1140..1620 (St Andrews on the Red -> Lower Fort Garry -> past Lower Fort): Settler village background
-        // - 1700..2010 (St. Peter's): Marsh reeds & oaks with only a few rare wigwams/fires before Lake Winnipeg
         const activeRedRiverSet = (score >= 520 && score < 1080)
           ? 'PLAINS'
           : (score >= 1140 && score < 1620)
