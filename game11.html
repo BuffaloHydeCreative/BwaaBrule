@@ -50,8 +50,6 @@ const ctx = cvs.getContext('2d');
 ctx.imageSmoothingEnabled = false;
 
 // --- DYNAMIC VIEWPORT & LOGICAL CANVAS SCALING ---
-// Locks logical height to 240px for crisp 16-bit pixel art while adapting logical width (VIEW_W)
-// to match the exact aspect ratio of the full-bleed 100vw x 100vh parent iframe without black bars or stretching.
 let VIEW_W = 320;
 const VIEW_H = 240;
 
@@ -635,8 +633,6 @@ let lastOutcomeHit = false;
 let activeWind = WIND_PRESETS[2];
 
 // Slingshot-Compatible Aiming Controls:
-// - Up/Down adjusts launch angle (live both before and while bowstring is drawn)
-// - Hold/Release Button A draws bowstring back and launches on release
 let aimAngleDeg = 32;
 let isDrawing = false;
 let drawPower = 0;
@@ -2367,10 +2363,9 @@ function drawPartridge(camX, env) {
     return;
   }
 
-  const d = partridge.dir;
-  ctx.scale(-d, 1);
-
   if (partridge.state === 'FLEEING') {
+    // Base art faces left (-x), so scale(1, 1) flips/mirrors it horizontally to face right (+x) along its top-right flight path!
+    ctx.scale(1, 1);
     const flap = Math.floor(elapsed * 22) % 2;
     ctx.fillStyle = PAL.GROUSE_DARK;
     ctx.fillRect(-5, -10, 11, 6);
@@ -2384,6 +2379,9 @@ function drawPartridge(camX, env) {
     ctx.restore();
     return;
   }
+
+  const d = partridge.dir;
+  ctx.scale(-d, 1);
 
   const step = Math.floor(partridge.animTimer * 4) % 2;
   const perkedUp = (partridge.state === 'ALERT');
@@ -2736,8 +2734,6 @@ function update(dt) {
 
   // =========================================================================
   // INTERACTIVE PHASE: 2-AXIS SLINGSHOT-COMPATIBLE AIM & DRAW
-  // - Up/Down adjusts launch angle (live both before and while bowstring is drawn)
-  // - Hold/Release A pulls back bowstring and fires on release
   // =========================================================================
   else if (state === 'AIM_AND_SHOOT') {
     playerFacing = 1;
@@ -2784,7 +2780,6 @@ function update(dt) {
       cameraX += (baseCam - cameraX) * Math.min(1, 8.5 * dt);
     }
 
-    // Live Up/Down launch angle control (works both before drawing and while bowstring is drawn)
     if (angleTickCooldown > 0) angleTickCooldown = Math.max(0, angleTickCooldown - dt);
     let aimChanged = false;
     if (keys.up) { aimAngleDeg = Math.min(76, aimAngleDeg + 46 * dt); aimChanged = true; }
@@ -2794,7 +2789,6 @@ function update(dt) {
       angleTickCooldown = 0.1;
     }
 
-    // Hold Button A to draw bowstring back, Release Button A to launch
     if (aJustPressed && !isDrawing && arrowsInQuiver > 0) {
       isDrawing = true;
       drawPower = 0.06;
@@ -3255,9 +3249,6 @@ function gameLoop(timestamp) {
 }
 
 // --- ARCADE CABINET postMessage BRIDGE (SINGLE SOURCE OF TRUTH FOR CONTROLS) ---
-// - 145ms D-Pad hold-window timers so joystick drags move smoothly without separate release events
-// - 110ms debounce guard on BUTTON_A / BUTTON_B so taps never double-trigger
-// - PAUSE / RESUME freezes loop and clears active input states
 let lastBtnATime = 0;
 let lastBtnBTime = 0;
 const BUTTON_DEBOUNCE_MS = 110;
@@ -3350,7 +3341,6 @@ window.addEventListener('message', (event) => {
   if (cmd === 'RESUME') { setPausedState(false); return; }
   if (isPaused) return;
 
-  // Global neutral / release signals from parent drag-joystick
   if (cmd === 'RELEASE' || cmd === 'STOP' || cmd === 'DPAD_RELEASE' || cmd === 'NEUTRAL') {
     setDirectionHold('up', false);
     setDirectionHold('down', false);
@@ -3359,7 +3349,6 @@ window.addEventListener('message', (event) => {
     return;
   }
 
-  // Cardinal D-Pad Hold & Release Events
   if (cmd === 'DPAD_UP_PRESS') setDirectionHold('up', true);
   else if (cmd === 'DPAD_UP_RELEASE') setDirectionHold('up', false);
   else if (cmd === 'DPAD_DOWN_PRESS') setDirectionHold('down', true);
@@ -3369,13 +3358,11 @@ window.addEventListener('message', (event) => {
   else if (cmd === 'DPAD_RIGHT_PRESS') setDirectionHold('right', true);
   else if (cmd === 'DPAD_RIGHT_RELEASE') setDirectionHold('right', false);
 
-  // Cardinal D-Pad Pulses (145ms hold window for smooth drag-joystick motion)
   else if (cmd === 'DPAD_UP') pulseDirection('up');
   else if (cmd === 'DPAD_DOWN') pulseDirection('down');
   else if (cmd === 'DPAD_LEFT') pulseDirection('left');
   else if (cmd === 'DPAD_RIGHT') pulseDirection('right');
 
-  // Action Button A (Press/Release + Debounced Tap Toggle)
   else if (cmd === 'BUTTON_A_PRESS') {
     const now = performance.now();
     if (now - lastBtnATime < BUTTON_DEBOUNCE_MS) return;
@@ -3397,7 +3384,6 @@ window.addEventListener('message', (event) => {
     }
   }
 
-  // Action Button B (Press/Release + Debounced Tap)
   else if (cmd === 'BUTTON_B_PRESS') {
     const now = performance.now();
     if (now - lastBtnBTime < BUTTON_DEBOUNCE_MS) return;
