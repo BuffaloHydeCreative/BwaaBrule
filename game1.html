@@ -217,7 +217,7 @@
     MOUTH_BAS_END: 2470,
     MANIGOTAGAN_END: 2910,
     BERENS_END: 3630,
-    LAKE_CLOSE_START: 4230,
+    LAKE_CLOSE_START: 4180,
     NORWAY_HOUSE_END: 4350,
     DEPLOY_END: 4470,
     BLIZZARD_PEAK: 5200,
@@ -246,11 +246,12 @@
   let crashReason = "RUN AGROUND!";
   let lastSplashStrokeId = -1;
 
-  // Opening Cutscene State (includes Upper Fort Garry dispatch + Bishop Taché's blessing from St. Boniface Cathedral)
+  // Opening Cutscene State (includes Upper Fort Garry dispatch + Bishop Taché's blessing dialogue box)
   let openingFrame = 0;
-  let awaitingOpeningConfirm = false;
+  let openingDialogueStage = 0; // 0: none, 1: Upper Fort Garry dispatch, 2: Bishop Taché blessing
   const OPENING_DIALOGUE_FRAME = 390;
-  const OPENING_TOTAL = 790;
+  const BISHOP_DIALOGUE_FRAME = 645;
+  const OPENING_TOTAL = 805;
 
   // Mid-Game Dogsled Deployment Cutscene at Norway House (4350 - 4470)
   let isDeployingSled = false;
@@ -437,7 +438,7 @@
       watMid = lerpColor(PAL.LAKE_MID, PAL.INDIGO_MID, nightT);
       watFoam = lerpColor(PAL.LAKE_FOAM, '#28457A', nightT);
     } else if (score < DIST.NORWAY_HOUSE_END) {
-      title = score >= 4210 ? "NORWAY HOUSE" : "MIDNIGHT LAKE WINNIPEG";
+      title = score >= DIST.LAKE_CLOSE_START ? "NORTH SHORE - NORWAY HOUSE" : "MIDNIGHT LAKE WINNIPEG";
       const dawnT = score >= 4130
         ? Math.min(1, (score - 4130) / (DIST.NORWAY_HOUSE_END - 4130))
         : 0;
@@ -539,6 +540,38 @@
     ctx.fillText(text, tx, ty + 1);
     ctx.fillStyle = isSil ? PAL.SIL_RIM_BRIGHT : PAL.GOLD_LIGHT;
     ctx.fillText(text, tx, ty);
+    ctx.textAlign = 'left';
+  }
+
+  // Framed 16-bit Dialogue Box Helper (used above Upper Fort Garry & below paddlers for Bishop Taché)
+  function drawDialogueBox(line1, line2, boxY, showPressA) {
+    const boxW = Math.min(VIEW_W - 18, 302);
+    const boxX = Math.floor((VIEW_W - boxW) / 2);
+    const boxH = showPressA ? 44 : 33;
+
+    ctx.fillStyle = PAL.OUTLINE;
+    ctx.fillRect(boxX - 2, boxY - 2, boxW + 4, boxH + 4);
+    ctx.fillStyle = '#0F241A';
+    ctx.fillRect(boxX, boxY, boxW, boxH);
+    ctx.strokeStyle = PAL.GOLD_LIGHT;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(boxX + 0.5, boxY + 0.5, boxW - 1, boxH - 1);
+
+    ctx.fillStyle = PAL.SNOW_LIGHT;
+    ctx.font = 'bold 8px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(line1, Math.floor(VIEW_W / 2), boxY + 12);
+    if (line2) {
+      ctx.fillText(line2, Math.floor(VIEW_W / 2), boxY + 24);
+    }
+
+    if (showPressA) {
+      const blinkOn = Math.floor(frame / 18) % 2 === 0;
+      if (blinkOn) {
+        ctx.fillStyle = PAL.GOLD_LIGHT;
+        ctx.fillText("PRESS 'A' TO CONTINUE", Math.floor(VIEW_W / 2), boxY + 37);
+      }
+    }
     ctx.textAlign = 'left';
   }
 
@@ -1098,16 +1131,13 @@
     }
   }
 
-  // Bishop Alexandre-Antonin Taché ferrying across in a timber skiff from St. Boniface Cathedral to bless the voyageur!
   function drawBishopTacheFerry(bx, by, frameCount, isBlessing) {
     const bob = Math.sin(frameCount * 0.14) * 1;
     const py = Math.round(by + bob);
 
-    // Water wake around Bishop's ferry skiff
     ctx.fillStyle = PAL.MAROON_FOAM;
     ctx.fillRect(bx - 12, py + 11, 24, 1);
 
-    // Timber ferry skiff
     ctx.fillStyle = PAL.OUTLINE;
     ctx.fillRect(bx - 10, py + 6, 20, 5);
     ctx.fillStyle = PAL.WOOD_MID;
@@ -1115,7 +1145,6 @@
     ctx.fillStyle = PAL.WOOD_LIGHT;
     ctx.fillRect(bx - 8, py + 6, 16, 1);
 
-    // Rowing oarsman at stern of skiff
     ctx.fillStyle = PAL.HIDE_MID;
     ctx.fillRect(bx + 3, py + 1, 4, 5);
     ctx.fillStyle = '#14110F';
@@ -1124,31 +1153,25 @@
     ctx.fillStyle = PAL.WOOD_LIGHT;
     ctx.fillRect(bx + 2, py + 4 + oarShift, 2, 7);
 
-    // Bishop Taché standing in bow facing left toward voyageur (black cassock, purple sash, white surplice, mitre)
     const tx = bx - 6;
     const ty = py - 6;
     ctx.fillStyle = PAL.OUTLINE;
     ctx.fillRect(tx, ty + 3, 7, 9);
-    // Black cassock
     ctx.fillStyle = '#15151C';
     ctx.fillRect(tx + 1, ty + 4, 5, 8);
-    // White lace surplice & purple episcopal sash
     ctx.fillStyle = PAL.SNOW_LIGHT;
     ctx.fillRect(tx + 1, ty + 4, 5, 4);
     ctx.fillStyle = PAL.BISHOP_PURPLE;
     ctx.fillRect(tx + 1, ty + 7, 5, 1);
-    // Face & beard
     ctx.fillStyle = '#E0AC84';
     ctx.fillRect(tx + 1, ty, 4, 3);
     ctx.fillStyle = PAL.STONE_LIGHT;
     ctx.fillRect(tx + 1, ty + 2, 2, 2);
-    // Episcopal Mitre hat
     ctx.fillStyle = PAL.BISHOP_PURPLE;
     ctx.fillRect(tx + 1, ty - 4, 4, 4);
     ctx.fillStyle = PAL.GOLD_LIGHT;
     ctx.fillRect(tx + 2, ty - 4, 2, 3);
 
-    // Raised blessing arm & golden cross shimmer
     if (isBlessing) {
       ctx.fillStyle = PAL.SNOW_LIGHT;
       ctx.fillRect(tx - 3, ty + 2, 4, 2);
@@ -1161,7 +1184,7 @@
 
   function drawOpeningCutscene() {
     const f = openingFrame;
-    const animTick = awaitingOpeningConfirm ? frame : f;
+    const animTick = openingDialogueStage !== 0 ? frame : f;
     const hudH = 36;
     const horizonY = hudH + Math.floor((VIEW_H - hudH) * 0.24);
     const riverTopY = horizonY + 18;
@@ -1263,54 +1286,27 @@
       drawWalkingVoyageur(wx, wy, animTick, true);
     }
 
+    // Upper Fort Garry Urgent Dispatch Text Box (above Upper Fort Garry)
     if (f >= 325 && f <= 420) {
-      const boxW = Math.min(VIEW_W - 18, 296);
-      const boxX = Math.floor((VIEW_W - boxW) / 2);
-      const boxY = 6;
-      const boxH = awaitingOpeningConfirm ? 44 : 33;
-
-      ctx.fillStyle = PAL.OUTLINE;
-      ctx.fillRect(boxX - 2, boxY - 2, boxW + 4, boxH + 4);
-      ctx.fillStyle = '#0F241A';
-      ctx.fillRect(boxX, boxY, boxW, boxH);
-      ctx.strokeStyle = PAL.GOLD_LIGHT;
-      ctx.lineWidth = 1;
-      ctx.strokeRect(boxX + 0.5, boxY + 0.5, boxW - 1, boxH - 1);
-
-      ctx.fillStyle = PAL.SNOW_LIGHT;
-      ctx.font = 'bold 8px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('This package is highly urgent and must get to', Math.floor(VIEW_W / 2), boxY + 12);
-      ctx.fillText('York Factory as soon as possible...no matter the weather!', Math.floor(VIEW_W / 2), boxY + 24);
-
-      if (awaitingOpeningConfirm) {
-        const blinkOn = Math.floor(frame / 18) % 2 === 0;
-        if (blinkOn) {
-          ctx.fillStyle = PAL.GOLD_LIGHT;
-          ctx.fillText("PRESS 'A' TO DEPART", Math.floor(VIEW_W / 2), boxY + 37);
-        }
-      }
-      ctx.textAlign = 'left';
+      drawDialogueBox(
+        'This package is highly urgent and must get to',
+        'York Factory as soon as possible...no matter the weather!',
+        6,
+        openingDialogueStage === 1
+      );
     }
 
-    // Phase 6 (f: 475..790):
-    // - 475..525: Voyageur paddles down the Assiniboine to The Forks
-    // - 525..575: Exclamation mark pops up and flashes 3 times above St. Boniface Cathedral!
-    // - 565..735: Bishop Taché ferries across quickly from St. Boniface Cathedral to bless the canoe man ("one life"),
-    //             then ferries back across the river!
-    // - 735..790: Voyageur turns right around The Forks bend to start the Red River run!
+    // Phase 6 (f: 475..805): Voyageur paddles to The Forks -> Bishop Taché ferries across from St. Boniface Cathedral -> turns right
     if (f >= 475) {
       if (f < 525) {
         const st = (f - 475) / 50;
         const cx = Math.round(assiniDockX + (forksJoinX - assiniDockX) * st);
         const cy = Math.round(assiniDockY + (midY - assiniDockY) * st);
         drawFrontFacingCanoe(cx, cy, animTick, true);
-      } else if (f < 735) {
-        // Voyageur holds steady at The Forks junction facing forward/right to receive Bishop Taché's blessing
+      } else if (f < 745) {
         drawFrontFacingCanoe(forksJoinX, midY, animTick, true);
       } else {
-        // Turns right around The Forks bend into active gameplay!
-        const rt = Math.min(1, (f - 735) / (OPENING_TOTAL - 735));
+        const rt = Math.min(1, (f - 745) / (OPENING_TOTAL - 745));
         const cx = Math.round((forksJoinX - 18) * (1 - rt) + 20 * rt);
         drawCanoeAndHunter(cx, midY, animTick, true, 0);
       }
@@ -1336,8 +1332,8 @@
       }
     }
 
-    // Bishop Taché ferrying quickly across from St. Boniface Cathedral to bless our canoe man (f: 565..735)
-    if (f >= 565 && f <= 735) {
+    // Bishop Taché ferrying across from St. Boniface Cathedral & Blessing Text Box below the paddlers on the river
+    if (f >= 565 && f <= 745) {
       const startBx = cathX - 8;
       const startBy = VIEW_H - 22;
       const meetBx = forksJoinX + 26;
@@ -1348,22 +1344,28 @@
       let isBlessing = false;
 
       if (f < 610) {
-        // Ferries quickly across from St. Boniface Cathedral to the canoe
         const ft = (f - 565) / 45;
         bx = Math.round(startBx + (meetBx - startBx) * ft);
         by = Math.round(startBy + (meetBy - startBy) * ft);
-      } else if (f < 690) {
-        // Gives episcopal blessing ("one life") alongside the voyageur
+      } else if (f < 700) {
         isBlessing = true;
-        drawUnboxedLabel("Bishop Taché's Blessing — One Life!", Math.floor(VIEW_W / 2), riverTopY - 6, false);
       } else {
-        // Ferries quickly back to St. Boniface Cathedral shore
-        const rt = (f - 690) / 45;
+        const rt = (f - 700) / 45;
         bx = Math.round(meetBx + (startBx - meetBx) * rt);
         by = Math.round(meetBy + (startBy - meetBy) * rt);
       }
 
       drawBishopTacheFerry(bx, by, animTick, isBlessing);
+
+      // Same style text box below the paddlers on the river for Bishop Taché!
+      if (isBlessing) {
+        drawDialogueBox(
+          '"Godspeed, my son—you have only',
+          'one life on these waters!"',
+          midY + 20,
+          openingDialogueStage === 2
+        );
+      }
     }
 
     if (f < 30) {
@@ -1568,6 +1570,7 @@
     }
   }
 
+  // North Shore Landing & Dogsled Deployment right at Norway House on the closed North Bank (4350 - 4470)
   function drawDeploymentSequence(horizonY, riverTopY, laneH) {
     const beachX = Math.round(VIEW_W * 0.44 - deployProgress * 26);
     const shoreTopY = riverTopY;
@@ -1577,6 +1580,7 @@
     fillPixelPoly([[beachX + 32, shoreTopY],[VIEW_W, shoreTopY],[VIEW_W, shoreBotY],[beachX, shoreBotY]], PAL.SNOW_LIGHT);
     fillPixelPoly([[beachX + 20, shoreTopY],[beachX + 25, shoreTopY],[beachX - 9, shoreBotY],[beachX - 14, shoreBotY]], PAL.ICE_MID);
 
+    // Large Norway House trading post on the closed North Shore bank right above the player
     const postX = Math.max(24, beachX - 12);
     drawFortLandmark(postX, horizonY - 11, 'NORWAY_HOUSE', true, false);
 
@@ -1637,37 +1641,30 @@
     ctx.fillRect(x + 7, y - 2, 1, 3);
   }
 
-  // American White Pelican (Resting on bank or flying diagonally across screen when triggered)
   function drawPelican(x, y, frameCount, isFlying) {
     const px = Math.round(x);
     const py = Math.round(y);
     if (!isFlying) {
-      // Resting pelican on bottom-closest riverbank
       ctx.fillStyle = PAL.OUTLINE;
       ctx.fillRect(px, py + 1, 7, 5);
       ctx.fillRect(px + 4, py - 3, 3, 5);
       ctx.fillStyle = PAL.SNOW_LIGHT;
       ctx.fillRect(px + 1, py + 1, 5, 4);
       ctx.fillRect(px + 5, py - 2, 2, 4);
-      // Black primary wing tip
       ctx.fillStyle = PAL.OUTLINE;
       ctx.fillRect(px + 1, py + 3, 2, 2);
-      // Long orange-gold pelican bill & pouch
       ctx.fillStyle = PAL.FIRE_ORANGE;
       ctx.fillRect(px + 7, py - 2, 5, 2);
       ctx.fillStyle = PAL.GOLD_LIGHT;
       ctx.fillRect(px + 7, py - 1, 4, 1);
     } else {
-      // Flying pelican beating wings diagonally across the river
       const wingUp = Math.floor(frameCount / 5) % 2 === 0;
       ctx.fillStyle = PAL.OUTLINE;
       ctx.fillRect(px + 1, py + 1, 8, 4);
       ctx.fillStyle = PAL.SNOW_LIGHT;
       ctx.fillRect(px + 2, py + 1, 7, 3);
-      // Long orange bill pointing forward-up
       ctx.fillStyle = PAL.FIRE_ORANGE;
       ctx.fillRect(px + 9, py + 1, 5, 2);
-      // Flapping white wings with black wingtips
       if (wingUp) {
         ctx.fillStyle = PAL.SNOW_LIGHT;
         ctx.fillRect(px + 2, py - 4, 5, 5);
@@ -2193,7 +2190,6 @@
     }
 
     if (type === 'ST_ANDREWS_CHURCH') {
-      // Trigger the two pelicans on the bottom-closest riverbank when the user's x-axis (~36..52) crosses St. Andrews on the Red!
       if (stAndrewsPelicans && !stAndrewsPelicans.flying && x <= 68) {
         stAndrewsPelicans.flying = true;
         playPaddleSplashSound();
@@ -2407,6 +2403,7 @@
     }
   }
 
+  // Near-Bank / East-Shoreline Unique Objects (Adjacent to sub-river mouths so they NEVER block river openings!)
   function drawNearBankLandmark(lm, bottomBankY, isSil = false) {
     const x = Math.round(lm.x);
 
@@ -2457,101 +2454,127 @@
     }
 
     if (lm.type === 'FORT_BAS') {
+      // Fort Bas de la Rivière sits on the bank adjacent to the open Winnipeg River mouth (never blocking the river mouth!)
       const fy = bottomBankY - 18;
+      // Open Winnipeg River mouth channel (x + 70 .. x + 102) cleanly separated to the right of the fort
       fillPixelPoly([
-        [x + 68, bottomBankY - 2],
-        [x + 98, bottomBankY - 2],
-        [x + 90, VIEW_H],
-        [x + 72, VIEW_H]
+        [x + 70, bottomBankY - 2],
+        [x + 102, bottomBankY - 2],
+        [x + 94, VIEW_H],
+        [x + 74, VIEW_H]
       ], PAL.LAKE_DEEP);
-      ctx.fillStyle = PAL.LAKE_FOAM;
-      ctx.fillRect(x + 67, bottomBankY - 2, 32, 2);
+      fillPixelPoly([
+        [x + 68, bottomBankY - 2],[x + 72, bottomBankY - 2],[x + 76, VIEW_H],[x + 72, VIEW_H]
+      ], PAL.LAKE_FOAM);
+      fillPixelPoly([
+        [x + 100, bottomBankY - 2],[x + 104, bottomBankY - 2],[x + 96, VIEW_H],[x + 92, VIEW_H]
+      ], PAL.LAKE_FOAM);
 
+      // Timber palisade & storehouses on the left bank adjacent to the Winnipeg River mouth
       ctx.fillStyle = PAL.OUTLINE;
-      ctx.fillRect(x, fy + 3, 68, 22);
+      ctx.fillRect(x, fy + 3, 64, 22);
       ctx.fillStyle = PAL.WOOD_DARK;
-      ctx.fillRect(x + 1, fy + 4, 66, 20);
+      ctx.fillRect(x + 1, fy + 4, 62, 20);
       ctx.fillStyle = PAL.WOOD_MID;
-      for (let px = 2; px < 65; px += 3) {
+      for (let px = 2; px < 61; px += 3) {
         ctx.fillRect(x + px, fy + 3, 2, 21);
       }
 
       ctx.fillStyle = PAL.WOOD_MID;
-      ctx.fillRect(x - 2, fy, 10, 24);
-      ctx.fillRect(x + 60, fy, 10, 24);
+      ctx.fillRect(x - 2, fy, 9, 24);
+      ctx.fillRect(x + 56, fy, 9, 24);
       ctx.fillStyle = PAL.MAROON_MID;
-      ctx.fillRect(x - 3, fy - 2, 12, 2);
-      ctx.fillRect(x + 59, fy - 2, 12, 2);
+      ctx.fillRect(x - 3, fy - 2, 11, 2);
+      ctx.fillRect(x + 55, fy - 2, 11, 2);
 
       ctx.fillStyle = PAL.WOOD_LIGHT;
-      ctx.fillRect(x + 12, fy - 5, 22, 10);
-      ctx.fillRect(x + 37, fy - 4, 20, 9);
+      ctx.fillRect(x + 11, fy - 5, 20, 10);
+      ctx.fillRect(x + 34, fy - 4, 19, 9);
       ctx.fillStyle = PAL.MAROON_MID;
-      ctx.fillRect(x + 11, fy - 7, 24, 2);
-      ctx.fillRect(x + 36, fy - 6, 22, 2);
+      ctx.fillRect(x + 10, fy - 7, 22, 2);
+      ctx.fillRect(x + 33, fy - 6, 21, 2);
 
+      // Moored trading canoe tucked along the bank edge (leaving river mouth open)
       ctx.fillStyle = PAL.HIDE_LIGHT;
-      ctx.fillRect(x + 73, fy + 10, 18, 4);
+      ctx.fillRect(x + 106, fy + 11, 16, 3);
 
-      drawUnboxedLabel("Fort Bas de la Rivière", x + 38, fy - 11, false);
+      drawUnboxedLabel("Fort Bas de la Rivière", x + 36, fy - 11, false);
       return;
     }
 
     if (lm.type === 'MANIGOTAGAN') {
+      // Manigotagan outpost sits on the left rocky bank adjacent to the open Bad Throat River gorge mouth (never blocking it!)
       const fy = bottomBankY - 17;
+      // Open Bad Throat River rocky gorge mouth (x + 32 .. x + 54) completely unblocked
       fillPixelPoly([
-        [x + 20, bottomBankY - 2],
-        [x + 38, bottomBankY - 2],
-        [x + 34, VIEW_H],
-        [x + 24, VIEW_H]
+        [x + 32, bottomBankY - 2],
+        [x + 54, bottomBankY - 2],
+        [x + 48, VIEW_H],
+        [x + 36, VIEW_H]
       ], PAL.LAKE_DEEP);
-      drawShadedGrayRock(x - 4, fy + 9, false, false);
-      drawShadedGrayRock(x + 40, fy + 9, false, false);
+      ctx.fillStyle = PAL.LAKE_FOAM;
+      ctx.fillRect(x + 31, bottomBankY - 2, 24, 2);
 
+      drawShadedGrayRock(x - 6, fy + 9, false, false);
+      drawShadedGrayRock(x + 54, fy + 9, false, false);
+
+      // Timber outpost positioned on the left bank adjacent to the river gorge
       ctx.fillStyle = PAL.OUTLINE;
-      ctx.fillRect(x + 14, fy - 1, 28, 15);
+      ctx.fillRect(x + 2, fy - 1, 26, 15);
       ctx.fillStyle = PAL.WOOD_MID;
-      ctx.fillRect(x + 15, fy, 26, 13);
+      ctx.fillRect(x + 3, fy, 24, 13);
       ctx.fillStyle = PAL.WOOD_LIGHT;
-      ctx.fillRect(x + 15, fy + 2, 26, 3);
+      ctx.fillRect(x + 3, fy + 2, 24, 3);
       ctx.fillStyle = PAL.MAROON_MID;
-      ctx.fillRect(x + 13, fy - 3, 30, 3);
+      ctx.fillRect(x + 1, fy - 3, 28, 3);
       ctx.fillStyle = PAL.GOLD_LIGHT;
-      ctx.fillRect(x + 20, fy + 5, 3, 3);
-      ctx.fillRect(x + 32, fy + 5, 3, 3);
+      ctx.fillRect(x + 8, fy + 5, 3, 3);
+      ctx.fillRect(x + 19, fy + 5, 3, 3);
 
-      drawUnboxedLabel("Manigotagan", x + 28, fy - 8, false);
+      drawUnboxedLabel("Manigotagan", x + 22, fy - 8, false);
       return;
     }
 
     if (lm.type === 'BERENS_RIVER') {
+      // Berens River House (Omaskosihk) sits on the rocky point adjacent to the open Berens River mouth (never blocking it!)
       const fy = bottomBankY - 18;
       const cWall = isSil ? PAL.SILHOUETTE : PAL.HIDE_LIGHT;
       const cRoof = isSil ? PAL.SILHOUETTE : PAL.MAROON_MID;
       const cRim = isSil ? PAL.SIL_RIM_BRIGHT : PAL.GOLD_LIGHT;
 
-      drawShadedGrayRock(x - 6, fy + 10, false, isSil);
-      drawShadedGrayRock(x + 48, fy + 10, false, isSil);
+      // Open Berens River mouth channel (x + 64 .. x + 90) cleanly separated on the right
+      fillPixelPoly([
+        [x + 64, bottomBankY - 2],
+        [x + 90, bottomBankY - 2],
+        [x + 84, VIEW_H],
+        [x + 68, VIEW_H]
+      ], isSil ? PAL.INDIGO_DEEP : PAL.LAKE_DEEP);
+      ctx.fillStyle = isSil ? '#28457A' : PAL.LAKE_FOAM;
+      ctx.fillRect(x + 63, bottomBankY - 2, 28, 2);
 
+      drawShadedGrayRock(x - 6, fy + 10, false, isSil);
+      drawShadedGrayRock(x + 88, fy + 10, false, isSil);
+
+      // Main whitewashed post building & pelt press on the left bank adjacent to the Berens River mouth
       ctx.fillStyle = PAL.OUTLINE;
-      ctx.fillRect(x + 6, fy, 42, 16);
+      ctx.fillRect(x + 4, fy, 42, 16);
       ctx.fillStyle = cWall;
-      ctx.fillRect(x + 7, fy + 1, 40, 14);
+      ctx.fillRect(x + 5, fy + 1, 40, 14);
       ctx.fillStyle = cRoof;
-      ctx.fillRect(x + 5, fy - 3, 44, 4);
+      ctx.fillRect(x + 3, fy - 3, 44, 4);
       ctx.fillStyle = cRim;
-      ctx.fillRect(x + 6, fy - 3, 42, 1);
+      ctx.fillRect(x + 4, fy - 3, 42, 1);
 
       ctx.fillStyle = isSil ? PAL.SILHOUETTE : PAL.WOOD_DARK;
-      ctx.fillRect(x + 51, fy - 2, 2, 16);
-      ctx.fillRect(x + 59, fy - 2, 2, 16);
-      ctx.fillRect(x + 51, fy + 1, 10, 3);
+      ctx.fillRect(x + 49, fy - 2, 2, 16);
+      ctx.fillRect(x + 57, fy - 2, 2, 16);
+      ctx.fillRect(x + 49, fy + 1, 10, 3);
       if (isSil) {
         ctx.fillStyle = PAL.SIL_RIM_BRIGHT;
-        ctx.fillRect(x + 51, fy - 2, 10, 1);
+        ctx.fillRect(x + 49, fy - 2, 10, 1);
       }
 
-      drawUnboxedLabel("Berens River House", x + 30, fy - 8, isSil);
+      drawUnboxedLabel("Berens River House", x + 32, fy - 8, isSil);
     }
   }
 
@@ -2566,7 +2589,7 @@
     spawnedFlags = {};
     stAndrewsPelicans = null;
     lakeWaveArmed = false;
-    awaitingOpeningConfirm = false;
+    openingDialogueStage = 0;
     isDeployingSled = false;
     deployProgress = 0;
     isSledMode = false;
@@ -2610,7 +2633,8 @@
   }
 
   function scheduleNextRiverFeature() {
-    if (score >= 4240 && score < 4490) {
+    // Keep clear water around North Shore closing & Norway House dogsled transition (4180 - 4490)
+    if (score >= DIST.LAKE_CLOSE_START && score < 4490) {
       nextFeatureX += 90;
       return;
     }
@@ -2629,7 +2653,6 @@
     }
     if (!spawnedFlags.ST_ANDREWS && score >= 1160) {
       landmarks.push({ x: VIEW_W + 35, type: 'ST_ANDREWS_CHURCH', clearW: 58 });
-      // Two pelicans sitting on the bottom-closest riverbank opposite St. Andrews on the Red
       stAndrewsPelicans = {
         x1: VIEW_W + 38,
         y1: VIEW_H - 9,
@@ -2673,7 +2696,7 @@
       spawnedFlags.BROKENHEAD = true;
     }
     if (!spawnedFlags.FORT_BAS && score >= 2410) {
-      nearBankLandmarks.push({ x: VIEW_W + 35, type: 'FORT_BAS', clearW: 118 });
+      nearBankLandmarks.push({ x: VIEW_W + 35, type: 'FORT_BAS', clearW: 126 });
       spawnedFlags.FORT_BAS = true;
     }
     if (!spawnedFlags.MANIGOTAGAN && score >= 2850) {
@@ -2681,7 +2704,7 @@
       spawnedFlags.MANIGOTAGAN = true;
     }
     if (!spawnedFlags.BERENS && score >= 3570) {
-      nearBankLandmarks.push({ x: VIEW_W + 35, type: 'BERENS_RIVER', clearW: 92 });
+      nearBankLandmarks.push({ x: VIEW_W + 35, type: 'BERENS_RIVER', clearW: 112 });
       spawnedFlags.BERENS = true;
     }
 
@@ -2900,10 +2923,12 @@
     const silT = getSilhouetteFactor();
     const isSil = silT > 0.55;
 
+    // 1. Mouth opening of Lake Winnipeg (2010 -> 2150: 0 -> 1, bank retracts to the left)
     const mouthOpenT = score < DIST.MOUTH_OPEN_START
       ? 0
       : Math.min(1, (score - DIST.MOUTH_OPEN_START) / (DIST.ST_PETERS_END - DIST.MOUTH_OPEN_START));
 
+    // 2. North Shore top bank closing in (4180 -> 4350: 0 -> 1, opposite of how it opens at the lake mouth!)
     const lakeCloseT = score < DIST.LAKE_CLOSE_START
       ? 0
       : Math.min(1, (score - DIST.LAKE_CLOSE_START) / (DIST.NORWAY_HOUSE_END - DIST.LAKE_CLOSE_START));
@@ -2951,14 +2976,16 @@
       }
     }
 
-    // 2. Top Horizon
+    // 2. Top Horizon (Gradually closes in from right to left across 4180 -> 4350, opposite of lake mouth opening!)
     if (!isLakeOpen) {
       let bankStartX = 0;
       let bankWidth = VIEW_W;
       if (mouthOpenT > 0 && mouthOpenT < 1) {
+        // Mouth of Lake Winnipeg opening: bank retracts to the left
         bankStartX = 0;
         bankWidth = Math.round(VIEW_W * (1 - mouthOpenT));
       } else if (lakeCloseT > 0 && lakeCloseT < 1) {
+        // North Shore closing in: snowy top bank closes in smoothly from right to left!
         bankWidth = Math.round(VIEW_W * lakeCloseT);
         bankStartX = VIEW_W - bankWidth;
       }
@@ -3196,7 +3223,7 @@
           ? 'LEG_2'
           : (score >= 3000 && score < 3510)
             ? 'LEG_3'
-            : (score >= 3710 && score < 4210)
+            : (score >= 3710 && score < 4160)
               ? 'LEG_4'
               : 'NONE';
 
@@ -3228,7 +3255,7 @@
             if (!isNearUniqueLandmark(bx + 120, 16, nearBankLandmarks)) drawWindsweptPine(bx + 120, sy - 13, isSil);
             if (!isNearUniqueLandmark(bx + 156, 28, nearBankLandmarks)) drawGraniteAndOchreOutcrop(bx + 156, sy - 8, isSil);
           } else if (activeShoreSet === 'LEG_4') {
-            const isSnowShore = score >= 4150;
+            const isSnowShore = score >= 4120;
             if (!isNearUniqueLandmark(bx + 14, 28, nearBankLandmarks)) drawBlackSpruceAndCordwood(bx + 14, sy - 10, isSil, isSnowShore);
             if (!isNearUniqueLandmark(bx + 54, 20, nearBankLandmarks)) drawShadedGrayRock(bx + 54, sy - 7, isSnowShore, isSil);
             if (!isNearUniqueLandmark(bx + 92, 28, nearBankLandmarks)) drawBlackSpruceAndCordwood(bx + 92, sy - 10, isSil, isSnowShore);
@@ -3641,7 +3668,7 @@
     }
 
     if (gameMode === 'OPENING_CUTSCENE') {
-      if (!awaitingOpeningConfirm) {
+      if (openingDialogueStage === 0) {
         openingFrame++;
         if (openingFrame === 136 || openingFrame === 162 || openingFrame === 188) {
           playTone(660, 'square', 0.08, 0.08);
@@ -3649,7 +3676,6 @@
         if (openingFrame === 325) {
           playTone(392, 'triangle', 0.12, 0.10);
         }
-        // St. Boniface Cathedral exclamation mark chimes & Bishop Taché's blessing chimes
         if (openingFrame === 525 || openingFrame === 545 || openingFrame === 565) {
           playTone(783.99, 'square', 0.08, 0.08);
         }
@@ -3658,7 +3684,9 @@
           setTimeout(() => playTone(880.00, 'sine', 0.34, 0.14), 140);
         }
         if (openingFrame === OPENING_DIALOGUE_FRAME) {
-          awaitingOpeningConfirm = true;
+          openingDialogueStage = 1;
+        } else if (openingFrame === BISHOP_DIALOGUE_FRAME) {
+          openingDialogueStage = 2;
         }
       }
       if (openingFrame >= OPENING_TOTAL) {
@@ -3786,7 +3814,6 @@
     }
     nearBankLandmarks = nearBankLandmarks.filter(lm => lm.x > -120);
 
-    // Update St. Andrews on the Red pelicans (resting on bottom riverbank, then flying diagonally off-screen)
     if (stAndrewsPelicans) {
       if (!stAndrewsPelicans.flying) {
         stAndrewsPelicans.x1 -= currentSpeed * 0.38;
@@ -4207,7 +4234,7 @@
 
     gameMode = 'OPENING_CUTSCENE';
     openingFrame = 0;
-    awaitingOpeningConfirm = false;
+    openingDialogueStage = 0;
     headerBar.style.display = 'none';
     msg.style.display = 'none';
     msg.style.background = '#4A0C10';
@@ -4271,9 +4298,14 @@
   let dpadHolds = { UP: 0, DOWN: 0, LEFT: 0, RIGHT: 0 };
 
   function handleActionA() {
-    if (gameMode === 'OPENING_CUTSCENE' && awaitingOpeningConfirm) {
-      awaitingOpeningConfirm = false;
-      openingFrame = OPENING_DIALOGUE_FRAME + 1;
+    if (gameMode === 'OPENING_CUTSCENE' && openingDialogueStage !== 0) {
+      if (openingDialogueStage === 1) {
+        openingDialogueStage = 0;
+        openingFrame = OPENING_DIALOGUE_FRAME + 1;
+      } else if (openingDialogueStage === 2) {
+        openingDialogueStage = 0;
+        openingFrame = BISHOP_DIALOGUE_FRAME + 1;
+      }
       playTone(493.88, 'triangle', 0.12, 0.14);
     } else if (gameMode === 'TITLE') {
       triggerStartFromTitle();
