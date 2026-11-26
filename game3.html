@@ -3,84 +3,589 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>li rassad di fleur - Anthology</title>
+    <title>li rassad di fleur - Moose Hide Cabin Edition</title>
     <style>
-        body {
+        html, body, #game-container {
+            width: 100vw;
+            height: 100vh;
             margin: 0;
             padding: 0;
-            background-color: transparent;
-            color: #33ff33;
-            font-family: 'Courier New', Courier, monospace;
             overflow: hidden;
+            background-color: #120a07;
+            color: #f6e7c8;
+            font-family: 'Courier New', Courier, monospace;
             touch-action: none;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-        #game-container {
-            width: 100%;
-            height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            box-sizing: border-box;
-            padding: 10px;
+            user-select: none;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
         }
         canvas {
-            width: 100%;
-            height: 100%;
-            max-width: 500px;
-            object-fit: contain;
-            background-color: #000000; 
-            border: 4px solid #222; 
-            border-radius: 8px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
-            aspect-ratio: 3 / 4;
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            background-color: #120a07;
             image-rendering: pixelated;
+            image-rendering: crisp-edges;
         }
     </style>
 </head>
 <body>
 
     <div id="game-container">
-        <canvas id="gameCanvas" width="400" height="533"></canvas>
+        <canvas id="gameCanvas"></canvas>
     </div>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        // Core Constants
+        // Offscreen static cabin backdrop buffer for smooth 60fps SNES detail
+        const bgCanvas = document.createElement('canvas');
+        const bgCtx = bgCanvas.getContext('2d');
+
+        // Dynamic Viewport & Layout Constants
+        let VIEW_W = 400;
+        let VIEW_H = 533;
+        const HUD_TOP_H = 64;
+        const HUD_BOT_H = 26;
+
         const COLS = 10;
-        const CELL_SIZE = 40;
-        const OFFSET_X = 0; 
-        const OFFSET_Y = 80; 
         const PUZZLE_ROWS = 10;
         const STUDIO_ROWS = 11;
-        
-        // Neon Lite-Brite Colors (1: Red, 2: Blue, 3: Yellow, 4: White, 0: Erase)
-        const COLORS = [null, '#ff003c', '#0077ff', '#ffea00', '#ffffff'];
-        const GLOWS = [null, '#aa0022', '#0044aa', '#aa9900', '#aaaaaa'];
-        const COLOR_NAMES = ['ERASER', 'RED BEAD', 'BLUE BEAD', 'YELLOW BEAD', 'WHITE BEAD'];
-        
+
+        // Cached scenic anchor coordinates (updated on resize)
+        let cabinLayout = {
+            winX: 16, winY: 96, winW: 88, winH: 108,
+            stoveX: 296, stoveY: 310, stoveW: 76, stoveH: 96,
+            floorY: 420
+        };
+
+        // Twinkling winter stars (normalized within window pane)
+        const WINTER_STARS = [
+            { nx: 0.16, ny: 0.18, phase: 0.2, size: 2 },
+            { nx: 0.34, ny: 0.12, phase: 1.4, size: 1 },
+            { nx: 0.52, ny: 0.22, phase: 2.7, size: 2 },
+            { nx: 0.78, ny: 0.15, phase: 0.9, size: 1 },
+            { nx: 0.86, ny: 0.32, phase: 3.8, size: 2 },
+            { nx: 0.24, ny: 0.38, phase: 4.5, size: 1 },
+            { nx: 0.64, ny: 0.36, phase: 5.1, size: 1 },
+            { nx: 0.42, ny: 0.44, phase: 2.0, size: 1 }
+        ];
+
+        // Floating stove embers
+        const EMBER_SPARKS = Array.from({ length: 7 }, (_, i) => ({
+            offset: i * 0.14,
+            drift: (i % 3 - 1) * 4
+        }));
+
+        // 1830-1860 Trade Bead Palette (Shaded Glass Seed Beads)
+        // 1: Cranberry Red (#8B1E24) - Cornaline d'Aleppo
+        // 2: Sky Blue (#7BAFD4) - Greasy Robin's-Egg
+        // 3: Ochre Yellow (#D99B26) - Greasy Mustard Yellow
+        // 4: Chalk White (#F2EFE9) - Warm Off-White
+        // 5: Moss Green (#3B5E3A) - Translucent Leaf Green
+        const BEAD_STYLES = [
+            null,
+            { // 1: Cornaline d'Aleppo / Cranberry Red (#8B1E24)
+                name: 'CRANBERRY RED',
+                uiColor: '#d9535c',
+                highlight: '#d9666d',
+                mid: '#8B1E24',
+                deep: '#540d11',
+                rim: '#260406',
+                coreColor: 'rgba(242, 232, 215, 0.42)', // Classic pale Cornaline inner core
+                rimGlow: 'rgba(255, 175, 115, 0.30)'
+            },
+            { // 2: Greasy Robin's-Egg / Sky Blue (#7BAFD4)
+                name: 'SKY BLUE',
+                uiColor: '#7BAFD4',
+                highlight: '#c8e3f5',
+                mid: '#7BAFD4',
+                deep: '#44769c',
+                rim: '#1f3d57',
+                coreColor: 'rgba(18, 36, 52, 0.34)',
+                rimGlow: 'rgba(255, 215, 165, 0.24)'
+            },
+            { // 3: Greasy Ochre / Mustard Yellow (#D99B26)
+                name: 'OCHRE YELLOW',
+                uiColor: '#D99B26',
+                highlight: '#fae09e',
+                mid: '#D99B26',
+                deep: '#8f5e0c',
+                rim: '#422903',
+                coreColor: 'rgba(54, 30, 4, 0.36)',
+                rimGlow: 'rgba(255, 230, 150, 0.32)'
+            },
+            { // 4: Chalk White (#F2EFE9)
+                name: 'CHALK WHITE',
+                uiColor: '#F2EFE9',
+                highlight: '#ffffff',
+                mid: '#F2EFE9',
+                deep: '#bab2a4',
+                rim: '#595247',
+                coreColor: 'rgba(64, 56, 46, 0.34)',
+                rimGlow: 'rgba(255, 220, 175, 0.28)'
+            },
+            { // 5: Translucent Leaf / Moss Green (#3B5E3A)
+                name: 'MOSS GREEN',
+                uiColor: '#6fa16d',
+                highlight: '#8ab888',
+                mid: '#3B5E3A',
+                deep: '#20381f',
+                rim: '#0d1a0d',
+                coreColor: 'rgba(155, 204, 145, 0.26)', // Subtle translucent glass depth
+                rimGlow: 'rgba(255, 200, 130, 0.24)'
+            }
+        ];
+
         // Master State Machine
-        let gameState = 'MODE_SELECT'; 
-        let currentMode = null; 
+        let gameState = 'MODE_SELECT';
+        let currentMode = null;
         let menuSelection = 0; // 0 = Puzzle, 1 = Studio
+        let isPaused = false;
 
         // Puzzle Variables
         let puzzleDifficulty = 2; // 1 = Single Bead, 2 = Double Bead
         let puzBoard = [];
         let score = 0;
         let combo = 0;
-        let active = { x: 4, y: 0, c1: 1, c2: 1, dir: 0, isSingle: false }; 
+        let active = { x: 4, y: 0, c1: 1, c2: 1, dir: 0, isSingle: false };
         let lastDropTime = 0;
-        let dropInterval = 800; 
+        let dropInterval = 800;
 
         // Studio Variables
         let studioBoard = [];
         let cursor = { x: 4, y: 5, color: 1 };
+
+        // Button Debounce Guards (110ms)
+        let lastBtnATime = 0;
+        let lastBtnBTime = 0;
+        const BTN_DEBOUNCE_MS = 110;
+
+        // ==========================================
+        // VIEWPORT SCALING & 16-BIT CABIN RENDERER
+        // ==========================================
+        function resizeViewport() {
+            const w = window.innerWidth || 400;
+            const h = window.innerHeight || 533;
+            const aspect = w / h;
+
+            if (aspect < 400 / 533) {
+                VIEW_W = 400;
+                VIEW_H = Math.round(400 / aspect);
+            } else {
+                VIEW_H = 533;
+                VIEW_W = Math.round(533 * aspect);
+            }
+
+            canvas.width = VIEW_W;
+            canvas.height = VIEW_H;
+            ctx.imageSmoothingEnabled = false;
+
+            bgCanvas.width = VIEW_W;
+            bgCanvas.height = VIEW_H;
+            bgCtx.imageSmoothingEnabled = false;
+
+            renderStaticCabinBackdrop();
+        }
+
+        function getGridMetrics(rows) {
+            const padX = VIEW_W > 520 ? 136 : 36;
+            const topVampArchPad = 36; // Headroom for rounded/puckered moccasin vamp toe
+            const botVampPad = 20;
+            const availW = VIEW_W - padX * 2;
+            const availH = VIEW_H - HUD_TOP_H - HUD_BOT_H - topVampArchPad - botVampPad;
+            const cellSize = Math.max(18, Math.floor(Math.min(availW / COLS, availH / rows)));
+            const gridW = cellSize * COLS;
+            const gridH = cellSize * rows;
+            const offsetX = Math.floor((VIEW_W - gridW) / 2);
+            const offsetY = HUD_TOP_H + topVampArchPad + Math.floor((availH - gridH) / 2);
+            return { cellSize, gridW, gridH, offsetX, offsetY };
+        }
+
+        // Ordered 2x2 pixel dither helper for authentic 16-bit SNES shading
+        function drawDitherBand(c, x, y, w, h, color, density = 2) {
+            c.fillStyle = color;
+            const step = density === 1 ? 2 : 4;
+            for (let py = y; py < y + h; py += 2) {
+                const rowShift = ((py >> 1) & 1) * (step >> 1);
+                for (let px = x + rowShift; px < x + w; px += step) {
+                    c.fillRect(px, py, 2, 2);
+                }
+            }
+        }
+
+        function renderStaticCabinBackdrop() {
+            const c = bgCtx;
+            const topY = HUD_TOP_H;
+            const botY = VIEW_H - HUD_BOT_H;
+            const wallH = botY - topY;
+            const floorH = Math.max(46, Math.floor(wallH * 0.16));
+            const floorY = botY - floorH;
+
+            const isWide = VIEW_W >= 540;
+            const sideSpace = isWide ? Math.floor((VIEW_W - 360) / 2) : 96;
+
+            const winW = Math.min(118, Math.max(76, Math.floor(sideSpace * 0.78)));
+            const winH = Math.floor(winW * 1.18);
+            const winX = isWide ? Math.floor((sideSpace - winW) / 2) : 10;
+            const winY = topY + 24;
+
+            const stoveW = Math.min(92, Math.max(66, Math.floor(sideSpace * 0.68)));
+            const stoveH = Math.floor(stoveW * 1.24);
+            const stoveX = isWide
+                ? VIEW_W - sideSpace + Math.floor((sideSpace - stoveW) / 2)
+                : VIEW_W - stoveW - 10;
+            const stoveY = floorY - stoveH + 14;
+
+            cabinLayout = { winX, winY, winW, winH, stoveX, stoveY, stoveW, stoveH, floorY };
+
+            // 1. HORIZONTAL CHINKED TIMBER LOG WALLS
+            const logH = 26;
+            const logPalette = [
+                { top: '#5e361e', mid: '#472714', bot: '#2c160b', grain: '#3a1f0f' },
+                { top: '#54301a', mid: '#3e2111', bot: '#251208', grain: '#31190c' },
+                { top: '#633a21', mid: '#4c2a16', bot: '#2f180c', grain: '#3d2010' }
+            ];
+
+            c.fillStyle = '#1d0f08';
+            c.fillRect(0, topY, VIEW_W, wallH);
+
+            let logIdx = 0;
+            for (let y = topY; y < floorY; y += logH) {
+                const pal = logPalette[logIdx % logPalette.length];
+                const h = Math.min(logH, floorY - y);
+
+                c.fillStyle = '#8b7a62';
+                c.fillRect(0, y, VIEW_W, 2);
+                c.fillStyle = '#5c4e3d';
+                c.fillRect(0, y + 2, VIEW_W, 1);
+
+                c.fillStyle = pal.top;
+                c.fillRect(0, y + 3, VIEW_W, 5);
+                c.fillStyle = pal.mid;
+                c.fillRect(0, y + 8, VIEW_W, Math.max(0, h - 14));
+                c.fillStyle = pal.bot;
+                c.fillRect(0, y + h - 6, VIEW_W, 6);
+
+                drawDitherBand(c, 0, y + 6, VIEW_W, 4, pal.mid, 2);
+                drawDitherBand(c, 0, y + h - 8, VIEW_W, 4, pal.bot, 2);
+
+                c.fillStyle = pal.grain;
+                for (let gx = (logIdx * 37) % 64; gx < VIEW_W; gx += 64) {
+                    c.fillRect(gx, y + 10, 22, 2);
+                    c.fillRect(gx + 28, y + 15, 16, 2);
+                }
+                const knotX = ((logIdx * 97 + 43) % Math.max(80, VIEW_W - 40)) + 16;
+                c.fillStyle = '#241108';
+                c.fillRect(knotX, y + 11, 8, 4);
+                c.fillStyle = '#6c4228';
+                c.fillRect(knotX + 1, y + 10, 6, 1);
+
+                logIdx++;
+            }
+
+            // Corner dovetail vertical log posts
+            for (let side = 0; side < 2; side++) {
+                const px = side === 0 ? 0 : VIEW_W - 10;
+                c.fillStyle = '#2a150a';
+                c.fillRect(px, topY, 10, floorY - topY);
+                c.fillStyle = '#4a2915';
+                c.fillRect(px + (side === 0 ? 2 : 0), topY, 4, floorY - topY);
+                c.fillStyle = '#180b05';
+                for (let y = topY; y < floorY; y += logH) {
+                    c.fillRect(px, y, 10, 3);
+                }
+            }
+
+            // 2. CABIN PLANK FLOORBOARDS
+            c.fillStyle = '#2b160b';
+            c.fillRect(0, floorY, VIEW_W, floorH);
+            c.fillStyle = '#180b05';
+            c.fillRect(0, floorY, VIEW_W, 3);
+
+            const plankH = 12;
+            for (let py = floorY + 3; py < botY; py += plankH) {
+                c.fillStyle = ((py - floorY) / plankH) % 2 === 0 ? '#3a2011' : '#311a0e';
+                c.fillRect(0, py, VIEW_W, plankH - 2);
+                c.fillStyle = '#1f0f07';
+                c.fillRect(0, py + plankH - 2, VIEW_W, 2);
+                for (let jx = ((py * 7) % 80) + 20; jx < VIEW_W; jx += 84) {
+                    c.fillRect(jx, py, 2, plankH);
+                }
+            }
+
+            // Woven Métis Ceinture Fléchée (sash) wall accent under window if wide
+            if (isWide) {
+                const sashX = winX + 6;
+                const sashY = winY + winH + 22;
+                const sashW = winW - 12;
+                if (sashY + 22 < floorY) {
+                    c.fillStyle = '#5e1116';
+                    c.fillRect(sashX, sashY, sashW, 14);
+                    c.fillStyle = '#8B1E24';
+                    c.fillRect(sashX, sashY + 2, sashW, 10);
+                    c.fillStyle = '#2c5475';
+                    c.fillRect(sashX, sashY + 5, sashW, 4);
+                    c.fillStyle = '#D99B26';
+                    for (let sx = sashX + 4; sx < sashX + sashW - 6; sx += 10) {
+                        c.fillRect(sx, sashY + 4, 2, 2);
+                        c.fillRect(sx + 2, sashY + 6, 2, 2);
+                        c.fillRect(sx, sashY + 8, 2, 2);
+                    }
+                    c.fillStyle = '#F2EFE9';
+                    c.fillRect(sashX - 4, sashY + 2, 4, 2);
+                    c.fillRect(sashX - 4, sashY + 6, 4, 2);
+                    c.fillRect(sashX - 4, sashY + 10, 4, 2);
+                    c.fillRect(sashX + sashW, sashY + 2, 4, 2);
+                    c.fillRect(sashX + sashW, sashY + 6, 4, 2);
+                    c.fillRect(sashX + sashW, sashY + 10, 4, 2);
+                }
+            }
+
+            // 3. CLEAR COLD WINTER'S NIGHT WINDOW (LEFT WALL)
+            drawWinterWindowStatic(c, winX, winY, winW, winH);
+
+            // 4. CAST-IRON WOOD STOVE & HEARTH (RIGHT WALL)
+            drawWoodStoveStatic(c, stoveX, stoveY, stoveW, stoveH, topY, floorY);
+        }
+
+        function drawWinterWindowStatic(c, x, y, w, h) {
+            c.fillStyle = 'rgba(0, 0, 0, 0.55)';
+            c.fillRect(x + 4, y + 4, w + 4, h + 6);
+
+            const skyGrad = c.createLinearGradient(0, y, 0, y + h);
+            skyGrad.addColorStop(0, '#050b1f');
+            skyGrad.addColorStop(0.52, '#0c1f4a');
+            skyGrad.addColorStop(0.78, '#1a3b6e');
+            skyGrad.addColorStop(1, '#6d8fb8');
+            c.fillStyle = skyGrad;
+            c.fillRect(x + 6, y + 6, w - 12, h - 12);
+
+            const mx = x + Math.floor(w * 0.72);
+            const my = y + Math.floor(h * 0.25);
+            c.fillStyle = '#eef6ff';
+            c.beginPath();
+            c.arc(mx, my, 7, 0, Math.PI * 2);
+            c.fill();
+            c.fillStyle = '#09183a';
+            c.beginPath();
+            c.arc(mx - 3, my - 2, 6, 0, Math.PI * 2);
+            c.fill();
+
+            const snowY = y + Math.floor(h * 0.72);
+            c.fillStyle = '#9bb6d4';
+            c.fillRect(x + 6, snowY, w - 12, y + h - 6 - snowY);
+            c.fillStyle = '#dcebfa';
+            c.fillRect(x + 6, snowY + 6, w - 12, y + h - 6 - (snowY + 6));
+            drawDitherBand(c, x + 6, snowY + 2, w - 12, 6, '#dcebfa', 2);
+
+            const trees = [
+                { tx: x + Math.floor(w * 0.24), ty: snowY + 4, s: 18 },
+                { tx: x + Math.floor(w * 0.45), ty: snowY + 7, s: 14 },
+                { tx: x + Math.floor(w * 0.78), ty: snowY + 5, s: 20 }
+            ];
+            trees.forEach(t => {
+                c.fillStyle = '#0d2238';
+                for (let row = 0; row < t.s; row += 2) {
+                    const halfW = Math.floor((row / t.s) * (t.s * 0.55)) + 1;
+                    c.fillRect(t.tx - halfW, t.ty - t.s + row, halfW * 2, 2);
+                }
+                c.fillStyle = '#d4e9ff';
+                for (let row = 2; row < t.s - 4; row += 6) {
+                    const halfW = Math.floor((row / t.s) * (t.s * 0.42)) + 1;
+                    c.fillRect(t.tx - halfW, t.ty - t.s + row, halfW * 2, 2);
+                }
+            });
+
+            c.fillStyle = 'rgba(215, 238, 255, 0.35)';
+            c.fillRect(x + 6, y + 6, 10, 4);
+            c.fillRect(x + 6, y + 10, 5, 6);
+            c.fillRect(x + w - 16, y + h - 12, 10, 6);
+
+            c.fillStyle = '#331a0d';
+            c.fillRect(x, y, w, 6);
+            c.fillRect(x, y + h - 6, w, 6);
+            c.fillRect(x, y, 6, h);
+            c.fillRect(x + w - 6, y, 6, h);
+
+            c.fillStyle = '#6b3e22';
+            c.fillRect(x + 1, y + 1, w - 2, 2);
+            c.fillRect(x + 1, y + 1, 2, h - 2);
+
+            const midX = x + Math.floor(w / 2) - 2;
+            const midY = y + Math.floor(h / 2) - 2;
+            c.fillStyle = '#331a0d';
+            c.fillRect(midX, y + 6, 4, h - 12);
+            c.fillRect(x + 6, midY, w - 12, 4);
+            c.fillStyle = '#5c341c';
+            c.fillRect(midX, y + 6, 1, h - 12);
+            c.fillRect(x + 6, midY, w - 12, 1);
+
+            c.fillStyle = '#4e2c17';
+            c.fillRect(x - 4, y + h - 2, w + 8, 7);
+            c.fillStyle = '#754426';
+            c.fillRect(x - 4, y + h - 2, w + 8, 2);
+            c.fillStyle = '#221007';
+            c.fillRect(x - 2, y + h + 5, w + 4, 3);
+        }
+
+        function drawWoodStoveStatic(c, x, y, w, h, topY, floorY) {
+            const hearthX = x - 12;
+            const hearthY = floorY - 2;
+            const hearthW = w + 24;
+            const hearthH = 26;
+            c.fillStyle = '#3c3936';
+            c.fillRect(hearthX, hearthY, hearthW, hearthH);
+            c.fillStyle = '#57524d';
+            c.fillRect(hearthX + 2, hearthY + 2, hearthW - 4, 4);
+            c.fillStyle = '#24211f';
+            for (let sx = hearthX + 18; sx < hearthX + hearthW - 8; sx += 22) {
+                c.fillRect(sx, hearthY, 2, hearthH);
+            }
+            c.fillRect(hearthX, hearthY + 12, hearthW, 2);
+
+            const pipeW = Math.max(14, Math.floor(w * 0.24));
+            const pipeX = x + Math.floor((w - pipeW) / 2);
+            c.fillStyle = '#141315';
+            c.fillRect(pipeX, topY, pipeW, y - topY + 6);
+            c.fillStyle = '#2f2d33';
+            c.fillRect(pipeX + 2, topY, 4, y - topY + 6);
+            c.fillStyle = '#4a4752';
+            c.fillRect(pipeX + 3, topY, 2, y - topY + 6);
+            for (let py = topY + 28; py < y; py += 42) {
+                c.fillStyle = '#09080a';
+                c.fillRect(pipeX - 2, py, pipeW + 4, 4);
+                c.fillStyle = '#3c3a42';
+                c.fillRect(pipeX - 1, py + 1, pipeW + 2, 1);
+            }
+
+            const legY = y + h - 14;
+            c.fillStyle = '#121113';
+            c.fillRect(x + 8, legY, 8, 16);
+            c.fillRect(x + w - 16, legY, 8, 16);
+            c.fillStyle = '#2b292e';
+            c.fillRect(x + 10, legY, 2, 14);
+            c.fillRect(x + w - 14, legY, 2, 14);
+
+            const bodyH = h - 14;
+            c.fillStyle = '#19171a';
+            c.fillRect(x, y, w, bodyH);
+            c.fillStyle = '#2f2c33';
+            c.fillRect(x - 4, y, w + 8, 7);
+            c.fillStyle = '#4c4852';
+            c.fillRect(x - 3, y + 1, w + 6, 2);
+            c.fillStyle = '#262329';
+            c.fillRect(x - 3, y + bodyH - 7, w + 6, 7);
+
+            c.fillStyle = '#2c2930';
+            c.fillRect(x + 3, y + 9, 6, bodyH - 18);
+            c.fillStyle = '#0e0d10';
+            c.fillRect(x + w - 8, y + 9, 6, bodyH - 18);
+
+            const kx = x + Math.floor(w * 0.14);
+            const ky = y - 12;
+            c.fillStyle = '#8f4722';
+            c.fillRect(kx, ky + 3, 14, 9);
+            c.fillStyle = '#d47c42';
+            c.fillRect(kx + 2, ky + 4, 6, 4);
+            c.fillStyle = '#5c2b12';
+            c.fillRect(kx + 3, ky, 8, 3);
+
+            const fbX = x + 11;
+            const fbY = y + 18;
+            const fbW = w - 22;
+            const fbH = Math.max(24, bodyH - 36);
+            c.fillStyle = '#0c0a0c';
+            c.fillRect(fbX - 2, fbY - 2, fbW + 4, fbH + 4);
+            c.fillStyle = '#3a353d';
+            c.fillRect(fbX - 2, fbY - 2, fbW + 4, 2);
+
+            const woodX = x - 24;
+            if (woodX > 8) {
+                const logs = [
+                    { lx: woodX, ly: floorY + 2 },
+                    { lx: woodX + 10, ly: floorY + 2 },
+                    { lx: woodX + 5, ly: floorY - 5 }
+                ];
+                logs.forEach(l => {
+                    c.fillStyle = '#4f2c16';
+                    c.fillRect(l.lx, l.ly, 9, 7);
+                    c.fillStyle = '#cfa776';
+                    c.fillRect(l.lx + 2, l.ly + 2, 5, 3);
+                });
+            }
+        }
+
+        function drawAnimatedCabinEffects(now) {
+            const { winX, winY, winW, winH, stoveX, stoveY, stoveW, stoveH } = cabinLayout;
+
+            for (let i = 0; i < WINTER_STARS.length; i++) {
+                const s = WINTER_STARS[i];
+                const pulse = Math.sin(now * 0.0025 + s.phase);
+                if (pulse > -0.25) {
+                    const sx = winX + 8 + Math.floor(s.nx * (winW - 16));
+                    const sy = winY + 8 + Math.floor(s.ny * (winH * 0.56));
+                    ctx.fillStyle = pulse > 0.55 ? '#ffffff' : '#9ec9ff';
+                    ctx.fillRect(sx, sy, s.size, s.size);
+                }
+            }
+
+            const flicker = 0.85 + Math.sin(now * 0.011) * 0.09 + Math.sin(now * 0.027) * 0.06;
+            const bodyH = stoveH - 14;
+            const fbX = stoveX + 11;
+            const fbY = stoveY + 18;
+            const fbW = stoveW - 22;
+            const fbH = Math.max(24, bodyH - 36);
+            const fireCX = fbX + fbW / 2;
+            const fireCY = fbY + fbH / 2;
+
+            const glowRadius = Math.max(120, VIEW_W * 0.34) * flicker;
+            const fireGlow = ctx.createRadialGradient(fireCX, fireCY, 6, fireCX, fireCY, glowRadius);
+            fireGlow.addColorStop(0, `rgba(255, 132, 36, ${0.36 * flicker})`);
+            fireGlow.addColorStop(0.35, `rgba(230, 82, 18, ${0.18 * flicker})`);
+            fireGlow.addColorStop(0.75, `rgba(140, 38, 10, ${0.07 * flicker})`);
+            fireGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = fireGlow;
+            ctx.fillRect(0, HUD_TOP_H, VIEW_W, VIEW_H - HUD_TOP_H - HUD_BOT_H);
+
+            const coalGrad = ctx.createLinearGradient(0, fbY, 0, fbY + fbH);
+            coalGrad.addColorStop(0, '#5c0e06');
+            coalGrad.addColorStop(0.45, '#d9380b');
+            coalGrad.addColorStop(0.78, '#ff8c1a');
+            coalGrad.addColorStop(1, '#ffe478');
+            ctx.fillStyle = coalGrad;
+            ctx.fillRect(fbX, fbY, fbW, fbH);
+
+            const flameStep = Math.floor(now / 120);
+            ctx.fillStyle = '#ffd24d';
+            for (let fx = fbX + 3; fx < fbX + fbW - 4; fx += 6) {
+                const fh = 5 + ((fx * 7 + flameStep * 3) % 9);
+                ctx.fillRect(fx, fbY + fbH - fh - 2, 4, fh);
+            }
+            ctx.fillStyle = '#fff5bd';
+            for (let fx = fbX + 5; fx < fbX + fbW - 5; fx += 9) {
+                const fh = 3 + ((fx * 3 + flameStep * 5) % 5);
+                ctx.fillRect(fx, fbY + fbH - fh - 1, 3, fh);
+            }
+
+            ctx.fillStyle = '#161316';
+            for (let gx = fbX + 6; gx < fbX + fbW - 3; gx += 7) {
+                ctx.fillRect(gx, fbY, 2, fbH);
+            }
+            ctx.fillRect(fbX, fbY + Math.floor(fbH * 0.45), fbW, 2);
+
+            ctx.fillStyle = '#ffdf70';
+            EMBER_SPARKS.forEach(sp => {
+                const t = ((now * 0.00055) + sp.offset) % 1;
+                const ex = Math.floor(fireCX + sp.drift + Math.sin(now * 0.005 + sp.offset * 10) * 3);
+                const ey = Math.floor(fbY + fbH - 4 - t * (fbH - 6));
+                ctx.fillRect(ex, ey, 2, 2);
+            });
+        }
+
+        window.addEventListener('resize', resizeViewport);
+        resizeViewport();
 
         // ==========================================
         // MATRIARCH'S TEARDROP LAMENT AUDIO ENGINE
@@ -91,8 +596,8 @@
         let currentStep = 0;
 
         const songTitle = "Matriarch's Teardrop Lament";
-        const BPM = 75; 
-        const noteLength = 60 / BPM / 2; // Slower 8th-note clock resolution for a sweeping, legato feel
+        const BPM = 75;
+        const noteLength = 60 / BPM / 2;
 
         const NOTES = {};
         NOTES['F#2'] = 92.50;  NOTES['G2'] = 98.00;   NOTES['A2'] = 110.00;  NOTES['B2'] = 123.47;
@@ -101,7 +606,6 @@
         NOTES['F#4'] = 369.99; NOTES['A4'] = 440.00;  NOTES['B4'] = 493.88;  NOTES['C#5'] = 554.37;
         NOTES['D5'] = 587.33;  NOTES['E5'] = 659.25;  NOTES['F#5'] = 739.99; NOTES['A5'] = 880.00;
 
-        // A mournful, rolling fiddle air simulating a slow Celtic/Métis lament
         var matriarchFiddle = [
             'B4', 'C#5', 'D5', 'F#5', 'E5', 'D5', 'B4', null,
             'A4', 'B4', 'D5', 'E5', 'F#5', null, 'A5', null,
@@ -109,7 +613,6 @@
             'F#5', 'D5', 'B4', 'A4', 'B4', null, null, null
         ];
 
-        // Deep, resonant cello/acoustic drone providing a melancholy emotional anchor
         var celloDrone = [
             'B2', null, null, null, 'B2', null, null, null,
             'A2', null, null, null, 'A2', null, null, null,
@@ -121,13 +624,13 @@
             if (!chiptuneAudioCtx) {
                 chiptuneAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
             }
-            if (chiptuneAudioCtx.state === 'suspended') {
+            if (chiptuneAudioCtx.state === 'suspended' && !isPaused) {
                 chiptuneAudioCtx.resume();
             }
         }
 
         function playTone(freq, type, duration, volume) {
-            if (!freq || !chiptuneAudioCtx) return;
+            if (!freq || !chiptuneAudioCtx || isPaused) return;
             const osc = chiptuneAudioCtx.createOscillator();
             const gainNode = chiptuneAudioCtx.createGain();
             osc.type = type;
@@ -141,15 +644,13 @@
         }
 
         function sequenceTrack() {
+            if (isPaused) return;
             var leadNote = matriarchFiddle[currentStep];
             var bassNote = celloDrone[currentStep];
 
-            // Track 1: Soft Square Wave (Simulating a gently bowed fiddle with legato phrasing)
             if (leadNote && NOTES[leadNote]) {
                 playTone(NOTES[leadNote], 'square', noteLength * 1.2, 0.02);
             }
-
-            // Track 2: Sustained Sine Wave (Deep, mournful acoustic bass drone)
             if (bassNote && NOTES[bassNote]) {
                 playTone(NOTES[bassNote], 'sine', noteLength * 3.8, 0.15);
             }
@@ -174,22 +675,56 @@
             }
         }
 
-        // Invisible event listeners to handle mobile Safari user-gesture requirements
         document.addEventListener('touchstart', initChiptuneAudio, { once: true });
         document.addEventListener('mousedown', initChiptuneAudio, { once: true });
 
         // ---------------------------------------------------------
-        // SIGNAL BRIDGE
+        // ARCADE CABINET SIGNAL BRIDGE (SINGLE SOURCE OF TRUTH)
         // ---------------------------------------------------------
         window.addEventListener('message', function(event) {
-            const cmd = event.data; 
-            
+            const cmd = event.data;
+            if (typeof cmd !== 'string') return;
+
+            if (cmd === 'PAUSE') {
+                isPaused = true;
+                if (chiptuneAudioCtx && chiptuneAudioCtx.state === 'running') {
+                    chiptuneAudioCtx.suspend();
+                }
+                return;
+            }
+            if (cmd === 'RESUME') {
+                isPaused = false;
+                lastDropTime = performance.now();
+                if (chiptuneAudioCtx && chiptuneAudioCtx.state === 'suspended') {
+                    chiptuneAudioCtx.resume();
+                }
+                return;
+            }
+            if (isPaused) return;
+
+            const now = performance.now();
+            const isBtnA = (cmd === 'BUTTON_A' || cmd === 'BUTTON_A_PRESS');
+            const isBtnB = (cmd === 'BUTTON_B' || cmd === 'BUTTON_B_PRESS');
+            const isUp = (cmd === 'DPAD_UP' || cmd === 'DPAD_UP_PRESS');
+            const isDown = (cmd === 'DPAD_DOWN' || cmd === 'DPAD_DOWN_PRESS');
+            const isLeft = (cmd === 'DPAD_LEFT' || cmd === 'DPAD_LEFT_PRESS');
+            const isRight = (cmd === 'DPAD_RIGHT' || cmd === 'DPAD_RIGHT_PRESS');
+
+            if (isBtnA) {
+                if (now - lastBtnATime < BTN_DEBOUNCE_MS) return;
+                lastBtnATime = now;
+            }
+            if (isBtnB) {
+                if (now - lastBtnBTime < BTN_DEBOUNCE_MS) return;
+                lastBtnBTime = now;
+            }
+
             // 1. BOOT SELECTION MENU
             if (gameState === 'MODE_SELECT') {
-                if (cmd === 'DPAD_UP' || cmd === 'DPAD_DOWN') {
+                if (isUp || isDown) {
                     menuSelection = menuSelection === 0 ? 1 : 0;
                 }
-                if (cmd === 'BUTTON_A') {
+                if (isBtnA) {
                     if (menuSelection === 0) {
                         currentMode = 'PUZZLE';
                         gameState = 'PUZZLE_START';
@@ -204,29 +739,29 @@
             // 2. PUZZLE MODE CONTROLS
             if (currentMode === 'PUZZLE') {
                 if (gameState === 'PUZZLE_START') {
-                    if (cmd === 'BUTTON_A') gameState = 'PUZZLE_DIFFICULTY';
-                    if (cmd === 'BUTTON_B') gameState = 'MODE_SELECT';
+                    if (isBtnA) gameState = 'PUZZLE_DIFFICULTY';
+                    if (isBtnB) gameState = 'MODE_SELECT';
                     return;
                 }
 
                 if (gameState === 'PUZZLE_DIFFICULTY') {
-                    if (cmd === 'DPAD_UP' || cmd === 'DPAD_DOWN') {
+                    if (isUp || isDown) {
                         puzzleDifficulty = puzzleDifficulty === 1 ? 2 : 1;
                     }
-                    if (cmd === 'BUTTON_A') {
+                    if (isBtnA) {
                         startChiptuneTrack();
                         startPuzzleGame();
                     }
-                    if (cmd === 'BUTTON_B') gameState = 'PUZZLE_START';
+                    if (isBtnB) gameState = 'PUZZLE_START';
                     return;
                 }
 
                 if (gameState === 'PUZZLE_GAMEOVER') {
-                    if (cmd === 'BUTTON_A') {
+                    if (isBtnA) {
                         startChiptuneTrack();
                         startPuzzleGame();
                     }
-                    if (cmd === 'BUTTON_B') {
+                    if (isBtnB) {
                         stopChiptuneTrack();
                         gameState = 'MODE_SELECT';
                     }
@@ -234,47 +769,47 @@
                 }
 
                 if (gameState === 'PUZZLE_PLAYING') {
-                    if (cmd === 'DPAD_LEFT') moveActive(-1, 0);
-                    if (cmd === 'DPAD_RIGHT') moveActive(1, 0);
-                    if (cmd === 'DPAD_DOWN') moveActive(0, 1); 
-                    if (cmd === 'BUTTON_A') rotateActive(1); 
-                    if (cmd === 'BUTTON_B') rotateActive(-1); 
+                    if (isLeft) moveActive(-1, 0);
+                    if (isRight) moveActive(1, 0);
+                    if (isDown) moveActive(0, 1);
+                    if (isBtnA) rotateActive(1);
+                    if (isBtnB) rotateActive(-1);
                 }
             }
 
             // 3. STUDIO MODE CONTROLS
             if (currentMode === 'STUDIO') {
                 if (gameState === 'STUDIO_START') {
-                    if (cmd === 'BUTTON_A') {
+                    if (isBtnA) {
                         startChiptuneTrack();
                         startStudioGame();
                     }
-                    if (cmd === 'BUTTON_B') gameState = 'MODE_SELECT';
+                    if (isBtnB) gameState = 'MODE_SELECT';
                     return;
                 }
 
                 if (gameState === 'STUDIO_PLAYING') {
-                    if (cmd === 'DPAD_LEFT') moveCursor(-1, 0);
-                    if (cmd === 'DPAD_RIGHT') moveCursor(1, 0);
-                    if (cmd === 'DPAD_UP') moveCursor(0, -1); 
-                    if (cmd === 'DPAD_DOWN') moveCursor(0, 1); 
-                    if (cmd === 'BUTTON_B') cycleColor(); 
-                    if (cmd === 'BUTTON_A') placeBead(); 
+                    if (isLeft) moveCursor(-1, 0);
+                    if (isRight) moveCursor(1, 0);
+                    if (isUp) moveCursor(0, -1);
+                    if (isDown) moveCursor(0, 1);
+                    if (isBtnB) cycleColor();
+                    if (isBtnA) placeBead();
                 }
             }
         });
 
         // ---------------------------------------------------------
-        // PUZZLE LOGIC
+        // PUZZLE LOGIC (Uses the 3 Primary 1830-1860 Trade Beads)
         // ---------------------------------------------------------
         function startPuzzleGame() {
             puzBoard = Array.from({ length: PUZZLE_ROWS }, () => Array(COLS).fill(0));
-            
-            puzBoard[8][4] = 1; 
-            puzBoard[8][5] = 2; 
-            puzBoard[9][4] = 3; 
-            puzBoard[9][5] = 1; 
-            
+
+            puzBoard[8][4] = 1; // Cranberry Red
+            puzBoard[8][5] = 2; // Sky Blue
+            puzBoard[9][4] = 3; // Ochre Yellow
+            puzBoard[9][5] = 1; // Cranberry Red
+
             score = 0;
             combo = 0;
             dropInterval = 800;
@@ -304,7 +839,7 @@
 
         function isValid(x, y, dir) {
             if (x < 0 || x >= COLS || y < 0 || y >= PUZZLE_ROWS || puzBoard[y][x] !== 0) return false;
-            
+
             if (!active.isSingle) {
                 let p2 = getC2Pos(x, y, dir);
                 if (p2.x < 0 || p2.x >= COLS || p2.y < 0 || p2.y >= PUZZLE_ROWS || puzBoard[p2.y][p2.x] !== 0) return false;
@@ -323,7 +858,7 @@
         }
 
         function rotateActive(direction) {
-            if (active.isSingle) return; 
+            if (active.isSingle) return;
 
             let newDir = (active.dir + direction + 4) % 4;
             if (isValid(active.x, active.y, newDir)) active.dir = newDir;
@@ -346,6 +881,10 @@
         }
 
         function applyGravity() {
+            if (isPaused) {
+                setTimeout(applyGravity, 150);
+                return;
+            }
             let moved = false;
             for (let c = 0; c < COLS; c++) {
                 for (let r = PUZZLE_ROWS - 2; r >= 0; r--) {
@@ -361,15 +900,19 @@
                 }
             }
             if (moved) setTimeout(resolveFlowers, 300);
-            else resolveFlowers(); 
+            else resolveFlowers();
         }
 
         function resolveFlowers() {
+            if (isPaused) {
+                setTimeout(resolveFlowers, 150);
+                return;
+            }
             let matched = findFlowers();
             if (matched.length > 0) {
                 combo++;
                 score += (matched.length * 100) * combo;
-                dropInterval = Math.max(200, dropInterval - 10); 
+                dropInterval = Math.max(200, dropInterval - 10);
                 matched.forEach(p => { puzBoard[p.y][p.x] = 0; });
                 setTimeout(applyGravity, 300);
             } else {
@@ -400,7 +943,7 @@
         }
 
         // ---------------------------------------------------------
-        // STUDIO LOGIC
+        // STUDIO LOGIC (All 5 Trade Beads + Eraser)
         // ---------------------------------------------------------
         function startStudioGame() {
             studioBoard = Array.from({ length: STUDIO_ROWS }, () => Array(COLS).fill(0));
@@ -413,7 +956,8 @@
         }
 
         function cycleColor() {
-            cursor.color = (cursor.color + 1) % 5;
+            // 0: Eraser, 1: Cranberry Red, 2: Sky Blue, 3: Ochre Yellow, 4: Chalk White, 5: Moss Green
+            cursor.color = (cursor.color + 1) % 6;
         }
 
         function placeBead() {
@@ -421,202 +965,452 @@
         }
 
         // ---------------------------------------------------------
-        // RENDERING
+        // 16-BIT SHADED RADIAL-GRADIENT BEAD & SMOKED MOOSE HIDE VAMP
         // ---------------------------------------------------------
-        function drawBead(x, y, colorCode, alpha = 1.0) {
-            if (colorCode === 0) return;
-            let cx = x * CELL_SIZE + (CELL_SIZE / 2);
-            let cy = y * CELL_SIZE + (CELL_SIZE / 2);
+        function drawShadedBeadAt(cx, cy, radius, colorCode, alpha = 1.0) {
+            const st = BEAD_STYLES[colorCode];
+            if (!st) return;
+
+            ctx.save();
             ctx.globalAlpha = alpha;
-            ctx.shadowBlur = 12;
-            ctx.shadowColor = GLOWS[colorCode];
-            ctx.fillStyle = COLORS[colorCode];
-            ctx.beginPath(); ctx.arc(cx, cy, CELL_SIZE / 2.5, 0, Math.PI * 2); ctx.fill();
-            ctx.shadowBlur = 0;
-            ctx.fillStyle = '#ffffff';
-            ctx.beginPath(); ctx.arc(cx, cy, CELL_SIZE / 10, 0, Math.PI * 2); ctx.fill();
-            ctx.globalAlpha = 1.0;
+
+            // 1. Deep grounded shadow on smoked moose hide for crisp bead separation
+            ctx.fillStyle = 'rgba(14, 6, 2, 0.72)';
+            ctx.beginPath();
+            ctx.arc(cx + radius * 0.14, cy + radius * 0.18, radius * 1.01, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 2. Main 3D Radial Gradient Bead Body
+            const grad = ctx.createRadialGradient(
+                cx - radius * 0.30, cy - radius * 0.32, radius * 0.08,
+                cx, cy, radius
+            );
+            grad.addColorStop(0.0, st.highlight);
+            grad.addColorStop(0.30, st.mid);
+            grad.addColorStop(0.76, st.deep);
+            grad.addColorStop(1.0, st.rim);
+
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 3. Subtle warm stove rim-light on lower-right edge
+            ctx.strokeStyle = st.rimGlow;
+            ctx.lineWidth = Math.max(1.2, radius * 0.12);
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius * 0.86, 0.15, Math.PI * 0.58);
+            ctx.stroke();
+
+            // 4. Seed-bead thread core (pale core for Cornaline d'Aleppo, recessed for others)
+            ctx.fillStyle = st.coreColor;
+            ctx.beginPath();
+            ctx.arc(cx, cy, Math.max(1.4, radius * 0.19), 0, Math.PI * 2);
+            ctx.fill();
+
+            // 5. Crisp specular glass highlight (upper-left)
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.86)';
+            ctx.beginPath();
+            ctx.ellipse(
+                cx - radius * 0.32, cy - radius * 0.34,
+                Math.max(1.5, radius * 0.24), Math.max(1.1, radius * 0.15),
+                -Math.PI / 4, 0, Math.PI * 2
+            );
+            ctx.fill();
+
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.52)';
+            ctx.fillRect(Math.floor(cx - radius * 0.14), Math.floor(cy - radius * 0.52), 2, 2);
+
+            ctx.restore();
         }
 
-        function drawGrid(rows) {
-            ctx.fillStyle = '#1a1a1a';
-            for(let r = 0; r <= rows; r++) {
-                for(let c = 0; c <= COLS; c++) {
-                    ctx.beginPath();
-                    ctx.arc(OFFSET_X + c*CELL_SIZE, OFFSET_Y + r*CELL_SIZE, 2, 0, Math.PI*2);
-                    ctx.fill();
+        function drawBead(x, y, colorCode, cellSize, alpha = 1.0) {
+            if (colorCode === 0) return;
+            const cx = x * cellSize + (cellSize / 2);
+            const cy = y * cellSize + (cellSize / 2);
+            const radius = Math.floor(cellSize * 0.42);
+            drawShadedBeadAt(cx, cy, radius, colorCode, alpha);
+        }
+
+        // Helper path for the rounded/puckered moccasin vamp silhouette
+        function traceMoccasinVampPath(ctxRef, left, right, topArchY, shoulderY, bottomY) {
+            const cx = (left + right) / 2;
+            const botCurve = 8;
+            ctxRef.beginPath();
+            ctxRef.moveTo(left, bottomY - botCurve);
+            ctxRef.lineTo(left, shoulderY);
+            ctxRef.bezierCurveTo(left, topArchY, cx - (right - left) * 0.32, topArchY, cx, topArchY);
+            ctxRef.bezierCurveTo(cx + (right - left) * 0.32, topArchY, right, topArchY, right, shoulderY);
+            ctxRef.lineTo(right, bottomY - botCurve);
+            ctxRef.quadraticCurveTo(right, bottomY, right - botCurve, bottomY);
+            ctxRef.lineTo(left + botCurve, bottomY);
+            ctxRef.quadraticCurveTo(left, bottomY, left, bottomY - botCurve);
+            ctxRef.closePath();
+        }
+
+        function drawMooseHideVamp(rows, m) {
+            const padSide = 16;
+            const padTop = 28;
+            const padBot = 14;
+
+            const left = m.offsetX - padSide;
+            const right = m.offsetX + m.gridW + padSide;
+            const topArchY = m.offsetY - padTop;
+            const shoulderY = m.offsetY + 26;
+            const bottomY = m.offsetY + m.gridH + padBot;
+            const cx = (left + right) / 2;
+
+            ctx.save();
+
+            // 1. Drop shadow beneath the moccasin vamp
+            ctx.save();
+            ctx.translate(4, 6);
+            traceMoccasinVampPath(ctx, left, right, topArchY, shoulderY, bottomY);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.62)';
+            ctx.fill();
+            ctx.restore();
+
+            // 2. Clip inside the deeply smoked brain-tanned moose hide silhouette
+            traceMoccasinVampPath(ctx, left, right, topArchY, shoulderY, bottomY);
+            ctx.save();
+            ctx.clip();
+
+            // Darkened, heavily smoked chestnut/walnut moose hide for high bead contrast
+            const hideGrad = ctx.createRadialGradient(
+                cx - 18, m.offsetY + m.gridH * 0.38, 14,
+                cx, m.offsetY + m.gridH * 0.45, Math.max(m.gridW, m.gridH) * 0.85
+            );
+            hideGrad.addColorStop(0.0, '#7a502c'); // Warm firelit smoked hide center
+            hideGrad.addColorStop(0.55, '#613c1e'); // Deep smoked moose hide mid-tone
+            hideGrad.addColorStop(0.88, '#472912'); // Rich dark smoked edge
+            hideGrad.addColorStop(1.0, '#2c1708'); // Burnished seam shadow
+            ctx.fillStyle = hideGrad;
+            ctx.fillRect(left - 2, topArchY - 2, (right - left) + 4, (bottomY - topArchY) + 4);
+
+            // Subtle 16-bit suede/buckskin grain dithering
+            drawDitherBand(ctx, left, topArchY, right - left, bottomY - topArchY, 'rgba(34, 16, 6, 0.20)', 2);
+            drawDitherBand(ctx, left + 2, topArchY + 2, right - left, bottomY - topArchY, 'rgba(220, 175, 120, 0.06)', 2);
+
+            // 3. PUCKERED / GATHERED PLEATS ALONG THE ROUNDED TOP TOE ARCH
+            const pleatCount = 13;
+            const archRadiusX = (right - left) * 0.49;
+            const archRadiusY = (shoulderY - topArchY) * 0.96;
+            const archCenterY = shoulderY + 4;
+
+            for (let i = 0; i < pleatCount; i++) {
+                const t = i / (pleatCount - 1);
+                const angle = Math.PI + 0.18 + t * (Math.PI - 0.36);
+                const ox = cx + Math.cos(angle) * archRadiusX;
+                const oy = archCenterY + Math.sin(angle) * archRadiusY;
+                const ix = cx + Math.cos(angle) * (archRadiusX - 17);
+                const iy = archCenterY + Math.sin(angle) * (archRadiusY - 15);
+
+                // Dark shadow crease of the gathered pucker
+                ctx.strokeStyle = 'rgba(26, 12, 4, 0.68)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(ox, oy);
+                ctx.lineTo(ix, iy);
+                ctx.stroke();
+
+                // Warm raised highlight ridge next to each pucker fold
+                ctx.strokeStyle = 'rgba(176, 126, 76, 0.42)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(ox + 2, oy + 1);
+                ctx.lineTo(ix + 2, iy + 1);
+                ctx.stroke();
+            }
+
+            // Inner perimeter welt shadow
+            traceMoccasinVampPath(ctx, left + 1, right - 1, topArchY + 1, shoulderY, bottomY - 1);
+            ctx.strokeStyle = 'rgba(24, 11, 4, 0.62)';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+
+            ctx.restore(); // End clip
+
+            // 4. Outer hide edge outline
+            traceMoccasinVampPath(ctx, left, right, topArchY, shoulderY, bottomY);
+            ctx.strokeStyle = '#241106';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // 5. Sinew / waxed-thread running stitch along the vamp seam
+            ctx.save();
+            traceMoccasinVampPath(ctx, left + 5, right - 5, topArchY + 5, shoulderY, bottomY - 5);
+            ctx.setLineDash([4, 4]);
+            ctx.strokeStyle = '#e5d4b3';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            ctx.restore();
+
+            // 6. Subtle recessed basting-guide grid on the moose hide
+            ctx.fillStyle = 'rgba(28, 14, 5, 0.24)';
+            ctx.fillRect(m.offsetX, m.offsetY, m.gridW, m.gridH);
+
+            ctx.strokeStyle = 'rgba(186, 142, 92, 0.24)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(m.offsetX - 1, m.offsetY - 1, m.gridW + 2, m.gridH + 2);
+
+            // Awl-prick stitch guide dots
+            ctx.fillStyle = 'rgba(24, 11, 4, 0.56)';
+            for (let r = 0; r <= rows; r++) {
+                for (let c = 0; c <= COLS; c++) {
+                    ctx.fillRect(m.offsetX + c * m.cellSize - 1, m.offsetY + r * m.cellSize - 1, 2, 2);
                 }
             }
-            ctx.strokeStyle = '#33ff33';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(OFFSET_X, OFFSET_Y, COLS * CELL_SIZE, rows * CELL_SIZE);
+
+            ctx.restore();
         }
 
-        function drawScene() {
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        function drawPixelText(text, x, y, color, font, align = 'center') {
+            ctx.font = font;
+            ctx.textAlign = align;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+            ctx.fillText(text, x + 2, y + 2);
+            ctx.fillStyle = color;
+            ctx.fillText(text, x, y);
+        }
 
+        function drawTopHudBar() {
+            const grad = ctx.createLinearGradient(0, 0, 0, HUD_TOP_H);
+            grad.addColorStop(0, '#2a160c');
+            grad.addColorStop(0.5, '#1d0e07');
+            grad.addColorStop(1, '#120804');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, VIEW_W, HUD_TOP_H);
+
+            ctx.fillStyle = '#784c23';
+            ctx.fillRect(0, HUD_TOP_H - 3, VIEW_W, 2);
+            ctx.fillStyle = '#cfa04e';
+            ctx.fillRect(0, HUD_TOP_H - 2, VIEW_W, 1);
+        }
+
+        function drawBottomHudBar(text) {
+            const y = VIEW_H - HUD_BOT_H;
+            ctx.fillStyle = '#180c06';
+            ctx.fillRect(0, y, VIEW_W, HUD_BOT_H);
+            ctx.fillStyle = '#8c5c2b';
+            ctx.fillRect(0, y, VIEW_W, 2);
+
+            drawPixelText(text, VIEW_W / 2, y + 17, '#d9c29c', 'bold 12px Courier New', 'center');
+        }
+
+        function drawScene(now) {
+            // 1. Blit pre-rendered 16-bit French-Métis log cabin
+            ctx.drawImage(bgCanvas, 0, 0);
+
+            // 2. Layer animated winter stars & flickering woodstove embers/glow
+            drawAnimatedCabinEffects(now);
+
+            // --- BOOT SELECTION MENU ---
             if (gameState === 'MODE_SELECT') {
-                ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 24px Courier New';
-                ctx.textAlign = 'center';
-                ctx.fillText("li rassad di fleur", canvas.width/2, 100);
-                
-                ctx.fillStyle = menuSelection === 0 ? '#33ff33' : '#555555';
-                ctx.font = 'bold 20px Courier New';
-                ctx.fillText("> PUZZLE SOLVER <", canvas.width/2, 250);
+                drawTopHudBar();
+                drawPixelText("li rassad di fleur", VIEW_W / 2, 40, '#ffe49e', 'bold 22px Courier New');
 
-                ctx.fillStyle = menuSelection === 1 ? '#33ff33' : '#555555';
-                ctx.fillText("> BEAD STUDIO <", canvas.width/2, 300);
+                const boxW = Math.min(310, VIEW_W - 44);
+                const boxH = 216;
+                const boxX = Math.floor((VIEW_W - boxW) / 2);
+                const boxY = Math.floor(HUD_TOP_H + (VIEW_H - HUD_TOP_H - HUD_BOT_H - boxH) / 2);
 
-                ctx.fillStyle = '#aaaaaa';
-                ctx.font = 'bold 14px Courier New';
-                ctx.fillText("USE D-PAD TO SELECT", canvas.width/2, 420);
-                ctx.fillText("PRESS 'A' TO START", canvas.width/2, 450);
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+                ctx.fillRect(boxX + 4, boxY + 4, boxW, boxH);
+                ctx.fillStyle = 'rgba(26, 15, 9, 0.92)';
+                ctx.fillRect(boxX, boxY, boxW, boxH);
+                ctx.strokeStyle = '#c9933b';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(boxX, boxY, boxW, boxH);
+                ctx.strokeStyle = '#5c3318';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(boxX + 4, boxY + 4, boxW - 8, boxH - 8);
+
+                // Prairie rose emblem using authentic Cranberry Red, Ochre Yellow & Moss Green leaves
+                const ex = VIEW_W / 2;
+                const ey = boxY + 44;
+                const sp = 18;
+                drawShadedBeadAt(ex - sp, ey + sp, 6, 5); // Moss Green leaf
+                drawShadedBeadAt(ex + sp, ey + sp, 6, 5); // Moss Green leaf
+                drawShadedBeadAt(ex, ey - sp, 8, 1);      // Cranberry Red petal
+                drawShadedBeadAt(ex, ey + sp, 8, 1);      // Cranberry Red petal
+                drawShadedBeadAt(ex - sp, ey, 8, 1);      // Cranberry Red petal
+                drawShadedBeadAt(ex + sp, ey, 8, 1);      // Cranberry Red petal
+                drawShadedBeadAt(ex, ey, 8, 3);           // Ochre Yellow center
+
+                drawPixelText(
+                    menuSelection === 0 ? "> PUZZLE SOLVER <" : "  PUZZLE SOLVER  ",
+                    VIEW_W / 2, boxY + 118,
+                    menuSelection === 0 ? '#ffe169' : '#8c7a66',
+                    'bold 20px Courier New'
+                );
+
+                drawPixelText(
+                    menuSelection === 1 ? "> BEAD STUDIO <" : "  BEAD STUDIO  ",
+                    VIEW_W / 2, boxY + 162,
+                    menuSelection === 1 ? '#ffe169' : '#8c7a66',
+                    'bold 20px Courier New'
+                );
+
+                drawBottomHudBar("D-PAD: SELECT  |  A: START");
+                drawPauseOverlay();
                 return;
             }
 
             // --- PUZZLE RENDERING ---
             if (currentMode === 'PUZZLE') {
-                drawGrid(PUZZLE_ROWS);
+                const m = getGridMetrics(PUZZLE_ROWS);
+                drawTopHudBar();
 
-                ctx.fillStyle = '#33ff33';
-                ctx.font = 'bold 20px Courier New';
-                ctx.textAlign = 'left'; ctx.fillText(`SCORE: ${score}`, 10, 30);
+                drawPixelText(`SCORE: ${score}`, 14, 28, '#ffe49e', 'bold 19px Courier New', 'left');
                 if (combo > 1) {
-                    ctx.textAlign = 'right'; ctx.fillStyle = '#ffea00';
-                    ctx.fillText(`COMBO x${combo}`, canvas.width - 10, 30);
+                    drawPixelText(`COMBO x${combo}`, VIEW_W - 14, 28, '#D99B26', 'bold 19px Courier New', 'right');
                 }
+                drawPixelText(`PUZZLE MODE (${puzzleDifficulty === 1 ? 'I' : 'II'})`, VIEW_W / 2, 52, '#d9c29c', 'bold 13px Courier New', 'center');
 
-                ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 16px Courier New';
-                ctx.textAlign = 'center'; ctx.fillText("PUZZLE MODE", canvas.width/2, 60);
+                drawMooseHideVamp(PUZZLE_ROWS, m);
+                drawBottomHudBar("D-PAD: MOVE  |  A/B: ROTATE");
 
                 if (gameState === 'PUZZLE_START') {
-                    ctx.fillStyle = 'rgba(0,0,0,0.85)';
-                    ctx.fillRect(OFFSET_X, OFFSET_Y, COLS * CELL_SIZE, PUZZLE_ROWS * CELL_SIZE);
-                    ctx.fillStyle = '#ff003c'; ctx.font = 'bold 26px Courier New'; ctx.textAlign = 'center';
-                    ctx.fillText("MAKE 3x3 FLOWERS", canvas.width/2, OFFSET_Y + 80);
-                    
-                    let exX = canvas.width / 2; let exY = OFFSET_Y + 145; let spacing = 28; 
-                    const drawMini = (bx, by, cCode) => {
-                        ctx.shadowBlur = 10; ctx.shadowColor = GLOWS[cCode]; ctx.fillStyle = COLORS[cCode];
-                        ctx.beginPath(); ctx.arc(bx, by, spacing / 2.5, 0, Math.PI * 2); ctx.fill();
-                        ctx.shadowBlur = 0; ctx.fillStyle = '#ffffff';
-                        ctx.beginPath(); ctx.arc(bx, by, spacing / 10, 0, Math.PI * 2); ctx.fill();
-                    };
-                    drawMini(exX, exY - spacing, 1); drawMini(exX, exY + spacing, 1);
-                    drawMini(exX - spacing, exY, 1); drawMini(exX + spacing, exY, 1); drawMini(exX, exY, 3);
-                    
-                    ctx.fillStyle = '#33ff33'; ctx.font = 'bold 16px Courier New';
-                    ctx.fillText("PETALS MUST MATCH", canvas.width/2, OFFSET_Y + 220);
-                    ctx.fillText("CENTER MUST DIFFER", canvas.width/2, OFFSET_Y + 250);
-                    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 18px Courier New';
-                    ctx.fillText("PRESS 'A' TO CONTINUE", canvas.width/2, OFFSET_Y + 310);
-                    ctx.font = 'bold 12px Courier New'; ctx.fillStyle = '#777';
-                    ctx.fillText("PRESS 'B' TO RETURN", canvas.width/2, OFFSET_Y + 340);
+                    ctx.fillStyle = 'rgba(26, 14, 7, 0.88)';
+                    ctx.fillRect(m.offsetX, m.offsetY, m.gridW, m.gridH);
+                    const cx = m.offsetX + m.gridW / 2;
+                    const cy = m.offsetY + m.gridH / 2;
+
+                    drawPixelText("MAKE 3x3 FLOWERS", cx, cy - 96, '#d9535c', 'bold 21px Courier New');
+
+                    const spacing = Math.min(26, Math.floor(m.cellSize * 0.78));
+                    const miniR = Math.floor(spacing * 0.42);
+                    const exY = cy - 34;
+                    drawShadedBeadAt(cx, exY - spacing, miniR, 1);
+                    drawShadedBeadAt(cx, exY + spacing, miniR, 1);
+                    drawShadedBeadAt(cx - spacing, exY, miniR, 1);
+                    drawShadedBeadAt(cx + spacing, exY, miniR, 1);
+                    drawShadedBeadAt(cx, exY, miniR, 3);
+
+                    drawPixelText("PETALS MUST MATCH", cx, cy + 34, '#F2EFE9', 'bold 14px Courier New');
+                    drawPixelText("CENTER MUST DIFFER", cx, cy + 56, '#F2EFE9', 'bold 14px Courier New');
+                    drawPixelText("PRESS 'A' TO CONTINUE", cx, cy + 98, '#D99B26', 'bold 15px Courier New');
+                    drawPixelText("PRESS 'B' TO RETURN", cx, cy + 122, '#a3907a', 'bold 12px Courier New');
+                    drawPauseOverlay();
                     return;
                 }
 
                 if (gameState === 'PUZZLE_DIFFICULTY') {
-                    ctx.fillStyle = 'rgba(0,0,0,0.85)';
-                    ctx.fillRect(OFFSET_X, OFFSET_Y, COLS * CELL_SIZE, PUZZLE_ROWS * CELL_SIZE);
-                    
-                    ctx.fillStyle = '#ffea00';
-                    ctx.font = 'bold 26px Courier New';
-                    ctx.textAlign = 'center';
-                    ctx.fillText("SELECT DIFFICULTY", canvas.width/2, OFFSET_Y + 100);
+                    ctx.fillStyle = 'rgba(26, 14, 7, 0.88)';
+                    ctx.fillRect(m.offsetX, m.offsetY, m.gridW, m.gridH);
+                    const cx = m.offsetX + m.gridW / 2;
+                    const cy = m.offsetY + m.gridH / 2;
 
-                    ctx.font = 'bold 20px Courier New';
-                    ctx.fillStyle = puzzleDifficulty === 1 ? '#33ff33' : '#555555';
-                    ctx.fillText("> I - SINGLE BEAD <", canvas.width/2, OFFSET_Y + 180);
-
-                    ctx.fillStyle = puzzleDifficulty === 2 ? '#33ff33' : '#555555';
-                    ctx.fillText("> II - DOUBLE BEAD <", canvas.width/2, OFFSET_Y + 230);
-
-                    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 18px Courier New';
-                    ctx.fillText("PRESS 'A' TO START", canvas.width/2, OFFSET_Y + 310);
-                    ctx.font = 'bold 12px Courier New'; ctx.fillStyle = '#777';
-                    ctx.fillText("PRESS 'B' TO RETURN", canvas.width/2, OFFSET_Y + 340);
+                    drawPixelText("SELECT DIFFICULTY", cx, cy - 78, '#D99B26', 'bold 21px Courier New');
+                    drawPixelText(
+                        puzzleDifficulty === 1 ? "> I - SINGLE BEAD <" : "  I - SINGLE BEAD  ",
+                        cx, cy - 12,
+                        puzzleDifficulty === 1 ? '#7BAFD4' : '#8c7a66',
+                        'bold 18px Courier New'
+                    );
+                    drawPixelText(
+                        puzzleDifficulty === 2 ? "> II - DOUBLE BEAD <" : "  II - DOUBLE BEAD  ",
+                        cx, cy + 32,
+                        puzzleDifficulty === 2 ? '#7BAFD4' : '#8c7a66',
+                        'bold 18px Courier New'
+                    );
+                    drawPixelText("PRESS 'A' TO START", cx, cy + 94, '#F2EFE9', 'bold 16px Courier New');
+                    drawPixelText("PRESS 'B' TO RETURN", cx, cy + 120, '#a3907a', 'bold 12px Courier New');
+                    drawPauseOverlay();
                     return;
                 }
 
-                ctx.save(); ctx.translate(OFFSET_X, OFFSET_Y);
-                for(let r = 0; r < PUZZLE_ROWS; r++) {
-                    for(let c = 0; c < COLS; c++) drawBead(c, r, puzBoard[r][c]);
+                ctx.save();
+                ctx.translate(m.offsetX, m.offsetY);
+                for (let r = 0; r < PUZZLE_ROWS; r++) {
+                    for (let c = 0; c < COLS; c++) drawBead(c, r, puzBoard[r][c], m.cellSize);
                 }
                 if (gameState === 'PUZZLE_PLAYING') {
-                    drawBead(active.x, active.y, active.c1);
+                    drawBead(active.x, active.y, active.c1, m.cellSize);
                     if (!active.isSingle) {
                         let p2 = getC2Pos(active.x, active.y, active.dir);
-                        drawBead(p2.x, p2.y, active.c2);
+                        drawBead(p2.x, p2.y, active.c2, m.cellSize);
                     }
                 }
                 ctx.restore();
 
                 if (gameState === 'PUZZLE_GAMEOVER') {
-                    ctx.fillStyle = 'rgba(0,0,0,0.9)'; ctx.fillRect(OFFSET_X, OFFSET_Y, COLS * CELL_SIZE, PUZZLE_ROWS * CELL_SIZE);
-                    ctx.fillStyle = '#ff003c'; ctx.font = 'bold 30px Courier New'; ctx.textAlign = 'center';
-                    ctx.fillText("GAME OVER", canvas.width/2, OFFSET_Y + 150);
-                    ctx.fillStyle = '#33ff33'; ctx.font = 'bold 18px Courier New';
-                    ctx.fillText(`FINAL SCORE: ${score}`, canvas.width/2, OFFSET_Y + 200);
-                    ctx.fillText("PRESS 'A' TO REPLAY", canvas.width/2, OFFSET_Y + 260);
-                    ctx.fillStyle = '#777'; ctx.font = 'bold 12px Courier New';
-                    ctx.fillText("PRESS 'B' TO RETURN", canvas.width/2, OFFSET_Y + 290);
+                    ctx.fillStyle = 'rgba(22, 11, 6, 0.90)';
+                    ctx.fillRect(m.offsetX, m.offsetY, m.gridW, m.gridH);
+                    const cx = m.offsetX + m.gridW / 2;
+                    const cy = m.offsetY + m.gridH / 2;
+
+                    drawPixelText("GAME OVER", cx, cy - 38, '#d9535c', 'bold 26px Courier New');
+                    drawPixelText(`FINAL SCORE: ${score}`, cx, cy + 10, '#ffe49e', 'bold 17px Courier New');
+                    drawPixelText("PRESS 'A' TO REPLAY", cx, cy + 58, '#F2EFE9', 'bold 16px Courier New');
+                    drawPixelText("PRESS 'B' TO RETURN", cx, cy + 86, '#a3907a', 'bold 12px Courier New');
                 }
             }
 
             // --- STUDIO RENDERING ---
             if (currentMode === 'STUDIO') {
-                drawGrid(STUDIO_ROWS);
+                const m = getGridMetrics(STUDIO_ROWS);
+                drawTopHudBar();
 
-                ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 18px Courier New';
-                ctx.textAlign = 'center'; ctx.fillText("STUDIO MODE", canvas.width/2, 30);
-                
+                drawPixelText("BEADWORK STUDIO", VIEW_W / 2, 26, '#ffe49e', 'bold 18px Courier New');
+
                 if (gameState === 'STUDIO_PLAYING') {
-                    ctx.fillStyle = cursor.color === 0 ? '#ff003c' : COLORS[cursor.color];
-                    ctx.font = 'bold 16px Courier New';
-                    ctx.fillText(`BRUSH: ${COLOR_NAMES[cursor.color]}`, canvas.width/2, 60);
+                    const brushColor = cursor.color === 0 ? '#d9535c' : BEAD_STYLES[cursor.color].uiColor;
+                    const brushName = cursor.color === 0 ? 'ERASER' : BEAD_STYLES[cursor.color].name;
+                    drawPixelText(`BRUSH: ${brushName}`, VIEW_W / 2, 52, brushColor, 'bold 15px Courier New');
                 }
 
+                drawMooseHideVamp(STUDIO_ROWS, m);
+                drawBottomHudBar("A: PLACE/ERASE  |  B: COLOR");
+
                 if (gameState === 'STUDIO_START') {
-                    ctx.fillStyle = 'rgba(0,0,0,0.85)';
-                    ctx.fillRect(OFFSET_X, OFFSET_Y, COLS * CELL_SIZE, STUDIO_ROWS * CELL_SIZE);
-                    ctx.fillStyle = '#ffea00'; ctx.font = 'bold 26px Courier New'; ctx.textAlign = 'center';
-                    ctx.fillText("BEADWORK STUDIO", canvas.width/2, OFFSET_Y + 120);
-                    ctx.fillStyle = '#33ff33'; ctx.font = 'bold 16px Courier New';
-                    ctx.fillText("DPAD   : MOVE CURSOR", canvas.width/2, OFFSET_Y + 190);
-                    ctx.fillText("BTN B  : CHANGE COLOR", canvas.width/2, OFFSET_Y + 230);
-                    ctx.fillText("BTN A  : PLACE/ERASE", canvas.width/2, OFFSET_Y + 270);
-                    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 18px Courier New';
-                    ctx.fillText("PRESS 'A' TO START", canvas.width/2, OFFSET_Y + 350);
-                    ctx.fillStyle = '#777'; ctx.font = 'bold 12px Courier New';
-                    ctx.fillText("PRESS 'B' TO RETURN", canvas.width/2, OFFSET_Y + 380);
+                    ctx.fillStyle = 'rgba(26, 14, 7, 0.88)';
+                    ctx.fillRect(m.offsetX, m.offsetY, m.gridW, m.gridH);
+                    const cx = m.offsetX + m.gridW / 2;
+                    const cy = m.offsetY + m.gridH / 2;
+
+                    drawPixelText("BEADWORK STUDIO", cx, cy - 78, '#D99B26', 'bold 22px Courier New');
+                    drawPixelText("DPAD   : MOVE CURSOR", cx, cy - 16, '#F2EFE9', 'bold 14px Courier New');
+                    drawPixelText("BTN B  : CHANGE COLOR", cx, cy + 16, '#F2EFE9', 'bold 14px Courier New');
+                    drawPixelText("BTN A  : PLACE/ERASE", cx, cy + 48, '#F2EFE9', 'bold 14px Courier New');
+                    drawPixelText("PRESS 'A' TO START", cx, cy + 102, '#7BAFD4', 'bold 16px Courier New');
+                    drawPixelText("PRESS 'B' TO RETURN", cx, cy + 128, '#a3907a', 'bold 12px Courier New');
+                    drawPauseOverlay();
                     return;
                 }
 
-                ctx.save(); ctx.translate(OFFSET_X, OFFSET_Y);
-                for(let r = 0; r < STUDIO_ROWS; r++) {
-                    for(let c = 0; c < COLS; c++) drawBead(c, r, studioBoard[r][c]);
+                ctx.save();
+                ctx.translate(m.offsetX, m.offsetY);
+                for (let r = 0; r < STUDIO_ROWS; r++) {
+                    for (let c = 0; c < COLS; c++) drawBead(c, r, studioBoard[r][c], m.cellSize);
                 }
-                if (cursor.color !== 0) drawBead(cursor.x, cursor.y, cursor.color, 0.6);
-                let isBlinkOn = Math.floor(Date.now() / 300) % 2 === 0;
-                ctx.strokeStyle = isBlinkOn ? '#ffffff' : '#333333';
-                ctx.lineWidth = 3;
-                ctx.strokeRect(cursor.x * CELL_SIZE, cursor.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+                if (cursor.color !== 0) drawBead(cursor.x, cursor.y, cursor.color, m.cellSize, 0.62);
+
+                let isBlinkOn = Math.floor(now / 280) % 2 === 0;
+                ctx.strokeStyle = isBlinkOn ? '#F2EFE9' : '#3a1f0b';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(cursor.x * m.cellSize + 1, cursor.y * m.cellSize + 1, m.cellSize - 2, m.cellSize - 2);
                 ctx.restore();
             }
+
+            drawPauseOverlay();
+        }
+
+        function drawPauseOverlay() {
+            if (!isPaused) return;
+            ctx.fillStyle = 'rgba(10, 6, 4, 0.78)';
+            ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+            drawPixelText("PAUSED", VIEW_W / 2, VIEW_H / 2, '#D99B26', 'bold 28px Courier New');
         }
 
         function gameLoop(timestamp) {
-            if (currentMode === 'PUZZLE' && gameState === 'PUZZLE_PLAYING') {
+            if (!isPaused && currentMode === 'PUZZLE' && gameState === 'PUZZLE_PLAYING') {
                 if (timestamp - lastDropTime > dropInterval) {
                     moveActive(0, 1);
                     lastDropTime = timestamp;
                 }
             }
-            drawScene();
+            drawScene(timestamp);
             requestAnimationFrame(gameLoop);
         }
 
