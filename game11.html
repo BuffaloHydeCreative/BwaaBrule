@@ -1,1 +1,3422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ᐊᐦᒐᐲᔑᐡ // ahcāpīshish</title>
+<style>
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  html, body, #game-container {
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: #050a18;
+    user-select: none;
+    touch-action: none;
+    font-family: 'Courier New', Courier, monospace;
+    image-rendering: pixelated;
+  }
+  #gameCanvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+</style>
+</head>
+<body>
+<div id="game-container">
+  <canvas id="gameCanvas" width="320" height="240"></canvas>
+</div>
 
+<script>
+/**
+ * ᐊᐦᒐᐲᔑᐡ // ahcāpīshish (Hudson Bay Lowlands • Severn River Progression)
+ * - Full-Screen, Full-Bleed Embedded Arcade Viewport (Dynamic Logical Aspect Scaling via resizeViewport)
+ * - Exclusive Parent Arcade Cabinet postMessage Bridge (145ms D-Pad Hold Window, 110ms A/B Debounce, PAUSE/RESUME)
+ * - Slingshot-Compatible 2-Parameter Aiming: Up/Down = Launch Angle (live even while drawn), Hold/Release A = Draw Power
+ * - 62 BPM 4/4 Backing Track: Hand Drum on Beat 1 (x - - -) + Stone-in-Hide Rattle on Every Beat (x x x x)
+ */
+
+const cvs = document.getElementById('gameCanvas');
+const ctx = cvs.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+// --- DYNAMIC VIEWPORT & LOGICAL CANVAS SCALING ---
+// Locks logical height to 240px for crisp 16-bit pixel art while adapting logical width (VIEW_W)
+// to match the exact aspect ratio of the full-bleed 100vw x 100vh parent iframe without black bars or stretching.
+let VIEW_W = 320;
+const VIEW_H = 240;
+
+function resizeViewport() {
+  const rect = document.getElementById('game-container').getBoundingClientRect();
+  const w = Math.max(1, rect.width || window.innerWidth);
+  const h = Math.max(1, rect.height || window.innerHeight);
+  const aspect = w / h;
+  VIEW_W = Math.max(240, Math.round(VIEW_H * aspect));
+  if (cvs.width !== VIEW_W || cvs.height !== VIEW_H) {
+    cvs.width = VIEW_W;
+    cvs.height = VIEW_H;
+    ctx.imageSmoothingEnabled = false;
+  }
+}
+window.addEventListener('resize', resizeViewport);
+resizeViewport();
+
+// --- 4x4 BAYER ORDERED DITHER MATRIX (0..15) ---
+const BAYER_4X4 = [
+  [ 0,  8,  2, 10],
+  [12,  4, 14,  6],
+  [ 3, 11,  1,  9],
+  [15,  7, 13,  5]
+];
+
+// --- HUDSON BAY TRADE & SUBARCTIC PALETTE ---
+const PAL = {
+  BLACKOUT: '#050a18',
+  INK: '#070B14',
+  WHITE: '#F4F7FA',
+  HIDE_DARK: '#6E4C32',
+  HIDE_MID: '#A3764E',
+  HIDE_LIGHT: '#CFA578',
+  TRADE_NAVY: '#16263D',
+  TRADE_NAVY_LIGHT: '#263F63',
+  TRADE_SCARLET: '#B8252A',
+  TRADE_SCARLET_DARK: '#7D1519',
+  TRADE_BLANKET_IVORY: '#EAE3D2',
+  TRADE_GOLD: '#E8B938',
+  TRADE_TEAL: '#27A3A8',
+  SKIN_LIGHT: '#DFA87E',
+  SKIN_MID: '#C78D63',
+  SKIN_SHADE: '#96613E',
+  HAIR: '#111217',
+  BOW_WOOD: '#7A4224',
+  BOW_LIGHT: '#B56B3E',
+  STRING: '#EDE8DC',
+  BASKET_GRASS: '#C4A86E',
+  BASKET_DARK: '#8A6F3E',
+  GROUSE_DARK: '#2E2118',
+  GROUSE_MID: '#5E442E',
+  GROUSE_LIGHT: '#9C7B56',
+  GROUSE_RUFF: '#141211',
+  AURORA_GREEN: '#3CE89E',
+  AURORA_VIOLET: '#8C5CE6',
+  NORTH_STAR: '#FFFBE0',
+  UI_BG: 'rgba(10, 16, 28, 0.88)',
+  UI_BORDER: '#C8D2DC',
+  UI_GOLD: '#EBC046'
+};
+
+// --- MATH & COLOR SPLINE HELPERS ---
+function clamp(v, min, max) { return v < min ? min : (v > max ? max : v); }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function smoothstep(e0, e1, x) {
+  const t = clamp((x - e0) / (e1 - e0), 0, 1);
+  return t * t * (3 - 2 * t);
+}
+function hexToRgb(hex) {
+  const n = parseInt(hex.replace('#', ''), 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+function rgbToHex(r, g, b) {
+  const h = c => clamp(Math.round(c), 0, 255).toString(16).padStart(2, '0');
+  return `#${h(r)}${h(g)}${h(b)}`;
+}
+function lerpColor(hexA, hexB, t) {
+  const a = hexToRgb(hexA);
+  const b = hexToRgb(hexB);
+  return rgbToHex(lerp(a.r, b.r, t), lerp(a.g, b.g, t), lerp(a.b, b.b, t));
+}
+
+// --- 4 SEVERN RIVER BIOME & SKYLIGHT KEYFRAMES (0.0 -> 1.0) ---
+const BIOME_KEYS = [
+  {
+    p: 0.0,
+    skyTop: '#2D4159', skyMid: '#7A6888', skyLow: '#D98B6C', skyHorizon: '#F2BE7E',
+    sunColor: '#FCE29C', sunGlow: '#F59E6C', sunFracX: 0.80, sunY: 96, sunAlpha: 0.95,
+    hazeColor: '#E8A87C', hazeAlpha: 0.16,
+    deepBase: '#243447', deepDetail: '#364C63', deepTreeMain: '#1E303D', deepTreeLight: '#334D5E',
+    midBase: '#695845', midRidge: '#9E907A', pondColor: '#D99B78',
+    riverMain: '#475D6B', riverMid: '#6E7F85', riverFoam: '#E8B88A', riverRapids: 0.05,
+    fgTop: '#5E564E', fgMid: '#453B32', fgDeep: '#29211B',
+    berryMain: '#F58A1F', berryLight: '#FFC45E', berryDark: '#A84A0D',
+    treeHeightScale: 0.22, canopyWallHeight: 0,
+    starAlpha: 0.0, auroraAlpha: 0.0,
+    rimAlpha: 0.38, rimColor: '#F7B267'
+  },
+  {
+    p: 0.30,
+    skyTop: '#3B6E9C', skyMid: '#689EC4', skyLow: '#9EC5DB', skyHorizon: '#D4E4EB',
+    sunColor: '#FFF8DC', sunGlow: '#E6F2F8', sunFracX: 0.67, sunY: 36, sunAlpha: 1.0,
+    hazeColor: '#B8D4E3', hazeAlpha: 0.14,
+    deepBase: '#283D4F', deepDetail: '#3E5970', deepTreeMain: '#1E3836', deepTreeLight: '#315752',
+    midBase: '#877245', midRidge: '#DCD6C0', pondColor: '#8AB8D4',
+    riverMain: '#385C73', riverMid: '#557E96', riverFoam: '#B8D6E6', riverRapids: 0.18,
+    fgTop: '#7D6E42', fgMid: '#52412E', fgDeep: '#302419',
+    berryMain: '#D92638', berryLight: '#FF6B78', berryDark: '#7D111C',
+    treeHeightScale: 0.48, canopyWallHeight: 8,
+    starAlpha: 0.0, auroraAlpha: 0.0,
+    rimAlpha: 0.16, rimColor: '#FFF5D6'
+  },
+  {
+    p: 0.56,
+    skyTop: '#1E2347', skyMid: '#6E3552', skyLow: '#C95438', skyHorizon: '#F29B38',
+    sunColor: '#FF8833', sunGlow: '#D94126', sunFracX: 0.76, sunY: 94, sunAlpha: 0.92,
+    hazeColor: '#D96B38', hazeAlpha: 0.18,
+    deepBase: '#1B243B', deepDetail: '#2E3A59', deepTreeMain: '#162430', deepTreeLight: '#2B3E4F',
+    midBase: '#6E502C', midRidge: '#8F6A38', pondColor: '#D96E34',
+    riverMain: '#3B281E', riverMid: '#5C3B28', riverFoam: '#E07E3C', riverRapids: 0.30,
+    fgTop: '#4A6B32', fgMid: '#3B2B1E', fgDeep: '#211710',
+    berryMain: '#5C38B8', berryLight: '#9A7DF2', berryDark: '#2E1866',
+    treeHeightScale: 0.82, canopyWallHeight: 28,
+    starAlpha: 0.15, auroraAlpha: 0.08,
+    rimAlpha: 0.45, rimColor: '#F59842'
+  },
+  {
+    p: 0.82,
+    skyTop: '#050a18', skyMid: '#091329', skyLow: '#10203D', skyHorizon: '#182E4F',
+    sunColor: '#E8F2FC', sunGlow: '#78A2CC', sunFracX: 0.78, sunY: 30, sunAlpha: 0.95,
+    hazeColor: '#162845', hazeAlpha: 0.16,
+    deepBase: '#0E192B', deepDetail: '#1C2E4A', deepTreeMain: '#0D1C26', deepTreeLight: '#1E3847',
+    midBase: '#1D2F3D', midRidge: '#31495C', pondColor: '#1B364A',
+    riverMain: '#132638', riverMid: '#244661', riverFoam: '#9ED6E8', riverRapids: 0.95,
+    fgTop: '#5E6870', fgMid: '#3A424A', fgDeep: '#1A2026',
+    berryMain: '#3A82E6', berryLight: '#8CC4FF', berryDark: '#1A3E7A',
+    treeHeightScale: 1.15, canopyWallHeight: 56,
+    starAlpha: 1.0, auroraAlpha: 1.0,
+    rimAlpha: 0.65, rimColor: '#6EF2C2'
+  }
+];
+
+function getEnvAtProgress(p) {
+  const prog = clamp(p, 0, 1);
+  let i = 0;
+  while (i < BIOME_KEYS.length - 2 && prog > BIOME_KEYS[i + 1].p) i++;
+  const a = BIOME_KEYS[i];
+  const b = BIOME_KEYS[i + 1];
+  const rawT = clamp((prog - a.p) / (b.p - a.p), 0, 1);
+  const t = rawT * rawT * (3 - 2 * rawT);
+
+  return {
+    progress: prog,
+    stageIndex: prog < 0.25 ? 0 : (prog < 0.50 ? 1 : (prog < 0.75 ? 2 : 3)),
+    skyTop: lerpColor(a.skyTop, b.skyTop, t),
+    skyMid: lerpColor(a.skyMid, b.skyMid, t),
+    skyLow: lerpColor(a.skyLow, b.skyLow, t),
+    skyHorizon: lerpColor(a.skyHorizon, b.skyHorizon, t),
+    sunColor: lerpColor(a.sunColor, b.sunColor, t),
+    sunGlow: lerpColor(a.sunGlow, b.sunGlow, t),
+    sunX: lerp(a.sunFracX, b.sunFracX, t) * VIEW_W,
+    sunY: lerp(a.sunY, b.sunY, t),
+    sunAlpha: lerp(a.sunAlpha, b.sunAlpha, t),
+    hazeColor: lerpColor(a.hazeColor, b.hazeColor, t),
+    hazeAlpha: lerp(a.hazeAlpha, b.hazeAlpha, t),
+    deepBase: lerpColor(a.deepBase, b.deepBase, t),
+    deepDetail: lerpColor(a.deepDetail, b.deepDetail, t),
+    deepTreeMain: lerpColor(a.deepTreeMain, b.deepTreeMain, t),
+    deepTreeLight: lerpColor(a.deepTreeLight, b.deepTreeLight, t),
+    midBase: lerpColor(a.midBase, b.midBase, t),
+    midRidge: lerpColor(a.midRidge, b.midRidge, t),
+    pondColor: lerpColor(a.pondColor, b.pondColor, t),
+    riverMain: lerpColor(a.riverMain, b.riverMain, t),
+    riverMid: lerpColor(a.riverMid, b.riverMid, t),
+    riverFoam: lerpColor(a.riverFoam, b.riverFoam, t),
+    riverRapids: lerp(a.riverRapids, b.riverRapids, t),
+    fgTop: lerpColor(a.fgTop, b.fgTop, t),
+    fgMid: lerpColor(a.fgMid, b.fgMid, t),
+    fgDeep: lerpColor(a.fgDeep, b.fgDeep, t),
+    berryMain: lerpColor(a.berryMain, b.berryMain, t),
+    berryLight: lerpColor(a.berryLight, b.berryLight, t),
+    berryDark: lerpColor(a.berryDark, b.berryDark, t),
+    treeHeightScale: lerp(a.treeHeightScale, b.treeHeightScale, t),
+    canopyWallHeight: lerp(a.canopyWallHeight, b.canopyWallHeight, t),
+    starAlpha: lerp(a.starAlpha, b.starAlpha, t),
+    auroraAlpha: lerp(a.auroraAlpha, b.auroraAlpha, t),
+    rimAlpha: lerp(a.rimAlpha, b.rimAlpha, t),
+    rimColor: lerpColor(a.rimColor, b.rimColor, t)
+  };
+}
+
+// --- 5 DIEGETIC WIND PRESETS (READ VIA SWAYING TREES & SEDGES — ZERO WIND HUD) ---
+const WIND_PRESETS = [
+  { id: 'STRONG_LEFT',  dir: -1, strength: 1.0,  accel: -0.015 },
+  { id: 'BREEZE_LEFT',  dir: -1, strength: 0.42, accel: -0.007 },
+  { id: 'NULL',         dir: 0,  strength: 0.0,  accel: 0 },
+  { id: 'BREEZE_RIGHT', dir: 1,  strength: 0.42, accel: 0.007 },
+  { id: 'STRONG_RIGHT', dir: 1,  strength: 1.0,  accel: 0.015 }
+];
+
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function() {
+    a |= 0;
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// --- WEB AUDIO SYNTHESIZER (SFX + ATMOSPHERE + 62 BPM 4/4 DRUM & RATTLE) ---
+class SoundEngine {
+  constructor() {
+    this.ctx = null;
+    this.atmosStarted = false;
+    this.riverGain = null;
+    this.windGain = null;
+    this.windFilter = null;
+    this.windGustTimer = 3.5;
+
+    this.drumActive = false;
+    this.beatTimer = 0;
+    this.beatIndex = 0;
+  }
+
+  init() {
+    if (!this.ctx) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) this.ctx = new AudioCtx();
+    }
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+    if (this.ctx && !this.atmosStarted) {
+      this.startAtmosphereBed();
+    }
+  }
+
+  startAtmosphereBed() {
+    if (!this.ctx || this.atmosStarted) return;
+    this.atmosStarted = true;
+    const now = this.ctx.currentTime;
+
+    const len = this.ctx.sampleRate * 3;
+    const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    let b0 = 0, b1 = 0, b2 = 0;
+    for (let i = 0; i < len; i++) {
+      const white = Math.random() * 2 - 1;
+      b0 = 0.997 * b0 + white * 0.029;
+      b1 = 0.985 * b1 + white * 0.032;
+      b2 = 0.950 * b2 + white * 0.048;
+      data[i] = (b0 + b1 + b2 + white * 0.018) * 0.6;
+    }
+
+    const riverSrc = this.ctx.createBufferSource();
+    riverSrc.buffer = buf;
+    riverSrc.loop = true;
+    const riverFilter = this.ctx.createBiquadFilter();
+    riverFilter.type = 'bandpass';
+    riverFilter.frequency.setValueAtTime(310, now);
+    riverFilter.Q.value = 0.85;
+    this.riverGain = this.ctx.createGain();
+    this.riverGain.gain.setValueAtTime(0.024, now);
+    riverSrc.connect(riverFilter);
+    riverFilter.connect(this.riverGain);
+    this.riverGain.connect(this.ctx.destination);
+    riverSrc.start(now);
+
+    const windSrc = this.ctx.createBufferSource();
+    windSrc.buffer = buf;
+    windSrc.loop = true;
+    this.windFilter = this.ctx.createBiquadFilter();
+    this.windFilter.type = 'bandpass';
+    this.windFilter.frequency.setValueAtTime(420, now);
+    this.windFilter.Q.value = 2.4;
+    this.windGain = this.ctx.createGain();
+    this.windGain.gain.setValueAtTime(0.002, now);
+    windSrc.connect(this.windFilter);
+    this.windFilter.connect(this.windGain);
+    this.windGain.connect(this.ctx.destination);
+    windSrc.start(now);
+  }
+
+  setAtmosphereActive(active) {
+    if (!this.ctx || !this.riverGain || !this.windGain) return;
+    const now = this.ctx.currentTime;
+    this.riverGain.gain.setTargetAtTime(active ? 0.024 : 0.0001, now, 0.35);
+    if (!active) {
+      this.windGain.gain.setTargetAtTime(0.0001, now, 0.25);
+    }
+  }
+
+  setDrumTrackActive(active) {
+    if (active && !this.drumActive) {
+      this.drumActive = true;
+      this.beatTimer = 0.15;
+      this.beatIndex = 0;
+    } else if (!active) {
+      this.drumActive = false;
+    }
+  }
+
+  playHandDrumBeat() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(98, now);
+    osc.frequency.exponentialRampToValueAtTime(52, now + 0.28);
+
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.linearRampToValueAtTime(0.125, now + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.40);
+  }
+
+  playRattleBeat(isDownbeat) {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+
+    const osc = this.ctx.createOscillator();
+    const oscGain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(82, now);
+    osc.frequency.exponentialRampToValueAtTime(58, now + 0.11);
+    const toneVol = isDownbeat ? 0.024 : 0.030;
+    oscGain.gain.setValueAtTime(0.001, now);
+    oscGain.gain.linearRampToValueAtTime(toneVol, now + 0.008);
+    oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+    osc.connect(oscGain);
+    oscGain.connect(this.ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.15);
+
+    const bufSize = Math.floor(this.ctx.sampleRate * 0.08);
+    const buf = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = buf;
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(510, now);
+    filter.Q.value = 1.7;
+    const nGain = this.ctx.createGain();
+    const noiseVol = isDownbeat ? 0.018 : 0.024;
+    nGain.gain.setValueAtTime(noiseVol, now);
+    nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+    noise.connect(filter);
+    filter.connect(nGain);
+    nGain.connect(this.ctx.destination);
+    noise.start(now);
+  }
+
+  playSoftFootstep() {
+    if (!this.ctx || this.ctx.state !== 'running') return;
+    const now = this.ctx.currentTime;
+    const bufSize = Math.floor(this.ctx.sampleRate * 0.055);
+    const buf = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = buf;
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(340, now);
+
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.linearRampToValueAtTime(0.028, now + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.055);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.ctx.destination);
+    noise.start(now);
+  }
+
+  updateAudio(dt) {
+    if (!this.ctx || this.ctx.state !== 'running') return;
+
+    if (this.windGain && this.windFilter && this.riverGain && this.riverGain.gain.value > 0.005) {
+      this.windGustTimer -= dt;
+      if (this.windGustTimer <= 0) {
+        const now = this.ctx.currentTime;
+        const gustVol = 0.012 + activeWind.strength * 0.014;
+        const freq = 340 + activeWind.strength * 220;
+        this.windFilter.frequency.setTargetAtTime(freq, now, 0.8);
+        this.windGain.gain.setTargetAtTime(gustVol, now, 1.1);
+        this.windGain.gain.setTargetAtTime(0.002, now + 2.4, 1.4);
+        this.windGustTimer = 9.0 + Math.random() * 9.0;
+      }
+    }
+
+    if (this.drumActive) {
+      const beatDuration = 60 / 62;
+      this.beatTimer -= dt;
+      if (this.beatTimer <= 0) {
+        this.beatTimer += beatDuration;
+        const isBeatOne = (this.beatIndex === 0);
+        if (isBeatOne) {
+          this.playHandDrumBeat();
+        }
+        this.playRattleBeat(isBeatOne);
+        this.beatIndex = (this.beatIndex + 1) % 4;
+      }
+    }
+  }
+
+  playTone(freq, endFreq, duration, type = 'triangle', vol = 0.12, delay = 0) {
+    this.init();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime + delay;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, now);
+    if (endFreq !== freq) {
+      osc.frequency.exponentialRampToValueAtTime(Math.max(20, endFreq), now + duration);
+    }
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.linearRampToValueAtTime(vol, now + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(now);
+    osc.stop(now + duration + 0.02);
+  }
+  playNoise(duration, filterFreq = 800, vol = 0.08, delay = 0) {
+    this.init();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime + delay;
+    const bufferSize = Math.floor(this.ctx.sampleRate * duration);
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = buffer;
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(filterFreq, now);
+    filter.Q.value = 1.5;
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(vol, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.ctx.destination);
+    noise.start(now);
+  }
+  playStartChime() {
+    this.playTone(392.00, 392.00, 0.14, 'triangle', 0.12, 0.0);
+    this.playTone(587.33, 587.33, 0.28, 'triangle', 0.14, 0.12);
+  }
+  playBerryPick() { this.playTone(520, 660, 0.07, 'sine', 0.05); }
+  playHoodRustle() {
+    this.playNoise(0.24, 650, 0.08);
+    this.playTone(220, 280, 0.14, 'sine', 0.06);
+  }
+  playArrowPickup() { this.playTone(620, 880, 0.06, 'triangle', 0.07); }
+  playTestPluck() {
+    this.playTone(196, 146.83, 0.35, 'triangle', 0.14);
+    this.playTone(293.66, 220, 0.25, 'sine', 0.07);
+  }
+  playRustle() {
+    this.playNoise(0.28, 1200, 0.10);
+    this.playTone(180, 290, 0.12, 'triangle', 0.08, 0.05);
+  }
+  playFlyInFlutter() {
+    this.playNoise(0.16, 1050, 0.11, 0.0);
+    this.playTone(230, 340, 0.12, 'triangle', 0.07, 0.0);
+    this.playNoise(0.18, 1150, 0.10, 0.19);
+    this.playTone(260, 390, 0.13, 'triangle', 0.065, 0.19);
+  }
+  playFlyAwaySoftFlutter() {
+    this.playNoise(0.22, 820, 0.075, 0.0);
+    this.playTone(210, 310, 0.16, 'sine', 0.05, 0.02);
+  }
+  playAngleTick() { this.playTone(340, 380, 0.035, 'square', 0.03); }
+  playBowCreak(drawRatio) {
+    const base = 110 + drawRatio * 95;
+    this.playTone(base, base + 25, 0.06, 'sawtooth', 0.035);
+  }
+  playBowSnap(power) {
+    const pitch = 210 + power * 140;
+    this.playTone(pitch, 95, 0.18, 'triangle', 0.18);
+    this.playTone(pitch * 1.5, 130, 0.14, 'sine', 0.11);
+    this.playNoise(0.22, 1600, 0.10);
+  }
+  playScoutPan() { this.playTone(260, 390, 0.14, 'sine', 0.06); }
+  playHitImpact() {
+    this.playNoise(0.16, 850, 0.16);
+    this.playTone(190, 75, 0.18, 'triangle', 0.16);
+  }
+  playHitFanfare() {
+    this.playTone(392.00, 392.00, 0.10, 'triangle', 0.13, 0.04);
+    this.playTone(493.88, 493.88, 0.10, 'triangle', 0.13, 0.13);
+    this.playTone(587.33, 587.33, 0.12, 'triangle', 0.14, 0.22);
+    this.playTone(783.99, 783.99, 0.32, 'triangle', 0.16, 0.32);
+  }
+  playNorthStarChime() {
+    this.playTone(523.25, 523.25, 0.25, 'sine', 0.10, 0.0);
+    this.playTone(659.25, 659.25, 0.25, 'sine', 0.10, 0.18);
+    this.playTone(783.99, 783.99, 0.45, 'sine', 0.12, 0.36);
+  }
+  playMissThud() {
+    this.playTone(130, 52, 0.16, 'triangle', 0.14);
+    this.playNoise(0.09, 420, 0.09);
+  }
+}
+
+const sfx = new SoundEngine();
+
+// --- GAME CONSTANTS & 12-ENCOUNTER SEVERN RIVER EXPEDITION ---
+const GRAVITY = 0.145;
+const MAX_ARROWS = 4;
+const TOTAL_ENCOUNTERS = 12;
+const TOTAL_WORLD_WIDTH = 4400;
+const NO_BLOCK_DEPARTURE_RADIUS = 56;
+
+// --- INPUT STATE (PARENT ARCADE CABINET postMessage BRIDGE) ---
+const keys = { up: false, down: false, left: false, right: false, a: false, b: false };
+let aJustPressed = false;
+let aJustReleased = false;
+let bJustPressed = false;
+
+// --- STATE MACHINE ---
+let state = 'TITLE';
+let isPaused = false;
+let elapsed = 0;
+let lastTimestamp = 0;
+let beatTimer = 0;
+
+// Title Fade-Out, End-Cutscene Fade-to-Black & First 1/4 Card Bayer Reveal
+let titleFadeAlpha = 0.0;
+let firstCardDither = 1.0;
+let screenFadeAlpha = 0.0;
+let revealEdgeX = VIEW_W;
+
+// Camera Scroll & Pan State
+let cameraX = 0;
+let targetCameraX = 0;
+let panStartX = 0;
+let panEndX = 0;
+let panSubPhase = 0;
+
+// River Current & Walking Stride Cycle State
+let riverFlowDist = 0;
+let walkCyclePhase = 0;
+let lastStepIndex = -1;
+
+// Player Stance, Facing Direction & Position
+let playerStance = 'HIDDEN';
+let playerFacing = 1;
+let archerX = 40;
+let walkTargetX = 264;
+let bowPluckVib = 0;
+let basketFillStage = 0;
+let headNodOffset = 0;
+let hoodWorn = false;
+
+// North Star & End-Game Silent Cutscene State
+let northStarAlpha = 0.0;
+let familyAtCampfire = false;
+let returnMoonlitLock = false;
+
+// Encounter & Physical Persistent Quiver Stats
+let encounterIdx = 0;
+let arrowsInQuiver = MAX_ARROWS;
+let embeddedArrows = [];
+let lastOutcomeHit = false;
+let activeWind = WIND_PRESETS[2];
+
+// Slingshot-Compatible Aiming Controls:
+// - Up/Down adjusts launch angle (live both before and while bowstring is drawn)
+// - Hold/Release Button A draws bowstring back and launches on release
+let aimAngleDeg = 32;
+let isDrawing = false;
+let drawPower = 0;
+let lastCreakStep = 0;
+let angleTickCooldown = 0;
+
+// Button B "Look Downfield" Pre-Animation + Scroll Pan
+let scoutMode = 'OFF';
+let scoutTimer = 0;
+const SCOUT_PAN_SPEED = 265;
+
+// Active Foreground Partridge Entity & Staggered Fly-In Flock
+let partridge = {
+  x: 610,
+  y: 184,
+  baseX: 610,
+  vx: 8,
+  dir: -1,
+  state: 'STRUT',
+  animTimer: 0,
+  bobY: 0,
+  hitTimer: 0,
+  impactAngle: 0.45
+};
+
+let flyInBirds = [];
+
+let arrow = {
+  active: false, x: 0, y: 0, vx: 0, vy: 0, angle: 0,
+  stuck: false, stuckTimer: 0, trail: []
+};
+
+// Procedural World Data
+let groundProfile = [];
+let thawPonds = [];
+let deepTrees = [];
+let midTrees = [];
+let foregroundItems = [];
+let milestonePatches = [];
+let riverRapidsNodes = [];
+let ambientParticles = [];
+let titleStars = [];
+
+// Ambient Mid/Deep Wildlife
+let belugaEvent = { timer: 6, active: false, phase: 0, baseX: 210 };
+let geeseFlocks = [];
+let cranes = [];
+let caribouHerd = [];
+let beaverActor = { x: 2450, dir: 1, lodgeX: 2410 };
+let greatGrayOwl = { x: 2750, y: 112 };
+let timberWolf = { x: 3650, dir: 1, pauseTimer: 0 };
+let taigaMoose = { x: 4020 };
+
+let particles = [];
+
+// --- WORLD GENERATION ---
+function getGroundY(worldX) {
+  const idx = Math.floor(worldX / 16);
+  if (idx < 0) return 184;
+  if (idx >= groundProfile.length - 1) return groundProfile[groundProfile.length - 1] || 184;
+  const t = (worldX % 16) / 16;
+  return groundProfile[idx] + (groundProfile[idx + 1] - groundProfile[idx]) * t;
+}
+
+function getCameraBaseForArcher(ax) {
+  return clamp(ax - 58, 0, Math.max(0, TOTAL_WORLD_WIDTH - VIEW_W));
+}
+
+function buildSevernWorld() {
+  const rng = mulberry32(16001600);
+  groundProfile = [];
+  const numCols = Math.ceil(TOTAL_WORLD_WIDTH / 16) + 12;
+
+  for (let i = 0; i < numCols; i++) {
+    const wx = i * 16;
+    const prog = clamp(wx / TOTAL_WORLD_WIDTH, 0, 1);
+    if (wx < 320) {
+      groundProfile.push(184);
+    } else if (prog < 0.25) {
+      groundProfile.push(Math.round(184 + Math.sin(i * 0.28) * 2));
+    } else if (prog < 0.50) {
+      groundProfile.push(Math.round(183 + Math.sin(i * 0.24) * 3.5));
+    } else if (prog < 0.75) {
+      groundProfile.push(Math.round(182 + Math.sin(i * 0.26) * 4));
+    } else {
+      const shelf = Math.floor(Math.sin(i * 0.20) * 2.5) * 2;
+      groundProfile.push(Math.round(181 + shelf));
+    }
+  }
+
+  thawPonds = [];
+  for (let px = 680; px < TOTAL_WORLD_WIDTH * 0.65; px += 120 + Math.floor(rng() * 90)) {
+    thawPonds.push({
+      x: px,
+      y: 132 + Math.floor(rng() * 14),
+      w: 30 + Math.floor(rng() * 34),
+      h: 4 + Math.floor(rng() * 3)
+    });
+  }
+
+  deepTrees = [];
+  for (let dx = 135; dx < TOTAL_WORLD_WIDTH * 0.30; dx += 9 + Math.floor(rng() * 8)) {
+    const eqProg = clamp(dx / (TOTAL_WORLD_WIDTH * 0.24), 0, 1);
+    deepTrees.push({
+      x: dx,
+      prog: eqProg,
+      baseH: 14 + Math.floor(rng() * 16),
+      lean: 1.5 + rng() * 2.0
+    });
+  }
+
+  midTrees = [];
+  for (let mx = 460; mx < TOTAL_WORLD_WIDTH * 0.65; mx += 22 + Math.floor(rng() * 26)) {
+    const eqProg = clamp(mx / (TOTAL_WORLD_WIDTH * 0.54), 0, 1);
+    midTrees.push({
+      x: mx,
+      prog: eqProg,
+      baseH: 18 + Math.floor(rng() * 20),
+      isDeciduous: eqProg > 0.72 && rng() < 0.38,
+      isTamarack: rng() < 0.35,
+      phase: rng() * 6.28
+    });
+  }
+
+  foregroundItems = [];
+  for (let wx = 295; wx < TOTAL_WORLD_WIDTH - 40; wx += 26 + Math.floor(rng() * 24)) {
+    const prog = clamp(wx / TOTAL_WORLD_WIDTH, 0, 1);
+    const gy = getGroundY(wx);
+    const roll = rng();
+
+    if (prog < 0.25) {
+      if (roll < 0.28) foregroundItems.push({ type: 'DRIFTWOOD', x: wx, y: gy, w: 18 + Math.floor(rng() * 10) });
+      else if (roll < 0.52) foregroundItems.push({ type: 'BOULDER', x: wx, y: gy + 1, w: 10 + Math.floor(rng() * 8), h: 5 + Math.floor(rng() * 3) });
+      else foregroundItems.push({ type: 'SEDGE', x: wx, y: gy, blades: 4, phase: rng() * 6.28, cottongrass: false });
+    } else if (prog < 0.50) {
+      if (roll < 0.28) foregroundItems.push({ type: 'DWARF_WILLOW', x: wx, y: gy, w: 14 + Math.floor(rng() * 8) });
+      else if (roll < 0.52) foregroundItems.push({ type: 'KRUMMHOLZ_FG', x: wx, y: gy, h: 20 + Math.floor(rng() * 10), phase: rng() * 6.28, isTamarack: rng() < 0.35 });
+      else foregroundItems.push({ type: 'SEDGE', x: wx, y: gy, blades: 3, phase: rng() * 6.28, cottongrass: rng() < 0.5 });
+    } else if (prog < 0.75) {
+      if (roll < 0.26) foregroundItems.push({ type: 'MOSSY_LOG', x: wx, y: gy, w: 22 + Math.floor(rng() * 10) });
+      else if (roll < 0.52) foregroundItems.push({ type: 'KRUMMHOLZ_FG', x: wx, y: gy, h: 28 + Math.floor(rng() * 14), phase: rng() * 6.28, isTamarack: rng() < 0.45 });
+      else foregroundItems.push({ type: 'LABRADOR_TEA', x: wx, y: gy, w: 15 });
+    } else {
+      if (roll < 0.32) foregroundItems.push({ type: 'LIMESTONE_LEDGE', x: wx, y: gy + 1, w: 24 + Math.floor(rng() * 16), h: 6 + Math.floor(rng() * 4) });
+      else if (roll < 0.56) foregroundItems.push({ type: 'TAIGA_SPRUCE_FG', x: wx, y: gy, h: 36 + Math.floor(rng() * 16), phase: rng() * 6.28 });
+      else foregroundItems.push({ type: 'FERN', x: wx, y: gy, phase: rng() * 6.28 });
+    }
+  }
+
+  milestonePatches = [
+    { stage: 0, x: 278,  y: getGroundY(278),  harvested: false },
+    { stage: 1, x: 1220, y: getGroundY(1220), harvested: false },
+    { stage: 2, x: 2320, y: getGroundY(2320), harvested: false },
+    { stage: 3, x: 3420, y: getGroundY(3420), harvested: false }
+  ];
+
+  riverRapidsNodes = [];
+  for (let rx = 0; rx < TOTAL_WORLD_WIDTH; rx += 34 + Math.floor(rng() * 28)) {
+    riverRapidsNodes.push({
+      x: rx,
+      yOff: Math.floor(rng() * 16),
+      w: 10 + Math.floor(rng() * 14)
+    });
+  }
+
+  geeseFlocks = [
+    { x: 150, y: 80, speed: 12, count: 6 },
+    { x: 380, y: 70, speed: 15, count: 7 }
+  ];
+  cranes = [
+    { x: 740, stepPhase: 0.2 },
+    { x: 1020, stepPhase: 2.1 }
+  ];
+  caribouHerd = [
+    { x: 630, offset: 0, antlers: true },
+    { x: 660, offset: 1.4, antlers: false },
+    { x: 688, offset: 2.8, antlers: true },
+    { x: 930, offset: 0.7, antlers: true },
+    { x: 960, offset: 2.2, antlers: false }
+  ];
+  beaverActor = { x: 1420, dir: 1, lodgeX: 1380 };
+  greatGrayOwl = { x: 1620, y: 112 };
+  timberWolf = { x: 1960, dir: 1, pauseTimer: 0 };
+  taigaMoose = { x: 2180 };
+
+  ambientParticles = [];
+  for (let i = 0; i < 34; i++) {
+    ambientParticles.push({
+      x: rng(),
+      y: 30 + rng() * 175,
+      phase: rng() * 6.28
+    });
+  }
+
+  titleStars = [];
+  for (let s = 0; s < 48; s++) {
+    titleStars.push({
+      xFrac: rng(),
+      y: Math.floor(rng() * VIEW_H),
+      phase: rng() * 6.28,
+      bright: rng() > 0.65
+    });
+  }
+}
+
+function advanceWalkMotion(dx) {
+  const dist = Math.abs(dx);
+  if (dist <= 0.001) return;
+  walkCyclePhase += dist * 0.28;
+  const stepIdx = Math.floor(walkCyclePhase / Math.PI);
+  if (stepIdx !== lastStepIndex) {
+    lastStepIndex = stepIdx;
+    sfx.playSoftFootstep();
+  }
+}
+
+function triggerPartridgeFlyIn() {
+  flyInBirds = [
+    { x: -18, y: 22, vx: 135, vy: 44, delay: 0.0,  soundPlayed: false },
+    { x: -24, y: 34, vx: 128, vy: 42, delay: 0.32, soundPlayed: false },
+    { x: -20, y: 16, vx: 142, vy: 48, delay: 0.62, soundPlayed: false }
+  ];
+}
+
+function initTitleScene() {
+  buildSevernWorld();
+  archerX = 40;
+  cameraX = 0;
+  targetCameraX = 0;
+  playerStance = 'HIDDEN';
+  titleFadeAlpha = 0.0;
+  firstCardDither = 0.0;
+  revealEdgeX = Math.round(VIEW_W * 0.25);
+  screenFadeAlpha = 0.0;
+  familyAtCampfire = false;
+  returnMoonlitLock = false;
+  northStarAlpha = 0.0;
+  hoodWorn = false;
+  flyInBirds = [];
+  walkCyclePhase = 0;
+  lastStepIndex = -1;
+  activeWind = WIND_PRESETS[2];
+  sfx.setDrumTrackActive(false);
+  sfx.setAtmosphereActive(true);
+  state = 'TITLE';
+}
+
+function startTitleFadeOut() {
+  sfx.init();
+  sfx.setAtmosphereActive(true);
+  sfx.playStartChime();
+  titleFadeAlpha = 0.0;
+  state = 'TITLE_FADE_OUT';
+}
+
+function beginCutsceneBeat1() {
+  encounterIdx = 0;
+  arrowsInQuiver = MAX_ARROWS;
+  embeddedArrows = [];
+  basketFillStage = 0;
+  familyAtCampfire = false;
+  returnMoonlitLock = false;
+  northStarAlpha = 0.0;
+  headNodOffset = 0;
+  hoodWorn = false;
+  flyInBirds = [];
+  walkCyclePhase = 0;
+  lastStepIndex = -1;
+
+  archerX = 42;
+  playerFacing = 1;
+  cameraX = 0;
+  targetCameraX = 0;
+  firstCardDither = 0.0;
+  revealEdgeX = Math.max(80, Math.round(VIEW_W * 0.25));
+  playerStance = 'EMERGE';
+  beatTimer = 0;
+  activeWind = WIND_PRESETS[2];
+  sfx.setDrumTrackActive(false);
+  state = 'CUTSCENE_REVEAL_1';
+}
+
+function collectPassedArrows(upToX) {
+  let recovered = 0;
+  for (let i = embeddedArrows.length - 1; i >= 0; i--) {
+    if (embeddedArrows[i].x <= upToX + 14) {
+      embeddedArrows.splice(i, 1);
+      if (arrowsInQuiver < MAX_ARROWS) {
+        arrowsInQuiver++;
+        recovered++;
+      }
+    }
+  }
+  if (recovered > 0) {
+    sfx.playArrowPickup();
+  }
+}
+
+function spawnPartridgeForEncounter(encIdx, fromX) {
+  const distAhead = 355 + Math.min(165, encIdx * 12 + Math.floor(Math.random() * 45));
+  const targetX = clamp(fromX + distAhead, 520, TOTAL_WORLD_WIDTH - 90);
+  partridge.baseX = targetX;
+  partridge.x = targetX;
+  partridge.y = getGroundY(targetX);
+  partridge.vx = (encIdx >= 3 ? 13 : 8) * (encIdx % 2 === 0 ? -1 : 1);
+  partridge.dir = -1;
+  partridge.state = 'STRUT';
+  partridge.animTimer = 0;
+  partridge.bobY = 0;
+  partridge.hitTimer = 0;
+
+  isDrawing = false;
+  drawPower = 0;
+  scoutMode = 'OFF';
+  activeWind = encIdx === 0 ? WIND_PRESETS[2] : WIND_PRESETS[Math.floor(Math.random() * WIND_PRESETS.length)];
+
+  if (encIdx >= 9) {
+    northStarAlpha = 1.0;
+  }
+}
+
+// --- PIXEL ART & CELESTIAL TITLE SCREEN ---
+function drawPixelText(text, x, y, size = 8, color = PAL.WHITE, align = 'left', shadow = true) {
+  ctx.font = `bold ${size}px "Courier New", monospace`;
+  ctx.textAlign = align;
+  ctx.textBaseline = 'top';
+  if (shadow) {
+    ctx.fillStyle = PAL.INK;
+    ctx.fillText(text, Math.round(x) + 1, Math.round(y) + 1);
+  }
+  ctx.fillStyle = color;
+  ctx.fillText(text, Math.round(x), Math.round(y));
+}
+
+function drawBox(x, y, w, h, bg = PAL.UI_BG, border = PAL.UI_BORDER) {
+  ctx.fillStyle = PAL.INK;
+  ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
+  ctx.fillStyle = border;
+  ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = bg;
+  ctx.fillRect(x + 2, y + 2, w - 4, h - 4);
+}
+
+const SYLLABIC_GLYPHS = [
+  ["0000111","0011111","1111011","1110011","1111011","0011111","0000111"],
+  ["00100","00100","11111","00100","00100","00000","00000"],
+  ["1100011","1100011","1100011","1100011","1111111","0111110","0000000"],
+  ["0011100","0000000","0111110","1111111","1100011","1100011","1100011"],
+  ["1111110","1100011","0000110","0111100","0110000","1100011","0111111"],
+  ["01111","11001","01110","10011","11110","00000","00000"]
+];
+
+function drawTitleScreen() {
+  ctx.fillStyle = PAL.BLACKOUT;
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+
+  const fadeOutMult = 1.0 - titleFadeAlpha;
+  if (fadeOutMult <= 0.01) return;
+
+  ctx.save();
+
+  for (const st of titleStars) {
+    const twinkle = 0.35 + 0.65 * Math.sin(elapsed * 2.8 + st.phase);
+    ctx.globalAlpha = fadeOutMult * (st.bright ? 0.65 : 0.35) * twinkle;
+    ctx.fillStyle = st.bright ? '#D4E8FF' : PAL.WHITE;
+    ctx.fillRect(Math.floor(st.xFrac * VIEW_W), st.y, 1, 1);
+  }
+
+  const moonX = Math.round(VIEW_W * 0.78);
+  const moonY = 48;
+  ctx.globalAlpha = fadeOutMult * 0.07;
+  ctx.fillStyle = '#B8D4F2';
+  ctx.fillRect(moonX - 24, moonY - 24, 48, 48);
+  ctx.globalAlpha = fadeOutMult * 0.13;
+  ctx.fillRect(moonX - 16, moonY - 16, 32, 32);
+  ctx.globalAlpha = fadeOutMult * 0.22;
+  ctx.fillStyle = '#E8F2FC';
+  ctx.fillRect(moonX - 11, moonY - 11, 22, 22);
+  ctx.globalAlpha = fadeOutMult * 0.12;
+  ctx.fillStyle = '#8FAAC7';
+  ctx.fillRect(moonX - 5, moonY - 4, 5, 4);
+  ctx.fillRect(moonX + 2, moonY + 2, 4, 5);
+
+  const nsX = Math.round(VIEW_W * 0.24);
+  const nsY = 44;
+  const pulse = 1 + Math.round(Math.sin(elapsed * 4.5) * 0.6);
+  ctx.globalAlpha = fadeOutMult * 0.28;
+  ctx.fillStyle = PAL.AURORA_GREEN;
+  ctx.fillRect(nsX - 6 - pulse, nsY - 1, 13 + pulse * 2, 3);
+  ctx.fillRect(nsX - 1, nsY - 6 - pulse, 3, 13 + pulse * 2);
+  ctx.globalAlpha = fadeOutMult * 0.92;
+  ctx.fillStyle = PAL.NORTH_STAR;
+  ctx.fillRect(nsX - 7 - pulse, nsY, 15 + pulse * 2, 1);
+  ctx.fillRect(nsX, nsY - 7 - pulse, 1, 15 + pulse * 2);
+  ctx.fillRect(nsX - 2, nsY - 2, 5, 5);
+  ctx.fillStyle = PAL.WHITE;
+  ctx.fillRect(nsX - 1, nsY - 1, 3, 3);
+
+  ctx.globalAlpha = fadeOutMult;
+  const centerX = Math.round(VIEW_W * 0.5);
+  const logoY = 82;
+  const pxScale = 4;
+  const charGap = 5;
+  let totalW = 0;
+  for (const g of SYLLABIC_GLYPHS) totalW += g[0].length * pxScale + charGap;
+  totalW -= charGap;
+
+  let curX = Math.round(centerX - totalW / 2);
+  for (const grid of SYLLABIC_GLYPHS) {
+    const rows = grid.length;
+    const cols = grid[0].length;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (grid[r][c] === '1') {
+          const px = curX + c * pxScale;
+          const py = logoY + r * pxScale;
+          ctx.fillStyle = r < 2 ? '#FFF6C7' : (r < 5 ? PAL.UI_GOLD : '#E88332');
+          ctx.fillRect(px, py, pxScale, pxScale);
+          if (r === 0) {
+            ctx.fillStyle = PAL.WHITE;
+            ctx.fillRect(px, py, pxScale, 1);
+          }
+        }
+      }
+    }
+    curX += cols * pxScale + charGap;
+  }
+
+  const barY = logoY + 34;
+  ctx.fillStyle = PAL.TRADE_SCARLET;
+  ctx.fillRect(centerX - 80, barY, 160, 2);
+  ctx.fillStyle = PAL.UI_GOLD;
+  ctx.fillRect(centerX - 3, barY - 1, 6, 4);
+
+  drawPixelText('ahcāpīshish', centerX, barY + 8, 12, PAL.WHITE, 'center', false);
+
+  if (Math.floor(elapsed * 2.4) % 2 === 0) {
+    drawPixelText('PRESS A TO START', centerX, 188, 9, PAL.UI_GOLD, 'center', false);
+  }
+
+  ctx.restore();
+}
+
+// --- PLAYER-X PUSH-TO-REVEAL BLACKOUT CURTAIN + 1ST 1/4 BAYER DISSOLVE ---
+function drawPushRevealMask(edgeX, firstQuarterFrac) {
+  if (edgeX >= VIEW_W && firstQuarterFrac >= 0.999) return;
+  const blockSize = 4;
+  const rows = Math.ceil(VIEW_H / blockSize);
+  const cols = Math.ceil(VIEW_W / blockSize);
+  const q1Width = Math.max(80, Math.round(VIEW_W * 0.25));
+
+  ctx.fillStyle = PAL.BLACKOUT;
+
+  if (firstQuarterFrac < 0.999) {
+    const q1Cols = Math.ceil(q1Width / blockSize);
+    for (let r = 0; r < rows; r++) {
+      const bRow = BAYER_4X4[r & 3];
+      for (let c = 0; c < q1Cols; c++) {
+        const threshold = (bRow[c & 3] + 0.5) / 16.0;
+        if (firstQuarterFrac <= threshold) {
+          ctx.fillRect(c * blockSize, r * blockSize, blockSize, blockSize);
+        }
+      }
+    }
+  }
+
+  if (edgeX < VIEW_W) {
+    const ditherBandW = 12;
+    const solidStartX = Math.ceil((edgeX + ditherBandW) / blockSize) * blockSize;
+    if (solidStartX < VIEW_W) {
+      ctx.fillRect(solidStartX, 0, VIEW_W - solidStartX, VIEW_H);
+    }
+
+    const startCol = Math.max(0, Math.floor(edgeX / blockSize));
+    const endCol = Math.min(cols, Math.ceil((edgeX + ditherBandW) / blockSize));
+    for (let r = 0; r < rows; r++) {
+      const bRow = BAYER_4X4[r & 3];
+      for (let c = startCol; c < endCol; c++) {
+        const px = c * blockSize;
+        const bandFrac = clamp((px - edgeX) / ditherBandW, 0, 1);
+        const threshold = (bRow[c & 3] + 0.5) / 16.0;
+        if (bandFrac >= threshold) {
+          ctx.fillRect(px, r * blockSize, blockSize, blockSize);
+        }
+      }
+    }
+  }
+}
+
+// --- MULTI-LAYER PARALLAX RENDERER (0.15x DEEP -> 0.5x MID -> 0.85x RIVER -> 1.0x FG) ---
+function drawWorldLayers(camX, env) {
+  const prog = env.progress;
+
+  const skyBands = [
+    { y: 0,  h: 32, c1: env.skyTop, c2: env.skyMid },
+    { y: 32, h: 36, c1: env.skyMid, c2: env.skyLow },
+    { y: 68, h: 48, c1: env.skyLow, c2: env.skyHorizon }
+  ];
+  for (const band of skyBands) {
+    ctx.fillStyle = band.c1;
+    ctx.fillRect(0, band.y, VIEW_W, band.h);
+    ctx.fillStyle = band.c2;
+    for (let dy = 0; dy < 6; dy += 2) {
+      for (let dx = (dy % 4 === 0 ? 0 : 2); dx < VIEW_W; dx += 4) {
+        ctx.fillRect(dx, band.y + band.h - 6 + dy, 2, 2);
+      }
+    }
+  }
+
+  if (env.starAlpha > 0.02) {
+    ctx.save();
+    for (let st = 0; st < 40; st++) {
+      const twinkle = 0.55 + 0.45 * Math.sin(elapsed * 3.5 + st * 1.9);
+      ctx.globalAlpha = env.starAlpha * twinkle;
+      const sx = ((st * 67 + Math.floor(camX * 0.02)) % VIEW_W + VIEW_W) % VIEW_W;
+      const sy = 5 + ((st * 23) % 68);
+      ctx.fillStyle = (st % 5 === 0) ? '#AEE8FF' : PAL.WHITE;
+      ctx.fillRect(sx, sy, 1, 1);
+    }
+    ctx.restore();
+  }
+
+  if (env.auroraAlpha > 0.02) {
+    ctx.save();
+    for (let ax = 0; ax < VIEW_W; ax += 4) {
+      const w1 = Math.sin(ax * 0.024 + elapsed * 1.15) * 9 + Math.cos(ax * 0.011 - elapsed * 0.65) * 5;
+      const ay = Math.round(24 + w1);
+      ctx.globalAlpha = env.auroraAlpha * 0.28;
+      ctx.fillStyle = PAL.AURORA_GREEN;
+      ctx.fillRect(ax, ay, 4, 17);
+      ctx.globalAlpha = env.auroraAlpha * 0.20;
+      ctx.fillStyle = PAL.AURORA_VIOLET;
+      ctx.fillRect(ax, ay - 6, 4, 8);
+      ctx.globalAlpha = env.auroraAlpha * 0.42;
+      ctx.fillStyle = '#C8FFEE';
+      ctx.fillRect(ax, ay + 14, 4, 2);
+    }
+    ctx.restore();
+  }
+
+  if (env.sunAlpha > 0.05) {
+    ctx.save();
+    const sx = Math.round(env.sunX - camX * 0.015);
+    const sy = Math.round(env.sunY);
+    ctx.globalAlpha = env.sunAlpha * 0.24;
+    ctx.fillStyle = env.sunGlow;
+    ctx.fillRect(sx - 16, sy - 16, 32, 32);
+    ctx.globalAlpha = env.sunAlpha * 0.96;
+    ctx.fillStyle = env.sunColor;
+    ctx.fillRect(sx - 8, sy - 8, 16, 16);
+    if (prog > 0.72) {
+      ctx.fillStyle = '#B8CBE0';
+      ctx.fillRect(sx - 4, sy - 3, 4, 3);
+      ctx.fillRect(sx + 1, sy + 1, 3, 4);
+    }
+    ctx.restore();
+  }
+
+  if (northStarAlpha > 0.02) {
+    ctx.save();
+    const nsX = Math.round(VIEW_W * 0.30);
+    const nsY = 26;
+    const pulse = 1 + Math.round(Math.sin(elapsed * 6) * 0.6);
+    ctx.globalAlpha = northStarAlpha * 0.35;
+    ctx.fillStyle = PAL.AURORA_GREEN;
+    ctx.fillRect(nsX - 5 - pulse, nsY - 1, 11 + pulse * 2, 3);
+    ctx.fillRect(nsX - 1, nsY - 5 - pulse, 3, 11 + pulse * 2);
+
+    ctx.globalAlpha = northStarAlpha;
+    ctx.fillStyle = PAL.NORTH_STAR;
+    ctx.fillRect(nsX - 6 - pulse, nsY, 13 + pulse * 2, 1);
+    ctx.fillRect(nsX, nsY - 6 - pulse, 1, 13 + pulse * 2);
+    ctx.fillRect(nsX - 2, nsY - 2, 5, 5);
+    ctx.fillStyle = PAL.WHITE;
+    ctx.fillRect(nsX - 1, nsY - 1, 3, 3);
+    ctx.restore();
+  }
+
+  const cloudVis = 1.0 - smoothstep(0.55, 0.85, prog);
+  if (cloudVis > 0.05) {
+    ctx.save();
+    ctx.globalAlpha = cloudVis * (0.35 + 0.45 * smoothstep(0.15, 0.35, prog));
+    const windDrift = activeWind.dir * (4 + activeWind.strength * 14);
+    const cloudScroll = camX * 0.05 - elapsed * (2.0 + windDrift);
+    const cloudWrap = Math.max(540, VIEW_W + 180);
+    const clouds = [
+      { bx: 28, y: 22, w: 52, h: 8 },
+      { bx: 146, y: 34, w: 66, h: 10 },
+      { bx: 274, y: 20, w: 46, h: 7 },
+      { bx: 392, y: 38, w: 58, h: 9 }
+    ];
+    for (const c of clouds) {
+      const cx = Math.round(((c.bx + cloudScroll) % cloudWrap + cloudWrap) % cloudWrap - 70);
+      ctx.fillStyle = PAL.WHITE;
+      ctx.fillRect(cx, c.y, c.w, c.h - 2);
+      ctx.fillRect(cx + 8, c.y - 2, c.w - 18, 3);
+    }
+    ctx.restore();
+  }
+
+  // === DEEP LAYER (0.15x) ===
+  const horizonY = 114;
+  const bayFade = 1.0 - smoothstep(0.18, 0.36, prog);
+
+  if (bayFade > 0.02) {
+    ctx.save();
+    ctx.globalAlpha = bayFade;
+    ctx.fillStyle = '#3B5163';
+    ctx.fillRect(0, horizonY - 4, VIEW_W, 14);
+    ctx.fillStyle = env.sunGlow;
+    const refShift = Math.floor(camX * 0.15 + elapsed * 3);
+    for (let rx = 0; rx < VIEW_W; rx += 18) {
+      const wx = ((rx - refShift) % VIEW_W + VIEW_W) % VIEW_W;
+      ctx.fillRect(wx, horizonY + 1, 10, 1);
+    }
+
+    if (belugaEvent.active) {
+      const bx = Math.round(belugaEvent.baseX - camX * 0.15);
+      for (let w = 0; w < 3; w++) {
+        const subPhase = belugaEvent.phase - w * 0.45;
+        if (subPhase > 0 && subPhase < Math.PI) {
+          const arcY = Math.sin(subPhase) * 4.5;
+          const wx = bx + w * 16;
+          const wy = Math.round(horizonY + 2 - arcY);
+          ctx.fillStyle = '#E6EEF5';
+          ctx.fillRect(wx, wy, 9, 3);
+          ctx.fillRect(wx + 2, wy - 1, 5, 1);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.70)';
+          ctx.fillRect(wx - 2, horizonY + 3, 13, 1);
+        }
+      }
+    }
+    ctx.restore();
+  }
+
+  const deepBaseY = 118;
+  if (env.canopyWallHeight > 1) {
+    const wallH = Math.round(env.canopyWallHeight);
+    ctx.fillStyle = env.deepBase;
+    ctx.fillRect(0, deepBaseY - wallH, VIEW_W, wallH + 6);
+    ctx.fillStyle = env.deepDetail;
+    const rShift = Math.floor(camX * 0.15);
+    for (let rx = -24; rx < VIEW_W + 32; rx += 22) {
+      const dx = rx - (rShift % 22);
+      const ridgeBump = ((Math.abs(rx + rShift) / 22) % 3) * 3;
+      ctx.fillRect(dx, deepBaseY - wallH - ridgeBump, 14, 4 + ridgeBump);
+    }
+  }
+
+  for (const dt of deepTrees) {
+    if (prog + 0.08 < dt.prog * 0.75) continue;
+    const sx = Math.round(dt.x - camX * 0.15);
+    if (sx < -24 || sx > VIEW_W + 24) continue;
+
+    const h = Math.round(dt.baseH * (0.45 + env.treeHeightScale * 1.45));
+    const gust = Math.sin(elapsed * (1.6 + activeWind.strength * 3.2) + dt.x);
+    const lean = Math.round(activeWind.dir * (activeWind.strength * 3.5 + gust * activeWind.strength));
+
+    ctx.fillStyle = env.deepBase;
+    ctx.fillRect(sx, deepBaseY - h + 4, 2, h - 4);
+
+    for (let tier = 0; tier < 4; tier++) {
+      const frac = 1 - tier / 4;
+      const ty = deepBaseY - h + tier * Math.floor(h / 4);
+      const tw = 3 + tier * 3;
+      const offX = Math.round(lean * frac);
+      ctx.fillStyle = env.deepTreeMain;
+      ctx.fillRect(sx - Math.floor(tw / 2) + offX, ty, tw, Math.ceil(h / 4) + 1);
+      ctx.fillStyle = env.deepTreeLight;
+      ctx.fillRect(sx - Math.floor(tw / 2) + offX, ty, Math.max(2, Math.floor(tw / 2)), 2);
+    }
+  }
+
+  if (prog >= 0.20 && prog <= 0.56) {
+    for (const cr of cranes) {
+      const cx = Math.round(cr.x - camX * 0.15);
+      if (cx < -24 || cx > VIEW_W + 24) continue;
+      const step = Math.sin(elapsed * 2.2 + cr.stepPhase);
+      ctx.fillStyle = env.deepTreeMain;
+      ctx.fillRect(cx - 2, deepBaseY - 9, 1, 9);
+      ctx.fillRect(cx + 2 + (step > 0 ? 1 : 0), deepBaseY - 9, 1, 9);
+      ctx.fillStyle = env.deepDetail;
+      ctx.fillRect(cx - 4, deepBaseY - 13, 8, 4);
+      ctx.fillRect(cx + 3, deepBaseY - 19, 2, 7);
+      ctx.fillRect(cx + 4, deepBaseY - 21, 3, 2);
+      ctx.fillStyle = env.rimColor;
+      ctx.fillRect(cx + 7, deepBaseY - 20, 4, 1);
+    }
+  }
+  if (prog >= 0.48 && prog <= 0.80) {
+    const ox = Math.round(greatGrayOwl.x - camX * 0.15);
+    const oy = deepBaseY - Math.round(env.canopyWallHeight) - 13;
+    if (ox >= -24 && ox <= VIEW_W + 24) {
+      ctx.fillStyle = env.deepTreeMain;
+      ctx.fillRect(ox, oy + 9, 2, 18);
+      ctx.fillRect(ox - 4, oy + 13, 6, 2);
+      ctx.fillStyle = env.deepDetail;
+      ctx.fillRect(ox - 3, oy + 2, 7, 8);
+      ctx.fillRect(ox - 4, oy - 3, 9, 5);
+      ctx.fillStyle = env.rimColor;
+      ctx.fillRect(ox + 3, oy - 2, 2, 4);
+    }
+  }
+  if (prog >= 0.72) {
+    const mx = Math.round(taigaMoose.x - camX * 0.15);
+    const my = deepBaseY + 2;
+    if (mx >= -34 && mx <= VIEW_W + 34) {
+      ctx.fillStyle = env.deepTreeMain;
+      ctx.fillRect(mx - 8, my - 13, 2, 13);
+      ctx.fillRect(mx - 4, my - 13, 2, 13);
+      ctx.fillRect(mx + 5, my - 13, 2, 13);
+      ctx.fillRect(mx + 9, my - 13, 2, 13);
+      ctx.fillStyle = env.deepDetail;
+      ctx.fillRect(mx - 9, my - 23, 20, 10);
+      ctx.fillRect(mx + 4, my - 26, 8, 4);
+      ctx.fillRect(mx + 10, my - 24, 7, 5);
+      ctx.fillRect(mx + 12, my - 19, 2, 3);
+      ctx.fillStyle = env.deepTreeLight;
+      ctx.fillRect(mx + 6, my - 31, 8, 5);
+      ctx.fillRect(mx + 5, my - 33, 3, 2);
+      ctx.fillRect(mx + 12, my - 33, 3, 2);
+      ctx.fillStyle = env.rimColor;
+      ctx.fillRect(mx - 8, my - 23, 13, 1);
+      ctx.fillRect(mx + 6, my - 33, 8, 1);
+    }
+  }
+
+  // === MID-LAYER (0.5x) ===
+  const midTop = 118;
+  const midH = 31;
+  ctx.fillStyle = env.midBase;
+  ctx.fillRect(0, midTop, VIEW_W, midH);
+
+  const ridgeVis = smoothstep(0.12, 0.28, prog) * (1.0 - smoothstep(0.52, 0.72, prog));
+  if (ridgeVis > 0.05) {
+    ctx.save();
+    ctx.globalAlpha = ridgeVis;
+    ctx.fillStyle = env.midRidge;
+    const rShift = Math.floor(camX * 0.5);
+    ctx.fillRect(0, midTop + 4, VIEW_W, 3);
+    for (let rx = -40; rx < VIEW_W + 60; rx += 54) {
+      const dx = rx - (rShift % 54);
+      ctx.fillRect(dx, midTop + 15, 36, 2);
+    }
+    ctx.restore();
+  }
+
+  for (const pond of thawPonds) {
+    const sx = Math.round(pond.x - camX * 0.5);
+    if (sx < -70 || sx > VIEW_W + 70) continue;
+    ctx.fillStyle = env.pondColor;
+    ctx.fillRect(sx, pond.y, pond.w, pond.h);
+    ctx.fillStyle = env.sunColor;
+    ctx.fillRect(sx + 5, pond.y + 1, Math.max(4, Math.floor(pond.w * 0.3)), 1);
+  }
+
+  const midGroundY = 148;
+  for (const mt of midTrees) {
+    if (prog + 0.08 < mt.prog * 0.65) continue;
+    const sx = Math.round(mt.x - camX * 0.5);
+    if (sx < -24 || sx > VIEW_W + 24) continue;
+
+    const h = Math.round(mt.baseH * (0.50 + env.treeHeightScale * 0.95));
+    const gust = Math.sin(elapsed * (1.9 + activeWind.strength * 3.8) + mt.phase);
+    const lean = Math.round(activeWind.dir * (activeWind.strength * 4.0 + gust * activeWind.strength * 1.3));
+
+    if (mt.isDeciduous) {
+      ctx.fillStyle = '#A8BAC9';
+      ctx.fillRect(sx, midGroundY - h, 2, h);
+      ctx.fillStyle = '#254052';
+      ctx.fillRect(sx - 5 + lean, midGroundY - h - 5, 12, 9);
+    } else {
+      ctx.fillStyle = '#291E17';
+      ctx.fillRect(sx, midGroundY - h + 3, 2, h - 3);
+      const col = mt.isTamarack ? '#AD6E2D' : '#1E3F31';
+      for (let t = 0; t < 4; t++) {
+        const frac = 1 - t / 4;
+        const ty = midGroundY - h + t * Math.floor((h - 2) / 4);
+        const tw = 4 + t * 2;
+        ctx.fillStyle = col;
+        ctx.fillRect(sx - Math.floor(tw / 2) + Math.round(lean * frac), ty, tw, 3);
+      }
+    }
+  }
+
+  if (prog < 0.34) {
+    const flockWrap = Math.max(480, VIEW_W + 140);
+    for (const flock of geeseFlocks) {
+      const fx = Math.round(((flock.x - elapsed * flock.speed - camX * 0.5) % flockWrap + flockWrap) % flockWrap - 40);
+      const fy = flock.y;
+      for (let g = 0; g < flock.count; g++) {
+        const side = g % 2 === 0 ? 1 : -1;
+        const rank = Math.ceil(g / 2);
+        const gx = fx + rank * 7;
+        const gy = fy + side * rank * 3 + Math.round(Math.sin(elapsed * 7 + g));
+        ctx.fillStyle = PAL.WHITE;
+        ctx.fillRect(gx, gy, 4, 2);
+        ctx.fillStyle = PAL.INK;
+        ctx.fillRect(gx + 3, gy, 1, 2);
+      }
+    }
+    for (let fg = 0; fg < 4; fg++) {
+      const gx = Math.round(180 + fg * 28 - camX * 0.5);
+      if (gx > -12 && gx < VIEW_W + 12) {
+        ctx.fillStyle = PAL.WHITE;
+        ctx.fillRect(gx, midGroundY - 4, 5, 3);
+        ctx.fillRect(gx + 4, midGroundY - 6, 2, 3);
+        ctx.fillStyle = PAL.INK;
+        ctx.fillRect(gx + 4, midGroundY - 3, 2, 1);
+      }
+    }
+  }
+  if (prog >= 0.20 && prog <= 0.58) {
+    for (const cb of caribouHerd) {
+      const cx = Math.round(cb.x - camX * 0.5);
+      if (cx < -24 || cx > VIEW_W + 24) continue;
+      const graze = Math.sin(elapsed * 1.5 + cb.offset) > 0.3 ? 1 : 0;
+      const cy = midGroundY - 1;
+      ctx.fillStyle = '#3B2E23';
+      ctx.fillRect(cx - 4, cy - 6, 1, 6);
+      ctx.fillRect(cx - 2, cy - 6, 1, 6);
+      ctx.fillRect(cx + 2, cy - 6, 1, 6);
+      ctx.fillRect(cx + 4, cy - 6, 1, 6);
+      ctx.fillStyle = '#B89772';
+      ctx.fillRect(cx - 5, cy - 11, 10, 5);
+      ctx.fillStyle = PAL.WHITE;
+      ctx.fillRect(cx + 3, cy - 13 + graze, 4, 5);
+      ctx.fillStyle = '#8C7054';
+      ctx.fillRect(cx + 6, cy - 14 + graze * 2, 4, 3);
+      if (cb.antlers) {
+        ctx.fillStyle = '#F2ECE1';
+        ctx.fillRect(cx + 4, cy - 18 + graze * 2, 1, 4);
+        ctx.fillRect(cx + 5, cy - 19 + graze * 2, 3, 1);
+        ctx.fillRect(cx + 7, cy - 17 + graze * 2, 1, 2);
+      }
+    }
+  }
+  if (prog >= 0.70) {
+    const wx = Math.round(timberWolf.x - camX * 0.5);
+    const wy = midGroundY - 1;
+    if (wx >= -24 && wx <= VIEW_W + 24) {
+      const d = timberWolf.dir;
+      const step = timberWolf.pauseTimer > 0 ? 0 : (Math.floor(elapsed * 8) % 2);
+      ctx.save();
+      ctx.translate(wx, wy);
+      ctx.scale(d, 1);
+      ctx.fillStyle = '#59534E';
+      ctx.fillRect(-5 + step, -6, 2, 6);
+      ctx.fillRect(3 - step, -6, 2, 6);
+      ctx.fillStyle = '#8A8179';
+      ctx.fillRect(-7, -11, 13, 5);
+      ctx.fillRect(-11, -10, 4, 3);
+      ctx.fillStyle = '#A3998F';
+      ctx.fillRect(5, -14, 5, 4);
+      ctx.fillRect(5, -16, 2, 2);
+      ctx.fillStyle = env.rimColor;
+      ctx.fillRect(-6, -11, 11, 1);
+      ctx.fillStyle = '#FFF282';
+      ctx.fillRect(8, -13, 1, 1);
+      ctx.restore();
+    }
+  }
+
+  ctx.save();
+  ctx.globalAlpha = env.hazeAlpha;
+  ctx.fillStyle = env.hazeColor;
+  ctx.fillRect(0, midTop, VIEW_W, midH);
+  ctx.restore();
+
+  // === FIXED SEVERN RIVER BAND (0.85x) — CONSTANT STEADY CURRENT SPEED ===
+  const riverTop = 149;
+  const riverH = 29;
+  ctx.fillStyle = env.riverMain;
+  ctx.fillRect(0, riverTop, VIEW_W, riverH);
+  ctx.fillStyle = env.riverMid;
+  ctx.fillRect(0, riverTop + 4, VIEW_W, 14);
+
+  if (prog < 0.28) {
+    const islShift = Math.floor(camX * 0.85);
+    for (let ix = 110; ix < 1100; ix += 260) {
+      const sx = ix - islShift;
+      if (sx > -50 && sx < VIEW_W + 50) {
+        ctx.fillStyle = '#524938';
+        ctx.fillRect(sx, riverTop + 10, 34, 4);
+        ctx.fillStyle = '#8C7A4A';
+        ctx.fillRect(sx + 4, riverTop + 8, 26, 2);
+      }
+    }
+  }
+
+  const riverShift = camX * 0.85 + riverFlowDist;
+  const riverWrap = VIEW_W + 60;
+  for (const rn of riverRapidsNodes) {
+    const sx = Math.round(((rn.x - riverShift) % riverWrap + riverWrap) % riverWrap - 30);
+    const sy = riverTop + 3 + (rn.yOff % (riverH - 6));
+    if (env.riverRapids > 0.55) {
+      ctx.fillStyle = '#4B555E';
+      ctx.fillRect(sx, sy + 1, rn.w, 2);
+      ctx.fillStyle = env.riverFoam;
+      ctx.fillRect(sx + 1, sy, Math.max(4, Math.round(rn.w * 0.75)), 2);
+    } else {
+      ctx.fillStyle = env.riverFoam;
+      ctx.fillRect(sx, sy, Math.min(12, rn.w), 1);
+    }
+  }
+
+  if (prog >= 0.46 && prog <= 0.78) {
+    const lodgeX = Math.round(beaverActor.lodgeX - camX * 0.85);
+    if (lodgeX > -40 && lodgeX < VIEW_W + 40) {
+      ctx.fillStyle = '#2E1E14';
+      ctx.fillRect(lodgeX - 10, riverTop - 1, 20, 6);
+      ctx.fillStyle = '#4F3524';
+      ctx.fillRect(lodgeX - 7, riverTop - 3, 14, 3);
+    }
+    const bx = Math.round(beaverActor.x - camX * 0.85);
+    const by = riverTop + 13;
+    if (bx > -30 && bx < VIEW_W + 30) {
+      ctx.fillStyle = env.riverFoam;
+      ctx.fillRect(bx - 11, by - 2, 9, 1);
+      ctx.fillRect(bx - 11, by + 3, 9, 1);
+      ctx.fillRect(bx - 4, by - 1, 4, 1);
+      ctx.fillRect(bx - 4, by + 2, 4, 1);
+      ctx.fillStyle = '#3B2214';
+      ctx.fillRect(bx - 7, by, 6, 3);
+      ctx.fillRect(bx, by - 1, 6, 4);
+    }
+  }
+}
+
+// === STAGGERED PARTRIDGE FLY-IN SPRITES ===
+function drawFlyInBirds(env) {
+  for (const fb of flyInBirds) {
+    if (fb.delay > 0) continue;
+    const sx = Math.round(fb.x);
+    const sy = Math.round(fb.y);
+    if (sx < -30 || sx > VIEW_W + 30) continue;
+
+    const flap = Math.floor(elapsed * 20 + fb.y) % 2;
+    ctx.save();
+    ctx.translate(sx, sy);
+
+    ctx.fillStyle = PAL.GROUSE_DARK;
+    ctx.fillRect(-5, -3, 10, 5);
+    ctx.fillStyle = PAL.GROUSE_MID;
+    ctx.fillRect(-4, -2, 8, 3);
+    ctx.fillStyle = PAL.GROUSE_DARK;
+    ctx.fillRect(-8, -3, 3, 4);
+    ctx.fillStyle = PAL.GROUSE_MID;
+    ctx.fillRect(4, -5, 4, 4);
+    ctx.fillStyle = PAL.GROUSE_LIGHT;
+    if (flap === 0) {
+      ctx.fillRect(-2, -9, 6, 6);
+    } else {
+      ctx.fillRect(-2, 1, 6, 5);
+    }
+    ctx.fillStyle = env.rimColor;
+    ctx.globalAlpha = 0.6;
+    ctx.fillRect(-2, -9, 6, 1);
+    ctx.restore();
+  }
+}
+
+// === FACELESS FAMILY MEMBER SPRITE ===
+function drawSeatedFamilyMember(sx, sy, robeMain, robeTrim, hoodColor, facingDir) {
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.scale(facingDir, 1);
+
+  ctx.fillStyle = PAL.HIDE_DARK;
+  ctx.fillRect(2, -3, 5, 3);
+  ctx.fillStyle = robeMain;
+  ctx.fillRect(-5, -13, 10, 11);
+  ctx.fillStyle = robeTrim;
+  ctx.fillRect(-5, -5, 10, 1);
+  ctx.fillStyle = PAL.TRADE_GOLD;
+  ctx.fillRect(-5, -3, 10, 1);
+
+  ctx.fillStyle = PAL.SKIN_SHADE;
+  ctx.fillRect(-2, -19, 5, 6);
+  ctx.fillStyle = PAL.SKIN_MID;
+  ctx.fillRect(-1, -19, 4, 5);
+  ctx.fillStyle = PAL.SKIN_LIGHT;
+  ctx.fillRect(1, -18, 2, 4);
+
+  ctx.fillStyle = hoodColor;
+  ctx.fillRect(-3, -20, 6, 3);
+  ctx.fillRect(-4, -18, 2, 6);
+
+  ctx.restore();
+}
+
+// === EHWASAHAK CRESCENT VILLAGE ===
+function drawEhwasahakVillage(camX) {
+  if (camX > 620) return;
+
+  const lodges = [
+    { wx: 40, wy: 184, h: 90, w: 80 },
+    { wx: 88, wy: 184, h: 74, w: 66 }
+  ];
+
+  for (let idx = lodges.length - 1; idx >= 0; idx--) {
+    const lg = lodges[idx];
+    const sx = Math.round(lg.wx - camX);
+    const sy = lg.wy;
+    const halfW = Math.floor(lg.w / 2);
+
+    ctx.strokeStyle = '#5C432E';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(sx - 8, sy - lg.h - 10);
+    ctx.lineTo(sx + 6, sy - lg.h + 6);
+    ctx.moveTo(sx + 8, sy - lg.h - 10);
+    ctx.lineTo(sx - 6, sy - lg.h + 6);
+    ctx.stroke();
+
+    ctx.fillStyle = PAL.HIDE_DARK;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - lg.h);
+    ctx.lineTo(sx - halfW, sy);
+    ctx.lineTo(sx + halfW, sy);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = PAL.HIDE_MID;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - lg.h);
+    ctx.lineTo(sx - 4, sy);
+    ctx.lineTo(sx + halfW, sy);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = PAL.HIDE_DARK;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(sx - Math.floor(halfW * 0.45), sy - Math.floor(lg.h * 0.55));
+    ctx.lineTo(sx + Math.floor(halfW * 0.45), sy - Math.floor(lg.h * 0.55));
+    ctx.moveTo(sx - Math.floor(halfW * 0.75), sy - Math.floor(lg.h * 0.25));
+    ctx.lineTo(sx + Math.floor(halfW * 0.75), sy - Math.floor(lg.h * 0.25));
+    ctx.stroke();
+
+    ctx.strokeStyle = '#F7B267';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - lg.h);
+    ctx.lineTo(sx + halfW, sy);
+    ctx.stroke();
+
+    ctx.fillStyle = PAL.HIDE_LIGHT;
+    ctx.fillRect(sx - 6, sy - lg.h + 6, 4, 8);
+    ctx.fillRect(sx + 3, sy - lg.h + 6, 4, 8);
+
+    const doorW = 12;
+    const doorH = 26;
+    ctx.fillStyle = PAL.INK;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - doorH);
+    ctx.lineTo(sx - Math.floor(doorW / 2), sy);
+    ctx.lineTo(sx + Math.floor(doorW / 2), sy);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = PAL.HIDE_LIGHT;
+    ctx.fillRect(sx + Math.floor(doorW / 2) - 1, sy - doorH + 4, 4, doorH - 4);
+
+    for (let sm = 0; sm < 6; sm++) {
+      const smokeY = sy - lg.h - 12 - sm * 6 - Math.floor((elapsed * 7) % 6);
+      const smokeX = sx + Math.round(Math.sin(elapsed * 2.2 + sm + lg.wx) * 2.5 + activeWind.dir * sm * 1.5);
+      ctx.fillStyle = 'rgba(245, 232, 218, 0.42)';
+      ctx.fillRect(smokeX, smokeY, 3, 2);
+    }
+  }
+
+  const fireX = Math.round(104 - camX);
+  ctx.fillStyle = '#3B4247';
+  ctx.fillRect(fireX - 6, 182, 12, 2);
+  const flicker = Math.floor(elapsed * 12) % 2;
+  if (familyAtCampfire) {
+    ctx.fillStyle = 'rgba(255, 168, 64, 0.25)';
+    ctx.fillRect(fireX - 16, 168, 32, 16);
+    ctx.fillStyle = '#E85D26';
+    ctx.fillRect(fireX - 4, 175 - flicker, 8, 7 + flicker);
+    ctx.fillStyle = '#FCE29C';
+    ctx.fillRect(fireX - 2, 177, 4, 5);
+
+    drawSeatedFamilyMember(fireX - 15, 184, PAL.TRADE_SCARLET, PAL.TRADE_NAVY, PAL.TRADE_NAVY, 1);
+    drawSeatedFamilyMember(fireX - 26, 184, PAL.TRADE_NAVY, PAL.TRADE_SCARLET, PAL.TRADE_SCARLET, 1);
+    drawSeatedFamilyMember(fireX + 15, 184, PAL.TRADE_BLANKET_IVORY, PAL.TRADE_SCARLET, PAL.TRADE_NAVY, -1);
+  } else {
+    ctx.fillStyle = '#E85D26';
+    ctx.fillRect(fireX - 3, 178 - flicker, 6, 4 + flicker);
+    ctx.fillStyle = '#FCE29C';
+    ctx.fillRect(fireX - 1, 179, 3, 3);
+  }
+
+  const rackX = Math.round(126 - camX);
+  ctx.fillStyle = '#4A3321';
+  ctx.fillRect(rackX, 166, 2, 18);
+  ctx.fillRect(rackX + 20, 166, 2, 18);
+  ctx.fillRect(rackX - 2, 168, 26, 2);
+  ctx.fillStyle = '#A63A2B';
+  ctx.fillRect(rackX + 4, 170, 3, 6);
+  ctx.fillRect(rackX + 10, 170, 3, 6);
+  ctx.fillRect(rackX + 16, 170, 2, 5);
+
+  const canoeX = Math.round(198 - camX);
+  ctx.fillStyle = '#6E4C32';
+  ctx.fillRect(canoeX, 180, 24, 4);
+  ctx.fillStyle = '#A3764E';
+  ctx.fillRect(canoeX + 2, 179, 20, 2);
+}
+
+// === FOREGROUND LAYER (1.0x): TERRAIN, FLORA, 1.5X MILESTONE BERRY BUSHES & ARROWS ===
+function drawForegroundTerrainAndProps(camX, env) {
+  const startCol = Math.max(0, Math.floor(camX / 16) - 1);
+  const endCol = Math.min(groundProfile.length - 1, Math.ceil((camX + VIEW_W) / 16) + 1);
+
+  for (let i = startCol; i <= endCol; i++) {
+    const sx = Math.round(i * 16 - camX);
+    const gy = groundProfile[i];
+
+    ctx.fillStyle = env.fgDeep;
+    ctx.fillRect(sx, gy + 11, 17, VIEW_H - gy);
+    ctx.fillStyle = env.fgMid;
+    ctx.fillRect(sx, gy + 4, 17, 8);
+    ctx.fillStyle = env.fgTop;
+    ctx.fillRect(sx, gy, 17, 4);
+
+    ctx.fillStyle = env.rimColor;
+    ctx.globalAlpha = env.rimAlpha * 0.45;
+    ctx.fillRect(sx, gy, 17, 1);
+    ctx.globalAlpha = 1.0;
+  }
+
+  drawEhwasahakVillage(camX);
+
+  for (const item of foregroundItems) {
+    const sx = Math.round(item.x - camX);
+    if (sx < -45 || sx > VIEW_W + 45) continue;
+
+    if (item.type === 'DRIFTWOOD') {
+      ctx.fillStyle = '#8C857B';
+      ctx.fillRect(sx - Math.floor(item.w / 2), item.y - 3, item.w, 3);
+      ctx.fillStyle = '#D9D2C5';
+      ctx.fillRect(sx - Math.floor(item.w / 2) + 1, item.y - 4, item.w - 3, 2);
+    } else if (item.type === 'BOULDER') {
+      ctx.fillStyle = '#3B4247';
+      ctx.fillRect(sx - Math.floor(item.w / 2), item.y - item.h, item.w, item.h);
+      ctx.fillStyle = '#737D85';
+      ctx.fillRect(sx - Math.floor(item.w / 2) + 1, item.y - item.h, item.w - 3, 2);
+    } else if (item.type === 'DWARF_WILLOW') {
+      ctx.fillStyle = '#4A5C36';
+      ctx.fillRect(sx - 6, item.y - 4, item.w, 4);
+      ctx.fillStyle = '#758C54';
+      ctx.fillRect(sx - 4, item.y - 5, item.w - 4, 2);
+    } else if (item.type === 'MOSSY_LOG') {
+      ctx.fillStyle = '#3B281B';
+      ctx.fillRect(sx - 10, item.y - 5, item.w, 5);
+      ctx.fillStyle = '#4F7A32';
+      ctx.fillRect(sx - 8, item.y - 6, item.w - 4, 2);
+    } else if (item.type === 'LABRADOR_TEA') {
+      ctx.fillStyle = '#3A4F2E';
+      ctx.fillRect(sx - 7, item.y - 6, 14, 6);
+      ctx.fillStyle = '#9E5428';
+      ctx.fillRect(sx - 5, item.y - 4, 10, 1);
+    } else if (item.type === 'LIMESTONE_LEDGE') {
+      ctx.fillStyle = '#495259';
+      ctx.fillRect(sx - Math.floor(item.w / 2), item.y - item.h, item.w, item.h);
+      ctx.fillStyle = '#7B868F';
+      ctx.fillRect(sx - Math.floor(item.w / 2), item.y - item.h, item.w, 2);
+      ctx.fillStyle = env.rimColor;
+      ctx.globalAlpha = env.rimAlpha * 0.5;
+      ctx.fillRect(sx - Math.floor(item.w / 2), item.y - item.h, item.w, 1);
+      ctx.globalAlpha = 1.0;
+    } else if (item.type === 'FERN') {
+      const sway = Math.round(activeWind.dir * activeWind.strength * 2);
+      ctx.fillStyle = '#2B4D36';
+      ctx.fillRect(sx - 4 + sway, item.y - 5, 3, 5);
+      ctx.fillRect(sx + 1 + sway, item.y - 6, 3, 6);
+    } else if (item.type === 'KRUMMHOLZ_FG' || item.type === 'TAIGA_SPRUCE_FG') {
+      const h = item.h;
+      const gust = Math.sin(elapsed * (2.0 + activeWind.strength * 4.2) + item.phase);
+      const topSway = activeWind.dir * (activeWind.strength * 6.5 + gust * activeWind.strength * 2.0);
+      ctx.fillStyle = '#241811';
+      ctx.fillRect(sx - 1, item.y - h + 5, 3, h - 4);
+      const col = item.isTamarack ? '#A35D27' : '#162B22';
+      const light = item.isTamarack ? '#CC7E35' : '#264739';
+      for (let t = 0; t < 5; t++) {
+        const frac = 1 - t / 5;
+        const ty = item.y - h + t * Math.floor((h - 5) / 5);
+        const tw = 5 + t * 3;
+        const shiftX = Math.round(topSway * frac);
+        ctx.fillStyle = col;
+        ctx.fillRect(sx - Math.floor(tw / 2) + shiftX, ty, tw, 4);
+        ctx.fillStyle = light;
+        ctx.fillRect(sx - Math.floor(tw / 2) + shiftX, ty, Math.max(2, Math.floor(tw / 2)), 2);
+      }
+    } else if (item.type === 'SEDGE') {
+      const gust = Math.sin(elapsed * (2.2 + activeWind.strength * 4.5) + item.phase);
+      const tipShift = Math.round(activeWind.dir * (activeWind.strength * 4.5 + gust * activeWind.strength * 1.8));
+      for (let b = 0; b < item.blades; b++) {
+        const bx = sx - 4 + b * 3;
+        const bh = 6 + (b % 2) * 3;
+        ctx.fillStyle = '#6E5832';
+        ctx.fillRect(bx, item.y - Math.floor(bh / 2), 1, Math.floor(bh / 2));
+        ctx.fillStyle = '#B8984E';
+        ctx.fillRect(bx + Math.round(tipShift * 0.6), item.y - bh, 1, Math.ceil(bh / 2));
+        if (item.cottongrass && b === 1) {
+          ctx.fillStyle = PAL.WHITE;
+          ctx.fillRect(bx + tipShift, item.y - bh - 2, 2, 2);
+        }
+      }
+    }
+  }
+
+  const stageCols = [
+    { main: '#F58A1F', light: '#FFC45E', dark: '#A84A0D' },
+    { main: '#D92638', light: '#FF6B78', dark: '#7D111C' },
+    { main: '#5C38B8', light: '#9A7DF2', dark: '#2E1866' },
+    { main: '#3A82E6', light: '#8CC4FF', dark: '#1A3E7A' }
+  ];
+
+  for (const mp of milestonePatches) {
+    const sx = Math.round(mp.x - camX);
+    if (sx < -36 || sx > VIEW_W + 36) continue;
+    const bc = stageCols[mp.stage];
+
+    ctx.fillStyle = '#1E2E18';
+    ctx.fillRect(sx - 14, mp.y - 7, 28, 7);
+    ctx.fillStyle = '#2F4A25';
+    ctx.fillRect(sx - 12, mp.y - 10, 24, 7);
+    ctx.fillStyle = '#476B36';
+    ctx.fillRect(sx - 9, mp.y - 12, 18, 4);
+
+    if (!mp.harvested) {
+      const spots = [
+        [-9, -8], [-4, -11], [1, -10], [6, -8],
+        [-7, -5], [-2, -7], [3, -6], [8, -5]
+      ];
+      for (const [dx, dy] of spots) {
+        ctx.fillStyle = bc.dark;
+        ctx.fillRect(sx + dx, mp.y + dy, 3, 3);
+        ctx.fillStyle = bc.main;
+        ctx.fillRect(sx + dx, mp.y + dy, 2, 2);
+        ctx.fillStyle = bc.light;
+        ctx.fillRect(sx + dx, mp.y + dy, 1, 1);
+      }
+      if (Math.floor(elapsed * 4 + mp.stage) % 2 === 0) {
+        ctx.fillStyle = PAL.WHITE;
+        ctx.fillRect(sx - 3, mp.y - 12, 1, 1);
+      }
+    }
+  }
+
+  for (const ea of embeddedArrows) {
+    const sx = Math.round(ea.x - camX);
+    if (sx < -25 || sx > VIEW_W + 25) continue;
+    const len = 14;
+    const tailX = sx - Math.cos(ea.angle) * len;
+    const tailY = ea.y - Math.sin(ea.angle) * len;
+    drawArrowSprite(tailX, tailY, sx, ea.y);
+  }
+}
+
+// --- WOVEN GRASS/HIDE BASKET & 4-DOT QUIVER ---
+function drawWovenBasket(x, y, fillStage) {
+  const bx = Math.round(x);
+  const by = Math.round(y);
+  ctx.fillStyle = PAL.INK;
+  ctx.fillRect(bx - 5, by - 7, 10, 8);
+  ctx.fillStyle = PAL.BASKET_DARK;
+  ctx.fillRect(bx - 4, by - 6, 8, 6);
+  ctx.fillStyle = PAL.BASKET_GRASS;
+  ctx.fillRect(bx - 3, by - 6, 5, 5);
+  ctx.fillStyle = PAL.HIDE_DARK;
+  ctx.fillRect(bx - 4, by - 7, 8, 2);
+
+  if (fillStage >= 1) {
+    const fillCols = ['#F58A1F', '#D92638', '#5C38B8', '#3A82E6'];
+    const c = fillCols[clamp(fillStage - 1, 0, 3)];
+    ctx.fillStyle = c;
+    ctx.fillRect(bx - 3, by - 9, 6, 2);
+    ctx.fillStyle = PAL.WHITE;
+    ctx.fillRect(bx - 1, by - 9, 1, 1);
+  }
+}
+
+function drawQuiverDots(sx, sy) {
+  if (
+    state.startsWith('CUTSCENE_REVEAL') ||
+    state === 'TITLE' ||
+    state === 'TITLE_FADE_OUT' ||
+    state.startsWith('END_CUTSCENE')
+  ) return;
+
+  const dotSpacing = 6;
+  const startX = sx - Math.floor(((MAX_ARROWS - 1) * dotSpacing) / 2);
+  const dotY = sy + 6;
+  for (let i = 0; i < MAX_ARROWS; i++) {
+    const dx = startX + i * dotSpacing;
+    const filled = i < arrowsInQuiver;
+    ctx.fillStyle = PAL.INK;
+    ctx.fillRect(dx - 1, dotY - 1, 4, 4);
+    ctx.fillStyle = filled ? PAL.UI_GOLD : '#29211B';
+    ctx.fillRect(dx, dotY, 2, 2);
+  }
+}
+
+// === SWAMPY CREE WOMAN: SUBTLE, GROUNDED FORWARD WALKING GAIT & CLEAN PROFILE ===
+function drawCreeWoman(camX, env) {
+  if (playerStance === 'HIDDEN' || state === 'CUTSCENE_REVEAL_1' || (state === 'CUTSCENE_REVEAL_2' && playerStance === 'EMERGE')) {
+    const rackToolX = Math.round(122 - camX);
+    drawWovenBasket(rackToolX, 184, 0);
+    ctx.strokeStyle = PAL.BOW_WOOD;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(rackToolX + 5, 184);
+    ctx.quadraticCurveTo(rackToolX + 3, 176, rackToolX + 6, 169);
+    ctx.stroke();
+  }
+
+  if (playerStance === 'HIDDEN') return;
+
+  const sx = Math.round(archerX - camX);
+  const sy = Math.round(getGroundY(archerX));
+  if (sx < -45 || sx > VIEW_W + 45) return;
+
+  drawQuiverDots(sx, sy);
+
+  // --- KNEELING POSE ---
+  if (playerStance === 'KNEEL_BERRY' || playerStance === 'KNEEL_BIRD') {
+    drawWovenBasket(sx - 13, sy + 1, basketFillStage);
+
+    ctx.strokeStyle = PAL.BOW_WOOD;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(sx - 9, sy);
+    ctx.quadraticCurveTo(sx - 11, sy - 8, sx - 8, sy - 15);
+    ctx.stroke();
+
+    ctx.fillStyle = PAL.HIDE_DARK;
+    ctx.fillRect(sx - 6, sy - 4, 12, 4);
+    ctx.fillStyle = PAL.HIDE_LIGHT;
+    ctx.fillRect(sx - 5, sy - 3, 5, 2);
+
+    ctx.fillStyle = PAL.TRADE_NAVY;
+    ctx.fillRect(sx - 6, sy - 12, 13, 9);
+    ctx.fillStyle = PAL.TRADE_SCARLET;
+    ctx.fillRect(sx - 6, sy - 5, 13, 1);
+    ctx.fillStyle = PAL.TRADE_GOLD;
+    ctx.fillRect(sx - 6, sy - 3, 13, 1);
+
+    ctx.fillStyle = PAL.TRADE_BLANKET_IVORY;
+    ctx.fillRect(sx - 4, sy - 19, 11, 8);
+    ctx.fillStyle = PAL.TRADE_NAVY;
+    ctx.fillRect(sx - 3, sy - 17, 9, 6);
+    ctx.fillStyle = PAL.TRADE_SCARLET;
+    ctx.fillRect(sx - 2, sy - 19, 2, 3);
+    ctx.fillRect(sx + 3, sy - 19, 2, 3);
+
+    const headDip = playerStance === 'KNEEL_BERRY' ? Math.round((Math.sin(elapsed * 2.2) * 0.5 + 0.5) * 1) : 0;
+    ctx.fillStyle = PAL.SKIN_SHADE;
+    ctx.fillRect(sx + 2, sy - 24 + headDip, 6, 6);
+    ctx.fillStyle = PAL.SKIN_MID;
+    ctx.fillRect(sx + 3, sy - 24 + headDip, 5, 5);
+    ctx.fillStyle = PAL.SKIN_LIGHT;
+    ctx.fillRect(sx + 5, sy - 23 + headDip, 3, 4);
+
+    if (hoodWorn) {
+      ctx.fillStyle = PAL.TRADE_SCARLET;
+      ctx.fillRect(sx + 1, sy - 25 + headDip, 7, 3);
+      ctx.fillRect(sx, sy - 24 + headDip, 3, 7);
+      ctx.fillStyle = PAL.TRADE_GOLD;
+      ctx.fillRect(sx + 7, sy - 24 + headDip, 1, 5);
+    } else {
+      ctx.fillStyle = PAL.HAIR;
+      ctx.fillRect(sx + 1, sy - 25 + headDip, 6, 3);
+      ctx.fillRect(sx, sy - 24 + headDip, 2, 5);
+      ctx.fillStyle = PAL.TRADE_SCARLET;
+      ctx.fillRect(sx - 5, sy - 19, 4, 4);
+    }
+
+    if (playerStance === 'KNEEL_BERRY') {
+      const cycle = Math.sin(elapsed * 2.2);
+      if (cycle >= 0) {
+        const ext = Math.round(cycle * 4);
+        ctx.fillStyle = PAL.TRADE_BLANKET_IVORY;
+        ctx.fillRect(sx + 5, sy - 15, 5 + ext, 3);
+        ctx.fillStyle = PAL.SKIN_MID;
+        ctx.fillRect(sx + 9 + ext, sy - 14, 3, 3);
+      } else {
+        const back = Math.round(Math.abs(cycle) * 8);
+        ctx.fillStyle = PAL.TRADE_BLANKET_IVORY;
+        ctx.fillRect(sx + 3 - back, sy - 15, 5, 3);
+        ctx.fillStyle = PAL.SKIN_MID;
+        ctx.fillRect(sx + 1 - back, sy - 14, 3, 3);
+      }
+    } else {
+      ctx.fillStyle = PAL.TRADE_BLANKET_IVORY;
+      ctx.fillRect(sx + 6, sy - 16, 7, 3);
+      ctx.fillStyle = PAL.SKIN_MID;
+      ctx.fillRect(sx + 12, sy - 15, 3, 3);
+    }
+    return;
+  }
+
+  // --- STANDING POSES ---
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.scale(playerFacing, 1);
+
+  const isWalking = (playerStance === 'WALK_BASKET');
+  const stepWave = isWalking ? Math.sin(walkCyclePhase) : 0;
+  const walkBob = isWalking ? (Math.abs(stepWave) > 0.65 ? 1 : 0) : 0;
+  const by = -walkBob;
+
+  let leadFootX = 1;
+  let trailFootX = -4;
+  let leadLift = 0;
+  let trailLift = 0;
+
+  if (isWalking) {
+    const strideShift = Math.round(stepWave * 2);
+    leadFootX = 1 + strideShift;
+    trailFootX = -3 - strideShift;
+    if (stepWave > 0.45) trailLift = 1;
+    else if (stepWave < -0.45) leadLift = 1;
+  }
+
+  ctx.fillStyle = PAL.TRADE_SCARLET_DARK;
+  ctx.fillRect(trailFootX, by - 9 - trailLift, 3, 6);
+  ctx.fillStyle = PAL.HIDE_DARK;
+  ctx.fillRect(trailFootX, by - 3 - trailLift, 4, 3);
+  ctx.fillStyle = PAL.TRADE_TEAL;
+  ctx.fillRect(trailFootX + 2, by - 3 - trailLift, 1, 1);
+
+  ctx.fillStyle = PAL.TRADE_SCARLET;
+  ctx.fillRect(leadFootX, by - 9 - leadLift, 3, 6);
+  ctx.fillStyle = PAL.HIDE_MID;
+  ctx.fillRect(leadFootX, by - 3 - leadLift, 5, 3);
+  ctx.fillStyle = PAL.TRADE_TEAL;
+  ctx.fillRect(leadFootX + 2, by - 3 - leadLift, 2, 1);
+
+  ctx.fillStyle = PAL.TRADE_NAVY;
+  ctx.fillRect(-6, by - 21, 13, 13);
+  ctx.fillStyle = PAL.TRADE_NAVY_LIGHT;
+  ctx.fillRect(-4, by - 21, 5, 12);
+  const hemSway = isWalking ? Math.round(stepWave * 0.6) : 0;
+  ctx.fillStyle = PAL.TRADE_SCARLET;
+  ctx.fillRect(-6 + hemSway, by - 12, 13, 1);
+  ctx.fillStyle = PAL.TRADE_GOLD;
+  ctx.fillRect(-6 + hemSway, by - 10, 13, 1);
+  ctx.fillStyle = PAL.TRADE_TEAL;
+  ctx.fillRect(-6 + hemSway, by - 8, 13, 1);
+
+  ctx.fillStyle = PAL.TRADE_BLANKET_IVORY;
+  ctx.fillRect(-5, by - 29, 11, 9);
+  ctx.fillStyle = PAL.TRADE_NAVY;
+  ctx.fillRect(-4, by - 26, 9, 6);
+  ctx.fillRect(-3, by - 29, 2, 4);
+  ctx.fillRect(2, by - 29, 2, 4);
+  ctx.fillStyle = PAL.TRADE_SCARLET;
+  ctx.fillRect(-3, by - 26, 7, 1);
+  ctx.fillStyle = PAL.TRADE_TEAL;
+  ctx.fillRect(-2, by - 24, 2, 2);
+  ctx.fillRect(2, by - 24, 2, 2);
+
+  ctx.fillStyle = PAL.TRADE_SCARLET;
+  ctx.fillRect(-5, by - 21, 11, 2);
+  ctx.fillStyle = PAL.TRADE_GOLD;
+  ctx.fillRect(-3, by - 21, 2, 2);
+  ctx.fillRect(2, by - 21, 2, 2);
+
+  const headY = by - 36 + headNodOffset;
+  ctx.fillStyle = PAL.SKIN_SHADE;
+  ctx.fillRect(-2, headY, 6, 7);
+  ctx.fillStyle = PAL.SKIN_MID;
+  ctx.fillRect(-1, headY, 5, 6);
+  ctx.fillStyle = PAL.SKIN_LIGHT;
+  ctx.fillRect(1, headY + 1, 3, 5);
+
+  if (hoodWorn) {
+    ctx.fillStyle = PAL.TRADE_SCARLET;
+    ctx.fillRect(-3, headY - 1, 7, 3);
+    ctx.fillRect(-4, headY, 3, 9);
+    ctx.fillRect(-5, by - 29, 4, 4);
+    ctx.fillStyle = PAL.TRADE_GOLD;
+    ctx.fillRect(3, headY, 1, 7);
+    ctx.fillStyle = PAL.TRADE_NAVY;
+    ctx.fillRect(-4, headY + 1, 2, 6);
+  } else {
+    ctx.fillStyle = PAL.HAIR;
+    ctx.fillRect(-3, headY - 1, 7, 3);
+    ctx.fillRect(-4, headY + 1, 2, 5);
+    ctx.fillRect(-5, headY + 2, 2, 3);
+    ctx.fillStyle = PAL.TRADE_SCARLET;
+    ctx.fillRect(-6, by - 29, 3, 5);
+    ctx.fillStyle = PAL.TRADE_GOLD;
+    ctx.fillRect(-6, by - 25, 3, 1);
+  }
+
+  ctx.fillStyle = env.rimColor;
+  ctx.globalAlpha = env.rimAlpha * 0.65;
+  ctx.fillRect(4, by - 36, 1, 26);
+  ctx.globalAlpha = 1.0;
+
+  if (playerStance === 'HOOD_UP') {
+    drawWovenBasket(-12, 1, basketFillStage);
+    ctx.strokeStyle = PAL.BOW_WOOD;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-8, by - 31);
+    ctx.quadraticCurveTo(-10, by - 23, -4, by - 16);
+    ctx.stroke();
+
+    ctx.fillStyle = PAL.TRADE_BLANKET_IVORY;
+    ctx.fillRect(-2, by - 34, 3, 7);
+    ctx.fillRect(2, by - 34, 3, 7);
+    ctx.fillStyle = PAL.SKIN_LIGHT;
+    ctx.fillRect(-2, headY, 2, 2);
+    ctx.fillRect(2, headY, 2, 2);
+    ctx.restore();
+    return;
+  }
+
+  if (playerStance === 'EMERGE' || playerStance === 'MOON_NOD') {
+    ctx.fillStyle = PAL.TRADE_BLANKET_IVORY;
+    ctx.fillRect(-1, by - 27, 3, 6);
+    ctx.fillStyle = PAL.SKIN_MID;
+    ctx.fillRect(-1, by - 21, 3, 2);
+    ctx.restore();
+    return;
+  }
+
+  if (playerStance === 'TEST_PLUCK') {
+    drawWovenBasket(-11, 1, basketFillStage);
+    const vib = Math.sin(bowPluckVib * 55) * (bowPluckVib * 3.0);
+    ctx.strokeStyle = PAL.BOW_WOOD;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(6, by - 32);
+    ctx.quadraticCurveTo(11, by - 25, 6, by - 18);
+    ctx.stroke();
+
+    ctx.strokeStyle = PAL.STRING;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(6, by - 32);
+    ctx.lineTo(5 - vib, by - 25);
+    ctx.lineTo(6, by - 18);
+    ctx.stroke();
+
+    ctx.fillStyle = PAL.TRADE_BLANKET_IVORY;
+    ctx.fillRect(1, by - 26, 4, 3);
+    ctx.restore();
+    return;
+  }
+
+  if (playerStance === 'WALK_BASKET' || playerStance === 'SCAN_BROW' || playerStance === 'NORTH_STAR_GAZE') {
+    ctx.strokeStyle = PAL.BOW_WOOD;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-8, by - 31);
+    ctx.quadraticCurveTo(-10, by - 23, -4, by - 16);
+    ctx.stroke();
+
+    drawWovenBasket(-8, by - 12, basketFillStage);
+
+    if (playerStance === 'SCAN_BROW') {
+      ctx.fillStyle = PAL.TRADE_BLANKET_IVORY;
+      ctx.fillRect(2, by - 32, 3, 5);
+      ctx.fillStyle = PAL.SKIN_LIGHT;
+      ctx.fillRect(3, headY, 4, 2);
+    } else if (playerStance === 'NORTH_STAR_GAZE') {
+      ctx.fillStyle = PAL.TRADE_BLANKET_IVORY;
+      ctx.fillRect(2, headY - 2, 3, 6);
+      ctx.fillStyle = PAL.SKIN_LIGHT;
+      ctx.fillRect(3, headY - 3, 4, 2);
+    } else {
+      const armSwing = isWalking ? Math.round(-stepWave * 1.2) : 0;
+      ctx.fillStyle = PAL.TRADE_BLANKET_IVORY;
+      ctx.fillRect(1 + armSwing, by - 26, 3, 5);
+      ctx.fillStyle = PAL.SKIN_MID;
+      ctx.fillRect(1 + armSwing, by - 21, 3, 2);
+    }
+    ctx.restore();
+    return;
+  }
+
+  // --- BOW_AIM STANCE (Compact Little Bow — ahcāpīshish) ---
+  drawWovenBasket(-14, 1, basketFillStage);
+
+  const rad = (aimAngleDeg * Math.PI) / 180;
+  const shoulderX = 1;
+  const shoulderY = by - 26;
+  const bowDist = 9;
+  const bowHandX = shoulderX + Math.cos(rad) * bowDist;
+  const bowHandY = shoulderY - Math.sin(rad) * bowDist;
+
+  ctx.strokeStyle = PAL.TRADE_BLANKET_IVORY;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(shoulderX, shoulderY);
+  ctx.lineTo(bowHandX, bowHandY);
+  ctx.stroke();
+  ctx.fillStyle = PAL.SKIN_LIGHT;
+  ctx.fillRect(Math.round(bowHandX) - 1, Math.round(bowHandY) - 1, 3, 3);
+
+  const perpX = -Math.sin(rad);
+  const perpY = -Math.cos(rad);
+  const bowHalfSpan = 8.5;
+  const limbFlex = 3 + drawPower * 5.2;
+
+  const topTipX = bowHandX + perpX * bowHalfSpan - Math.cos(rad) * limbFlex;
+  const topTipY = bowHandY + perpY * bowHalfSpan + Math.sin(rad) * limbFlex;
+  const botTipX = bowHandX - perpX * bowHalfSpan - Math.cos(rad) * limbFlex;
+  const botTipY = bowHandY - perpY * bowHalfSpan + Math.sin(rad) * limbFlex;
+
+  ctx.strokeStyle = PAL.BOW_WOOD;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(topTipX, topTipY);
+  ctx.quadraticCurveTo(bowHandX + Math.cos(rad) * 1.5, bowHandY - Math.sin(rad) * 1.5, botTipX, botTipY);
+  ctx.stroke();
+
+  ctx.strokeStyle = PAL.BOW_LIGHT;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(topTipX, topTipY);
+  ctx.quadraticCurveTo(bowHandX + Math.cos(rad) * 1.5, bowHandY - Math.sin(rad) * 1.5, botTipX, botTipY);
+  ctx.stroke();
+
+  const hasArrowLoaded = (state === 'AIM_AND_SHOOT' || state === 'PAN_TO_PREY') && arrowsInQuiver > 0;
+  const pullBack = hasArrowLoaded ? drawPower * 8.5 : 0;
+  const nockX = bowHandX - Math.cos(rad) * (3 + pullBack);
+  const nockY = bowHandY + Math.sin(rad) * (3 + pullBack);
+
+  ctx.strokeStyle = PAL.STRING;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(topTipX, topTipY);
+  ctx.lineTo(nockX, nockY);
+  ctx.lineTo(botTipX, botTipY);
+  ctx.stroke();
+
+  ctx.strokeStyle = PAL.SKIN_MID;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(shoulderX - 1, shoulderY);
+  ctx.lineTo(nockX, nockY);
+  ctx.stroke();
+
+  if (hasArrowLoaded) {
+    const arrowLen = 15;
+    const tipX = nockX + Math.cos(rad) * arrowLen;
+    const tipY = nockY - Math.sin(rad) * arrowLen;
+    drawArrowSprite(nockX, nockY, tipX, tipY);
+  }
+
+  ctx.restore();
+}
+
+function drawArrowSprite(tailX, tailY, tipX, tipY) {
+  ctx.strokeStyle = '#E8DFCC';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(tailX, tailY);
+  ctx.lineTo(tipX, tipY);
+  ctx.stroke();
+
+  const ang = Math.atan2(tipY - tailY, tipX - tailX);
+  ctx.fillStyle = PAL.TRADE_SCARLET;
+  ctx.fillRect(Math.round(tailX) - 1, Math.round(tailY) - 1, 3, 2);
+  ctx.fillStyle = PAL.WHITE;
+  ctx.fillRect(Math.round(tailX + Math.cos(ang) * 2) - 1, Math.round(tailY + Math.sin(ang) * 2) - 1, 2, 2);
+
+  ctx.fillStyle = '#8FA1B3';
+  ctx.fillRect(Math.round(tipX) - 1, Math.round(tipY) - 1, 3, 3);
+  ctx.fillStyle = PAL.WHITE;
+  ctx.fillRect(Math.round(tipX), Math.round(tipY), 1, 1);
+}
+
+// --- FOREGROUND WILLOW PTARMIGAN / PARTRIDGE ---
+function drawPartridge(camX, env) {
+  if (partridge.state === 'COLLECTED' || state === 'TITLE' || state === 'TITLE_FADE_OUT') return;
+  const sx = Math.round(partridge.x - camX);
+  const sy = Math.round(partridge.y + partridge.bobY);
+  if (sx < -35 || sx > VIEW_W + 35) return;
+
+  ctx.save();
+  ctx.translate(sx, sy);
+
+  if (partridge.state === 'HIT_IMPACT') {
+    const recoilX = Math.round(Math.sin(Math.min(1, partridge.hitTimer * 6) * Math.PI) * 3);
+    const dropOffset = Math.round(smoothstep(0.25, 0.75, partridge.hitTimer) * 5);
+    ctx.translate(recoilX, dropOffset);
+
+    ctx.fillStyle = PAL.GROUSE_DARK;
+    ctx.fillRect(-6, -12, 12, 7);
+    ctx.fillStyle = PAL.GROUSE_MID;
+    ctx.fillRect(-5, -11, 10, 5);
+    ctx.fillStyle = PAL.GROUSE_LIGHT;
+    ctx.fillRect(-3, -15, 7, 4);
+    ctx.fillStyle = PAL.GROUSE_MID;
+    ctx.fillRect(-8, -14, 4, 4);
+
+    const ang = partridge.impactAngle;
+    const len = 15;
+    const tipX = -1;
+    const tipY = -9;
+    drawArrowSprite(tipX - Math.cos(ang) * len, tipY - Math.sin(ang) * len, tipX, tipY);
+
+    ctx.restore();
+    return;
+  }
+
+  if (partridge.state === 'HIT_DROPPED') {
+    ctx.fillStyle = PAL.GROUSE_DARK;
+    ctx.fillRect(-6, -5, 12, 5);
+    ctx.fillStyle = PAL.GROUSE_MID;
+    ctx.fillRect(-5, -4, 9, 4);
+    ctx.fillStyle = PAL.GROUSE_LIGHT;
+    ctx.fillRect(-3, -4, 5, 2);
+
+    const ang = partridge.impactAngle;
+    const len = 14;
+    drawArrowSprite(-Math.cos(ang) * len, -3 - Math.sin(ang) * len, 0, -3);
+    ctx.restore();
+    return;
+  }
+
+  const d = partridge.dir;
+  ctx.scale(-d, 1);
+
+  if (partridge.state === 'FLEEING') {
+    const flap = Math.floor(elapsed * 22) % 2;
+    ctx.fillStyle = PAL.GROUSE_DARK;
+    ctx.fillRect(-5, -10, 11, 6);
+    ctx.fillStyle = PAL.GROUSE_MID;
+    ctx.fillRect(-4, -9, 9, 4);
+    ctx.fillStyle = PAL.GROUSE_LIGHT;
+    if (flap === 0) ctx.fillRect(-2, -16, 6, 6);
+    else ctx.fillRect(-2, -6, 6, 5);
+    ctx.fillStyle = PAL.GROUSE_MID;
+    ctx.fillRect(-8, -13, 4, 4);
+    ctx.restore();
+    return;
+  }
+
+  const step = Math.floor(partridge.animTimer * 4) % 2;
+  const perkedUp = (partridge.state === 'ALERT');
+
+  ctx.fillStyle = PAL.HIDE_LIGHT;
+  ctx.fillRect(-2 + (step ? 1 : -1), -4, 1, 4);
+  ctx.fillRect(2 + (step ? -1 : 1), -4, 1, 4);
+
+  ctx.fillStyle = PAL.GROUSE_DARK;
+  ctx.fillRect(5, -11, 6, 6);
+  ctx.fillStyle = PAL.GROUSE_LIGHT;
+  ctx.fillRect(6, -10, 4, 4);
+  ctx.fillStyle = PAL.INK;
+  ctx.fillRect(9, -11, 2, 6);
+
+  ctx.fillStyle = PAL.GROUSE_DARK;
+  ctx.fillRect(-5, -11, 11, 7);
+  ctx.fillStyle = PAL.GROUSE_MID;
+  ctx.fillRect(-4, -10, 9, 5);
+  ctx.fillStyle = PAL.GROUSE_LIGHT;
+  ctx.fillRect(-2, -9, 5, 3);
+  ctx.fillStyle = PAL.GROUSE_DARK;
+  ctx.fillRect(-1, -8, 3, 1);
+
+  ctx.fillStyle = PAL.GROUSE_RUFF;
+  ctx.fillRect(-6, -12, 3, 5);
+
+  const headLift = perkedUp ? -2 : 0;
+  ctx.fillStyle = PAL.GROUSE_MID;
+  ctx.fillRect(-8, -16 + headLift, 5, 5);
+  ctx.fillStyle = PAL.GROUSE_DARK;
+  ctx.fillRect(-7, -18 + headLift, 3, 2);
+  ctx.fillStyle = PAL.TRADE_SCARLET;
+  ctx.fillRect(-7, -15 + headLift, 2, 1);
+  ctx.fillStyle = PAL.INK;
+  ctx.fillRect(-7, -14 + headLift, 1, 1);
+  ctx.fillStyle = PAL.HIDE_LIGHT;
+  ctx.fillRect(-10, -14 + headLift, 2, 2);
+
+  ctx.fillStyle = env.rimColor;
+  ctx.globalAlpha = env.rimAlpha * 0.7;
+  ctx.fillRect(-7, -16 + headLift, 5, 1);
+  ctx.fillRect(-4, -11, 9, 1);
+  ctx.globalAlpha = 1.0;
+
+  ctx.restore();
+}
+
+// --- SLINGSHOT-COMPATIBLE LAUNCH VECTOR & SHORT 3-DOT PROJECTION ---
+function getLaunchVector(powerRatio) {
+  const rad = (aimAngleDeg * Math.PI) / 180;
+  const speed = 3.2 + powerRatio * 6.8;
+  return {
+    vx: Math.cos(rad) * speed,
+    vy: -Math.sin(rad) * speed
+  };
+}
+
+function drawTrajectoryPreview(camX) {
+  if (state !== 'AIM_AND_SHOOT' || scoutMode !== 'OFF' || arrowsInQuiver <= 0) return;
+  const rad = (aimAngleDeg * Math.PI) / 180;
+  const startX = archerX + Math.cos(rad) * 14;
+  const startY = getGroundY(archerX) - 26 - Math.sin(rad) * 14;
+
+  const previewPower = isDrawing ? Math.max(0.20, drawPower) : 0.62;
+  const vel = getLaunchVector(previewPower);
+
+  let px = startX;
+  let py = startY;
+  let vx = vel.vx;
+  let vy = vel.vy;
+
+  for (let i = 1; i <= 3; i++) {
+    for (let step = 0; step < 2; step++) {
+      vx += activeWind.accel;
+      vy += GRAVITY;
+      px += vx;
+      py += vy;
+    }
+    const sx = Math.round(px - camX);
+    const sy = Math.round(py);
+    if (sy >= getGroundY(px)) break;
+
+    if (i < 3) {
+      ctx.fillStyle = PAL.INK;
+      ctx.fillRect(sx - 1, sy - 1, 3, 3);
+      ctx.fillStyle = i === 1 ? PAL.WHITE : PAL.UI_GOLD;
+      ctx.fillRect(sx, sy, 1, 1);
+    } else {
+      ctx.fillStyle = PAL.INK;
+      ctx.fillRect(sx - 1, sy - 1, 2, 2);
+      ctx.fillStyle = PAL.TRADE_TEAL;
+      ctx.fillRect(sx, sy, 1, 1);
+    }
+  }
+}
+
+// --- PARTICLES ---
+function spawnParticles(wx, wy, cols, count = 16) {
+  for (let i = 0; i < count; i++) {
+    const ang = Math.random() * Math.PI * 2;
+    const spd = 30 + Math.random() * 120;
+    particles.push({
+      x: wx, y: wy - 6,
+      vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd - 60,
+      col: cols[i % cols.length],
+      life: 0.5 + Math.random() * 0.4,
+      size: i % 3 === 0 ? 3 : 2
+    });
+  }
+}
+
+function updateAndDrawParticles(camX, dt, env) {
+  const windPush = activeWind.dir * (10 + activeWind.strength * 44);
+  for (const pt of ambientParticles) {
+    let px = pt.x * VIEW_W;
+    px += (windPush * 0.8 + Math.sin(elapsed * 2 + pt.phase) * 8) * dt;
+    pt.x = ((px % VIEW_W) + VIEW_W) % VIEW_W / VIEW_W;
+    pt.y += Math.cos(elapsed * 2.5 + pt.phase) * 4 * dt;
+    ctx.fillStyle = env.auroraAlpha > 0.4 ? PAL.AURORA_GREEN : 'rgba(240, 232, 208, 0.42)';
+    ctx.fillRect(Math.round(pt.x * VIEW_W), Math.round(pt.y), 1, 1);
+  }
+
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const pt = particles[i];
+    pt.x += pt.vx * dt;
+    pt.y += pt.vy * dt;
+    pt.vy += 200 * dt;
+    pt.vx *= Math.pow(0.18, dt);
+    pt.life -= dt;
+    if (pt.life <= 0) { particles.splice(i, 1); continue; }
+    ctx.fillStyle = pt.col;
+    ctx.fillRect(Math.round(pt.x - camX), Math.round(pt.y), pt.size, pt.size);
+  }
+}
+
+// --- MAIN DETERMINISTIC STATE MACHINE UPDATE ---
+function update(dt) {
+  if (isPaused) return;
+  elapsed += dt;
+  const stepScale = dt * 60;
+
+  sfx.updateAudio(dt);
+  riverFlowDist += 14 * dt;
+
+  for (let i = flyInBirds.length - 1; i >= 0; i--) {
+    const fb = flyInBirds[i];
+    if (fb.delay > 0) {
+      fb.delay -= dt;
+      continue;
+    }
+    if (!fb.soundPlayed) {
+      fb.soundPlayed = true;
+      sfx.playFlyInFlutter();
+    }
+    fb.x += fb.vx * dt;
+    fb.y += fb.vy * dt;
+    if (fb.x > VIEW_W + 30) {
+      flyInBirds.splice(i, 1);
+    }
+  }
+
+  belugaEvent.timer -= dt;
+  if (!belugaEvent.active && belugaEvent.timer <= 0) {
+    belugaEvent.active = true;
+    belugaEvent.phase = 0;
+    belugaEvent.baseX = 160 + Math.random() * 140;
+  }
+  if (belugaEvent.active) {
+    belugaEvent.phase += dt * 1.1;
+    if (belugaEvent.phase > Math.PI + 1.1) {
+      belugaEvent.active = false;
+      belugaEvent.timer = 25 + Math.random() * 20;
+    }
+  }
+
+  beaverActor.x += beaverActor.dir * 11 * dt;
+  if (beaverActor.x > beaverActor.lodgeX + 95) beaverActor.dir = -1;
+  if (beaverActor.x < beaverActor.lodgeX - 25) beaverActor.dir = 1;
+
+  if (timberWolf.pauseTimer > 0) {
+    timberWolf.pauseTimer -= dt;
+  } else {
+    timberWolf.x += timberWolf.dir * 18 * dt;
+    if (Math.random() < 0.25 * dt) timberWolf.pauseTimer = 1.2;
+    if (timberWolf.x > 2120) timberWolf.dir = -1;
+    if (timberWolf.x < 1820) timberWolf.dir = 1;
+  }
+
+  if (partridge.state === 'STRUT' || partridge.state === 'ALERT') {
+    partridge.animTimer += dt;
+    if (partridge.state === 'STRUT') {
+      partridge.x += partridge.vx * dt;
+      partridge.y = getGroundY(partridge.x);
+      partridge.bobY = Math.sin(elapsed * 14) * 0.65;
+      if (partridge.x > partridge.baseX + 16) partridge.vx = -Math.abs(partridge.vx);
+      if (partridge.x < partridge.baseX - 16) partridge.vx = Math.abs(partridge.vx);
+    } else {
+      partridge.bobY = 0;
+    }
+  } else if (partridge.state === 'HIT_IMPACT') {
+    partridge.hitTimer += dt;
+  } else if (partridge.state === 'FLEEING') {
+    partridge.x += 185 * dt;
+    partridge.y -= 95 * dt;
+  }
+
+  // =========================================================================
+  // TITLE SCREEN -> FADE OUT LOGO/STARS -> BAYER DITHER REVEAL OF 1/4 FRAME
+  // =========================================================================
+  if (state === 'TITLE') {
+    if (aJustPressed) {
+      startTitleFadeOut();
+    }
+  } else if (state === 'TITLE_FADE_OUT') {
+    titleFadeAlpha = Math.min(1.0, titleFadeAlpha + dt * 1.15);
+    if (titleFadeAlpha >= 1.0) {
+      beginCutsceneBeat1();
+    }
+  }
+
+  // =========================================================================
+  // 1:1 OPENING CUTSCENE: PLAYER-X PUSH-TO-REVEAL + SMOOTH PAN-SCROLL TO LEVEL 1
+  // =========================================================================
+  else if (state === 'CUTSCENE_REVEAL_1') {
+    const q1Width = Math.max(80, Math.round(VIEW_W * 0.25));
+    beatTimer += dt;
+    cameraX = 0;
+    firstCardDither = Math.min(1.0, beatTimer / 1.1);
+
+    if (beatTimer < 1.2) {
+      playerStance = 'EMERGE';
+      archerX = 42;
+    } else {
+      playerStance = 'WALK_BASKET';
+      const nextX = Math.min(96, 42 + (beatTimer - 1.2) * 18);
+      advanceWalkMotion(nextX - archerX);
+      archerX = nextX;
+    }
+    revealEdgeX = Math.max(q1Width, Math.round(archerX + 38));
+
+    if (beatTimer >= 4.2) {
+      beatTimer = 0;
+      firstCardDither = 1.0;
+      state = 'CUTSCENE_REVEAL_2';
+    }
+  } else if (state === 'CUTSCENE_REVEAL_2') {
+    beatTimer += dt;
+
+    if (beatTimer < 1.3) {
+      playerStance = 'WALK_BASKET';
+      const nextX = Math.min(118, 96 + beatTimer * 18);
+      advanceWalkMotion(nextX - archerX);
+      archerX = nextX;
+    } else if (beatTimer < 2.7) {
+      playerStance = 'KNEEL_BIRD';
+    } else {
+      if (playerStance !== 'TEST_PLUCK') {
+        playerStance = 'TEST_PLUCK';
+        bowPluckVib = 1.0;
+        sfx.playTestPluck();
+      }
+      bowPluckVib = Math.max(0, bowPluckVib - dt * 1.2);
+    }
+    revealEdgeX = Math.max(revealEdgeX, Math.round(archerX + 38));
+
+    if (beatTimer >= 4.2) {
+      beatTimer = 0;
+      state = 'CUTSCENE_REVEAL_3';
+    }
+  } else if (state === 'CUTSCENE_REVEAL_3') {
+    beatTimer += dt;
+
+    if (beatTimer < 0.9) {
+      playerStance = 'EMERGE';
+    } else {
+      playerStance = 'WALK_BASKET';
+      const nextX = Math.min(264, 118 + (beatTimer - 0.9) * 32);
+      advanceWalkMotion(nextX - archerX);
+      archerX = nextX;
+    }
+    revealEdgeX = Math.min(VIEW_W, Math.max(revealEdgeX, Math.round(archerX + 56)));
+
+    if (archerX >= 264) {
+      archerX = 264;
+      revealEdgeX = VIEW_W;
+      beatTimer = 0;
+      spawnPartridgeForEncounter(0, archerX);
+      triggerPartridgeFlyIn();
+      state = 'CUTSCENE_REVEAL_4_HARVEST';
+    }
+  } else if (state === 'CUTSCENE_REVEAL_4_HARVEST') {
+    const prevT = beatTimer;
+    beatTimer += dt;
+    revealEdgeX = VIEW_W;
+    cameraX = 0;
+
+    if (beatTimer < 5.0) {
+      playerStance = 'KNEEL_BERRY';
+      if (Math.floor(prevT / 1.4) !== Math.floor(beatTimer / 1.4)) {
+        sfx.playBerryPick();
+      }
+      if (beatTimer >= 2.8 && !milestonePatches[0].harvested) {
+        milestonePatches[0].harvested = true;
+        basketFillStage = 1;
+      }
+    } else {
+      if (prevT < 5.0) {
+        sfx.playRustle();
+      }
+      playerStance = 'SCAN_BROW';
+    }
+
+    if (beatTimer >= 6.4) {
+      beatTimer = 0;
+      panSubPhase = 0;
+      panStartX = cameraX;
+      panEndX = clamp(partridge.x - VIEW_W * 0.5, 0, Math.max(0, TOTAL_WORLD_WIDTH - VIEW_W));
+      state = 'PAN_TO_PREY';
+    }
+  } else if (state === 'PAN_TO_PREY') {
+    beatTimer += dt;
+    const level1StartCamX = getCameraBaseForArcher(archerX);
+    if (panSubPhase === 0) {
+      const t = smoothstep(0, 1.8, beatTimer);
+      cameraX = lerp(panStartX, panEndX, t);
+      if (beatTimer >= 1.8) {
+        beatTimer = 0;
+        panSubPhase = 1;
+        partridge.state = 'ALERT';
+      }
+    } else if (panSubPhase === 1) {
+      cameraX = panEndX;
+      if (beatTimer >= 1.3) {
+        beatTimer = 0;
+        panSubPhase = 2;
+        partridge.state = 'STRUT';
+      }
+    } else {
+      const t = smoothstep(0, 1.8, beatTimer);
+      cameraX = lerp(panEndX, level1StartCamX, t);
+      if (beatTimer >= 1.8) {
+        cameraX = level1StartCamX;
+        playerStance = 'BOW_AIM';
+        sfx.setDrumTrackActive(true);
+        state = 'AIM_AND_SHOOT';
+      }
+    }
+  }
+
+  // =========================================================================
+  // INTERACTIVE PHASE: 2-AXIS SLINGSHOT-COMPATIBLE AIM & DRAW
+  // - Up/Down adjusts launch angle (live both before and while bowstring is drawn)
+  // - Hold/Release A pulls back bowstring and fires on release
+  // =========================================================================
+  else if (state === 'AIM_AND_SHOOT') {
+    playerFacing = 1;
+    const baseCam = getCameraBaseForArcher(archerX);
+    const maxScoutCam = clamp(partridge.x - VIEW_W * 0.45, baseCam, Math.max(0, TOTAL_WORLD_WIDTH - VIEW_W));
+
+    if (bJustPressed && !isDrawing) {
+      if (scoutMode === 'OFF') {
+        scoutMode = 'PRE_LOOK';
+        scoutTimer = 0.55;
+        playerStance = 'SCAN_BROW';
+        sfx.playScoutPan();
+      } else if (scoutMode === 'PRE_LOOK' || scoutMode === 'PAN_OUT' || scoutMode === 'HOLD_END') {
+        scoutMode = 'PAN_BACK';
+        sfx.playScoutPan();
+      }
+    }
+
+    if (scoutMode === 'PRE_LOOK') {
+      playerStance = 'SCAN_BROW';
+      cameraX = baseCam;
+      scoutTimer -= dt;
+      if (scoutTimer <= 0) scoutMode = 'PAN_OUT';
+    } else if (scoutMode === 'PAN_OUT') {
+      playerStance = 'SCAN_BROW';
+      cameraX += SCOUT_PAN_SPEED * dt;
+      if (cameraX >= maxScoutCam) {
+        cameraX = maxScoutCam;
+        scoutMode = 'HOLD_END';
+        scoutTimer = 0.9;
+      }
+    } else if (scoutMode === 'HOLD_END') {
+      scoutTimer -= dt;
+      if (scoutTimer <= 0) scoutMode = 'PAN_BACK';
+    } else if (scoutMode === 'PAN_BACK') {
+      cameraX -= SCOUT_PAN_SPEED * 1.15 * dt;
+      if (cameraX <= baseCam) {
+        cameraX = baseCam;
+        scoutMode = 'OFF';
+        playerStance = 'BOW_AIM';
+      }
+    } else {
+      playerStance = 'BOW_AIM';
+      cameraX += (baseCam - cameraX) * Math.min(1, 8.5 * dt);
+    }
+
+    // Live Up/Down launch angle control (works both before drawing and while bowstring is drawn)
+    if (angleTickCooldown > 0) angleTickCooldown = Math.max(0, angleTickCooldown - dt);
+    let aimChanged = false;
+    if (keys.up) { aimAngleDeg = Math.min(76, aimAngleDeg + 46 * dt); aimChanged = true; }
+    if (keys.down) { aimAngleDeg = Math.max(6, aimAngleDeg - 46 * dt); aimChanged = true; }
+    if (aimChanged && angleTickCooldown === 0) {
+      sfx.playAngleTick();
+      angleTickCooldown = 0.1;
+    }
+
+    // Hold Button A to draw bowstring back, Release Button A to launch
+    if (aJustPressed && !isDrawing && arrowsInQuiver > 0) {
+      isDrawing = true;
+      drawPower = 0.06;
+      lastCreakStep = 0;
+      if (scoutMode !== 'OFF') {
+        scoutMode = 'OFF';
+        cameraX = baseCam;
+        playerStance = 'BOW_AIM';
+      }
+      sfx.playBowCreak(drawPower);
+    }
+
+    if (isDrawing && keys.a) {
+      drawPower = Math.min(1.0, drawPower + 0.51 * dt);
+      const step = Math.floor(drawPower * 5);
+      if (step > lastCreakStep) {
+        lastCreakStep = step;
+        sfx.playBowCreak(drawPower);
+      }
+    }
+
+    if (isDrawing && (!keys.a || aJustReleased)) {
+      launchArrow();
+    }
+  } else if (state === 'FLYING') {
+    updateArrowFlight(stepScale);
+  } else if (state === 'HIT_HOLD_AND_PAN') {
+    beatTimer += dt;
+    if (beatTimer < 1.15) {
+      const impactCam = clamp(partridge.x - VIEW_W * 0.55, 0, Math.max(0, TOTAL_WORLD_WIDTH - VIEW_W));
+      cameraX += (impactCam - cameraX) * Math.min(1, 10 * dt);
+    } else {
+      partridge.state = 'HIT_DROPPED';
+      const baseCam = getCameraBaseForArcher(archerX);
+      cameraX += (baseCam - cameraX) * Math.min(1, 5.5 * dt);
+      if (Math.abs(cameraX - baseCam) < 3.0) {
+        cameraX = baseCam;
+        walkTargetX = partridge.x - 10;
+        playerStance = 'WALK_BASKET';
+        state = 'AUTO_WALK_TO_SPOT';
+      }
+    }
+  } else if (state === 'MISS_RETURN') {
+    arrow.stuckTimer -= dt;
+    if (arrow.stuckTimer <= 0) {
+      if (arrowsInQuiver <= 0) {
+        partridge.state = 'FLEEING';
+        sfx.playFlyAwaySoftFlutter();
+        lastOutcomeHit = false;
+        beatTimer = 0;
+        state = 'BIRD_FLIES_AWAY';
+      } else {
+        const baseCam = getCameraBaseForArcher(archerX);
+        cameraX += (baseCam - cameraX) * Math.min(1, 7.0 * dt);
+        if (Math.abs(cameraX - baseCam) < 2.5) {
+          cameraX = baseCam;
+          state = 'AIM_AND_SHOOT';
+        }
+      }
+    }
+  } else if (state === 'BIRD_FLIES_AWAY') {
+    beatTimer += dt;
+    if (partridge.x > cameraX + VIEW_W - 28 && partridge.y > -16) {
+      const followBirdCam = clamp(partridge.x - VIEW_W * 0.72, cameraX, Math.max(0, TOTAL_WORLD_WIDTH - VIEW_W));
+      cameraX += (followBirdCam - cameraX) * Math.min(1, 8.0 * dt);
+    }
+
+    const birdOffscreenTopRight = (partridge.x > cameraX + VIEW_W + 24) || (partridge.y < -20);
+    if (birdOffscreenTopRight || beatTimer >= 2.8) {
+      beatTimer = 0;
+      state = 'FLEE_PAN_BACK';
+    }
+  } else if (state === 'FLEE_PAN_BACK') {
+    const baseCam = getCameraBaseForArcher(archerX);
+    cameraX += (baseCam - cameraX) * Math.min(1, 6.2 * dt);
+    if (Math.abs(cameraX - baseCam) < 2.5) {
+      cameraX = baseCam;
+      const aheadArrows = embeddedArrows.filter(a => a.x >= archerX);
+      if (aheadArrows.length > 0) {
+        aheadArrows.sort((a, b) => a.x - b.x);
+        walkTargetX = aheadArrows[0].x;
+      } else {
+        walkTargetX = archerX + 45;
+      }
+      playerStance = 'WALK_BASKET';
+      state = 'AUTO_WALK_TO_SPOT';
+    }
+  }
+
+  // =========================================================================
+  // AUTOMATED TRANSITION PHASE: WALK, COLLECT ARROWS/BIRD & HAND-OVER-BROW SCAN
+  // =========================================================================
+  else if (state === 'AUTO_WALK_TO_SPOT') {
+    playerStance = 'WALK_BASKET';
+    playerFacing = 1;
+    const step = 118 * dt;
+    archerX += step;
+    advanceWalkMotion(step);
+    cameraX = getCameraBaseForArcher(archerX);
+
+    collectPassedArrows(archerX);
+
+    if (archerX >= walkTargetX) {
+      archerX = walkTargetX;
+      cameraX = getCameraBaseForArcher(archerX);
+      collectPassedArrows(archerX);
+      beatTimer = 0;
+      if (lastOutcomeHit) {
+        playerStance = 'KNEEL_BIRD';
+        state = 'KNEEL_COLLECT_BIRD';
+      } else {
+        playerStance = 'SCAN_BROW';
+        state = 'HAND_OVER_BROW_SCAN';
+      }
+    }
+  } else if (state === 'KNEEL_COLLECT_BIRD') {
+    beatTimer += dt;
+    playerStance = 'KNEEL_BIRD';
+    if (beatTimer >= 0.65 && partridge.state === 'HIT_DROPPED') {
+      partridge.state = 'COLLECTED';
+      if (arrowsInQuiver < MAX_ARROWS) {
+        arrowsInQuiver++;
+      }
+      sfx.playBerryPick();
+    }
+    if (beatTimer >= 1.25) {
+      beatTimer = 0;
+      playerStance = 'SCAN_BROW';
+      state = 'HAND_OVER_BROW_SCAN';
+    }
+  } else if (state === 'HAND_OVER_BROW_SCAN') {
+    beatTimer += dt;
+    playerStance = 'SCAN_BROW';
+    if (beatTimer >= 1.35) {
+      encounterIdx++;
+      if (encounterIdx >= TOTAL_ENCOUNTERS) {
+        beatTimer = 0;
+        playerStance = 'MOON_NOD';
+        state = 'END_CUTSCENE_MOON_NOD';
+        return;
+      }
+
+      if (encounterIdx === 3 || encounterIdx === 6 || encounterIdx === 9) {
+        const milestoneIdx = encounterIdx / 3;
+        walkTargetX = milestonePatches[milestoneIdx].x - 10;
+        playerStance = 'WALK_BASKET';
+        state = 'WALK_TO_BERRY_PATCH';
+      } else {
+        spawnPartridgeForEncounter(encounterIdx, archerX);
+        beatTimer = 0;
+        panSubPhase = 0;
+        panStartX = cameraX;
+        panEndX = clamp(partridge.x - VIEW_W * 0.5, 0, Math.max(0, TOTAL_WORLD_WIDTH - VIEW_W));
+        state = 'PAN_TO_PREY';
+      }
+    }
+  } else if (state === 'WALK_TO_BERRY_PATCH') {
+    playerStance = 'WALK_BASKET';
+    const diff = walkTargetX - archerX;
+    if (Math.abs(diff) > 2) {
+      playerFacing = diff >= 0 ? 1 : -1;
+      const step = 118 * dt;
+      if (Math.abs(diff) <= step) {
+        advanceWalkMotion(Math.abs(diff));
+        archerX = walkTargetX;
+      } else {
+        archerX += playerFacing * step;
+        advanceWalkMotion(step);
+      }
+    } else {
+      archerX = walkTargetX;
+    }
+
+    cameraX = getCameraBaseForArcher(archerX);
+    collectPassedArrows(archerX);
+
+    if (Math.abs(walkTargetX - archerX) <= 1) {
+      archerX = walkTargetX;
+      playerFacing = 1;
+      cameraX = getCameraBaseForArcher(archerX);
+      collectPassedArrows(archerX);
+      beatTimer = 0;
+      triggerPartridgeFlyIn();
+
+      if (encounterIdx === 6 && !hoodWorn) {
+        playerStance = 'HOOD_UP';
+        sfx.playHoodRustle();
+        state = 'HOOD_UP_BEAT';
+      } else {
+        playerStance = 'KNEEL_BERRY';
+        state = 'BERRY_HARVEST_5S';
+      }
+    }
+  } else if (state === 'HOOD_UP_BEAT') {
+    beatTimer += dt;
+    playerStance = 'HOOD_UP';
+    if (beatTimer >= 0.75 && !hoodWorn) {
+      hoodWorn = true;
+    }
+    if (beatTimer >= 1.45) {
+      beatTimer = 0;
+      playerStance = 'KNEEL_BERRY';
+      state = 'BERRY_HARVEST_5S';
+    }
+  } else if (state === 'BERRY_HARVEST_5S') {
+    const prevT = beatTimer;
+    beatTimer += dt;
+    playerStance = 'KNEEL_BERRY';
+    const milestoneIdx = Math.floor(encounterIdx / 3);
+    const patch = milestonePatches[milestoneIdx];
+
+    if (Math.floor(prevT / 1.4) !== Math.floor(beatTimer / 1.4) && beatTimer < 4.5) {
+      sfx.playBerryPick();
+    }
+    if (beatTimer >= 2.8 && !patch.harvested) {
+      patch.harvested = true;
+      basketFillStage = milestoneIdx + 1;
+    }
+    if (beatTimer >= 5.0) {
+      spawnPartridgeForEncounter(encounterIdx, archerX);
+      beatTimer = 0;
+      panSubPhase = 0;
+      panStartX = cameraX;
+      panEndX = clamp(partridge.x - VIEW_W * 0.5, 0, Math.max(0, TOTAL_WORLD_WIDTH - VIEW_W));
+      state = 'PAN_TO_PREY';
+    }
+  }
+
+  // =========================================================================
+  // END-GAME SILENT CUTSCENE: GRANDMOTHER MOON NOD -> NORTH STAR -> WALK HOME
+  // =========================================================================
+  else if (state === 'END_CUTSCENE_MOON_NOD') {
+    beatTimer += dt;
+    playerStance = 'MOON_NOD';
+    if (beatTimer >= 0.8 && beatTimer <= 1.8) {
+      headNodOffset = Math.round(Math.sin(((beatTimer - 0.8) / 1.0) * Math.PI) * 2);
+    } else {
+      headNodOffset = 0;
+    }
+
+    if (beatTimer >= 2.6) {
+      beatTimer = 0;
+      playerFacing = -1;
+      playerStance = 'NORTH_STAR_GAZE';
+      sfx.playNorthStarChime();
+      state = 'END_CUTSCENE_NORTH_STAR';
+    }
+  } else if (state === 'END_CUTSCENE_NORTH_STAR') {
+    beatTimer += dt;
+    playerFacing = -1;
+    playerStance = 'NORTH_STAR_GAZE';
+    northStarAlpha = 1.0;
+
+    if (beatTimer >= 2.6) {
+      beatTimer = 0;
+      familyAtCampfire = true;
+      returnMoonlitLock = true;
+      sfx.setDrumTrackActive(false);
+      playerStance = 'WALK_BASKET';
+      state = 'END_CUTSCENE_WALK_HOME';
+    }
+  } else if (state === 'END_CUTSCENE_WALK_HOME') {
+    playerFacing = -1;
+    playerStance = 'WALK_BASKET';
+    const step = 240 * dt;
+    archerX -= step;
+    advanceWalkMotion(step * 0.55);
+    cameraX = clamp(archerX - Math.round(VIEW_W * 0.56), 0, Math.max(0, TOTAL_WORLD_WIDTH - VIEW_W));
+
+    if (archerX <= 116) {
+      archerX = 116;
+      cameraX = 0;
+      beatTimer = 0;
+      playerStance = 'EMERGE';
+      state = 'END_CUTSCENE_FAMILY_FADE';
+    }
+  } else if (state === 'END_CUTSCENE_FAMILY_FADE') {
+    beatTimer += dt;
+    cameraX = 0;
+    playerFacing = -1;
+    playerStance = 'EMERGE';
+
+    if (beatTimer >= 2.2) {
+      screenFadeAlpha = Math.min(1.0, screenFadeAlpha + dt * 0.45);
+      if (screenFadeAlpha >= 0.85) {
+        sfx.setAtmosphereActive(false);
+      }
+      if (screenFadeAlpha >= 1.0 && beatTimer >= 5.2) {
+        initTitleScene();
+      }
+    }
+  }
+
+  aJustPressed = false;
+  aJustReleased = false;
+  bJustPressed = false;
+}
+
+function launchArrow() {
+  isDrawing = false;
+  const finalPower = Math.max(0.18, drawPower);
+  const rad = (aimAngleDeg * Math.PI) / 180;
+  const startX = archerX + Math.cos(rad) * 14;
+  const startY = getGroundY(archerX) - 26 - Math.sin(rad) * 14;
+  const vel = getLaunchVector(finalPower);
+
+  arrow.active = true;
+  arrow.stuck = false;
+  arrow.x = startX;
+  arrow.y = startY;
+  arrow.vx = vel.vx;
+  arrow.vy = vel.vy;
+  arrow.angle = -rad;
+  arrow.trail = [];
+
+  arrowsInQuiver = Math.max(0, arrowsInQuiver - 1);
+  sfx.playBowSnap(finalPower);
+  state = 'FLYING';
+}
+
+function updateArrowFlight(stepScale) {
+  if (!arrow.active) return;
+  const subSteps = 2;
+  const dtStep = stepScale / subSteps;
+
+  for (let s = 0; s < subSteps; s++) {
+    arrow.vx += activeWind.accel * dtStep;
+    arrow.vy += GRAVITY * dtStep;
+    arrow.x += arrow.vx * dtStep;
+    arrow.y += arrow.vy * dtStep;
+    arrow.angle = Math.atan2(arrow.vy, arrow.vx);
+
+    if (s === 0 && (arrow.trail.length === 0 || Math.hypot(arrow.x - arrow.trail[arrow.trail.length - 1].x, arrow.y - arrow.trail[arrow.trail.length - 1].y) > 7)) {
+      arrow.trail.push({ x: arrow.x, y: arrow.y });
+      if (arrow.trail.length > 14) arrow.trail.shift();
+    }
+
+    if (partridge.state === 'STRUT' || partridge.state === 'ALERT') {
+      const hitDx = Math.abs(arrow.x - partridge.x);
+      const hitDy = Math.abs(arrow.y - (partridge.y - 8));
+      if (hitDx <= 11 && hitDy <= 10) {
+        arrow.active = false;
+        partridge.state = 'HIT_IMPACT';
+        partridge.hitTimer = 0;
+        partridge.impactAngle = clamp(arrow.angle, 0.2, 1.1);
+        lastOutcomeHit = true;
+
+        spawnParticles(partridge.x, partridge.y, [PAL.GROUSE_LIGHT, PAL.GROUSE_MID, PAL.WHITE, PAL.TRADE_SCARLET], 24);
+        sfx.playHitImpact();
+        sfx.playHitFanfare();
+
+        beatTimer = 0;
+        state = 'HIT_HOLD_AND_PAN';
+        return;
+      }
+    }
+
+    for (const item of foregroundItems) {
+      if (item.type === 'KRUMMHOLZ_FG' || item.type === 'TAIGA_SPRUCE_FG') {
+        if (Math.abs(item.x - archerX) <= NO_BLOCK_DEPARTURE_RADIUS) continue;
+        if (Math.abs(arrow.x - item.x) < 5 && arrow.y > item.y - item.h + 4 && arrow.y < item.y) {
+          embedArrow(arrow.x, getGroundY(arrow.x));
+          return;
+        }
+      }
+    }
+
+    const gy = getGroundY(arrow.x);
+    if (arrow.y >= gy || arrow.x > TOTAL_WORLD_WIDTH - 20 || arrow.x < archerX + 12) {
+      const clampX = clamp(arrow.x, archerX + 18, TOTAL_WORLD_WIDTH - 30);
+      embedArrow(clampX, getGroundY(clampX));
+      return;
+    }
+  }
+
+  targetCameraX = clamp(arrow.x - VIEW_W * 0.38, 0, Math.max(0, TOTAL_WORLD_WIDTH - VIEW_W));
+  cameraX += (targetCameraX - cameraX) * Math.min(1, 14 * (stepScale / 60));
+}
+
+function embedArrow(wx, wy) {
+  arrow.active = false;
+  arrow.stuck = true;
+  arrow.x = wx;
+  arrow.y = wy;
+  arrow.stuckTimer = arrowsInQuiver <= 0 ? 0.35 : 0.75;
+
+  embeddedArrows.push({
+    x: wx,
+    y: wy,
+    angle: clamp(arrow.angle, 0.25, 1.35)
+  });
+
+  spawnParticles(wx, wy, ['#7D6E42', '#52412E'], 10);
+  sfx.playMissThud();
+  state = 'MISS_RETURN';
+}
+
+// --- MAIN RENDER LOOP ---
+function render(dt) {
+  ctx.clearRect(0, 0, VIEW_W, VIEW_H);
+
+  if (state === 'TITLE' || state === 'TITLE_FADE_OUT') {
+    drawTitleScreen();
+    return;
+  }
+
+  const prog = returnMoonlitLock ? 0.96 : clamp(archerX / TOTAL_WORLD_WIDTH, 0, 1);
+  const env = getEnvAtProgress(prog);
+
+  drawWorldLayers(cameraX, env);
+  drawFlyInBirds(env);
+  drawForegroundTerrainAndProps(cameraX, env);
+  drawPartridge(cameraX, env);
+  drawCreeWoman(cameraX, env);
+  drawTrajectoryPreview(cameraX);
+
+  if (arrow.active) {
+    for (let i = 0; i < arrow.trail.length; i++) {
+      const tr = arrow.trail[i];
+      ctx.fillStyle = i % 2 === 0 ? 'rgba(244,247,250,0.45)' : 'rgba(235,192,70,0.35)';
+      ctx.fillRect(Math.round(tr.x - cameraX), Math.round(tr.y), 2, 1);
+    }
+    const len = 15;
+    const tailX = arrow.x - Math.cos(arrow.angle) * len - cameraX;
+    const tailY = arrow.y - Math.sin(arrow.angle) * len;
+    const tipX = arrow.x - cameraX;
+    const tipY = arrow.y;
+    drawArrowSprite(tailX, tailY, tipX, tipY);
+  }
+
+  updateAndDrawParticles(cameraX, dt, env);
+
+  drawPushRevealMask(revealEdgeX, firstCardDither);
+
+  if (screenFadeAlpha > 0.001) {
+    ctx.fillStyle = PAL.BLACKOUT;
+    ctx.globalAlpha = screenFadeAlpha;
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    ctx.globalAlpha = 1.0;
+  }
+
+  if (isPaused) {
+    const cx = Math.round(VIEW_W * 0.5);
+    drawBox(cx - 76, 96, 152, 46, 'rgba(10, 16, 28, 0.95)', PAL.UI_GOLD);
+    drawPixelText('PAUSED', cx, 106, 13, PAL.UI_GOLD, 'center');
+    drawPixelText('SYSTEM PAUSED', cx, 125, 7, PAL.WHITE, 'center');
+  }
+}
+
+function gameLoop(timestamp) {
+  if (!lastTimestamp) lastTimestamp = timestamp;
+  const dt = Math.min(0.05, Math.max(0.001, (timestamp - lastTimestamp) / 1000));
+  lastTimestamp = timestamp;
+
+  update(dt);
+  render(dt);
+  requestAnimationFrame(gameLoop);
+}
+
+// --- ARCADE CABINET postMessage BRIDGE (SINGLE SOURCE OF TRUTH FOR CONTROLS) ---
+// - 145ms D-Pad hold-window timers so joystick drags move smoothly without separate release events
+// - 110ms debounce guard on BUTTON_A / BUTTON_B so taps never double-trigger
+// - PAUSE / RESUME freezes loop and clears active input states
+let lastBtnATime = 0;
+let lastBtnBTime = 0;
+const BUTTON_DEBOUNCE_MS = 110;
+const DPAD_HOLD_WINDOW_MS = 145;
+const dpadHoldTimers = { up: null, down: null, left: null, right: null };
+
+function pulseDirection(dirKey, ms = DPAD_HOLD_WINDOW_MS) {
+  keys[dirKey] = true;
+  clearTimeout(dpadHoldTimers[dirKey]);
+  dpadHoldTimers[dirKey] = setTimeout(() => {
+    keys[dirKey] = false;
+  }, ms);
+}
+
+function setDirectionHold(dirKey, pressed) {
+  clearTimeout(dpadHoldTimers[dirKey]);
+  keys[dirKey] = pressed;
+}
+
+function setButtonA(pressed) {
+  if (isPaused) return;
+  sfx.init();
+  if (pressed && !keys.a) aJustPressed = true;
+  if (!pressed && keys.a) aJustReleased = true;
+  keys.a = pressed;
+}
+
+function setButtonB(pressed) {
+  if (isPaused) return;
+  sfx.init();
+  if (pressed && !keys.b) bJustPressed = true;
+  keys.b = pressed;
+  if (pressed && isDrawing) {
+    isDrawing = false;
+    drawPower = 0;
+    lastCreakStep = 0;
+    bJustPressed = false;
+  }
+}
+
+function clearAllInputs() {
+  for (const dir of ['up', 'down', 'left', 'right']) {
+    clearTimeout(dpadHoldTimers[dir]);
+    keys[dir] = false;
+  }
+  keys.a = false;
+  keys.b = false;
+  aJustPressed = false;
+  aJustReleased = false;
+  bJustPressed = false;
+  isDrawing = false;
+  drawPower = 0;
+}
+
+function setPausedState(paused) {
+  isPaused = paused;
+  clearAllInputs();
+  if (paused) {
+    if (sfx.ctx && sfx.ctx.state === 'running') sfx.ctx.suspend();
+  } else {
+    lastTimestamp = 0;
+    if (sfx.ctx && sfx.ctx.state === 'suspended') sfx.ctx.resume();
+  }
+}
+
+function normalizeCabinetCommand(raw) {
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (trimmed.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        return (parsed.type || parsed.action || parsed.cmd || parsed.command || parsed.button || '').toString().toUpperCase();
+      } catch (e) {
+        return trimmed.toUpperCase();
+      }
+    }
+    return trimmed.toUpperCase();
+  }
+  if (raw && typeof raw === 'object') {
+    return (raw.type || raw.action || raw.cmd || raw.command || raw.button || '').toString().toUpperCase();
+  }
+  return '';
+}
+
+window.addEventListener('message', (event) => {
+  const cmd = normalizeCabinetCommand(event.data);
+  if (!cmd) return;
+
+  if (cmd === 'PAUSE') { setPausedState(true); return; }
+  if (cmd === 'RESUME') { setPausedState(false); return; }
+  if (isPaused) return;
+
+  // Global neutral / release signals from parent drag-joystick
+  if (cmd === 'RELEASE' || cmd === 'STOP' || cmd === 'DPAD_RELEASE' || cmd === 'NEUTRAL') {
+    setDirectionHold('up', false);
+    setDirectionHold('down', false);
+    setDirectionHold('left', false);
+    setDirectionHold('right', false);
+    return;
+  }
+
+  // Cardinal D-Pad Hold & Release Events
+  if (cmd === 'DPAD_UP_PRESS') setDirectionHold('up', true);
+  else if (cmd === 'DPAD_UP_RELEASE') setDirectionHold('up', false);
+  else if (cmd === 'DPAD_DOWN_PRESS') setDirectionHold('down', true);
+  else if (cmd === 'DPAD_DOWN_RELEASE') setDirectionHold('down', false);
+  else if (cmd === 'DPAD_LEFT_PRESS') setDirectionHold('left', true);
+  else if (cmd === 'DPAD_LEFT_RELEASE') setDirectionHold('left', false);
+  else if (cmd === 'DPAD_RIGHT_PRESS') setDirectionHold('right', true);
+  else if (cmd === 'DPAD_RIGHT_RELEASE') setDirectionHold('right', false);
+
+  // Cardinal D-Pad Pulses (145ms hold window for smooth drag-joystick motion)
+  else if (cmd === 'DPAD_UP') pulseDirection('up');
+  else if (cmd === 'DPAD_DOWN') pulseDirection('down');
+  else if (cmd === 'DPAD_LEFT') pulseDirection('left');
+  else if (cmd === 'DPAD_RIGHT') pulseDirection('right');
+
+  // Action Button A (Press/Release + Debounced Tap Toggle)
+  else if (cmd === 'BUTTON_A_PRESS') {
+    const now = performance.now();
+    if (now - lastBtnATime < BUTTON_DEBOUNCE_MS) return;
+    lastBtnATime = now;
+    setButtonA(true);
+  } else if (cmd === 'BUTTON_A_RELEASE') {
+    setButtonA(false);
+  } else if (cmd === 'BUTTON_A') {
+    const now = performance.now();
+    if (now - lastBtnATime < BUTTON_DEBOUNCE_MS) return;
+    lastBtnATime = now;
+
+    if (state === 'TITLE') {
+      setButtonA(true);
+      setTimeout(() => setButtonA(false), 60);
+    } else if (state === 'AIM_AND_SHOOT') {
+      if (!isDrawing) setButtonA(true);
+      else setButtonA(false);
+    }
+  }
+
+  // Action Button B (Press/Release + Debounced Tap)
+  else if (cmd === 'BUTTON_B_PRESS') {
+    const now = performance.now();
+    if (now - lastBtnBTime < BUTTON_DEBOUNCE_MS) return;
+    lastBtnBTime = now;
+    setButtonB(true);
+  } else if (cmd === 'BUTTON_B_RELEASE') {
+    setButtonB(false);
+  } else if (cmd === 'BUTTON_B') {
+    const now = performance.now();
+    if (now - lastBtnBTime < BUTTON_DEBOUNCE_MS) return;
+    lastBtnBTime = now;
+    setButtonB(true);
+    setTimeout(() => setButtonB(false), 60);
+  }
+});
+
+// Boot directly onto the Solid Black Celestial Title Screen
+initTitleScene();
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
