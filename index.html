@@ -1019,10 +1019,10 @@
 
         <div class="action-cluster">
           <div class="btn-well btn-well-b">
-            <div class="action-btn btn-b" id="btn-b" onmousedown="btnAction('BUTTON_B')" ontouchstart="preventGhostClick(event, 'BUTTON_B')">B</div>
+            <div class="action-btn btn-b" id="btn-b">B</div>
           </div>
           <div class="btn-well btn-well-a">
-            <div class="action-btn btn-a" id="btn-a" onmousedown="btnAction('BUTTON_A')" ontouchstart="preventGhostClick(event, 'BUTTON_A')">A</div>
+            <div class="action-btn btn-a" id="btn-a">A</div>
           </div>
         </div>
       </div>
@@ -1136,7 +1136,7 @@
       },
       {
         file: 'game12.html',
-        title: 'LA LOCHE BRIGADE — 1855 UPPER FORT GARRY',
+        title: 'LA LOCHE BRIGADE',
         genre: 'WHO-DUN-IT MYSTERY IN THE FORT',
         accent: '#12AEA2',
         badge: '12',
@@ -1541,6 +1541,7 @@
     /* --- FULL MACHINE RESTART (BACK TO BUFFALOHYDE BOOT SPLASH) --- */
     function restartMachine() {
       stopSendingDirection();
+      releaseAllActionButtons();
       stopAllMenuAudio();
       isFramePaused = false;
       pausedRAFCallbacks = [];
@@ -1650,14 +1651,111 @@
       }
     }
 
+    /* --- PRESS, HOLD-DURATION & RELEASE ENGINE FOR BUTTON A & BUTTON B --- */
+    const actionBtnState = {
+      BUTTON_A: { held: false, pressTime: 0, holdInterval: null, el: btnAEl },
+      BUTTON_B: { held: false, pressTime: 0, holdInterval: null, el: btnBEl }
+    };
+
+    function pressActionButton(buttonStr) {
+      const state = actionBtnState[buttonStr];
+      if (!state || state.held) return;
+
+      state.held = true;
+      state.pressTime = performance.now();
+      state.el.classList.add('active-press');
+
+      if (machineState === 'PLAYING') {
+        // Send explicit PRESS event + structured payload + standard tap pulse for full compatibility
+        sendSignal(`${buttonStr}_PRESS`);
+        sendSignal({ type: 'BUTTON_PRESS', button: buttonStr, timestamp: state.pressTime });
+        sendSignal(buttonStr);
+
+        // Stream live hold duration (~60fps) while held down so charge/hold games can read exact ms
+        state.holdInterval = setInterval(() => {
+          if (!state.held || machineState !== 'PLAYING') return;
+          const heldMs = Math.round(performance.now() - state.pressTime);
+          sendSignal({
+            type: 'BUTTON_HOLD',
+            button: buttonStr,
+            heldMs: heldMs,
+            durationSec: +(heldMs / 1000).toFixed(3)
+          });
+        }, 16);
+      } else {
+        // UI / Menu navigation triggers immediately on button press
+        btnAction(buttonStr);
+      }
+    }
+
+    function releaseActionButton(buttonStr) {
+      const state = actionBtnState[buttonStr];
+      if (!state || !state.held) return;
+
+      const heldMs = Math.max(0, Math.round(performance.now() - state.pressTime));
+      state.held = false;
+      state.el.classList.remove('active-press');
+
+      if (state.holdInterval) {
+        clearInterval(state.holdInterval);
+        state.holdInterval = null;
+      }
+
+      if (isPlaying && gameFrame.contentWindow) {
+        postToGame(`${buttonStr}_RELEASE`);
+        postToGame({
+          type: 'BUTTON_RELEASE',
+          button: buttonStr,
+          heldMs: heldMs,
+          durationSec: +(heldMs / 1000).toFixed(3)
+        });
+      }
+    }
+
+    function releaseAllActionButtons() {
+      releaseActionButton('BUTTON_A');
+      releaseActionButton('BUTTON_B');
+    }
+
+    // Bind pointer/touch hold-and-release listeners directly to A and B buttons
+    function bindHoldButtonEvents(el, buttonStr) {
+      el.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        pressActionButton(buttonStr);
+      }, { passive: false });
+
+      el.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        releaseActionButton(buttonStr);
+      }, { passive: false });
+
+      el.addEventListener('touchcancel', (e) => {
+        e.preventDefault();
+        releaseActionButton(buttonStr);
+      }, { passive: false });
+
+      el.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        pressActionButton(buttonStr);
+      });
+    }
+
+    bindHoldButtonEvents(btnAEl, 'BUTTON_A');
+    bindHoldButtonEvents(btnBEl, 'BUTTON_B');
+
+    // Window-level release catch ensures releasing mouse/finger after sliding off A/B still triggers release
+    window.addEventListener('mouseup', () => {
+      releaseAllActionButtons();
+    });
+
     function preventGhostClick(e, actionType) {
       e.preventDefault(); 
       e.stopPropagation();
-      if (actionType === 'BUTTON_A' || actionType === 'BUTTON_B') {
-        btnAction(actionType);
-        e.target.classList.add('active-press');
-        setTimeout(() => e.target.classList.remove('active-press'), 150);
-      } else if (actionType === 'START') {
+      if (actionType === 'START') {
         e.target.classList.add('active-press');
         setTimeout(() => e.target.classList.remove('active-press'), 150);
         handleSystemMenuTrigger();
@@ -1797,6 +1895,7 @@
     function openPauseMenu(origin = 'PLAYING') {
       if (machineState !== 'PLAYING' && machineState !== 'MENU') return;
       stopSendingDirection();
+      releaseAllActionButtons();
       machineState = 'PAUSED';
       configurePauseOverlay(origin);
       if (origin === 'PLAYING') {
@@ -1819,6 +1918,7 @@
 
     function restartGame() {
       stopAllMenuAudio();
+      releaseAllActionButtons();
       pauseOverlay.style.display = 'none';
       isFramePaused = false;
       pausedRAFCallbacks = [];
@@ -1833,6 +1933,7 @@
     }
 
     function returnToGameMenu() {
+      releaseAllActionButtons();
       pauseOverlay.style.display = 'none';
       isFramePaused = false;
       pausedRAFCallbacks = [];
@@ -1891,6 +1992,7 @@
 
     function returnToSplash() {
       stopSendingDirection();
+      releaseAllActionButtons();
       isFramePaused = false;
       pausedRAFCallbacks = [];
       pauseOverlay.style.display = 'none';
@@ -2020,7 +2122,7 @@
     window.addEventListener('mouseup', endDrag);
     window.addEventListener('touchend', endDrag);
 
-    /* --- KEYBOARD INPUT HANDLERS (ARROWS = DPAD, Z/A = A, X/B = B, ESC = PAUSE/SETTINGS) --- */
+    /* --- KEYBOARD INPUT HANDLERS (ARROWS = DPAD, Z/A = A HOLD, X/B = B HOLD, ESC = PAUSE/SETTINGS) --- */
     const activeDirectionKeys = new Set();
     const ARROW_TO_DIR = {
       ArrowUp: 'DPAD_UP',
@@ -2072,16 +2174,14 @@
       if (lower === 'a' || lower === 'z' || key === 'Enter') {
         e.preventDefault();
         if (e.repeat) return;
-        btnAEl.classList.add('active-press');
-        btnAction('BUTTON_A');
+        pressActionButton('BUTTON_A');
         return;
       }
 
       if (lower === 'b' || lower === 'x') {
         e.preventDefault();
         if (e.repeat) return;
-        btnBEl.classList.add('active-press');
-        btnAction('BUTTON_B');
+        pressActionButton('BUTTON_B');
         return;
       }
 
@@ -2107,13 +2207,13 @@
 
       if (lower === 'a' || lower === 'z' || key === 'Enter') {
         e.preventDefault();
-        btnAEl.classList.remove('active-press');
+        releaseActionButton('BUTTON_A');
         return;
       }
 
       if (lower === 'b' || lower === 'x') {
         e.preventDefault();
-        btnBEl.classList.remove('active-press');
+        releaseActionButton('BUTTON_B');
         return;
       }
 
@@ -2127,8 +2227,7 @@
     window.addEventListener('blur', () => {
       activeDirectionKeys.clear();
       syncKeyboardJoystick();
-      btnAEl.classList.remove('active-press');
-      btnBEl.classList.remove('active-press');
+      releaseAllActionButtons();
       btnStartEl.classList.remove('active-press');
     });
 
@@ -2705,7 +2804,6 @@
 
       const bankY = Math.round(H * 0.52);
 
-      // 1. Sky Gradient Bands interpolating from Indigo Twilight (dayT=0) to Golden-Blue Morning Sunrise (dayT=1)
       const nightSky = [
         [30, 43, 84],
         [40, 57, 107],
@@ -2724,7 +2822,6 @@
         ctx.fillRect(0, i * bandH, W, bandH + 1);
       }
 
-      // 2. Twinkling Stars (Occluded cleanly by dark lunar disc!)
       const starAlpha = Math.max(0, 1 - dayT * 1.45);
       if (starAlpha > 0.02) {
         for (let i = 0; i < 42; i++) {
@@ -2746,7 +2843,7 @@
         }
       }
 
-      // 3. Crescent Moon Anchored Over Upper Fort Garry (x = 1220) — Rises & Falls Under Fort Garry!
+      // Crescent Moon Anchored Over Upper Fort Garry (x = 1220)
       const moonX = worldToScreenX(1220);
       const moonBob = Math.sin(tick * 0.015) * 4;
       const moonY = Math.round(42 + moonBob + dayT * (bankY + 28));
@@ -2778,8 +2875,7 @@
         ctx.restore();
       }
 
-      // 4. Morning Sun Anchored Between the Twin Towers of St. Boniface Cathedral (x = 180)!
-      //    Rises directly between the twin tin spires during sunrise and stays framed between them.
+      // Morning Sun Anchored Between the Twin Towers of St. Boniface Cathedral (x = 180)
       const stbCenterX = worldToScreenX(180);
       if (dayT > 0.06 && stbCenterX > -120 && stbCenterX < W + 120) {
         const sunTowerY = Math.round((bankY - 38) - dayT * 46);
@@ -2799,19 +2895,18 @@
         ctx.fill();
       }
 
-      // 5. Forks River Waters
+      // Forks River Waters
       ctx.fillStyle = lerpRgb([24, 84, 117], [34, 124, 168], dayT);
       ctx.fillRect(0, bankY, W, H - bankY);
       ctx.fillStyle = lerpRgb([32, 107, 148], [52, 154, 198], dayT);
       ctx.fillRect(0, bankY + 4, W, 28);
 
-      // Continuous Prairie & Riverbank Horizon Strip
       ctx.fillStyle = lerpRgb([74, 110, 77], [104, 148, 86], dayT);
       ctx.fillRect(0, bankY - 12, W, 18);
       ctx.fillStyle = lerpRgb([128, 105, 50], [168, 134, 68], dayT);
       ctx.fillRect(0, bankY + 4, W, 8);
 
-      // --- 1. ST. BONIFACE CATHEDRAL & GREY NUNS' CONVENT (x = 180) ---
+      // 1. ST. BONIFACE CATHEDRAL & GREY NUNS' CONVENT (x = 180)
       const stbX = worldToScreenX(180);
       if (stbX > -320 && stbX < W + 320) {
         drawStBonifaceCathedral1860(ctx, stbX, bankY - 2, 1.22, 0.55 + dayT * 0.45);
@@ -2820,7 +2915,7 @@
         drawSettlementTownsfolk(ctx, stbX + 26, bankY + 4, tick, 0);
       }
 
-      // --- 2. RED RIVER FACING SOUTH (x = 520) ---
+      // 2. RED RIVER FACING SOUTH (x = 520)
       const southX = worldToScreenX(520);
       if (southX > -260 && southX < W + 260) {
         ctx.fillStyle = lerpRgb([32, 107, 148], [52, 154, 198], dayT);
@@ -2830,7 +2925,7 @@
         drawSettlementTownsfolk(ctx, southX + 54, bankY + 4, tick, 2);
       }
 
-      // --- 3. FORT ROUGE — LEFT OF UPPER FORT GARRY, WITH ASSINIBOINE RIVER ON RIGHT FRAME (x = 880) ---
+      // 3. FORT ROUGE — LEFT OF UPPER FORT GARRY, WITH ASSINIBOINE RIVER ON RIGHT FRAME (x = 880)
       const frX = worldToScreenX(880);
       if (frX > -280 && frX < W + 280) {
         drawOakTree(ctx, frX - 104, bankY - 8, 1.2);
@@ -2845,7 +2940,7 @@
         ctx.fillRect(frX + 62, bankY - 12, 76, 24);
       }
 
-      // --- 4. UPPER FORT GARRY — ASSINIBOINE JUST TO THE LEFT OFF-FRAME (x = 1220) ---
+      // 4. UPPER FORT GARRY — ASSINIBOINE JUST TO THE LEFT OFF-FRAME (x = 1220)
       const ufgX = worldToScreenX(1220);
       if (ufgX > -260 && ufgX < W + 260) {
         ctx.fillStyle = '#bcc5d9';
@@ -2863,7 +2958,7 @@
         ctx.fillRect(ufgX + 3, bankY - 72, 20, 12);
       }
 
-      // --- 5. EARLY "WINNIPEG" SETTLEMENT — SALOON, SHOP & WATERMILL IMMEDIATE RIGHT OF FORT GARRY (x = 1520) ---
+      // 5. EARLY "WINNIPEG" SETTLEMENT — SALOON, SHOP & WATERMILL IMMEDIATE RIGHT OF FORT GARRY (x = 1520)
       const wpgX = worldToScreenX(1520);
       if (wpgX > -260 && wpgX < W + 260) {
         ctx.fillStyle = '#7d4824';
@@ -2890,7 +2985,7 @@
         drawSettlementTownsfolk(ctx, wpgX - 28, bankY + 4, tick, 1);
       }
 
-      // --- 6. RED RIVER FACING NORTH / POINT DOUGLAS (x = 1880) ---
+      // 6. RED RIVER FACING NORTH / POINT DOUGLAS (x = 1880)
       const pdX = worldToScreenX(1880);
       if (pdX > -260 && pdX < W + 260) {
         ctx.fillStyle = lerpRgb([32, 107, 148], [52, 154, 198], dayT);
@@ -2902,7 +2997,7 @@
         drawSettlementTownsfolk(ctx, pdX + 18, bankY + 4, tick, 1);
       }
 
-      // --- 7. ST. BONIFACE VILLAGE — LOG HOUSES LEFT OF CATHEDRAL WRAPPING BACK TO ST. BONIFACE (x = 2200) ---
+      // 7. ST. BONIFACE VILLAGE — LOG HOUSES LEFT OF CATHEDRAL WRAPPING BACK TO ST. BONIFACE (x = 2200)
       const sbvX = worldToScreenX(2200);
       if (sbvX > -280 && sbvX < W + 280) {
         drawOakTree(ctx, sbvX - 118, bankY - 8, 1.2);
@@ -2915,7 +3010,6 @@
         drawSettlementTownsfolk(ctx, sbvX + 38, bankY + 4, tick, 0);
       }
 
-      // Animated Water Ripples & Passing Voyageur Canoe on the Forks
       const wave = Math.floor(tick / 18) % 2;
       ctx.fillStyle = dayT > 0.4 ? 'rgba(255, 248, 214, 0.42)' : 'rgba(255, 255, 255, 0.32)';
       for (let rx = 20; rx < W - 20; rx += 68) {
@@ -3624,18 +3718,15 @@
 
       } else if (game.artType === 'WOODLAND_BOW') {
         // 11. ᐊᐦᒐᐲᔑᐡ // ahcāpīshish: Woodland strap-dressed matriarch holding a small gatherer's bow against a woodland backdrop
-        // Deep Boreal Forest Sky & Canopy Light
         ctx.fillStyle = '#0d261c';
         ctx.fillRect(0, 0, W, 56);
         ctx.fillStyle = '#174231';
         ctx.fillRect(0, 56, W, 62);
 
-        // Dappled Sunbeams Filtering Through Woodland Canopy
         ctx.fillStyle = 'rgba(247, 200, 68, 0.14)';
         ctx.fillRect(cx - 48, 0, 36, 152);
         ctx.fillRect(cx + 24, 0, 28, 152);
 
-        // Background Boreal Evergreens & Birch Trunks
         drawPineTree(ctx, 36, 118, 1.5, false);
         drawBirchTree(ctx, 74, 134, 134, 9);
         drawPineTree(ctx, 116, 116, 1.3, false);
@@ -3643,12 +3734,10 @@
         drawPineTree(ctx, W - 82, 118, 1.5, false);
         drawBirchTree(ctx, W - 40, 134, 134, 10);
 
-        // Mossy Forest Floor & Woodland Ferns
         ctx.fillStyle = '#254d32';
         ctx.fillRect(0, 118, W, 24);
         ctx.fillStyle = '#3b2514';
         ctx.fillRect(0, 140, W, H - 140);
-        // Woodland fern fronds & berries
         ctx.fillStyle = '#4e8c54';
         ctx.fillRect(24, 128, 18, 6);
         ctx.fillRect(92, 132, 16, 5);
@@ -3657,11 +3746,9 @@
         ctx.fillRect(30, 126, 3, 3);
         ctx.fillRect(W - 88, 128, 3, 3);
 
-        // Woodland Strap-Dressed Matriarch (Centered Foreground)
         const mx = cx - 8;
         const my = Math.round(154 + bob * 0.45);
 
-        // Moccasined Feet & Leggings
         ctx.fillStyle = '#6b4423';
         ctx.fillRect(mx - 8, my - 14, 7, 14);
         ctx.fillRect(mx + 2, my - 14, 7, 14);
@@ -3669,36 +3756,29 @@
         ctx.fillRect(mx - 8, my - 4, 7, 3);
         ctx.fillRect(mx + 2, my - 4, 7, 3);
 
-        // Under-blouse (Warm Cream/Ochre) & Traditional Woodland Strap-Dress (Deep Indigo/Burgundy with Quill/Bead Trim)
         ctx.fillStyle = '#e8dcc5';
         ctx.fillRect(mx - 10, my - 44, 21, 14);
-        // Strap-dress shoulder straps
         ctx.fillStyle = '#1b365d';
         ctx.fillRect(mx - 8, my - 45, 4, 12);
         ctx.fillRect(mx + 5, my - 45, 4, 12);
-        // Strap-dress main bodice & flared skirt
         ctx.fillStyle = '#1b365d';
         ctx.fillRect(mx - 11, my - 35, 23, 23);
-        // Decorative red & gold woodland trim bands along strap-dress hem and bodice
         ctx.fillStyle = '#AD1C21';
         ctx.fillRect(mx - 11, my - 35, 23, 3);
         ctx.fillRect(mx - 11, my - 17, 23, 3);
         ctx.fillStyle = '#F7C844';
         ctx.fillRect(mx - 11, my - 14, 23, 2);
 
-        // Matriarch Head, Warm Skin Tone, & Two Braids with Beaded Ties
         ctx.fillStyle = '#8c5332';
         ctx.fillRect(mx - 6, my - 57, 13, 12);
         ctx.fillStyle = '#1e1b18';
         ctx.fillRect(mx - 7, my - 60, 15, 5);
-        // Long braided hair falling over shoulders
         ctx.fillRect(mx - 10, my - 55, 4, 22);
         ctx.fillRect(mx + 7, my - 55, 4, 22);
         ctx.fillStyle = '#AD1C21';
         ctx.fillRect(mx - 10, my - 35, 4, 3);
         ctx.fillRect(mx + 7, my - 35, 4, 3);
 
-        // Arms & Small Gatherer's Bow Held Ready
         ctx.fillStyle = '#8c5332';
         ctx.fillRect(mx + 10, my - 40, 12, 5);
         ctx.fillRect(mx - 14, my - 38, 6, 8);
@@ -3706,12 +3786,10 @@
         const bowX = mx + 22;
         const bowY = my - 38;
         const drawPull = wave === 0 ? 0 : -2;
-        // Curved Ash/Willow Gatherer's Bow Stave
         ctx.fillStyle = '#c4864b';
         ctx.fillRect(bowX, bowY - 18, 4, 36);
         ctx.fillRect(bowX - 3, bowY - 22, 4, 5);
         ctx.fillRect(bowX - 3, bowY + 17, 4, 5);
-        // Sinew Bowstring & Small Wooden Arrow
         ctx.fillStyle = '#f2efe9';
         ctx.fillRect(bowX - 4 + drawPull, bowY - 19, 1, 38);
         ctx.fillStyle = '#F7C844';
@@ -3720,9 +3798,7 @@
         ctx.fillRect(bowX + 12 + drawPull, bowY - 2, 4, 4);
 
       } else if (game.artType === 'YORK_BRIGADE') {
-        // 12. LA LOCHE BRIGADE — 1855 UPPER FORT GARRY:
-        //     Close-up of the detailed Portage La Loche York Boat against the 1855 Red River Settlement & Upper Fort Garry backdrop
-        // Crisp 1855 Red River Morning Sky
+        // 12. LA LOCHE BRIGADE: Close-up of the detailed Portage La Loche York Boat against the 1855 Red River Settlement & Upper Fort Garry backdrop
         ctx.fillStyle = '#1b365d';
         ctx.fillRect(0, 0, W, 42);
         ctx.fillStyle = '#3b6e9c';
@@ -3730,20 +3806,17 @@
         ctx.fillStyle = '#d98a4e';
         ctx.fillRect(0, 86, W, 22);
 
-        // 1855 Upper Fort Garry Stone Bastion Walls, Gatehouse & HBC Red Ensign in Background
         const fortY = 106;
         ctx.fillStyle = '#476337';
         ctx.fillRect(0, fortY - 6, W, 14);
         drawOakTree(ctx, 36, fortY - 2, 1.25);
         drawOakTree(ctx, W - 40, fortY - 2, 1.3);
 
-        // Stone Curtain Wall & Corner Bastions
         ctx.fillStyle = '#b4bdd1';
         ctx.fillRect(cx - 110, fortY - 30, 220, 30);
         ctx.fillStyle = '#7e889e';
         ctx.fillRect(cx - 118, fortY - 38, 24, 38);
         ctx.fillRect(cx + 94, fortY - 38, 24, 38);
-        // Central Stone Gatehouse & Red Ensign Flag
         ctx.fillStyle = '#ece7da';
         ctx.fillRect(cx - 20, fortY - 42, 40, 42);
         ctx.fillStyle = '#1e1b18';
@@ -3755,7 +3828,6 @@
         ctx.fillStyle = '#0038A8';
         ctx.fillRect(cx + 3, fortY - 66, 9, 6);
 
-        // Red River Waters in Foreground
         ctx.fillStyle = '#144966';
         ctx.fillRect(0, fortY + 6, W, H - (fortY + 6));
         ctx.fillStyle = '#1e688f';
@@ -3767,11 +3839,10 @@
           ctx.fillRect(rx + 26, fortY + 58, 20, 3);
         }
 
-        // Close-Up of the Detailed Portage La Loche Brigade York Boat (1.48x Zoomed Showcase)
         drawPortageLaLocheYorkBoat(ctx, cx - 4, fortY + 46, tick, 1.48);
       }
 
-      // 4. Lower Title Banner Plate (Auto-scales title font if long)
+      // 4. Lower Title Banner Plate
       const plateY = H - 76;
       ctx.fillStyle = 'rgba(6, 8, 16, 0.92)';
       ctx.fillRect(10, plateY, W - 20, 66);
