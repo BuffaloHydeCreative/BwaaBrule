@@ -41,7 +41,8 @@
  * ᐊᐦᒐᐲᔑᐡ // ahcāpīshish (Hudson Bay Lowlands • Severn River Progression)
  * - Full-Screen, Full-Bleed Embedded Arcade Viewport (Dynamic Logical Aspect Scaling via resizeViewport)
  * - Exclusive Parent Arcade Cabinet postMessage Bridge:
- *     * Click/Press-Hold-Release Button A Bow Draw (BUTTON_A_PRESS -> draw, BUTTON_A_RELEASE -> snap arrow)
+ *     * True Press-Hold-Release Button A Bow Draw (420ms pulse bridge across cabinet repeat threshold + BUTTON_A_PRESS/RELEASE)
+ *     * Steady, deliberate bow draw speed (+0.38/s) so shorter shots are controlled and never rushed
  *     * 145ms D-Pad Hold Window for live Up/Down angle adjustment before & during draw
  *     * 110ms Button B Debounce for Downfield Look
  * - Aspect-Ratio-Safe Opening Cutscene Camera Follow (4:3, 3:4 & Widescreen CRT Ready)
@@ -2369,7 +2370,6 @@ function drawPartridge(camX, env) {
   }
 
   if (partridge.state === 'FLEEING') {
-    // Flipped horizontally so the fleeing bird faces right (+x) along its top-right ascent
     ctx.scale(-1, 1);
     const flap = Math.floor(elapsed * 22) % 2;
     ctx.fillStyle = PAL.GROUSE_DARK;
@@ -2451,7 +2451,7 @@ function drawTrajectoryPreview(camX) {
   const startX = archerX + Math.cos(rad) * 14;
   const startY = getGroundY(archerX) - 26 - Math.sin(rad) * 14;
 
-  const previewPower = isDrawing ? Math.max(0.20, drawPower) : 0.62;
+  const previewPower = isDrawing ? Math.max(0.15, drawPower) : 0.62;
   const vel = getLaunchVector(previewPower);
 
   let px = startX;
@@ -2803,10 +2803,12 @@ function update(dt) {
       angleTickCooldown = 0.1;
     }
 
-    // Click-hold-release bow draw: holding A pulls back bowstring; releasing A snaps arrow forward
+    // Click-hold-release bow draw:
+    // - Holding Button A draws the bowstring back steadily (+0.38/s) so shorter shots are controlled
+    // - Releasing Button A snaps the arrow forward at the drawn power & angle
     if (aJustPressed && !isDrawing && arrowsInQuiver > 0) {
       isDrawing = true;
-      drawPower = 0.06;
+      drawPower = 0.04;
       lastCreakStep = 0;
       if (scoutMode !== 'OFF') {
         scoutMode = 'OFF';
@@ -2817,7 +2819,7 @@ function update(dt) {
     }
 
     if (isDrawing && keys.a) {
-      drawPower = Math.min(1.0, drawPower + 0.51 * dt);
+      drawPower = Math.min(1.0, drawPower + 0.38 * dt);
       const step = Math.floor(drawPower * 5);
       if (step > lastCreakStep) {
         lastCreakStep = step;
@@ -3104,7 +3106,7 @@ function update(dt) {
 
 function launchArrow() {
   isDrawing = false;
-  const finalPower = Math.max(0.18, drawPower);
+  const finalPower = Math.max(0.14, drawPower);
   const rad = (aimAngleDeg * Math.PI) / 180;
   const startX = archerX + Math.cos(rad) * 14;
   const startY = getGroundY(archerX) - 26 - Math.sin(rad) * 14;
@@ -3263,11 +3265,14 @@ function gameLoop(timestamp) {
   requestAnimationFrame(gameLoop);
 }
 
-// --- ARCADE CABINET postMessage BRIDGE (CLICK-HOLD-RELEASE BUTTON A DRAW) ---
+// --- ARCADE CABINET postMessage BRIDGE (TRUE HOLD-TO-DRAW BUTTON A) ---
 let lastBtnBTime = 0;
 let btnAPulseTimer = null;
 const BUTTON_DEBOUNCE_MS = 110;
 const DPAD_HOLD_WINDOW_MS = 145;
+// 420ms pulse bridge spans the cabinet's initial 300ms hold-delay + 100ms repeat interval
+// so holding Button A continuously draws the bowstring without prematurely firing!
+const BUTTON_A_HOLD_BRIDGE_MS = 420;
 const dpadHoldTimers = { up: null, down: null, left: null, right: null };
 
 function pulseDirection(dirKey, ms = DPAD_HOLD_WINDOW_MS) {
@@ -3380,10 +3385,8 @@ window.addEventListener('message', (event) => {
   else if (cmd === 'DPAD_LEFT') pulseDirection('left');
   else if (cmd === 'DPAD_RIGHT') pulseDirection('right');
 
-  // Click-Hold-Release Action Button A:
-  // - BUTTON_A_PRESS engages draw immediately; BUTTON_A_RELEASE snaps arrow forward.
-  // - If parent cabinet emits repeated BUTTON_A pulses while held, a 170ms hold-window keeps the bow
-  //   drawing continuously and releases cleanly the moment pulses stop.
+  // Press-Hold-Release Action Button A:
+  // - Supports explicit BUTTON_A_PRESS / BUTTON_A_RELEASE pairs AND cabinet BUTTON_A repeat pulses
   else if (cmd === 'BUTTON_A_PRESS') {
     setButtonA(true);
   } else if (cmd === 'BUTTON_A_RELEASE') {
@@ -3395,7 +3398,7 @@ window.addEventListener('message', (event) => {
     } else if (state === 'AIM_AND_SHOOT') {
       if (!keys.a) setButtonA(true);
       clearTimeout(btnAPulseTimer);
-      btnAPulseTimer = setTimeout(() => setButtonA(false), 170);
+      btnAPulseTimer = setTimeout(() => setButtonA(false), BUTTON_A_HOLD_BRIDGE_MS);
     }
   }
 
