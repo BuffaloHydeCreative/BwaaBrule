@@ -9,6 +9,7 @@
     box-sizing: border-box;
     margin: 0;
     padding: 0;
+    -webkit-tap-highlight-color: transparent;
   }
   html, body, #game-container {
     width: 100vw;
@@ -18,6 +19,7 @@
     overflow: hidden;
     background: #050a18;
     user-select: none;
+    -webkit-user-select: none;
     touch-action: none;
     font-family: 'Courier New', Courier, monospace;
     image-rendering: pixelated;
@@ -39,13 +41,12 @@
 <script>
 /**
  * ᐊᐦᒐᐲᔑᐡ // ahcāpīshish (Hudson Bay Lowlands • Severn River Progression)
- * - Full-Screen, Full-Bleed Embedded Arcade Viewport (Dynamic Logical Aspect Scaling via resizeViewport)
- * - Clean Arcade Cabinet postMessage Bridge:
- *     * BUTTON_A: Press once to begin steady bow draw -> press again to snap & release (plus direct PRESS/RELEASE support)
- *     * Up/Down D-Pad: Live launch angle adjustment before & during draw
- *     * BUTTON_B: Cancel active draw or trigger Downfield Look
- * - Aspect-Ratio-Safe Opening Cutscene Camera Follow (4:3, 3:4 & Widescreen CRT Ready)
- * - 62 BPM 4/4 Backing Track: Hand Drum on Beat 1 (x - - -) + Stone-in-Hide Rattle on Every Beat (x x x x)
+ * - Full-Screen, Full-Bleed Embedded Arcade Cabinet Build
+ * - Single-Press Hold-to-Draw, Release-to-Fire Button A Mechanic via Parent postMessage Bridge
+ * - Up/Down D-Pad Live Launch Angle Control (Before & While Bowstring is Drawn)
+ * - Arrows Embed Directly Into Blocking Trees at Exact Impact Height
+ * - Title North Star Remains Fixed Behind Tipi Village & Fades Gently Into Morning Sunrise
+ * - Natural Level 4 Timber Wolf Howling at Moon • Shimmering Grandmother Moon & North Star Gaze
  */
 
 const cvs = document.getElementById('gameCanvas');
@@ -61,7 +62,7 @@ function resizeViewport() {
   const w = Math.max(1, rect.width || window.innerWidth);
   const h = Math.max(1, rect.height || window.innerHeight);
   const aspect = w / h;
-  VIEW_W = Math.max(180, Math.round(VIEW_H * aspect));
+  VIEW_W = Math.max(160, Math.round(VIEW_H * aspect));
   if (cvs.width !== VIEW_W || cvs.height !== VIEW_H) {
     cvs.width = VIEW_W;
     cvs.height = VIEW_H;
@@ -245,7 +246,7 @@ function getEnvAtProgress(p) {
   };
 }
 
-// --- 5 DIEGETIC WIND PRESETS (READ VIA SWAYING TREES & SEDGES — ZERO WIND HUD) ---
+// --- 5 DIEGETIC WIND PRESETS ---
 const WIND_PRESETS = [
   { id: 'STRONG_LEFT',  dir: -1, strength: 1.0,  accel: -0.015 },
   { id: 'BREEZE_LEFT',  dir: -1, strength: 0.42, accel: -0.007 },
@@ -440,6 +441,28 @@ class SoundEngine {
     noise.start(now);
   }
 
+  playDistantWolfHowl() {
+    if (!this.ctx || this.ctx.state !== 'running') return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(255, now);
+    osc.frequency.exponentialRampToValueAtTime(385, now + 0.45);
+    osc.frequency.linearRampToValueAtTime(370, now + 1.15);
+    osc.frequency.exponentialRampToValueAtTime(220, now + 1.85);
+
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.linearRampToValueAtTime(0.032, now + 0.35);
+    gain.gain.setValueAtTime(0.028, now + 1.15);
+    gain.gain.exponentialRampToValueAtTime(0.0008, now + 1.9);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(now);
+    osc.stop(now + 1.95);
+  }
+
   updateAudio(dt) {
     if (!this.ctx || this.ctx.state !== 'running') return;
 
@@ -552,15 +575,10 @@ class SoundEngine {
     this.playNoise(0.22, 1600, 0.10);
   }
   playScoutPan() { this.playTone(260, 390, 0.14, 'sine', 0.06); }
-  playHitImpact() {
-    this.playNoise(0.16, 850, 0.16);
-    this.playTone(190, 75, 0.18, 'triangle', 0.16);
-  }
-  playHitFanfare() {
-    this.playTone(392.00, 392.00, 0.10, 'triangle', 0.13, 0.04);
-    this.playTone(493.88, 493.88, 0.10, 'triangle', 0.13, 0.13);
-    this.playTone(587.33, 587.33, 0.12, 'triangle', 0.14, 0.22);
-    this.playTone(783.99, 783.99, 0.32, 'triangle', 0.16, 0.32);
+  playHitAndPop() {
+    this.playNoise(0.14, 820, 0.16, 0.0);
+    this.playTone(185, 68, 0.16, 'triangle', 0.16, 0.0);
+    this.playTone(290, 540, 0.075, 'sine', 0.13, 0.045);
   }
   playNorthStarChime() {
     this.playTone(523.25, 523.25, 0.25, 'sine', 0.10, 0.0);
@@ -580,10 +598,13 @@ const GRAVITY = 0.145;
 const MAX_ARROWS = 4;
 const TOTAL_ENCOUNTERS = 12;
 const TOTAL_WORLD_WIDTH = 4400;
+const END_RANGE_THRESHOLD_X = TOTAL_WORLD_WIDTH - 490;
 const NO_BLOCK_DEPARTURE_RADIUS = 56;
+const INTRO_WALK_SPEED = 32;
+const RETURN_WALK_SPEED = 78;
 
 // --- INPUT STATE (PARENT ARCADE CABINET postMessage BRIDGE) ---
-const keys = { up: false, down: false, left: false, right: false };
+const keys = { up: false, down: false, left: false, right: false, a: false };
 
 // --- STATE MACHINE ---
 let state = 'TITLE';
@@ -592,7 +613,7 @@ let elapsed = 0;
 let lastTimestamp = 0;
 let beatTimer = 0;
 
-// Title Fade-Out, End-Cutscene Fade-to-Black & First 1/4 Card Bayer Reveal
+// Title Fade-Out, Layered End-Cutscene Fade-to-Black & First 1/4 Card Bayer Reveal
 let titleFadeAlpha = 0.0;
 let firstCardDither = 1.0;
 let screenFadeAlpha = 0.0;
@@ -618,12 +639,18 @@ let walkTargetX = 264;
 let bowPluckVib = 0;
 let basketFillStage = 0;
 let headNodOffset = 0;
+let headTiltUp = 0;
 let hoodWorn = false;
 
-// North Star & End-Game Silent Cutscene State
+// North Star & Celestial Shimmer States
+let introNorthStarAlpha = 0.0;
 let northStarAlpha = 0.0;
+let moonShimmerBoost = 0.0;
+let starShimmerBoost = 0.0;
 let familyAtCampfire = false;
 let returnMoonlitLock = false;
+let lockedMoonScreenX = 0;
+let endCutsceneStartCamX = 0;
 
 // Encounter & Physical Persistent Quiver Stats
 let encounterIdx = 0;
@@ -632,16 +659,16 @@ let embeddedArrows = [];
 let lastOutcomeHit = false;
 let activeWind = WIND_PRESETS[2];
 
-// Bow Aiming & Draw Controls:
-// - Up/Down adjusts launch angle (live both before and while bowstring is drawn)
-// - BUTTON_A begins drawing the bowstring back; pressing BUTTON_A again (or reaching 100% full draw) releases!
+// Press-Hold-Release Bow Draw & Up/Down Aiming State:
+// - Up/Down D-Pad adjusts launch angle (live both before and while bowstring is drawn)
+// - Holding Button A (BUTTON_A_PRESS) draws bowstring back steadily; releasing Button A (BUTTON_A_RELEASE) fires!
 let aimAngleDeg = 32;
 let isDrawing = false;
 let drawPower = 0;
 let lastCreakStep = 0;
 let angleTickCooldown = 0;
 
-// Button B "Look Downfield" Pre-Animation + Scroll Pan
+// Look Downfield Pre-Animation + Scroll Pan
 let scoutMode = 'OFF';
 let scoutTimer = 0;
 const SCOUT_PAN_SPEED = 265;
@@ -683,10 +710,10 @@ let belugaEvent = { timer: 6, active: false, phase: 0, baseX: 210 };
 let geeseFlocks = [];
 let cranes = [];
 let caribouHerd = [];
-let beaverActor = { x: 2450, dir: 1, lodgeX: 2410 };
-let greatGrayOwl = { x: 2750, y: 112 };
-let timberWolf = { x: 3650, dir: 1, pauseTimer: 0 };
-let taigaMoose = { x: 4020 };
+let beaverActor = { x: 2055, dir: 1, lodgeX: 2010 };
+let greatGrayOwl = { x: 1620, y: 112 };
+let timberWolf = { x: 1880, howlTimer: 3.2, isHowling: false };
+let taigaMoose = { x: 2180 };
 
 let particles = [];
 
@@ -702,6 +729,27 @@ function getGroundY(worldX) {
 function getCameraBaseForArcher(ax) {
   const leftMargin = clamp(Math.round(VIEW_W * 0.24), 44, 68);
   return clamp(ax - leftMargin, 0, Math.max(0, TOTAL_WORLD_WIDTH - VIEW_W));
+}
+
+function getHarvestFrameCamX() {
+  return clamp(Math.max(0, 298 - VIEW_W), 0, Math.max(0, TOTAL_WORLD_WIDTH - VIEW_W));
+}
+
+function triggerEndCutscene() {
+  const curProg = clamp(archerX / TOTAL_WORLD_WIDTH, 0, 1);
+  const curEnv = getEnvAtProgress(curProg);
+  lockedMoonScreenX = curEnv.sunX - cameraX * 0.015;
+  endCutsceneStartCamX = cameraX;
+
+  partridge.state = 'COLLECTED';
+  keys.a = false;
+  isDrawing = false;
+  drawPower = 0;
+  scoutMode = 'OFF';
+  beatTimer = 0;
+  playerFacing = 1;
+  playerStance = 'MOON_NOD';
+  state = 'END_CUTSCENE_MOON_NOD';
 }
 
 function buildSevernWorld() {
@@ -737,13 +785,13 @@ function buildSevernWorld() {
   }
 
   deepTrees = [];
-  for (let dx = 135; dx < TOTAL_WORLD_WIDTH * 0.30; dx += 9 + Math.floor(rng() * 8)) {
-    const eqProg = clamp(dx / (TOTAL_WORLD_WIDTH * 0.24), 0, 1);
+  for (let dx = 130; dx < TOTAL_WORLD_WIDTH * 0.35; dx += 8 + Math.floor(rng() * 7)) {
+    const eqProg = clamp((dx - 110) / (TOTAL_WORLD_WIDTH * 0.20), 0, 1);
     deepTrees.push({
       x: dx,
       prog: eqProg,
-      baseH: 14 + Math.floor(rng() * 16),
-      lean: 1.5 + rng() * 2.0
+      baseH: 14 + Math.floor(rng() * 18),
+      lean: 1.0 + rng() * 1.6
     });
   }
 
@@ -816,9 +864,9 @@ function buildSevernWorld() {
     { x: 930, offset: 0.7, antlers: true },
     { x: 960, offset: 2.2, antlers: false }
   ];
-  beaverActor = { x: 1420, dir: 1, lodgeX: 1380 };
+  beaverActor = { x: 2055, dir: 1, lodgeX: 2010 };
   greatGrayOwl = { x: 1620, y: 112 };
-  timberWolf = { x: 1960, dir: 1, pauseTimer: 0 };
+  timberWolf = { x: 1880, howlTimer: 3.2, isHowling: false };
   taigaMoose = { x: 2180 };
 
   ambientParticles = [];
@@ -868,15 +916,23 @@ function initTitleScene() {
   playerStance = 'HIDDEN';
   titleFadeAlpha = 0.0;
   firstCardDither = 0.0;
-  revealEdgeX = Math.round(VIEW_W * 0.25);
+  revealEdgeX = Math.max(80, Math.round(VIEW_W * 0.25));
   screenFadeAlpha = 0.0;
   familyAtCampfire = false;
   returnMoonlitLock = false;
+  introNorthStarAlpha = 0.0;
   northStarAlpha = 0.0;
+  moonShimmerBoost = 0.0;
+  starShimmerBoost = 0.0;
+  headNodOffset = 0;
+  headTiltUp = 0;
   hoodWorn = false;
   flyInBirds = [];
   walkCyclePhase = 0;
   lastStepIndex = -1;
+  keys.a = false;
+  isDrawing = false;
+  drawPower = 0;
   activeWind = WIND_PRESETS[2];
   sfx.setDrumTrackActive(false);
   sfx.setAtmosphereActive(true);
@@ -898,19 +954,26 @@ function beginCutsceneBeat1() {
   basketFillStage = 0;
   familyAtCampfire = false;
   returnMoonlitLock = false;
+  introNorthStarAlpha = 0.85;
   northStarAlpha = 0.0;
+  moonShimmerBoost = 0.0;
+  starShimmerBoost = 0.0;
   headNodOffset = 0;
+  headTiltUp = 0;
   hoodWorn = false;
   flyInBirds = [];
   walkCyclePhase = 0;
   lastStepIndex = -1;
+  keys.a = false;
+  isDrawing = false;
+  drawPower = 0;
 
   archerX = 42;
   playerFacing = 1;
   cameraX = 0;
   targetCameraX = 0;
   firstCardDither = 0.0;
-  revealEdgeX = Math.max(76, Math.round(VIEW_W * 0.25));
+  revealEdgeX = Math.max(80, Math.round(VIEW_W * 0.25));
   playerStance = 'EMERGE';
   beatTimer = 0;
   activeWind = WIND_PRESETS[2];
@@ -947,6 +1010,7 @@ function spawnPartridgeForEncounter(encIdx, fromX) {
   partridge.bobY = 0;
   partridge.hitTimer = 0;
 
+  keys.a = false;
   isDrawing = false;
   drawPower = 0;
   scoutMode = 'OFF';
@@ -1086,7 +1150,7 @@ function drawPushRevealMask(edgeX, firstQuarterFrac) {
   const blockSize = 4;
   const rows = Math.ceil(VIEW_H / blockSize);
   const cols = Math.ceil(VIEW_W / blockSize);
-  const q1Width = Math.max(76, Math.round(VIEW_W * 0.25));
+  const q1Width = Math.max(80, Math.round(VIEW_W * 0.25));
 
   ctx.fillStyle = PAL.BLACKOUT;
 
@@ -1148,10 +1212,11 @@ function drawWorldLayers(camX, env) {
 
   if (env.starAlpha > 0.02) {
     ctx.save();
+    const starParallax = returnMoonlitLock ? 0.004 : 0.02;
     for (let st = 0; st < 40; st++) {
       const twinkle = 0.55 + 0.45 * Math.sin(elapsed * 3.5 + st * 1.9);
       ctx.globalAlpha = env.starAlpha * twinkle;
-      const sx = ((st * 67 + Math.floor(camX * 0.02)) % VIEW_W + VIEW_W) % VIEW_W;
+      const sx = ((st * 67 + Math.floor(camX * starParallax)) % VIEW_W + VIEW_W) % VIEW_W;
       const sy = 5 + ((st * 23) % 68);
       ctx.fillStyle = (st % 5 === 0) ? '#AEE8FF' : PAL.WHITE;
       ctx.fillRect(sx, sy, 1, 1);
@@ -1177,15 +1242,47 @@ function drawWorldLayers(camX, env) {
     ctx.restore();
   }
 
+  if (introNorthStarAlpha > 0.01) {
+    ctx.save();
+    const nsX = Math.round(VIEW_W * 0.24);
+    const nsY = 44;
+    const pulse = Math.round(Math.sin(elapsed * 4.5) * 0.5);
+    ctx.globalAlpha = introNorthStarAlpha * 0.22;
+    ctx.fillStyle = PAL.AURORA_GREEN;
+    ctx.fillRect(nsX - 5 - pulse, nsY - 1, 11 + pulse * 2, 3);
+    ctx.fillRect(nsX - 1, nsY - 5 - pulse, 3, 11 + pulse * 2);
+
+    ctx.globalAlpha = introNorthStarAlpha * 0.85;
+    ctx.fillStyle = PAL.NORTH_STAR;
+    ctx.fillRect(nsX - 6 - pulse, nsY, 13 + pulse * 2, 1);
+    ctx.fillRect(nsX, nsY - 6 - pulse, 1, 13 + pulse * 2);
+    ctx.fillRect(nsX - 1, nsY - 1, 3, 3);
+    ctx.restore();
+  }
+
   if (env.sunAlpha > 0.05) {
     ctx.save();
-    const sx = Math.round(env.sunX - camX * 0.015);
+    const sx = returnMoonlitLock
+      ? Math.round(lockedMoonScreenX - (camX - endCutsceneStartCamX) * 0.003)
+      : Math.round(env.sunX - camX * 0.015);
     const sy = Math.round(env.sunY);
+
+    if (moonShimmerBoost > 0.01) {
+      const shimmerWave = 0.65 + 0.35 * Math.sin(elapsed * 7.5);
+      const radPulse = Math.round(shimmerWave * 3);
+      ctx.globalAlpha = moonShimmerBoost * 0.18 * shimmerWave;
+      ctx.fillStyle = '#FFFBE0';
+      ctx.fillRect(sx - 24 - radPulse, sy - 24 - radPulse, 48 + radPulse * 2, 48 + radPulse * 2);
+      ctx.globalAlpha = moonShimmerBoost * 0.35 * shimmerWave;
+      ctx.fillRect(sx - 18, sy - 1, 36, 2);
+      ctx.fillRect(sx - 1, sy - 18, 2, 36);
+    }
+
     ctx.globalAlpha = env.sunAlpha * 0.24;
     ctx.fillStyle = env.sunGlow;
     ctx.fillRect(sx - 16, sy - 16, 32, 32);
     ctx.globalAlpha = env.sunAlpha * 0.96;
-    ctx.fillStyle = env.sunColor;
+    ctx.fillStyle = moonShimmerBoost > 0.1 ? '#FFFDF0' : env.sunColor;
     ctx.fillRect(sx - 8, sy - 8, 16, 16);
     if (prog > 0.72) {
       ctx.fillStyle = '#B8CBE0';
@@ -1199,8 +1296,17 @@ function drawWorldLayers(camX, env) {
     ctx.save();
     const nsX = Math.round(VIEW_W * 0.30);
     const nsY = 26;
-    const pulse = 1 + Math.round(Math.sin(elapsed * 6) * 0.6);
-    ctx.globalAlpha = northStarAlpha * 0.35;
+    const basePulse = 1 + Math.round(Math.sin(elapsed * 6) * 0.6);
+    const boostPulse = starShimmerBoost > 0.01 ? Math.round((0.5 + 0.5 * Math.sin(elapsed * 9.5)) * 4 * starShimmerBoost) : 0;
+    const pulse = basePulse + boostPulse;
+
+    if (starShimmerBoost > 0.01) {
+      ctx.globalAlpha = starShimmerBoost * 0.28;
+      ctx.fillStyle = '#FFFBE0';
+      ctx.fillRect(nsX - 10 - boostPulse, nsY - 10 - boostPulse, 21 + boostPulse * 2, 21 + boostPulse * 2);
+    }
+
+    ctx.globalAlpha = northStarAlpha * (0.35 + starShimmerBoost * 0.30);
     ctx.fillStyle = PAL.AURORA_GREEN;
     ctx.fillRect(nsX - 5 - pulse, nsY - 1, 11 + pulse * 2, 3);
     ctx.fillRect(nsX - 1, nsY - 5 - pulse, 3, 11 + pulse * 2);
@@ -1277,13 +1383,6 @@ function drawWorldLayers(camX, env) {
     const wallH = Math.round(env.canopyWallHeight);
     ctx.fillStyle = env.deepBase;
     ctx.fillRect(0, deepBaseY - wallH, VIEW_W, wallH + 6);
-    ctx.fillStyle = env.deepDetail;
-    const rShift = Math.floor(camX * 0.15);
-    for (let rx = -24; rx < VIEW_W + 32; rx += 22) {
-      const dx = rx - (rShift % 22);
-      const ridgeBump = ((Math.abs(rx + rShift) / 22) % 3) * 3;
-      ctx.fillRect(dx, deepBaseY - wallH - ridgeBump, 14, 4 + ridgeBump);
-    }
   }
 
   for (const dt of deepTrees) {
@@ -1291,9 +1390,9 @@ function drawWorldLayers(camX, env) {
     const sx = Math.round(dt.x - camX * 0.15);
     if (sx < -24 || sx > VIEW_W + 24) continue;
 
-    const h = Math.round(dt.baseH * (0.45 + env.treeHeightScale * 1.45));
+    const h = Math.round(dt.baseH * (0.50 + env.treeHeightScale * 1.95));
     const gust = Math.sin(elapsed * (1.6 + activeWind.strength * 3.2) + dt.x);
-    const lean = Math.round(activeWind.dir * (activeWind.strength * 3.5 + gust * activeWind.strength));
+    const lean = Math.round(activeWind.dir * (activeWind.strength * 3.0 + gust * activeWind.strength));
 
     ctx.fillStyle = env.deepBase;
     ctx.fillRect(sx, deepBaseY - h + 4, 2, h - 4);
@@ -1358,9 +1457,6 @@ function drawWorldLayers(camX, env) {
       ctx.fillRect(mx + 6, my - 31, 8, 5);
       ctx.fillRect(mx + 5, my - 33, 3, 2);
       ctx.fillRect(mx + 12, my - 33, 3, 2);
-      ctx.fillStyle = env.rimColor;
-      ctx.fillRect(mx - 8, my - 23, 13, 1);
-      ctx.fillRect(mx + 6, my - 33, 8, 1);
     }
   }
 
@@ -1474,28 +1570,55 @@ function drawWorldLayers(camX, env) {
       }
     }
   }
-  if (prog >= 0.70) {
+
+  // Stage 4 Mid-Layer Timber Wolf (~80% scale, NO black outline, NO eye, periodically howling at Grandmother Moon)
+  if (prog >= 0.68) {
     const wx = Math.round(timberWolf.x - camX * 0.5);
     const wy = midGroundY - 1;
-    if (wx >= -24 && wx <= VIEW_W + 24) {
-      const d = timberWolf.dir;
-      const step = timberWolf.pauseTimer > 0 ? 0 : (Math.floor(elapsed * 8) % 2);
+    if (wx >= -26 && wx <= VIEW_W + 26) {
+      const howling = timberWolf.isHowling;
       ctx.save();
       ctx.translate(wx, wy);
-      ctx.scale(d, 1);
-      ctx.fillStyle = '#59534E';
-      ctx.fillRect(-5 + step, -6, 2, 6);
-      ctx.fillRect(3 - step, -6, 2, 6);
-      ctx.fillStyle = '#8A8179';
-      ctx.fillRect(-7, -11, 13, 5);
-      ctx.fillRect(-11, -10, 4, 3);
-      ctx.fillStyle = '#A3998F';
-      ctx.fillRect(5, -14, 5, 4);
-      ctx.fillRect(5, -16, 2, 2);
-      ctx.fillStyle = env.rimColor;
-      ctx.fillRect(-6, -11, 11, 1);
-      ctx.fillStyle = '#FFF282';
-      ctx.fillRect(8, -13, 1, 1);
+
+      ctx.fillStyle = '#524B45';
+      ctx.fillRect(-5, -6, 1, 6);
+      ctx.fillRect(3, -6, 1, 6);
+      ctx.fillStyle = '#857C73';
+      ctx.fillRect(-2, -6, 1, 6);
+      ctx.fillRect(6, -6, 1, 6);
+      ctx.fillStyle = '#CFC7BE';
+      ctx.fillRect(-5, -1, 2, 1);
+      ctx.fillRect(6, -1, 2, 1);
+
+      ctx.fillStyle = '#6E665E';
+      ctx.fillRect(-10, -9, 4, 2);
+      ctx.fillStyle = '#3B3632';
+      ctx.fillRect(-12, -8, 3, 2);
+
+      ctx.fillStyle = '#69615A';
+      ctx.fillRect(-6, -11, 12, 5);
+      ctx.fillStyle = '#9E948B';
+      ctx.fillRect(-5, -11, 10, 3);
+      ctx.fillStyle = '#DED7CE';
+      ctx.fillRect(3, -11, 3, 4);
+
+      if (howling) {
+        ctx.fillStyle = '#8F867D';
+        ctx.fillRect(4, -16, 4, 5);
+        ctx.fillStyle = '#B8AFA6';
+        ctx.fillRect(6, -19, 2, 4);
+        ctx.fillStyle = '#57504A';
+        ctx.fillRect(3, -18, 1, 2);
+      } else {
+        ctx.fillStyle = '#8F867D';
+        ctx.fillRect(4, -14, 5, 4);
+        ctx.fillStyle = '#B8AFA6';
+        ctx.fillRect(8, -13, 3, 2);
+        ctx.fillStyle = '#57504A';
+        ctx.fillRect(4, -17, 1, 2);
+        ctx.fillRect(6, -16, 1, 1);
+      }
+
       ctx.restore();
     }
   }
@@ -1506,7 +1629,7 @@ function drawWorldLayers(camX, env) {
   ctx.fillRect(0, midTop, VIEW_W, midH);
   ctx.restore();
 
-  // === FIXED SEVERN RIVER BAND (0.85x) — CONSTANT STEADY CURRENT SPEED ===
+  // === FIXED SEVERN RIVER BAND (0.85x) ===
   const riverTop = 149;
   const riverH = 29;
   ctx.fillStyle = env.riverMain;
@@ -1543,59 +1666,137 @@ function drawWorldLayers(camX, env) {
     }
   }
 
-  if (prog >= 0.46 && prog <= 0.78) {
+  // Stage 3 Beaver Lodge on Far Riverbank (also rendered as a snow-dusted night lodge during final return walk)
+  const showBeaverLodge = (prog >= 0.44 && prog <= 0.82) || returnMoonlitLock;
+  if (showBeaverLodge) {
     const lodgeX = Math.round(beaverActor.lodgeX - camX * 0.85);
-    if (lodgeX > -40 && lodgeX < VIEW_W + 40) {
-      ctx.fillStyle = '#2E1E14';
-      ctx.fillRect(lodgeX - 10, riverTop - 1, 20, 6);
-      ctx.fillStyle = '#4F3524';
-      ctx.fillRect(lodgeX - 7, riverTop - 3, 14, 3);
+    if (lodgeX > -45 && lodgeX < VIEW_W + 45) {
+      if (returnMoonlitLock) {
+        ctx.fillStyle = '#1B2E40';
+        ctx.fillRect(lodgeX - 18, riverTop - 2, 36, 4);
+        ctx.fillStyle = '#121E2B';
+        ctx.fillRect(lodgeX - 14, riverTop - 6, 28, 7);
+        ctx.fillStyle = '#25394D';
+        ctx.fillRect(lodgeX - 12, riverTop - 9, 24, 6);
+        ctx.fillStyle = '#A8C2D9';
+        ctx.fillRect(lodgeX - 10, riverTop - 10, 20, 3);
+        ctx.fillStyle = '#DCEBF7';
+        ctx.fillRect(lodgeX - 8, riverTop - 11, 16, 2);
+        ctx.fillStyle = '#6D859C';
+        ctx.fillRect(lodgeX - 9, riverTop - 6, 6, 1);
+        ctx.fillRect(lodgeX + 3, riverTop - 5, 7, 1);
+        ctx.fillStyle = '#7EA2BF';
+        ctx.fillRect(lodgeX - 16, riverTop + 1, 32, 1);
+      } else {
+        ctx.fillStyle = '#332419';
+        ctx.fillRect(lodgeX - 18, riverTop - 2, 36, 4);
+        ctx.fillStyle = '#24160E';
+        ctx.fillRect(lodgeX - 14, riverTop - 6, 28, 7);
+        ctx.fillStyle = '#4A3120';
+        ctx.fillRect(lodgeX - 12, riverTop - 9, 24, 6);
+        ctx.fillStyle = '#6E4B32';
+        ctx.fillRect(lodgeX - 8, riverTop - 11, 16, 4);
+        ctx.fillStyle = '#B89D74';
+        ctx.fillRect(lodgeX - 10, riverTop - 7, 6, 1);
+        ctx.fillRect(lodgeX - 3, riverTop - 10, 7, 1);
+        ctx.fillRect(lodgeX + 4, riverTop - 6, 7, 1);
+        ctx.fillRect(lodgeX - 6, riverTop - 4, 8, 1);
+        ctx.fillStyle = env.rimColor;
+        ctx.fillRect(lodgeX - 7, riverTop - 11, 14, 1);
+        ctx.fillStyle = env.riverFoam;
+        ctx.fillRect(lodgeX - 16, riverTop + 1, 32, 1);
+      }
     }
-    const bx = Math.round(beaverActor.x - camX * 0.85);
-    const by = riverTop + 13;
-    if (bx > -30 && bx < VIEW_W + 30) {
-      ctx.fillStyle = env.riverFoam;
-      ctx.fillRect(bx - 11, by - 2, 9, 1);
-      ctx.fillRect(bx - 11, by + 3, 9, 1);
-      ctx.fillRect(bx - 4, by - 1, 4, 1);
-      ctx.fillRect(bx - 4, by + 2, 4, 1);
-      ctx.fillStyle = '#3B2214';
-      ctx.fillRect(bx - 7, by, 6, 3);
-      ctx.fillRect(bx, by - 1, 6, 4);
+
+    if (!returnMoonlitLock) {
+      const bx = Math.round(beaverActor.x - camX * 0.85);
+      const by = riverTop + 14;
+      if (bx > -35 && bx < VIEW_W + 35) {
+        const d = beaverActor.dir;
+        const tailBob = Math.round(Math.sin(elapsed * 7) * 0.8);
+        ctx.save();
+        ctx.translate(bx, by);
+        ctx.scale(d, 1);
+
+        ctx.fillStyle = env.riverFoam;
+        ctx.fillRect(-15, -3, 10, 1);
+        ctx.fillRect(-15, 4, 10, 1);
+        ctx.fillRect(-8, -2, 6, 1);
+        ctx.fillRect(-8, 3, 6, 1);
+
+        ctx.fillStyle = '#1E1A18';
+        ctx.fillRect(-11, -1 + tailBob, 6, 3);
+        ctx.fillStyle = '#3B3532';
+        ctx.fillRect(-10, tailBob, 4, 1);
+
+        ctx.fillStyle = '#331D10';
+        ctx.fillRect(-5, -3, 8, 4);
+        ctx.fillStyle = '#5E3820';
+        ctx.fillRect(-4, -3, 6, 2);
+        ctx.fillStyle = env.rimColor;
+        ctx.fillRect(-3, -3, 5, 1);
+
+        ctx.fillStyle = '#4A2B18';
+        ctx.fillRect(3, -4, 5, 4);
+        ctx.fillStyle = '#754729';
+        ctx.fillRect(4, -4, 3, 2);
+        ctx.fillStyle = '#24140B';
+        ctx.fillRect(3, -5, 1, 1);
+        ctx.fillStyle = PAL.INK;
+        ctx.fillRect(6, -3, 1, 1);
+        ctx.fillStyle = env.riverFoam;
+        ctx.fillRect(7, 0, 4, 1);
+
+        ctx.restore();
+      }
     }
   }
+}
+
+// === SHARED RIGHTWARD-FACING FLYING PARTRIDGE SPRITE ===
+function drawFlyingPartridgeSprite(sx, sy, env, phaseOffset = 0) {
+  const flap = Math.floor(elapsed * 20 + phaseOffset) % 2;
+  ctx.save();
+  ctx.translate(Math.round(sx), Math.round(sy));
+
+  ctx.fillStyle = PAL.GROUSE_DARK;
+  ctx.fillRect(-5, -3, 10, 5);
+  ctx.fillStyle = PAL.GROUSE_MID;
+  ctx.fillRect(-4, -2, 8, 3);
+
+  ctx.fillStyle = PAL.GROUSE_DARK;
+  ctx.fillRect(-8, -3, 3, 4);
+  ctx.fillStyle = PAL.GROUSE_LIGHT;
+  ctx.fillRect(-7, -2, 2, 2);
+
+  ctx.fillStyle = PAL.GROUSE_MID;
+  ctx.fillRect(4, -5, 4, 4);
+  ctx.fillStyle = PAL.TRADE_SCARLET;
+  ctx.fillRect(6, -5, 2, 1);
+  ctx.fillStyle = PAL.HIDE_LIGHT;
+  ctx.fillRect(8, -4, 2, 1);
+
+  ctx.fillStyle = PAL.GROUSE_LIGHT;
+  if (flap === 0) {
+    ctx.fillRect(-2, -9, 6, 6);
+  } else {
+    ctx.fillRect(-2, 1, 6, 5);
+  }
+
+  if (env.auroraAlpha < 0.35) {
+    ctx.fillStyle = env.rimColor;
+    ctx.globalAlpha = 0.6;
+    ctx.fillRect(-2, -9, 6, 1);
+  }
+  ctx.restore();
 }
 
 // === STAGGERED PARTRIDGE FLY-IN SPRITES ===
 function drawFlyInBirds(env) {
   for (const fb of flyInBirds) {
     if (fb.delay > 0) continue;
-    const sx = Math.round(fb.x);
-    const sy = Math.round(fb.y);
-    if (sx < -30 || sx > VIEW_W + 30) continue;
-
-    const flap = Math.floor(elapsed * 20 + fb.y) % 2;
-    ctx.save();
-    ctx.translate(sx, sy);
-
-    ctx.fillStyle = PAL.GROUSE_DARK;
-    ctx.fillRect(-5, -3, 10, 5);
-    ctx.fillStyle = PAL.GROUSE_MID;
-    ctx.fillRect(-4, -2, 8, 3);
-    ctx.fillStyle = PAL.GROUSE_DARK;
-    ctx.fillRect(-8, -3, 3, 4);
-    ctx.fillStyle = PAL.GROUSE_MID;
-    ctx.fillRect(4, -5, 4, 4);
-    ctx.fillStyle = PAL.GROUSE_LIGHT;
-    if (flap === 0) {
-      ctx.fillRect(-2, -9, 6, 6);
-    } else {
-      ctx.fillRect(-2, 1, 6, 5);
-    }
-    ctx.fillStyle = env.rimColor;
-    ctx.globalAlpha = 0.6;
-    ctx.fillRect(-2, -9, 6, 1);
-    ctx.restore();
+    if (fb.x < -30 || fb.x > VIEW_W + 30) continue;
+    drawFlyingPartridgeSprite(fb.x, fb.y, env, fb.y);
   }
 }
 
@@ -1628,8 +1829,8 @@ function drawSeatedFamilyMember(sx, sy, robeMain, robeTrim, hoodColor, facingDir
   ctx.restore();
 }
 
-// === EHWASAHAK CRESCENT VILLAGE ===
-function drawEhwasahakVillage(camX) {
+// === TIPI VILLAGE SILHOUETTE LAYER ===
+function drawTipiLodges(camX, silhouetteOnly = false) {
   if (camX > 620) return;
 
   const lodges = [
@@ -1642,6 +1843,35 @@ function drawEhwasahakVillage(camX) {
     const sx = Math.round(lg.wx - camX);
     const sy = lg.wy;
     const halfW = Math.floor(lg.w / 2);
+
+    if (silhouetteOnly) {
+      ctx.strokeStyle = '#18263B';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(sx - 8, sy - lg.h - 10);
+      ctx.lineTo(sx + 6, sy - lg.h + 6);
+      ctx.moveTo(sx + 8, sy - lg.h - 10);
+      ctx.lineTo(sx - 6, sy - lg.h + 6);
+      ctx.stroke();
+
+      ctx.fillStyle = '#0D1626';
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - lg.h);
+      ctx.lineTo(sx - halfW, sy);
+      ctx.lineTo(sx + halfW, sy);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = '#2C4A66';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - lg.h);
+      ctx.lineTo(sx - halfW, sy);
+      ctx.moveTo(sx, sy - lg.h);
+      ctx.lineTo(sx + halfW, sy);
+      ctx.stroke();
+      continue;
+    }
 
     ctx.strokeStyle = '#5C432E';
     ctx.lineWidth = 2;
@@ -1708,6 +1938,13 @@ function drawEhwasahakVillage(camX) {
       ctx.fillRect(smokeX, smokeY, 3, 2);
     }
   }
+}
+
+// === EHWASAHAK CRESCENT VILLAGE ===
+function drawEhwasahakVillage(camX) {
+  if (camX > 620) return;
+
+  drawTipiLodges(camX, false);
 
   const fireX = Math.round(104 - camX);
   ctx.fillStyle = '#3B4247';
@@ -1944,7 +2181,7 @@ function drawQuiverDots(sx, sy) {
   }
 }
 
-// === SWAMPY CREE WOMAN: SUBTLE, GROUNDED FORWARD WALKING GAIT & CLEAN PROFILE ===
+// === SWAMPY CREE WOMAN ===
 function drawCreeWoman(camX, env) {
   if (playerStance === 'HIDDEN' || state === 'CUTSCENE_REVEAL_1' || (state === 'CUTSCENE_REVEAL_2' && playerStance === 'EMERGE')) {
     const rackToolX = Math.round(122 - camX);
@@ -2109,7 +2346,7 @@ function drawCreeWoman(camX, env) {
   ctx.fillRect(-3, by - 21, 2, 2);
   ctx.fillRect(2, by - 21, 2, 2);
 
-  const headY = by - 36 + headNodOffset;
+  const headY = by - 36 + headNodOffset + headTiltUp;
   ctx.fillStyle = PAL.SKIN_SHADE;
   ctx.fillRect(-2, headY, 6, 7);
   ctx.fillStyle = PAL.SKIN_MID;
@@ -2120,7 +2357,7 @@ function drawCreeWoman(camX, env) {
   if (hoodWorn) {
     ctx.fillStyle = PAL.TRADE_SCARLET;
     ctx.fillRect(-3, headY - 1, 7, 3);
-    ctx.fillRect(-4, headY, 3, 9);
+    ctx.fillRect(-4, headY, 3, 9 - headTiltUp);
     ctx.fillRect(-5, by - 29, 4, 4);
     ctx.fillStyle = PAL.TRADE_GOLD;
     ctx.fillRect(3, headY, 1, 7);
@@ -2162,6 +2399,15 @@ function drawCreeWoman(camX, env) {
   }
 
   if (playerStance === 'EMERGE' || playerStance === 'MOON_NOD') {
+    if (playerStance === 'MOON_NOD') {
+      ctx.strokeStyle = PAL.BOW_WOOD;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-8, by - 31);
+      ctx.quadraticCurveTo(-10, by - 23, -4, by - 16);
+      ctx.stroke();
+      drawWovenBasket(-8, by - 12, basketFillStage);
+    }
     ctx.fillStyle = PAL.TRADE_BLANKET_IVORY;
     ctx.fillRect(-1, by - 27, 3, 6);
     ctx.fillStyle = PAL.SKIN_MID;
@@ -2325,6 +2571,11 @@ function drawPartridge(camX, env) {
   const sy = Math.round(partridge.y + partridge.bobY);
   if (sx < -35 || sx > VIEW_W + 35) return;
 
+  if (partridge.state === 'FLEEING') {
+    drawFlyingPartridgeSprite(sx, sy - 8, env, partridge.baseX);
+    return;
+  }
+
   ctx.save();
   ctx.translate(sx, sy);
 
@@ -2363,22 +2614,6 @@ function drawPartridge(camX, env) {
     const ang = partridge.impactAngle;
     const len = 14;
     drawArrowSprite(-Math.cos(ang) * len, -3 - Math.sin(ang) * len, 0, -3);
-    ctx.restore();
-    return;
-  }
-
-  if (partridge.state === 'FLEEING') {
-    ctx.scale(-1, 1);
-    const flap = Math.floor(elapsed * 22) % 2;
-    ctx.fillStyle = PAL.GROUSE_DARK;
-    ctx.fillRect(-5, -10, 11, 6);
-    ctx.fillStyle = PAL.GROUSE_MID;
-    ctx.fillRect(-4, -9, 9, 4);
-    ctx.fillStyle = PAL.GROUSE_LIGHT;
-    if (flap === 0) ctx.fillRect(-2, -16, 6, 6);
-    else ctx.fillRect(-2, -6, 6, 5);
-    ctx.fillStyle = PAL.GROUSE_MID;
-    ctx.fillRect(-8, -13, 4, 4);
     ctx.restore();
     return;
   }
@@ -2424,16 +2659,18 @@ function drawPartridge(camX, env) {
   ctx.fillStyle = PAL.HIDE_LIGHT;
   ctx.fillRect(-10, -14 + headLift, 2, 2);
 
-  ctx.fillStyle = env.rimColor;
-  ctx.globalAlpha = env.rimAlpha * 0.7;
-  ctx.fillRect(-7, -16 + headLift, 5, 1);
-  ctx.fillRect(-4, -11, 9, 1);
-  ctx.globalAlpha = 1.0;
+  if (env.auroraAlpha < 0.35) {
+    ctx.fillStyle = env.rimColor;
+    ctx.globalAlpha = env.rimAlpha * 0.7;
+    ctx.fillRect(-7, -16 + headLift, 5, 1);
+    ctx.fillRect(-4, -11, 9, 1);
+    ctx.globalAlpha = 1.0;
+  }
 
   ctx.restore();
 }
 
-// --- SLINGSHOT-COMPATIBLE LAUNCH VECTOR & SHORT 3-DOT PROJECTION ---
+// --- LAUNCH VECTOR & SHORT 3-DOT PROJECTION ---
 function getLaunchVector(powerRatio) {
   const rad = (aimAngleDeg * Math.PI) / 180;
   const speed = 3.2 + powerRatio * 6.8;
@@ -2443,12 +2680,12 @@ function getLaunchVector(powerRatio) {
   };
 }
 
-function drawTrajectoryPreview(camX) {
+function drawTrajectoryProjection(camX) {
   if (state !== 'AIM_AND_SHOOT' || scoutMode !== 'OFF' || arrowsInQuiver <= 0) return;
+
   const rad = (aimAngleDeg * Math.PI) / 180;
   const startX = archerX + Math.cos(rad) * 14;
   const startY = getGroundY(archerX) - 26 - Math.sin(rad) * 14;
-
   const previewPower = isDrawing ? Math.max(0.15, drawPower) : 0.62;
   const vel = getLaunchVector(previewPower);
 
@@ -2530,6 +2767,11 @@ function update(dt) {
   sfx.updateAudio(dt);
   riverFlowDist += 14 * dt;
 
+  // Gently fade out the lingering Title Screen North Star as the morning sunrise scene unfolds
+  if (introNorthStarAlpha > 0) {
+    introNorthStarAlpha = Math.max(0, introNorthStarAlpha - dt * 0.065);
+  }
+
   for (let i = flyInBirds.length - 1; i >= 0; i--) {
     const fb = flyInBirds[i];
     if (fb.delay > 0) {
@@ -2565,13 +2807,21 @@ function update(dt) {
   if (beaverActor.x > beaverActor.lodgeX + 95) beaverActor.dir = -1;
   if (beaverActor.x < beaverActor.lodgeX - 25) beaverActor.dir = 1;
 
-  if (timberWolf.pauseTimer > 0) {
-    timberWolf.pauseTimer -= dt;
-  } else {
-    timberWolf.x += timberWolf.dir * 18 * dt;
-    if (Math.random() < 0.25 * dt) timberWolf.pauseTimer = 1.2;
-    if (timberWolf.x > 2120) timberWolf.dir = -1;
-    if (timberWolf.x < 1820) timberWolf.dir = 1;
+  const curProg = returnMoonlitLock ? 0.96 : clamp(archerX / TOTAL_WORLD_WIDTH, 0, 1);
+  if (curProg >= 0.72) {
+    timberWolf.howlTimer -= dt;
+    if (timberWolf.howlTimer <= 0) {
+      timberWolf.isHowling = !timberWolf.isHowling;
+      if (timberWolf.isHowling) {
+        timberWolf.howlTimer = 2.1;
+        const wxScreen = Math.round(timberWolf.x - cameraX * 0.5);
+        if (wxScreen >= -30 && wxScreen <= VIEW_W + 30) {
+          sfx.playDistantWolfHowl();
+        }
+      } else {
+        timberWolf.howlTimer = 4.2 + Math.random() * 2.5;
+      }
+    }
   }
 
   if (partridge.state === 'STRUT' || partridge.state === 'ALERT') {
@@ -2603,10 +2853,10 @@ function update(dt) {
   }
 
   // =========================================================================
-  // 1:1 OPENING CUTSCENE: ASPECT-SAFE PUSH-TO-REVEAL + SMOOTH CAMERA FOLLOW
+  // 1:1 OPENING CUTSCENE (ASPECT-RATIO ADAPTIVE FRAMING)
   // =========================================================================
   else if (state === 'CUTSCENE_REVEAL_1') {
-    const q1Width = Math.max(76, Math.round(VIEW_W * 0.25));
+    const q1Width = Math.max(80, Math.round(VIEW_W * 0.25));
     beatTimer += dt;
     cameraX = 0;
     firstCardDither = Math.min(1.0, beatTimer / 1.1);
@@ -2629,6 +2879,7 @@ function update(dt) {
     }
   } else if (state === 'CUTSCENE_REVEAL_2') {
     beatTimer += dt;
+    const harvestFrameCamX = getHarvestFrameCamX();
 
     if (beatTimer < 1.3) {
       playerStance = 'WALK_BASKET';
@@ -2646,8 +2897,8 @@ function update(dt) {
       bowPluckVib = Math.max(0, bowPluckVib - dt * 1.2);
     }
 
-    const desiredCam2 = Math.max(0, (archerX + 34) - VIEW_W * 0.72);
-    cameraX += (desiredCam2 - cameraX) * Math.min(1, 6.0 * dt);
+    const desiredCam = clamp(archerX - Math.round(VIEW_W * 0.48), 0, harvestFrameCamX);
+    cameraX += (desiredCam - cameraX) * Math.min(1, 4.0 * dt);
     revealEdgeX = Math.max(revealEdgeX, Math.round((archerX - cameraX) + 38));
 
     if (beatTimer >= 4.2) {
@@ -2656,23 +2907,25 @@ function update(dt) {
     }
   } else if (state === 'CUTSCENE_REVEAL_3') {
     beatTimer += dt;
+    const harvestFrameCamX = getHarvestFrameCamX();
 
     if (beatTimer < 0.9) {
       playerStance = 'EMERGE';
     } else {
       playerStance = 'WALK_BASKET';
-      const nextX = Math.min(264, 118 + (beatTimer - 0.9) * 32);
+      const nextX = Math.min(264, 118 + (beatTimer - 0.9) * INTRO_WALK_SPEED);
       advanceWalkMotion(nextX - archerX);
       archerX = nextX;
     }
 
-    const harvestFrameCamX = Math.max(0, 298 - VIEW_W);
-    const desiredCam3 = Math.max(0, (archerX + 42) - VIEW_W * 0.82);
-    cameraX += (Math.min(harvestFrameCamX, desiredCam3) - cameraX) * Math.min(1, 6.5 * dt);
+    const walkFrac = clamp((archerX - 118) / (264 - 118), 0, 1);
+    const targetHarvestCam = lerp(cameraX, harvestFrameCamX, walkFrac);
+    cameraX += (targetHarvestCam - cameraX) * Math.min(1, 5.5 * dt);
     revealEdgeX = Math.min(VIEW_W, Math.max(revealEdgeX, Math.round((archerX - cameraX) + 46)));
 
     if (archerX >= 264) {
       archerX = 264;
+      revealEdgeX = VIEW_W;
       beatTimer = 0;
       spawnPartridgeForEncounter(0, archerX);
       triggerPartridgeFlyIn();
@@ -2681,11 +2934,10 @@ function update(dt) {
   } else if (state === 'CUTSCENE_REVEAL_4_HARVEST') {
     const prevT = beatTimer;
     beatTimer += dt;
+    revealEdgeX = VIEW_W;
 
-    const harvestFrameCamX = Math.max(0, 298 - VIEW_W);
-    cameraX += (harvestFrameCamX - cameraX) * Math.min(1, 8.0 * dt);
-    revealEdgeX = Math.min(VIEW_W, Math.max(revealEdgeX, Math.round((278 - cameraX) + 24)));
-    if (beatTimer >= 0.45) revealEdgeX = VIEW_W;
+    const harvestFrameCamX = getHarvestFrameCamX();
+    cameraX += (harvestFrameCamX - cameraX) * Math.min(1, 6.0 * dt);
 
     if (beatTimer < 5.0) {
       playerStance = 'KNEEL_BERRY';
@@ -2741,7 +2993,7 @@ function update(dt) {
   }
 
   // =========================================================================
-  // INTERACTIVE PHASE: 2-AXIS AIM & STEADY BOW DRAW
+  // INTERACTIVE PHASE: PRESS-HOLD-RELEASE BUTTON A BOW DRAW & UP/DOWN AIM
   // =========================================================================
   else if (state === 'AIM_AND_SHOOT') {
     playerFacing = 1;
@@ -2776,6 +3028,7 @@ function update(dt) {
       cameraX += (baseCam - cameraX) * Math.min(1, 8.5 * dt);
     }
 
+    // Live Up/Down D-Pad launch angle control (works both before and while Button A is held)
     if (angleTickCooldown > 0) angleTickCooldown = Math.max(0, angleTickCooldown - dt);
     let aimChanged = false;
     if (keys.up) { aimAngleDeg = Math.min(76, aimAngleDeg + 46 * dt); aimChanged = true; }
@@ -2785,17 +3038,13 @@ function update(dt) {
       angleTickCooldown = 0.1;
     }
 
-    // Steady, unhurried bow draw when isDrawing is active
-    if (isDrawing) {
+    // Steady, unhurried bowstring draw while Button A is held down (caps at 1.0 until released)
+    if (isDrawing && keys.a) {
       drawPower = Math.min(1.0, drawPower + 0.36 * dt);
       const step = Math.floor(drawPower * 5);
       if (step > lastCreakStep) {
         lastCreakStep = step;
         sfx.playBowCreak(drawPower);
-      }
-      // Auto-releases cleanly if drawn all the way to 100% full tension
-      if (drawPower >= 1.0) {
-        launchArrow();
       }
     }
   } else if (state === 'FLYING') {
@@ -2909,10 +3158,8 @@ function update(dt) {
     playerStance = 'SCAN_BROW';
     if (beatTimer >= 1.35) {
       encounterIdx++;
-      if (encounterIdx >= TOTAL_ENCOUNTERS) {
-        beatTimer = 0;
-        playerStance = 'MOON_NOD';
-        state = 'END_CUTSCENE_MOON_NOD';
+      if (encounterIdx >= TOTAL_ENCOUNTERS || archerX >= END_RANGE_THRESHOLD_X) {
+        triggerEndCutscene();
         return;
       }
 
@@ -2993,6 +3240,10 @@ function update(dt) {
       basketFillStage = milestoneIdx + 1;
     }
     if (beatTimer >= 5.0) {
+      if (archerX >= END_RANGE_THRESHOLD_X) {
+        triggerEndCutscene();
+        return;
+      }
       spawnPartridgeForEncounter(encounterIdx, archerX);
       beatTimer = 0;
       panSubPhase = 0;
@@ -3003,19 +3254,26 @@ function update(dt) {
   }
 
   // =========================================================================
-  // END-GAME SILENT CUTSCENE: GRANDMOTHER MOON NOD -> NORTH STAR -> WALK HOME
+  // END-GAME SILENT CUTSCENE: GRANDMOTHER MOON GAZE -> NORTH STAR GAZE -> WALK HOME
   // =========================================================================
   else if (state === 'END_CUTSCENE_MOON_NOD') {
     beatTimer += dt;
+    playerFacing = 1;
     playerStance = 'MOON_NOD';
-    if (beatTimer >= 0.8 && beatTimer <= 1.8) {
-      headNodOffset = Math.round(Math.sin(((beatTimer - 0.8) / 1.0) * Math.PI) * 2);
+    headTiltUp = -2;
+    moonShimmerBoost = Math.sin(clamp(beatTimer / 2.8, 0, 1) * Math.PI);
+
+    if (beatTimer >= 1.1 && beatTimer <= 2.1) {
+      headNodOffset = Math.round(Math.sin(((beatTimer - 1.1) / 1.0) * Math.PI) * 2);
     } else {
       headNodOffset = 0;
     }
 
-    if (beatTimer >= 2.6) {
+    if (beatTimer >= 2.8) {
       beatTimer = 0;
+      headNodOffset = 0;
+      headTiltUp = -2;
+      moonShimmerBoost = 0;
       playerFacing = -1;
       playerStance = 'NORTH_STAR_GAZE';
       sfx.playNorthStarChime();
@@ -3025,10 +3283,14 @@ function update(dt) {
     beatTimer += dt;
     playerFacing = -1;
     playerStance = 'NORTH_STAR_GAZE';
+    headTiltUp = -2;
     northStarAlpha = 1.0;
+    starShimmerBoost = Math.sin(clamp(beatTimer / 2.8, 0, 1) * Math.PI);
 
-    if (beatTimer >= 2.6) {
+    if (beatTimer >= 2.8) {
       beatTimer = 0;
+      headTiltUp = 0;
+      starShimmerBoost = 0;
       familyAtCampfire = true;
       returnMoonlitLock = true;
       sfx.setDrumTrackActive(false);
@@ -3038,9 +3300,10 @@ function update(dt) {
   } else if (state === 'END_CUTSCENE_WALK_HOME') {
     playerFacing = -1;
     playerStance = 'WALK_BASKET';
-    const step = 240 * dt;
+    headTiltUp = 0;
+    const step = RETURN_WALK_SPEED * dt;
     archerX -= step;
-    advanceWalkMotion(step * 0.55);
+    advanceWalkMotion(step * 0.72);
     cameraX = clamp(archerX - Math.round(VIEW_W * 0.56), 0, Math.max(0, TOTAL_WORLD_WIDTH - VIEW_W));
 
     if (archerX <= 116) {
@@ -3056,12 +3319,12 @@ function update(dt) {
     playerFacing = -1;
     playerStance = 'EMERGE';
 
-    if (beatTimer >= 2.2) {
-      screenFadeAlpha = Math.min(1.0, screenFadeAlpha + dt * 0.45);
+    if (beatTimer >= 4.5) {
+      screenFadeAlpha = Math.min(1.0, screenFadeAlpha + dt * 0.22);
       if (screenFadeAlpha >= 0.85) {
         sfx.setAtmosphereActive(false);
       }
-      if (screenFadeAlpha >= 1.0 && beatTimer >= 5.2) {
+      if (screenFadeAlpha >= 1.0 && beatTimer >= 9.8) {
         initTitleScene();
       }
     }
@@ -3069,8 +3332,9 @@ function update(dt) {
 }
 
 function launchArrow() {
+  keys.a = false;
   isDrawing = false;
-  const finalPower = Math.max(0.14, drawPower);
+  const finalPower = Math.max(0.18, drawPower);
   const rad = (aimAngleDeg * Math.PI) / 180;
   const startX = archerX + Math.cos(rad) * 14;
   const startY = getGroundY(archerX) - 26 - Math.sin(rad) * 14;
@@ -3118,8 +3382,7 @@ function updateArrowFlight(stepScale) {
         lastOutcomeHit = true;
 
         spawnParticles(partridge.x, partridge.y, [PAL.GROUSE_LIGHT, PAL.GROUSE_MID, PAL.WHITE, PAL.TRADE_SCARLET], 24);
-        sfx.playHitImpact();
-        sfx.playHitFanfare();
+        sfx.playHitAndPop();
 
         beatTimer = 0;
         state = 'HIT_HOLD_AND_PAN';
@@ -3127,11 +3390,12 @@ function updateArrowFlight(stepScale) {
       }
     }
 
+    // Arrows hitting a tree embed directly into the tree at arrow.y rather than dropping to the ground
     for (const item of foregroundItems) {
       if (item.type === 'KRUMMHOLZ_FG' || item.type === 'TAIGA_SPRUCE_FG') {
         if (Math.abs(item.x - archerX) <= NO_BLOCK_DEPARTURE_RADIUS) continue;
         if (Math.abs(arrow.x - item.x) < 5 && arrow.y > item.y - item.h + 4 && arrow.y < item.y) {
-          embedArrow(arrow.x, getGroundY(arrow.x));
+          embedArrow(arrow.x, arrow.y);
           return;
         }
       }
@@ -3159,7 +3423,7 @@ function embedArrow(wx, wy) {
   embeddedArrows.push({
     x: wx,
     y: wy,
-    angle: clamp(arrow.angle, 0.25, 1.35)
+    angle: clamp(arrow.angle, -1.15, 1.35)
   });
 
   spawnParticles(wx, wy, ['#7D6E42', '#52412E'], 10);
@@ -3184,7 +3448,7 @@ function render(dt) {
   drawForegroundTerrainAndProps(cameraX, env);
   drawPartridge(cameraX, env);
   drawCreeWoman(cameraX, env);
-  drawTrajectoryPreview(cameraX);
+  drawTrajectoryProjection(cameraX);
 
   if (arrow.active) {
     for (let i = 0; i < arrow.trail.length; i++) {
@@ -3209,6 +3473,29 @@ function render(dt) {
     ctx.globalAlpha = screenFadeAlpha;
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
     ctx.globalAlpha = 1.0;
+
+    if (state === 'END_CUTSCENE_FAMILY_FADE' && northStarAlpha > 0.02) {
+      const lingeringStarAlpha = clamp(1.0 - screenFadeAlpha * 0.85, 0, 1);
+      if (lingeringStarAlpha > 0.02) {
+        ctx.save();
+        const nsX = Math.round(VIEW_W * 0.30);
+        const nsY = 26;
+        const pulse = 1 + Math.round(Math.sin(elapsed * 6) * 0.6);
+        ctx.globalAlpha = lingeringStarAlpha * 0.35;
+        ctx.fillStyle = PAL.AURORA_GREEN;
+        ctx.fillRect(nsX - 5 - pulse, nsY - 1, 11 + pulse * 2, 3);
+        ctx.fillRect(nsX - 1, nsY - 5 - pulse, 3, 11 + pulse * 2);
+
+        ctx.globalAlpha = lingeringStarAlpha;
+        ctx.fillStyle = PAL.NORTH_STAR;
+        ctx.fillRect(nsX - 6 - pulse, nsY, 13 + pulse * 2, 1);
+        ctx.fillRect(nsX, nsY - 6 - pulse, 1, 13 + pulse * 2);
+        ctx.fillRect(nsX - 2, nsY - 2, 5, 5);
+        ctx.fillStyle = PAL.WHITE;
+        ctx.fillRect(nsX - 1, nsY - 1, 3, 3);
+        ctx.restore();
+      }
+    }
   }
 
   if (isPaused) {
@@ -3229,8 +3516,7 @@ function gameLoop(timestamp) {
   requestAnimationFrame(gameLoop);
 }
 
-// --- ARCADE CABINET postMessage BRIDGE ---
-let lastBtnATime = 0;
+// --- ARCADE CABINET postMessage BRIDGE (PRESS-HOLD-RELEASE BUTTON A BOW DRAW) ---
 let lastBtnBTime = 0;
 const BUTTON_DEBOUNCE_MS = 110;
 const DPAD_HOLD_WINDOW_MS = 145;
@@ -3249,11 +3535,23 @@ function setDirectionHold(dirKey, pressed) {
   keys[dirKey] = pressed;
 }
 
-function beginBowDraw() {
+function handleButtonADown() {
+  if (isPaused) return;
+  sfx.init();
+
+  if (state === 'TITLE') {
+    startTitleFadeOut();
+    return;
+  }
+
+  if (state !== 'AIM_AND_SHOOT') return;
   if (isDrawing || arrowsInQuiver <= 0) return;
+
+  keys.a = true;
   isDrawing = true;
   drawPower = 0.05;
   lastCreakStep = 0;
+
   if (scoutMode !== 'OFF') {
     scoutMode = 'OFF';
     cameraX = getCameraBaseForArcher(archerX);
@@ -3262,29 +3560,11 @@ function beginBowDraw() {
   sfx.playBowCreak(drawPower);
 }
 
-function handleButtonA_Signal(mode) {
+function handleButtonAUp() {
+  keys.a = false;
   if (isPaused) return;
-  sfx.init();
-
-  if (state === 'TITLE') {
-    if (mode !== 'RELEASE') startTitleFadeOut();
-    return;
-  }
-
-  if (state !== 'AIM_AND_SHOOT') return;
-
-  if (mode === 'PRESS') {
-    beginBowDraw();
-  } else if (mode === 'RELEASE') {
-    if (isDrawing) launchArrow();
-  } else {
-    // Standard cabinet BUTTON_A discrete signal:
-    // 1st press begins drawing the bowstring back; 2nd press releases & snaps the arrow!
-    if (!isDrawing) {
-      beginBowDraw();
-    } else {
-      launchArrow();
-    }
+  if (state === 'AIM_AND_SHOOT' && isDrawing) {
+    launchArrow();
   }
 }
 
@@ -3293,7 +3573,7 @@ function handleButtonB_Signal() {
   sfx.init();
 
   if (isDrawing) {
-    // Cancel an active draw cleanly without firing
+    keys.a = false;
     isDrawing = false;
     drawPower = 0;
     lastCreakStep = 0;
@@ -3318,6 +3598,7 @@ function clearAllInputs() {
     clearTimeout(dpadHoldTimers[dir]);
     keys[dir] = false;
   }
+  keys.a = false;
   isDrawing = false;
   drawPower = 0;
 }
@@ -3365,6 +3646,7 @@ window.addEventListener('message', (event) => {
     setDirectionHold('down', false);
     setDirectionHold('left', false);
     setDirectionHold('right', false);
+    if (isDrawing) handleButtonAUp();
     return;
   }
 
@@ -3382,18 +3664,11 @@ window.addEventListener('message', (event) => {
   else if (cmd === 'DPAD_LEFT') pulseDirection('left');
   else if (cmd === 'DPAD_RIGHT') pulseDirection('right');
 
-  else if (cmd === 'BUTTON_A_PRESS') {
-    const now = performance.now();
-    if (now - lastBtnATime < BUTTON_DEBOUNCE_MS) return;
-    lastBtnATime = now;
-    handleButtonA_Signal('PRESS');
+  // Press-Hold-Release Action Button A
+  else if (cmd === 'BUTTON_A_PRESS' || cmd === 'BUTTON_A') {
+    handleButtonADown();
   } else if (cmd === 'BUTTON_A_RELEASE') {
-    handleButtonA_Signal('RELEASE');
-  } else if (cmd === 'BUTTON_A') {
-    const now = performance.now();
-    if (now - lastBtnATime < BUTTON_DEBOUNCE_MS) return;
-    lastBtnATime = now;
-    handleButtonA_Signal('TAP');
+    handleButtonAUp();
   }
 
   else if (cmd === 'BUTTON_B' || cmd === 'BUTTON_B_PRESS') {
