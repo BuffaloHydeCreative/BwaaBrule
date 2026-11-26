@@ -1,1 +1,3374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>La Loche Brigade — 1855 Upper Fort Garry</title>
+<style>
+  * {
+    box-sizing: border-box;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background: #0b0d14;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: 'Courier New', Courier, monospace;
+  }
+  canvas {
+    display: block;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: -webkit-crisp-edges;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+</style>
+</head>
+<body>
+<canvas id="gameCanvas" width="480" height="336"></canvas>
 
+<script>
+(() => {
+  const cvs = document.getElementById('gameCanvas');
+  const ctx = cvs.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+
+  function resizeViewport() {
+    const scale = Math.min(window.innerWidth / 480, window.innerHeight / 336);
+    cvs.style.width = Math.floor(480 * scale) + 'px';
+    cvs.style.height = Math.floor(336 * scale) + 'px';
+  }
+  window.addEventListener('resize', resizeViewport);
+  resizeViewport();
+
+  const HUD_H = 22;
+  const SCREEN_W = 480;
+  const SCREEN_H = 336 - HUD_H; // 314px
+
+  const SUB_COLS = 3;
+  const SUB_ROWS = 3;
+  const TILE_W = SCREEN_W / SUB_COLS; // 160px
+  const TILE_H = SCREEN_H / SUB_ROWS; // ~104.67px
+
+  // =========================================================================
+  // 1. ARCADE CABINET POSTMESSAGE BRIDGE
+  // =========================================================================
+  const keys = { up: false, down: false, left: false, right: false };
+  const releaseTimers = {};
+  let lastBtnATime = 0;
+  let lastBtnBTime = 0;
+  let isPaused = false;
+
+  function clearAllMovementKeys() {
+    keys.up = false;
+    keys.down = false;
+    keys.left = false;
+    keys.right = false;
+  }
+
+  function triggerHoldDir(dir, duration = 145) {
+    keys[dir] = true;
+    clearTimeout(releaseTimers[dir]);
+    releaseTimers[dir] = setTimeout(() => { keys[dir] = false; }, duration);
+    handleMenuNav(dir);
+  }
+
+  function setPausedState(paused) {
+    isPaused = paused;
+    if (paused) clearAllMovementKeys();
+  }
+
+  window.addEventListener('message', (event) => {
+    const cmd = event.data;
+    if (cmd === 'PAUSE') { setPausedState(true); return; }
+    if (cmd === 'RESUME') { setPausedState(false); return; }
+    if (isPaused) return;
+
+    if (cmd === 'DPAD_UP') triggerHoldDir('up');
+    else if (cmd === 'DPAD_DOWN') triggerHoldDir('down');
+    else if (cmd === 'DPAD_LEFT') triggerHoldDir('left');
+    else if (cmd === 'DPAD_RIGHT') triggerHoldDir('right');
+    else if (cmd === 'DPAD_UP_PRESS') { keys.up = true; handleMenuNav('up'); }
+    else if (cmd === 'DPAD_DOWN_PRESS') { keys.down = true; handleMenuNav('down'); }
+    else if (cmd === 'DPAD_LEFT_PRESS') { keys.left = true; handleMenuNav('left'); }
+    else if (cmd === 'DPAD_RIGHT_PRESS') { keys.right = true; handleMenuNav('right'); }
+    else if (cmd === 'DPAD_UP_RELEASE') keys.up = false;
+    else if (cmd === 'DPAD_DOWN_RELEASE') keys.down = false;
+    else if (cmd === 'DPAD_LEFT_RELEASE') keys.left = false;
+    else if (cmd === 'DPAD_RIGHT_RELEASE') keys.right = false;
+    else if (cmd === 'BUTTON_A') handleButtonA();
+    else if (cmd === 'BUTTON_B') handleButtonB();
+  });
+
+  // =========================================================================
+  // === TEMPORARY DEV KEYBOARD MAP (REMOVE BEFORE CABINET DEPLOY) ===
+  // Mapping: X = Button A | Z = Button B | Escape = Start/Pause | Arrows = D-Pad
+  // =========================================================================
+  window.addEventListener('keydown', (e) => {
+    const k = e.key.toLowerCase();
+    if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'z', 'x', 'escape'].includes(k)) {
+      e.preventDefault();
+    }
+    if (e.repeat) return;
+
+    if (k === 'escape') {
+      if (gameState && gameState.screen === 'TITLE') {
+        handleButtonA();
+      } else {
+        setPausedState(!isPaused);
+      }
+      return;
+    }
+
+    if (isPaused) return;
+
+    if (e.key === 'ArrowUp') { keys.up = true; handleMenuNav('up'); }
+    else if (e.key === 'ArrowDown') { keys.down = true; handleMenuNav('down'); }
+    else if (e.key === 'ArrowLeft') { keys.left = true; handleMenuNav('left'); }
+    else if (e.key === 'ArrowRight') { keys.right = true; handleMenuNav('right'); }
+    else if (k === 'x') handleButtonA();
+    else if (k === 'z') handleButtonB();
+  });
+
+  window.addEventListener('keyup', (e) => {
+    if (e.key === 'ArrowUp') keys.up = false;
+    else if (e.key === 'ArrowDown') keys.down = false;
+    else if (e.key === 'ArrowLeft') keys.left = false;
+    else if (e.key === 'ArrowRight') keys.right = false;
+  });
+  // === END TEMPORARY DEV KEYBOARD MAP ===
+
+  // =========================================================================
+  // 2. 16-BIT WEB AUDIO FOLEY SYNTH
+  // =========================================================================
+  let audioCtx = null;
+  function playSfx(type) {
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      if (type === 'blip') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(520, now);
+        osc.frequency.exponentialRampToValueAtTime(780, now + 0.06);
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+        osc.start(now); osc.stop(now + 0.07);
+      } else if (type === 'clue') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.setValueAtTime(659.25, now + 0.08);
+        osc.frequency.setValueAtTime(880, now + 0.16);
+        gain.gain.setValueAtTime(0.07, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+        osc.start(now); osc.stop(now + 0.28);
+      } else if (type === 'door') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(140, now);
+        osc.frequency.linearRampToValueAtTime(95, now + 0.14);
+        gain.gain.setValueAtTime(0.07, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+        osc.start(now); osc.stop(now + 0.15);
+      } else if (type === 'locked') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(110, now);
+        osc.frequency.setValueAtTime(85, now + 0.07);
+        gain.gain.setValueAtTime(0.09, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+        osc.start(now); osc.stop(now + 0.15);
+      } else if (type === 'bell') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, now);
+        gain.gain.setValueAtTime(0.14, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
+        osc.start(now); osc.stop(now + 0.9);
+      }
+    } catch (_) {}
+  }
+
+  // =========================================================================
+  // 3. DYNAMIC SUNRISE -> DAYTIME -> SUNSET -> NIGHTTIME CELESTIAL LIGHTING
+  // =========================================================================
+  function lerp(a, b, t) {
+    return a + (b - a) * Math.max(0, Math.min(1, t));
+  }
+
+  function lerpRgb(c1, c2, t) {
+    return [
+      Math.round(lerp(c1[0], c2[0], t)),
+      Math.round(lerp(c1[1], c2[1], t)),
+      Math.round(lerp(c1[2], c2[2], t))
+    ];
+  }
+
+  function getCelestialState(clockMinutes) {
+    const minsInDay = clockMinutes % 1440;
+    const hour = minsInDay / 60;
+
+    const keyframes = [
+      { h: 0.0,  skyTop: [10, 15, 36],   skyBot: [22, 34, 72],    tint: [10, 16, 44, 0.56], isNight: true },
+      { h: 4.5,  skyTop: [22, 26, 58],   skyBot: [78, 64, 108],   tint: [28, 24, 62, 0.42], isNight: true },
+      { h: 6.0,  skyTop: [68, 96, 158],  skyBot: [242, 162, 92],  tint: [245, 155, 75, 0.18], isNight: false },
+      { h: 9.0,  skyTop: [62, 124, 198], skyBot: [168, 212, 242], tint: [255, 244, 214, 0.04], isNight: false },
+      { h: 14.0, skyTop: [46, 112, 192], skyBot: [142, 198, 238], tint: [255, 252, 240, 0.00], isNight: false },
+      { h: 17.5, skyTop: [76, 84, 148],  skyBot: [236, 134, 68],  tint: [235, 118, 48, 0.20], isNight: false },
+      { h: 19.5, skyTop: [36, 26, 68],   skyBot: [158, 66, 62],   tint: [92, 38, 68, 0.36], isNight: true },
+      { h: 21.5, skyTop: [14, 18, 44],   skyBot: [28, 38, 78],    tint: [12, 18, 48, 0.52], isNight: true },
+      { h: 24.0, skyTop: [10, 15, 36],   skyBot: [22, 34, 72],    tint: [10, 16, 44, 0.56], isNight: true }
+    ];
+
+    let k1 = keyframes[0], k2 = keyframes[keyframes.length - 1], t = 0;
+    for (let i = 0; i < keyframes.length - 1; i++) {
+      if (hour >= keyframes[i].h && hour <= keyframes[i + 1].h) {
+        k1 = keyframes[i];
+        k2 = keyframes[i + 1];
+        t = (hour - k1.h) / (k2.h - k1.h);
+        break;
+      }
+    }
+
+    const skyTopRgb = lerpRgb(k1.skyTop, k2.skyTop, t);
+    const skyBotRgb = lerpRgb(k1.skyBot, k2.skyBot, t);
+    const tintRgb = lerpRgb([k1.tint[0], k1.tint[1], k1.tint[2]], [k2.tint[0], k2.tint[1], k2.tint[2]], t);
+    const tintAlpha = lerp(k1.tint[3], k2.tint[3], t);
+
+    const isDay = hour >= 5.5 && hour < 19.5;
+    let bodyProgress = 0;
+    if (isDay) {
+      bodyProgress = (hour - 5.5) / 14.0;
+    } else {
+      const nightHour = hour >= 19.5 ? (hour - 19.5) : (hour + 4.5);
+      bodyProgress = nightHour / 10.0;
+    }
+
+    const shadowShiftX = Math.round((bodyProgress - 0.5) * 14);
+    const windowGlow = !isDay || hour < 6.8 || hour > 17.8;
+
+    return {
+      isDay,
+      isNight: !isDay,
+      windowGlow,
+      bodyProgress,
+      shadowShiftX,
+      skyTopCss: `rgb(${skyTopRgb[0]},${skyTopRgb[1]},${skyTopRgb[2]})`,
+      skyBotCss: `rgb(${skyBotRgb[0]},${skyBotRgb[1]},${skyBotRgb[2]})`,
+      tintCss: tintAlpha > 0.01 ? `rgba(${tintRgb[0]},${tintRgb[1]},${tintRgb[2]},${tintAlpha.toFixed(3)})` : null
+    };
+  }
+
+  // =========================================================================
+  // 4. OPTIMIZED 12x12 WORLD GRID (4x4 SCREENS OF 3x3 TILES)
+  // =========================================================================
+  const WORLD_COLS = 12;
+  const WORLD_ROWS = 12;
+
+  const worldTiles = Array.from({ length: WORLD_ROWS }, () =>
+    Array.from({ length: WORLD_COLS }, () => ({
+      type: 'PRAIRIE',
+      zoneName: 'Red River Settlement',
+      buildingId: null,
+      doorFace: null,
+      bastionCorner: null,
+      multiRole: null,
+      pathMask: { n: false, s: false, e: false, w: false }
+    }))
+  );
+
+  function fillTiles(c1, r1, c2, r2, type, zoneName) {
+    for (let r = r1; r <= r2; r++) {
+      for (let c = c1; c <= c2; c++) {
+        if (r >= 0 && r < WORLD_ROWS && c >= 0 && c < WORLD_COLS) {
+          worldTiles[r][c] = {
+            type,
+            zoneName,
+            buildingId: null,
+            doorFace: null,
+            bastionCorner: null,
+            multiRole: null,
+            pathMask: { n: false, s: false, e: false, w: false }
+          };
+        }
+      }
+    }
+  }
+
+  function markDirtPath(c1, r1, c2, r2) {
+    for (let r = r1; r <= r2; r++) {
+      for (let c = c1; c <= c2; c++) {
+        const cell = worldTiles[r]?.[c];
+        if (!cell) continue;
+        if (cell.type === 'FORT_GRASS' || cell.type === 'PRAIRIE' || cell.type.startsWith('GATE_')) {
+          cell.type = cell.type.startsWith('GATE_') ? cell.type : 'DIRT_PATH';
+        }
+      }
+    }
+  }
+
+  // 1. Rivers: Assiniboine River along Row 11 & Red River Confluence along Col 11
+  fillTiles(0, 11, 11, 11, 'RIVER', 'Assiniboine River');
+  fillTiles(11, 7, 11, 11, 'RIVER', 'Red & Assiniboine Forks');
+
+  // 2. 1-Tile Assiniboine Riverbank Path (Row 10) & Outer Dirt Trails
+  fillTiles(0, 10, 10, 10, 'RIVERBANK', 'Assiniboine Riverbank');
+  fillTiles(10, 0, 10, 10, 'DIRT_PATH', 'East Wallside Path');
+  fillTiles(5, 0, 10, 0, 'DIRT_PATH', 'North Gate Approach Trail');
+
+  // 3. Fort Interior Grounds: Lush Grassed Lawns
+  fillTiles(1, 2, 8, 4, 'FORT_GRASS', 'North Compound — Governor’s Lawn');
+  fillTiles(1, 6, 8, 8, 'FORT_GRASS', 'South Fur Trade Compound');
+
+  // Carve Thin Dirt Paths through the grassed inner fort:
+  markDirtPath(5, 2, 5, 3);
+  markDirtPath(2, 2, 8, 2);
+  markDirtPath(2, 3, 7, 3);
+  markDirtPath(4, 7, 4, 8);
+  markDirtPath(2, 7, 8, 7);
+  markDirtPath(2, 6, 2, 8);
+  markDirtPath(7, 6, 7, 8);
+
+  // 4. Perimeter Limestone & Oak Walls + Central Partition Wall
+  fillTiles(0, 1, 0, 4, 'WALL_OAK', 'West Oak Palisade');
+  fillTiles(0, 5, 0, 9, 'WALL_STONE', 'West Limestone Wall');
+
+  fillTiles(0, 1, 9, 1, 'WALL_OAK', 'North Oak Palisade');
+  worldTiles[1][5] = {
+    type: 'GATE_NORTH',
+    zoneName: 'Famed Front Gate',
+    buildingId: null,
+    doorFace: null,
+    bastionCorner: null,
+    multiRole: null,
+    pathMask: { n: true, s: true, e: false, w: false }
+  };
+
+  fillTiles(1, 5, 8, 5, 'PARTITION_WALL', 'Central Fort Partition Wall');
+
+  fillTiles(9, 1, 9, 4, 'WALL_OAK', 'East Oak Palisade');
+  fillTiles(9, 5, 9, 9, 'WALL_STONE', 'East Limestone Wall');
+  worldTiles[7][9] = {
+    type: 'GATE_EAST',
+    zoneName: 'East River Postern Gate',
+    buildingId: null,
+    doorFace: null,
+    bastionCorner: null,
+    multiRole: null,
+    pathMask: { n: false, s: false, e: true, w: true }
+  };
+
+  fillTiles(0, 9, 9, 9, 'WALL_STONE', 'South Limestone Wall');
+  worldTiles[9][4] = {
+    type: 'GATE_SOUTH',
+    zoneName: 'Assiniboine River Gate',
+    buildingId: null,
+    doorFace: null,
+    bastionCorner: null,
+    multiRole: null,
+    pathMask: { n: true, s: true, e: false, w: false }
+  };
+
+  // 4 Circular Limestone Corner Bastions
+  worldTiles[1][0] = { type: 'BASTION', zoneName: 'Northwest Bastion', buildingId: null, doorFace: null, bastionCorner: 'NW', multiRole: null, pathMask: {} };
+  worldTiles[1][9] = { type: 'BASTION', zoneName: 'Northeast Bastion', buildingId: null, doorFace: null, bastionCorner: 'NE', multiRole: null, pathMask: {} };
+  worldTiles[9][0] = { type: 'BASTION', zoneName: 'Southwest Bastion', buildingId: null, doorFace: null, bastionCorner: 'SW', multiRole: null, pathMask: {} };
+  worldTiles[9][9] = { type: 'BASTION', zoneName: 'Southeast Bastion', buildingId: null, doorFace: null, bastionCorner: 'SE', multiRole: null, pathMask: {} };
+
+  // 5. NORTH COMPOUND BUILDINGS
+  worldTiles[2][1] = { type: 'BUILDING', zoneName: 'HBC Courthouse & Gaol', buildingId: 'BLDG_COURTHOUSE', doorFace: 'EAST', bastionCorner: null, multiRole: 'TOP', pathMask: {} };
+  worldTiles[3][1] = { type: 'BUILDING', zoneName: 'HBC Courthouse & Gaol', buildingId: 'BLDG_COURTHOUSE', doorFace: 'EAST', bastionCorner: null, multiRole: 'BOT', pathMask: {} };
+
+  worldTiles[4][5] = { type: 'BUILDING', zoneName: "Governor's Residence", buildingId: 'BLDG_GOVERNORS_HOUSE', doorFace: 'NORTH', bastionCorner: null, multiRole: null, pathMask: {} };
+  worldTiles[4][4] = { type: 'GARDEN', zoneName: "Governor's Formal Garden", buildingId: null, doorFace: null, bastionCorner: null, multiRole: null, pathMask: {} };
+  worldTiles[4][6] = { type: 'GARDEN', zoneName: "Governor's Formal Garden", buildingId: null, doorFace: null, bastionCorner: null, multiRole: null, pathMask: {} };
+
+  worldTiles[3][8] = { type: 'BUILDING', zoneName: 'Powder Magazine', buildingId: 'BLDG_POWDER_MAGAZINE', doorFace: 'WEST', bastionCorner: null, multiRole: null, pathMask: {} };
+
+  // 6. SOUTH COMPOUND BUILDINGS
+  worldTiles[6][4] = { type: 'BUILDING', zoneName: "Clerk's Quarters & Mess", buildingId: 'BLDG_CLERKS_OFFICE', doorFace: 'SOUTH', bastionCorner: null, multiRole: 'LEFT', pathMask: {} };
+  worldTiles[6][5] = { type: 'BUILDING', zoneName: "Clerk's Quarters & Mess", buildingId: 'BLDG_CLERKS_OFFICE', doorFace: 'SOUTH', bastionCorner: null, multiRole: 'RIGHT', pathMask: {} };
+
+  worldTiles[8][4] = {
+    type: 'PLAZA',
+    zoneName: 'Central Flagpole Green',
+    buildingId: null,
+    doorFace: null,
+    bastionCorner: null,
+    multiRole: null,
+    pathMask: { n: true, s: true, e: false, w: false }
+  };
+
+  worldTiles[6][1] = { type: 'BUILDING', zoneName: 'Pemmican Store', buildingId: 'BLDG_PEMMICAN_STORE', doorFace: 'EAST', bastionCorner: null, multiRole: null, pathMask: {} };
+  worldTiles[7][1] = { type: 'BUILDING', zoneName: 'Fur & Inland Store', buildingId: 'BLDG_FUR_WAREHOUSE', doorFace: 'EAST', bastionCorner: null, multiRole: null, pathMask: {} };
+
+  worldTiles[6][8] = { type: 'BUILDING', zoneName: "Men's Quarters & Mess", buildingId: 'BLDG_MENS_QUARTERS', doorFace: 'WEST', bastionCorner: null, multiRole: null, pathMask: {} };
+  worldTiles[8][8] = { type: 'BUILDING', zoneName: 'HBC Trading Post & Shop', buildingId: 'BLDG_SALES_SHOP', doorFace: 'WEST', bastionCorner: null, multiRole: null, pathMask: {} };
+
+  for (let r = 0; r < WORLD_ROWS; r++) {
+    for (let c = 0; c < WORLD_COLS; c++) {
+      const cell = worldTiles[r][c];
+      if (cell.type === 'DIRT_PATH' || cell.type.startsWith('GATE_') || cell.type === 'PLAZA') {
+        const isPathLike = (tc, tr) => {
+          const t = worldTiles[tr]?.[tc]?.type;
+          return t === 'DIRT_PATH' || t === 'PLAZA' || t === 'RIVERBANK' || (t && t.startsWith('GATE_'));
+        };
+        cell.pathMask = {
+          n: isPathLike(c, r - 1),
+          s: isPathLike(c, r + 1),
+          e: isPathLike(c + 1, r),
+          w: isPathLike(c - 1, r)
+        };
+      }
+    }
+  }
+
+  const BUILDINGS = {
+    BLDG_COURTHOUSE: {
+      id: 'BLDG_COURTHOUSE',
+      label: 'HBC Courthouse & Gaol (#17)',
+      depthFrames: 2,
+      isLocked: false,
+      entryWall: 'EAST',
+      exitWorld: { c: 2, r: 3, offsetX: -48, offsetY: 0 },
+      style: 'COURTHOUSE'
+    },
+    BLDG_GOVERNORS_HOUSE: {
+      id: 'BLDG_GOVERNORS_HOUSE',
+      label: "Governor's Residence (#2)",
+      depthFrames: 2,
+      isLocked: false,
+      entryWall: 'NORTH',
+      exitWorld: { c: 5, r: 3, offsetX: 0, offsetY: 22 },
+      style: 'VICTORIAN_MANSION'
+    },
+    BLDG_CLERKS_OFFICE: {
+      id: 'BLDG_CLERKS_OFFICE',
+      label: "Clerk's Quarters & Mess (#10)",
+      depthFrames: 2,
+      isLocked: false,
+      entryWall: 'SOUTH',
+      exitWorld: { c: 4, r: 7, offsetX: 80, offsetY: -24 },
+      style: 'FUR_TRADE_OFFICE'
+    },
+    BLDG_MENS_QUARTERS: {
+      id: 'BLDG_MENS_QUARTERS',
+      label: "Men's Quarters & Bunkhouse (#6/#9)",
+      depthFrames: 2,
+      isLocked: false,
+      entryWall: 'WEST',
+      exitWorld: { c: 7, r: 6, offsetX: 48, offsetY: 0 },
+      style: 'FUR_TRADE_BARRACKS'
+    },
+    BLDG_FUR_WAREHOUSE: {
+      id: 'BLDG_FUR_WAREHOUSE',
+      label: 'Fur & Inland Store (#12/#13)',
+      depthFrames: 1,
+      isLocked: false,
+      entryWall: 'EAST',
+      exitWorld: { c: 2, r: 7, offsetX: -48, offsetY: 0 },
+      style: 'FUR_TRADE_WAREHOUSE'
+    },
+    BLDG_PEMMICAN_STORE: {
+      id: 'BLDG_PEMMICAN_STORE',
+      label: 'Pemmican Store (#14)',
+      depthFrames: 1,
+      isLocked: false,
+      entryWall: 'EAST',
+      exitWorld: { c: 2, r: 6, offsetX: -48, offsetY: 0 },
+      style: 'FUR_TRADE_PROVISIONS'
+    },
+    BLDG_SALES_SHOP: {
+      id: 'BLDG_SALES_SHOP',
+      label: 'HBC Trading Post & Shop (#8)',
+      depthFrames: 1,
+      isLocked: false,
+      entryWall: 'WEST',
+      exitWorld: { c: 7, r: 8, offsetX: 48, offsetY: 0 },
+      style: 'FUR_TRADE_SHOP'
+    },
+    BLDG_POWDER_MAGAZINE: {
+      id: 'BLDG_POWDER_MAGAZINE',
+      label: 'Powder Magazine & Armoury (#4)',
+      depthFrames: 1,
+      isLocked: true,
+      entryWall: 'WEST',
+      lockedMsg: 'Heavy iron-strapped oak door is bolted. Door is locked.'
+    }
+  };
+
+  function worldTileCenter(c, r) {
+    return { x: c * TILE_W + TILE_W / 2, y: r * TILE_H + TILE_H / 2 };
+  }
+
+  function getBuildingTileBox(c, r) {
+    const cell = worldTiles[r]?.[c];
+    const x = c * TILE_W;
+    const y = r * TILE_H;
+    const pad = 8;
+    let bx = x + pad;
+    let by = y + pad;
+    let bw = TILE_W - pad * 2;
+    let bh = TILE_H - pad * 2;
+
+    if (cell?.multiRole === 'LEFT') {
+      bw = TILE_W - pad;
+    } else if (cell?.multiRole === 'RIGHT') {
+      bx = x;
+      bw = TILE_W - pad;
+    } else if (cell?.multiRole === 'TOP') {
+      bh = TILE_H - pad;
+    } else if (cell?.multiRole === 'BOT') {
+      by = y;
+      bh = TILE_H - pad;
+    }
+    return { bx, by, bw, bh };
+  }
+
+  // =========================================================================
+  // 5. PHASES, HBC MENTORS, SEASONAL COURT DOCKET, RED HERRINGS & FOX GENERATOR
+  // =========================================================================
+  const PHASES = [
+    { id: 'MORNING_06_12', label: '06:00 MORNING' },
+    { id: 'AFTERNOON_12_18', label: '12:00 AFTERNOON' },
+    { id: 'EVENING_18_00', label: '18:00 EVENING' },
+    { id: 'NIGHT_00_06', label: '00:00 NIGHT' }
+  ];
+
+  const HISTORICAL_PEOPLE = [
+    { name: 'Michel Dumas', parish: 'St. Boniface' },
+    { name: 'J-B. Boucher', parish: 'St. François Xavier' },
+    { name: 'Pierre Falcon Jr.', parish: 'St. François Xavier' },
+    { name: 'Antoine Desjarlais', parish: 'St. Vital' },
+    { name: 'Louis Riel Sr.', parish: 'St. Vital' },
+    { name: 'Joseph Monkman', parish: 'St. Andrews' },
+    { name: 'Magnus Linklater', parish: 'Kildonan' },
+    { name: 'William Sinclair', parish: 'St. Andrews' },
+    { name: 'B. Lafrenière', parish: 'St. Norbert' },
+    { name: 'Charles Nolin', parish: 'St. Boniface' },
+    { name: 'Donald McLeod', parish: 'Kildonan' },
+    { name: 'Ambroise Lépine', parish: 'St. Boniface' },
+    { name: 'Thomas Sinclair', parish: 'St. Andrews' },
+    { name: 'Louison Gladu', parish: 'St. François Xavier' },
+    { name: 'Peter Erasmus', parish: 'Kildonan' },
+    { name: 'Narcisse Marion', parish: 'St. Boniface' },
+    { name: 'John Flett', parish: 'Kildonan' },
+    { name: 'Isidore Dumont', parish: 'St. François Xavier' },
+    { name: 'François Bruneau', parish: 'St. Boniface' },
+    { name: 'James Bird Jr.', parish: 'St. Andrews' }
+  ];
+
+  const HBC_MENTORS = [
+    {
+      id: 'mentor_factor',
+      name: 'Chief Factor MacTavish',
+      roleTitle: 'HBC Chief Factor',
+      space: 'EXTERIOR',
+      ...worldTileCenter(3, 10),
+      facing: 'RIGHT',
+      palette: { coat: '#1e283a', sash: '#c89b3c', hat: '#11151c', beard: '#8d96a5' },
+      lines: [
+        "Dawn bell tolls at 06:00, Bonami. Twelve men must stand signed on the Clerk's board: 2 Steersmen, 2 Bowsmen, and 8 Middlemen.",
+        "Four reserve hands wait along the Assiniboine riverbank by the canoes if you must replace a man—mind who you cut, or their kin will sour."
+      ]
+    },
+    {
+      id: 'mentor_clerk',
+      name: 'Clerk James Hargrave',
+      roleTitle: 'HBC Accountant',
+      space: 'BLDG_CLERKS_OFFICE',
+      roomIdx: 0,
+      x: 330, y: 120,
+      facing: 'DOWN',
+      palette: { coat: '#2b3a4a', sash: '#a83232', hat: 'NONE', beard: '#4a3525' },
+      lines: [
+        "The Final Brigade Roster hangs on my wall, with the Servants' Mess Hall right behind us. Inspect the board anytime to strike or muster hands.",
+        "My advance pay and debt ledgers sit open on the desk—coin tells the truth before a 4,000-mile pull."
+      ]
+    },
+    {
+      id: 'mentor_shop',
+      name: 'Trader McDermott',
+      roleTitle: 'Trading Post Keeper',
+      space: 'BLDG_SALES_SHOP',
+      roomIdx: 0,
+      x: 240, y: 112,
+      facing: 'DOWN',
+      palette: { coat: '#3c4f3d', sash: '#d4a238', hat: 'NONE', beard: '#6b442a' },
+      lines: [
+        "Half these lads sneak around hiding extra twist tobacco, trading-post rum flasks, or love letters—harmless voyageur noise.",
+        "Look for three matching signs—physical goods, ledger ink, and loose tongues—before you strike a man from the roster."
+      ]
+    },
+    {
+      id: 'mentor_recorder',
+      name: 'Recorder Adam Thom',
+      roleTitle: 'General Quarterly Judge',
+      space: 'BLDG_COURTHOUSE',
+      roomIdx: 0,
+      x: 330, y: 120,
+      facing: 'DOWN',
+      palette: { coat: '#1b1d26', sash: '#c89b3c', hat: 'NONE', beard: '#9da5b4' },
+      lines: [
+        "The General Quarterly Court Docket hangs on my courtroom wall. Check whether a man's hearing falls in SUMMER or WINTER!",
+        "A man summoned for the upcoming SUMMER sitting cannot depart on the brigade without forfeiting his family's river lot; a WINTER case waits until autumn return."
+      ]
+    }
+  ];
+
+  const RED_HERRING_TEMPLATES = [
+    {
+      heat: 'LOW',
+      codename: 'Extra Twist Tobacco',
+      space: 'BLDG_SALES_SHOP', roomIdx: 0,
+      phase: 'EVENING_18_00',
+      propLabel: 'Trading Post Chit Book',
+      x: 155, y: 145,
+      cover: 'Slipping into the HBC Trading Post at dusk to stash a parcel.',
+      motive: 'Bought two extra twists of Brazilian tobacco out of his own wages.',
+      clueText: 'Signed personal credit slip for 2 lbs twist tobacco—paid in full.'
+    },
+    {
+      heat: 'LOW',
+      codename: 'St. Boniface Farewell',
+      space: 'EXTERIOR', roomIdx: 0,
+      phase: 'EVENING_18_00',
+      propLabel: 'Birchbark Canoe Bow',
+      ...worldTileCenter(7, 10),
+      cover: 'Lingering by the birchbark canoes on the Assiniboine bank after supper.',
+      motive: 'Paddled across to St. Boniface to bid farewell to his sweetheart.',
+      clueText: 'Ribboned birchbark ring box tucked beneath a cedar canoe thwart.'
+    },
+    {
+      heat: 'LOW',
+      codename: 'Winter Court Boundary Filing',
+      space: 'BLDG_COURTHOUSE', roomIdx: 0,
+      phase: 'AFTERNOON_12_18',
+      propLabel: 'Courthouse Clerk Bench',
+      x: 155, y: 145,
+      cover: 'Checking the Quarterly Court notices inside the HBC Courthouse.',
+      motive: 'Confirmed his routine fence-line deed hearing is scheduled for WINTER (November)—well after the brigade returns.',
+      clueText: 'Stamped Courthouse receipt: hearing docketed for WINTER sitting (Nov 1855), clear to depart.'
+    },
+    {
+      heat: 'MEDIUM',
+      codename: 'La Moccasin Gaming',
+      space: 'BLDG_CLERKS_OFFICE', roomIdx: 1,
+      phase: 'NIGHT_00_06',
+      propLabel: "Servants' Mess Trestle Table",
+      x: 240, y: 120,
+      cover: 'Whispering in the Servants’ Mess Hall after curfew.',
+      motive: 'Running a high-stakes la moccasin guessing game with copper buttons.',
+      clueText: 'Four beaded deerskin moccasins and a marked lead bullet.'
+    },
+    {
+      heat: 'MEDIUM',
+      codename: 'East Path Beadwork Barter',
+      space: 'EXTERIOR', roomIdx: 0,
+      phase: 'AFTERNOON_12_18',
+      propLabel: 'East Wallside Cart Post',
+      ...worldTileCenter(10, 5),
+      cover: 'Passing a bundled satchel along the East outer wallside path.',
+      motive: 'Traded his sister’s silk-embroidered moccasins for warm wool socks.',
+      clueText: 'Sentry note: women’s floral beadwork swapped for 3 pairs of wool hose.'
+    },
+    {
+      heat: 'HIGH',
+      codename: 'Unpacked Pièce Fiddle',
+      space: 'EXTERIOR', roomIdx: 0,
+      phase: 'NIGHT_00_06',
+      propLabel: 'Riverbank Cargo Bale',
+      ...worldTileCenter(8, 10),
+      cover: 'Prying open a lashed 90-lb pièce beside the York boats after midnight.',
+      motive: 'Retrieved his grandfather’s maple fiddle packed by mistake.',
+      clueText: 'Cargo manifest weight matches; a rosined fiddle bow rests inside.'
+    },
+    {
+      heat: 'HIGH',
+      codename: 'Gunwale Prayer Carving',
+      space: 'EXTERIOR', roomIdx: 0,
+      phase: 'NIGHT_00_06',
+      propLabel: 'Lead York Boat Gunwale',
+      ...worldTileCenter(6, 10),
+      cover: 'Crouching over the drawn-ashore York boat stem with a knife at 02:00.',
+      motive: 'Carved a traditional protective cross & prayer into the oak gunwale.',
+      clueText: 'Shallow devotional cross carved above the waterline—planking sound.'
+    }
+  ];
+
+  function buildFoxClues(fox, archetype) {
+    switch (archetype) {
+      case 'FREE_TRADER_SABOTEUR':
+        return {
+          category: 'BAD FOX',
+          codename: 'Free-Trader Saboteur',
+          motive: 'Paid 20 silver dollars by Pembina free-traders to score Boat #1 so it splits at Grand Rapids.',
+          suspiciousPhase: 'NIGHT_00_06',
+          suspiciousSpace: 'EXTERIOR',
+          suspiciousRoom: 0,
+          suspiciousPos: worldTileCenter(5, 10),
+          clues: [
+            {
+              id: 'fox_c1', medium: 'PHYSICAL', space: 'EXTERIOR', roomIdx: 0,
+              ...worldTileCenter(5, 10), label: 'York Boat #1 Hull',
+              text: `Fresh wood shavings & deep auger score plugged with tallow at ${fox.name}'s station.`
+            },
+            {
+              id: 'fox_c2', medium: 'LEDGER', space: 'BLDG_CLERKS_OFFICE', roomIdx: 0,
+              x: 155, y: 135, label: "Clerk's Debt Ledger",
+              text: `Unsigned Pembina free-trader bank draft matches ${fox.name}'s exact parish debt.`
+            },
+            {
+              id: 'fox_c3', medium: 'RUMOR', space: 'EXTERIOR', roomIdx: 0,
+              ...worldTileCenter(9, 10), label: 'Assiniboine Bank Watch',
+              text: `Gate reserve overheard ${fox.name} boasting he won't row past Lake Winnipeg.`
+            }
+          ]
+        };
+
+      case 'CARGO_SKIMMER':
+        return {
+          category: 'BAD FOX',
+          codename: 'Cargo Skimmer',
+          motive: 'Swapped trade blankets for limestone cobbles in Bale #14 and plans to desert at Norway House.',
+          suspiciousPhase: 'AFTERNOON_12_18',
+          suspiciousSpace: 'BLDG_FUR_WAREHOUSE',
+          suspiciousRoom: 0,
+          suspiciousPos: { x: 240, y: 135 },
+          clues: [
+            {
+              id: 'fox_c1', medium: 'PHYSICAL', space: 'BLDG_FUR_WAREHOUSE', roomIdx: 0,
+              x: 240, y: 135, label: 'Fur Store Balance Scale',
+              text: `Bale #14 packed by ${fox.name} rattles with river cobbles wrapped in oilcloth.`
+            },
+            {
+              id: 'fox_c2', medium: 'LEDGER', space: 'BLDG_CLERKS_OFFICE', roomIdx: 0,
+              x: 155, y: 135, label: 'Quartermaster Tally',
+              text: `Three 4-point HBC blankets signed out by ${fox.name} never reached the riverbank.`
+            },
+            {
+              id: 'fox_c3', medium: 'RUMOR', space: 'BLDG_SALES_SHOP', roomIdx: 0,
+              x: 325, y: 145, label: 'Trading Post Counter',
+              text: `Cart driver confirms ${fox.name} arranged a private cache pickup near Norway House.`
+            }
+          ]
+        };
+
+      case 'OUTBREAK_CARRIER':
+        return {
+          category: 'BAD FOX',
+          codename: 'Outbreak Carrier',
+          motive: 'Hiding early contagious typhus fever so he will not forfeit his 5-pound advance pay.',
+          suspiciousPhase: 'MORNING_06_12',
+          suspiciousSpace: 'BLDG_PEMMICAN_STORE',
+          suspiciousRoom: 0,
+          suspiciousPos: { x: 240, y: 135 },
+          clues: [
+            {
+              id: 'fox_c1', medium: 'PHYSICAL', space: 'BLDG_PEMMICAN_STORE', roomIdx: 0,
+              x: 240, y: 135, label: 'Pemmican Store Kit Bench',
+              text: `Blood-flecked handkerchief & chewed bitter willow bark beside ${fox.name}'s kit.`
+            },
+            {
+              id: 'fox_c2', medium: 'LEDGER', space: 'BLDG_CLERKS_OFFICE', roomIdx: 0,
+              x: 155, y: 135, label: 'Advance Pay Book',
+              text: `${fox.name} drew 100% advance pay yesterday—forfeited only if he misses 06:00 boarding.`
+            },
+            {
+              id: 'fox_c3', medium: 'RUMOR', space: 'BLDG_GOVERNORS_HOUSE', roomIdx: 1,
+              x: 310, y: 120, label: "Governor's Study Apothecary",
+              text: `Surgeon notes a tripman from ${fox.parish} bought laudanum under a false name.`
+            }
+          ]
+        };
+
+      case 'INJURED_VETERAN':
+        return {
+          category: 'GOOD FOX',
+          codename: 'Quietly Injured Veteran',
+          motive: 'Cracked two ribs in the spring buffalo run; pushing through to feed his family though his arm will fail on Methy Portage.',
+          suspiciousPhase: 'AFTERNOON_12_18',
+          suspiciousSpace: 'EXTERIOR',
+          suspiciousRoom: 0,
+          suspiciousPos: worldTileCenter(10, 8),
+          clues: [
+            {
+              id: 'fox_c1', medium: 'PHYSICAL', space: 'EXTERIOR', roomIdx: 0,
+              ...worldTileCenter(10, 8), label: 'Riverbank Timber Bollard',
+              text: `Tightly bound linen rib-wrap stained with arnica liniment behind ${fox.name}'s seat.`
+            },
+            {
+              id: 'fox_c2', medium: 'LEDGER', space: 'BLDG_CLERKS_OFFICE', roomIdx: 0,
+              x: 155, y: 135, label: 'Engagement Contracts',
+              text: `${fox.name} signed 100% of his autumn wage allotment directly to his spouse.`
+            },
+            {
+              id: 'fox_c3', medium: 'RUMOR', space: 'BLDG_MENS_QUARTERS', roomIdx: 0,
+              x: 155, y: 145, label: "Men's Quarters Bunk",
+              text: `Bunkmate saw ${fox.name} wince sharply when lifting an iron-banded keg left-handed.`
+            }
+          ]
+        };
+
+      case 'URGENT_FAMILY_CRISIS':
+        return {
+          category: 'GOOD FOX',
+          codename: 'Urgent Family Crisis',
+          motive: 'His wife is in perilous early labor on their flooded river lot, but he is too honor-bound to break his HBC oath.',
+          suspiciousPhase: 'EVENING_18_00',
+          suspiciousSpace: 'EXTERIOR',
+          suspiciousRoom: 0,
+          suspiciousPos: worldTileCenter(5, 9),
+          clues: [
+            {
+              id: 'fox_c1', medium: 'LEDGER', space: 'EXTERIOR', roomIdx: 0,
+              ...worldTileCenter(5, 9), label: 'River Gate Dispatch Box',
+              text: `Urgent letter to ${fox.name} from the ${fox.parish} priest urging immediate return.`
+            },
+            {
+              id: 'fox_c2', medium: 'RUMOR', space: 'BLDG_CLERKS_OFFICE', roomIdx: 0,
+              x: 155, y: 135, label: "Clerk's Desk Notes",
+              text: `${fox.name} asked quietly if a reserve could take his oar without dishonoring his name.`
+            },
+            {
+              id: 'fox_c3', medium: 'PHYSICAL', space: 'BLDG_CLERKS_OFFICE', roomIdx: 1,
+              x: 325, y: 145, label: "Servants' Mess Kit Rack",
+              text: `${fox.name}'s personal pack remains unlashed and strapped for a southbound ride.`
+            }
+          ]
+        };
+
+      case 'LAND_CLAIM_TARGET':
+      default:
+        return {
+          category: 'GOOD FOX',
+          codename: 'Land-Claim Target',
+          motive: 'Must appear at the General Quarterly Court SUMMER sitting to defend his family’s hay privilege from seizure.',
+          suspiciousPhase: 'AFTERNOON_12_18',
+          suspiciousSpace: 'BLDG_COURTHOUSE',
+          suspiciousRoom: 0,
+          suspiciousPos: { x: 240, y: 135 },
+          clues: [
+            {
+              id: 'fox_c1', medium: 'LEDGER', space: 'BLDG_COURTHOUSE', roomIdx: 0,
+              x: 240, y: 135, label: 'SUMMER Quarterly Court Summons',
+              text: `General Quarterly Court notice summoning ${fox.name} for the upcoming SUMMER sitting over his ${fox.parish} hay-lot title.`
+            },
+            {
+              id: 'fox_c2', medium: 'PHYSICAL', space: 'BLDG_CLERKS_OFFICE', roomIdx: 0,
+              x: 155, y: 135, label: 'Red River Survey Map',
+              text: `Red-ink boundary dispute marks circling Lot #42—registered to ${fox.name}'s kin.`
+            },
+            {
+              id: 'fox_c3', medium: 'RUMOR', space: 'EXTERIOR', roomIdx: 0,
+              ...worldTileCenter(4, 7), label: 'Flagpole Green Gathering',
+              text: `Veterans say ${fox.name} loses his family's winter hay land if he misses the SUMMER court sitting.`
+            }
+          ]
+        };
+    }
+  }
+
+  let gameState = null;
+
+  function initNewCase() {
+    const people = [...HISTORICAL_PEOPLE].sort(() => Math.random() - 0.5);
+    const roles = [
+      'Steersman', 'Steersman', 'Steersman',
+      'Bowsman', 'Bowsman', 'Bowsman',
+      'Middleman', 'Middleman', 'Middleman', 'Middleman', 'Middleman',
+      'Middleman', 'Middleman', 'Middleman', 'Middleman', 'Middleman',
+      'Steersman', 'Bowsman', 'Middleman', 'Middleman'
+    ];
+
+    const capoteColors = ['#e6e6e6', '#234b8c', '#8f2424', '#3d5948', '#b5945b', '#4b3b5c'];
+    const sashColors = ['#d31a1a', '#cca010', '#12aea2', '#fb6604'];
+
+    const dutyTiles = [
+      { c: 3, r: 7 }, { c: 5, r: 7 }, { c: 6, r: 7 }, { c: 7, r: 7 },
+      { c: 2, r: 7 }, { c: 2, r: 8 }, { c: 3, r: 8 }, { c: 5, r: 8 },
+      { c: 6, r: 8 }, { c: 7, r: 8 }, { c: 3, r: 2 }, { c: 6, r: 2 },
+      { c: 10, r: 3 }, { c: 10, r: 6 }, { c: 10, r: 8 }, { c: 6, r: 10 }
+    ];
+
+    const reserveTiles = [
+      { c: 1, r: 10 }, { c: 2, r: 10 }, { c: 8, r: 10 }, { c: 9, r: 10 }
+    ];
+
+    const allTripmen = people.map((p, idx) => {
+      const isReserve = idx >= 16;
+      const id = isReserve ? `res_${idx}` : `trip_${idx}`;
+      const baseTile = isReserve ? reserveTiles[idx - 16] : dutyTiles[idx];
+      const startPt = worldTileCenter(baseTile.c, baseTile.r);
+
+      const schedule = {
+        MORNING_06_12: isReserve
+          ? { space: 'EXTERIOR', roomIdx: 0, ...startPt, note: 'Waiting along the Assiniboine riverbank by the canoes for an opening.' }
+          : (idx % 3 === 0
+              ? { space: 'BLDG_FUR_WAREHOUSE', roomIdx: 0, x: 180 + (idx % 3) * 55, y: 155, note: 'Stacking and weighing fur bales in the Fur Store.' }
+              : { space: 'EXTERIOR', roomIdx: 0, ...startPt, note: 'Hauling pemmican sacks across the fur yard paths.' }),
+        AFTERNOON_12_18: isReserve
+          ? { space: 'EXTERIOR', roomIdx: 0, ...worldTileCenter(reserveTiles[(idx + 1) % 4].c, reserveTiles[(idx + 1) % 4].r), note: 'Inspecting the York boats drawn ashore on the riverbank.' }
+          : (idx % 4 === 1
+              ? { space: 'BLDG_SALES_SHOP', roomIdx: 0, x: 180 + (idx % 3) * 55, y: 155, note: 'Outfitting wool capotes and sashes at the Trading Post.' }
+              : { space: 'EXTERIOR', roomIdx: 0, ...worldTileCenter(10, 2 + (idx % 8)), note: 'Carrying 90-lb pièces along the East wallside path.' }),
+        EVENING_18_00: isReserve
+          ? { space: 'EXTERIOR', roomIdx: 0, ...worldTileCenter(2, 10), note: 'Smoking a clay pipe along the Assiniboine bank.' }
+          : (idx % 3 === 2
+              ? { space: 'BLDG_CLERKS_OFFICE', roomIdx: 1, x: 180 + (idx % 3) * 55, y: 155, note: "Eating supper & sharing stories in the Servants' Mess Hall." }
+              : { space: 'EXTERIOR', roomIdx: 0, ...worldTileCenter(3 + (idx % 3), 7 + (idx % 2)), note: 'Gathering on the grass around the Central Flagpole at dusk.' }),
+        NIGHT_00_06: isReserve
+          ? { space: 'EXTERIOR', roomIdx: 0, ...startPt, note: 'Keeping watch by the drawn-ashore York boats.' }
+          : (idx % 4 === 0
+              ? { space: 'BLDG_CLERKS_OFFICE', roomIdx: 0, x: 180 + (idx % 3) * 55, y: 165, note: 'Checking the hanging Final Brigade Roster.' }
+              : { space: 'BLDG_MENS_QUARTERS', roomIdx: 0, x: 180 + (idx % 3) * 55, y: 165, note: 'Resting in the South Bunkhouse before the 06:00 bell.' })
+      };
+
+      return {
+        id,
+        name: p.name,
+        parish: p.parish,
+        role: roles[idx],
+        skill: 3 + (idx % 3),
+        isReserve,
+        kinshipIds: [],
+        onRoster: !isReserve && (
+          (roles[idx] === 'Steersman' && idx < 2) ||
+          (roles[idx] === 'Bowsman' && idx < 5) ||
+          (roles[idx] === 'Middleman' && idx < 14)
+        ),
+        wasCut: false,
+        space: 'EXTERIOR',
+        roomIdx: 0,
+        x: startPt.x,
+        y: startPt.y,
+        goalX: startPt.x,
+        goalY: startPt.y,
+        facing: 'DOWN',
+        walkPhase: idx * 1.1,
+        isMoving: false,
+        wanderTimer: 35 + (idx * 19) % 85,
+        palette: {
+          coat: capoteColors[idx % capoteColors.length],
+          sash: sashColors[idx % sashColors.length]
+        },
+        schedule,
+        secret: { category: 'CLEAN', codename: 'Honest Tripman', motive: 'Ready for the 4,000-mile pull.', clues: [] }
+      };
+    });
+
+    const candidates = allTripmen.slice(0, 16);
+
+    const kinOrder = [...candidates].sort(() => Math.random() - 0.5);
+    for (let i = 0; i < 8; i += 2) {
+      kinOrder[i].kinshipIds.push(kinOrder[i + 1].id);
+      kinOrder[i + 1].kinshipIds.push(kinOrder[i].id);
+    }
+
+    const fox = candidates[Math.floor(Math.random() * candidates.length)];
+    if (!fox.onRoster) {
+      const sameRole = candidates.find((c) => c.onRoster && c.role === fox.role);
+      if (sameRole) sameRole.onRoster = false;
+      fox.onRoster = true;
+    }
+
+    const archetypes = [
+      'FREE_TRADER_SABOTEUR', 'CARGO_SKIMMER', 'OUTBREAK_CARRIER',
+      'INJURED_VETERAN', 'URGENT_FAMILY_CRISIS', 'LAND_CLAIM_TARGET'
+    ];
+    const foxArchetype = archetypes[Math.floor(Math.random() * archetypes.length)];
+    const foxData = buildFoxClues(fox, foxArchetype);
+    fox.secret = {
+      category: foxData.category,
+      codename: foxData.codename,
+      motive: foxData.motive,
+      clues: foxData.clues.map((c) => ({ ...c, discovered: false, isFox: true, targetName: fox.name }))
+    };
+    fox.schedule[foxData.suspiciousPhase] = {
+      space: foxData.suspiciousSpace,
+      roomIdx: foxData.suspiciousRoom,
+      x: foxData.suspiciousPos.x,
+      y: foxData.suspiciousPos.y,
+      note: 'Acting guarded and avoiding eye contact.'
+    };
+
+    const nonFox = candidates.filter((c) => c.id !== fox.id).sort(() => Math.random() - 0.5);
+    const propClues = [...fox.secret.clues];
+
+    const winterCandidate = nonFox[2];
+    const winterCandidate2 = nonFox[7];
+    const courtDocketEntries = [
+      {
+        season: 'WINTER',
+        sitting: 'NOVEMBER 1855 (WINTER SITTING)',
+        litigant: winterCandidate.name,
+        parish: winterCandidate.parish,
+        matter: 'St. Boniface creek fence-line registration (Post-Brigade Return).'
+      },
+      {
+        season: 'WINTER',
+        sitting: 'FEBRUARY 1856 (WINTER SITTING)',
+        litigant: winterCandidate2.name,
+        parish: winterCandidate2.parish,
+        matter: 'Timber lot probate witness deposition (Winter Quarter).'
+      }
+    ];
+    if (foxArchetype === 'LAND_CLAIM_TARGET') {
+      courtDocketEntries.unshift({
+        season: 'SUMMER',
+        sitting: 'JULY 1855 (UPCOMING SUMMER SITTING)',
+        litigant: fox.name,
+        parish: fox.parish,
+        matter: 'URGENT: Contested Hay-Privilege Title #42 — Personal attendance required or land forfeited!'
+      });
+    } else {
+      const resSummer = allTripmen[16];
+      courtDocketEntries.unshift({
+        season: 'SUMMER',
+        sitting: 'JULY 1855 (UPCOMING SUMMER SITTING)',
+        litigant: `${resSummer.name} [RESERVE]`,
+        parish: resSummer.parish,
+        matter: 'River-lot boundary survey hearing (Cannot depart on summer brigade).'
+      });
+    }
+
+    for (let r = 0; r < 10; r++) {
+      const npc = nonFox[r];
+      const tpl = RED_HERRING_TEMPLATES[r % RED_HERRING_TEMPLATES.length];
+
+      const alibiClue = {
+        id: `rh_${npc.id}`,
+        medium: 'ALIBI',
+        space: tpl.space,
+        roomIdx: tpl.roomIdx || 0,
+        x: tpl.x,
+        y: tpl.y,
+        label: tpl.propLabel,
+        text: `${npc.name}: ${tpl.clueText}`,
+        discovered: false,
+        isFox: false,
+        targetName: npc.name
+      };
+
+      npc.secret = {
+        category: 'RED HERRING',
+        codename: tpl.codename,
+        motive: tpl.motive,
+        clues: [alibiClue]
+      };
+      npc.schedule[tpl.phase] = {
+        space: tpl.space,
+        roomIdx: tpl.roomIdx || 0,
+        x: tpl.x,
+        y: tpl.y,
+        note: tpl.cover
+      };
+      propClues.push(alibiClue);
+    }
+
+    const spawnPt = worldTileCenter(4, 10);
+    const startScX = Math.floor(spawnPt.x / SCREEN_W);
+    const startScY = Math.floor(spawnPt.y / SCREEN_H);
+
+    gameState = {
+      screen: 'TITLE',
+      clockMinutes: 360,
+      frame: 0,
+      player: {
+        space: 'EXTERIOR',
+        roomIdx: 0,
+        x: spawnPt.x,
+        y: spawnPt.y,
+        facing: 'UP',
+        walkFrame: 0,
+        isMoving: false,
+        doorCooldown: 0
+      },
+      view: {
+        scX: startScX,
+        scY: startScY
+      },
+      slide: {
+        active: false,
+        fromScX: startScX,
+        fromScY: startScY,
+        fromRoom: 0,
+        dir: 'UP',
+        progress: 0
+      },
+      dissolve: {
+        active: false,
+        progress: 0,
+        switched: false,
+        targetSpace: 'EXTERIOR',
+        targetRoom: 0,
+        targetX: spawnPt.x,
+        targetY: spawnPt.y
+      },
+      tripmen: allTripmen,
+      foxId: fox.id,
+      foxArchetype,
+      clues: propClues,
+      courtDocket: courtDocketEntries,
+      morale: 86,
+      rosterCursor: 0,
+      dialogQueue: [],
+      outcome: null
+    };
+  }
+
+  initNewCase();
+
+  // =========================================================================
+  // 6. TIME, MORALE & ROSTER EVALUATION
+  // =========================================================================
+  function getCurrentPhaseIndex() {
+    const elapsed = gameState.clockMinutes - 360;
+    return Math.min(3, Math.floor(elapsed / 360));
+  }
+
+  function advanceTime(minutes) {
+    const prevPhase = getCurrentPhaseIndex();
+    gameState.clockMinutes = Math.min(1800, gameState.clockMinutes + minutes);
+    const nextPhase = getCurrentPhaseIndex();
+    if (nextPhase !== prevPhase && gameState.clockMinutes < 1800) {
+      playSfx('bell');
+      openDialog([`${PHASES[nextPhase].label} — Watch bell rings across Upper Fort Garry.`]);
+    }
+    if (gameState.clockMinutes >= 1800 && gameState.screen !== 'OUTCOME') {
+      triggerDawnRollCall();
+    }
+  }
+
+  function formatClock(totalMins) {
+    const minsInDay = totalMins % 1440;
+    const hh = String(Math.floor(minsInDay / 60)).padStart(2, '0');
+    const mm = String(Math.floor(minsInDay % 60)).padStart(2, '0');
+    return `${hh}:${mm}`;
+  }
+
+  function getRosterStats() {
+    const selected = gameState.tripmen.filter((t) => t.onRoster);
+    const steersmen = selected.filter((t) => t.role === 'Steersman').length;
+    const bowsmen = selected.filter((t) => t.role === 'Bowsman').length;
+    const middlemen = selected.filter((t) => t.role === 'Middleman').length;
+    return { selected, count: selected.length, steersmen, bowsmen, middlemen };
+  }
+
+  function toggleRosterMember(tripman) {
+    const stats = getRosterStats();
+    if (tripman.onRoster) {
+      tripman.onRoster = false;
+      tripman.wasCut = true;
+      if (tripman.id !== gameState.foxId) {
+        const kinOnBoard = tripman.kinshipIds.filter((kid) =>
+          gameState.tripmen.some((t) => t.id === kid && t.onRoster)
+        ).length;
+        gameState.morale = Math.max(0, gameState.morale - (6 + kinOnBoard * 9));
+      } else {
+        gameState.morale = Math.min(100, gameState.morale + 4);
+      }
+      playSfx('door');
+    } else {
+      if (stats.count >= 12) {
+        playSfx('locked');
+        return;
+      }
+      tripman.onRoster = true;
+      if (tripman.wasCut && tripman.id !== gameState.foxId) {
+        gameState.morale = Math.min(100, gameState.morale + 4);
+        tripman.wasCut = false;
+      }
+      playSfx('blip');
+    }
+  }
+
+  function triggerDawnRollCall() {
+    playSfx('bell');
+    const stats = getRosterStats();
+    const fox = gameState.tripmen.find((t) => t.id === gameState.foxId);
+    const foxStillOnRoster = fox.onRoster;
+    const rolesValid =
+      stats.count === 12 &&
+      stats.steersmen >= 2 &&
+      stats.bowsmen >= 2 &&
+      stats.middlemen >= 8;
+    const moraleValid = gameState.morale >= 65;
+
+    const won = !foxStillOnRoster && rolesValid && moraleValid;
+    let reason = '';
+    if (won) {
+      reason = `The brigade shoves off at dawn with 12 strong hands. ${fox.name} (${fox.secret.codename}) was left ashore.`;
+    } else if (foxStillOnRoster) {
+      reason = `${fox.name} (${fox.secret.codename}) departed with the brigade! ${fox.secret.motive}`;
+    } else if (!rolesValid) {
+      reason = `Incomplete crew (${stats.count}/12 men; ${stats.steersmen}B / ${stats.bowsmen}A / ${stats.middlemen}M). Boats cannot clear the rapids.`;
+    } else {
+      reason = `Brigade morale collapsed (${gameState.morale}%) after unjust cuts—the men refused the oars.`;
+    }
+
+    gameState.outcome = { won, reason, fox, stats };
+    gameState.screen = 'OUTCOME';
+  }
+
+  // =========================================================================
+  // 7. COLLISION, DOORWAYS & SIMULATION UPDATE
+  // =========================================================================
+  function getBastionWorldCenter(c, r, corner) {
+    const base = worldTileCenter(c, r);
+    const shiftX = (corner === 'NW' || corner === 'SW') ? 38 : -38;
+    const shiftY = (corner === 'NW' || corner === 'NE') ? 24 : -24;
+    return { bx: base.x + shiftX, by: base.y + shiftY };
+  }
+
+  function isPointSolidExterior(px, py) {
+    const tc = Math.floor(px / TILE_W);
+    const tr = Math.floor(py / TILE_H);
+    if (tc < 1 || tc >= WORLD_COLS || tr < 0 || tr >= WORLD_ROWS) return true;
+
+    const cell = worldTiles[tr][tc];
+    if (!cell) return true;
+
+    if (cell.type === 'GATE_NORTH' || cell.type === 'GATE_SOUTH') {
+      const localX = px - tc * TILE_W;
+      return localX < 34 || localX > TILE_W - 34;
+    }
+    if (cell.type === 'GATE_EAST') {
+      const localY = py - tr * TILE_H;
+      return localY < 20 || localY > TILE_H - 20;
+    }
+
+    if (
+      cell.type === 'WALL_STONE' ||
+      cell.type === 'WALL_OAK' ||
+      cell.type === 'PARTITION_WALL' ||
+      cell.type === 'RIVER'
+    ) {
+      return true;
+    }
+
+    const bastionCoords = [
+      { c: 0, r: 1, corner: 'NW' },
+      { c: 9, r: 1, corner: 'NE' },
+      { c: 0, r: 9, corner: 'SW' },
+      { c: 9, r: 9, corner: 'SE' }
+    ];
+    for (const b of bastionCoords) {
+      const { bx, by } = getBastionWorldCenter(b.c, b.r, b.corner);
+      if (Math.hypot(px - bx, py - by) <= 42) return true;
+    }
+
+    if (cell.type === 'BUILDING') {
+      const box = getBuildingTileBox(tc, tr);
+      if (px >= box.bx && px <= box.bx + box.bw && py >= box.by && py <= box.by + box.bh) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  function canWalkExterior(nx, ny) {
+    const fpCenter = worldTileCenter(4, 8);
+    if (Math.abs(nx - fpCenter.x) < 16 && Math.abs(ny - fpCenter.y) < 11) {
+      return false;
+    }
+
+    const hw = 7;
+    const pts = [
+      { x: nx - hw, y: ny - 4 },
+      { x: nx + hw, y: ny - 4 },
+      { x: nx - hw, y: ny + 6 },
+      { x: nx + hw, y: ny + 6 }
+    ];
+    for (const pt of pts) {
+      if (isPointSolidExterior(pt.x, pt.y)) return false;
+    }
+    return true;
+  }
+
+  function canWalkInterior(nx, ny) {
+    if (nx < 54 || nx > SCREEN_W - 54 || ny < 54 || ny > SCREEN_H - 22) return false;
+    if (nx > 105 && nx < 205 && ny > 112 && ny < 158) return false;
+    if (nx > 275 && nx < 375 && ny > 112 && ny < 158) return false;
+    return true;
+  }
+
+  function getInteriorSpawnForEntryWall(entryWall) {
+    if (entryWall === 'NORTH') return { x: 240, y: 74 };
+    if (entryWall === 'EAST') return { x: SCREEN_W - 76, y: 175 };
+    if (entryWall === 'WEST') return { x: 76, y: 175 };
+    return { x: 240, y: SCREEN_H - 42 };
+  }
+
+  function startPixelDissolve(targetSpace, targetRoom, targetX, targetY) {
+    gameState.dissolve = {
+      active: true,
+      progress: 0,
+      switched: false,
+      targetSpace,
+      targetRoom,
+      targetX,
+      targetY
+    };
+    playSfx('door');
+  }
+
+  function startScreenSlide(dir, newScX, newScY, newRoom) {
+    gameState.slide = {
+      active: true,
+      fromScX: gameState.view.scX,
+      fromScY: gameState.view.scY,
+      fromRoom: gameState.player.roomIdx,
+      dir,
+      progress: 0
+    };
+    gameState.view.scX = newScX;
+    gameState.view.scY = newScY;
+    gameState.player.roomIdx = newRoom;
+  }
+
+  function checkDoorwayPush(nx, ny, dir) {
+    const p = gameState.player;
+    if (p.doorCooldown > 0) return false;
+
+    const probeX = nx + (dir === 'LEFT' ? -14 : (dir === 'RIGHT' ? 14 : 0));
+    const probeY = ny + (dir === 'UP' ? -14 : (dir === 'DOWN' ? 12 : 0));
+    const tc = Math.floor(probeX / TILE_W);
+    const tr = Math.floor(probeY / TILE_H);
+    const cell = worldTiles[tr]?.[tc];
+
+    if (cell && cell.type === 'BUILDING' && cell.buildingId) {
+      let doorX = tc * TILE_W + TILE_W / 2;
+      let doorY = tr * TILE_H + TILE_H / 2;
+      if (cell.buildingId === 'BLDG_CLERKS_OFFICE') doorX = 5 * TILE_W;
+      if (cell.buildingId === 'BLDG_COURTHOUSE') doorY = 3 * TILE_H;
+
+      const aligned =
+        (cell.doorFace === 'NORTH' && dir === 'DOWN' && Math.abs(nx - doorX) < 34) ||
+        (cell.doorFace === 'SOUTH' && dir === 'UP' && Math.abs(nx - doorX) < 34) ||
+        (cell.doorFace === 'EAST' && dir === 'LEFT' && Math.abs(ny - doorY) < 34) ||
+        (cell.doorFace === 'WEST' && dir === 'RIGHT' && Math.abs(ny - doorY) < 34);
+
+      if (aligned) {
+        const bldg = BUILDINGS[cell.buildingId];
+        if (bldg.isLocked) {
+          p.doorCooldown = 25;
+          playSfx('locked');
+          openDialog([`${bldg.label}: ${bldg.lockedMsg}`]);
+        } else {
+          const sp = getInteriorSpawnForEntryWall(bldg.entryWall);
+          startPixelDissolve(bldg.id, 0, sp.x, sp.y);
+        }
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function isAtInteriorExitMat(p, bldg) {
+    if (p.roomIdx !== 0) return false;
+    const w = bldg.entryWall;
+    if (w === 'NORTH') return p.y < 64 && Math.abs(p.x - 240) < 38;
+    if (w === 'EAST') return p.x > SCREEN_W - 64 && Math.abs(p.y - 175) < 38;
+    if (w === 'WEST') return p.x < 64 && Math.abs(p.y - 175) < 38;
+    return p.y > SCREEN_H - 32 && Math.abs(p.x - 240) < 38;
+  }
+
+  function openDialog(lines) {
+    gameState.dialogQueue = [...lines];
+    gameState.screen = 'DIALOG';
+    playSfx('blip');
+  }
+
+  function handleMenuNav(dir) {
+    if (gameState.screen === 'ROSTER_UI') {
+      if (dir === 'up') {
+        gameState.rosterCursor = (gameState.rosterCursor + 19) % 20;
+        playSfx('blip');
+      } else if (dir === 'down') {
+        gameState.rosterCursor = (gameState.rosterCursor + 1) % 20;
+        playSfx('blip');
+      }
+    }
+  }
+
+  function handleButtonA() {
+    const now = performance.now();
+    if (now - lastBtnATime < 110) return;
+    lastBtnATime = now;
+
+    if (gameState.screen === 'TITLE') {
+      gameState.screen = 'PLAYING';
+      playSfx('bell');
+      return;
+    }
+
+    if (gameState.screen === 'OUTCOME') {
+      initNewCase();
+      gameState.screen = 'PLAYING';
+      playSfx('blip');
+      return;
+    }
+
+    if (gameState.screen === 'DIALOG') {
+      gameState.dialogQueue.shift();
+      if (gameState.dialogQueue.length === 0) {
+        gameState.screen = 'PLAYING';
+      } else {
+        playSfx('blip');
+      }
+      return;
+    }
+
+    if (gameState.screen === 'ROSTER_UI') {
+      const target = gameState.tripmen[gameState.rosterCursor];
+      toggleRosterMember(target);
+      return;
+    }
+
+    if (gameState.screen === 'NOTEBOOK_UI' || gameState.screen === 'DOCKET_UI') {
+      gameState.screen = 'PLAYING';
+      playSfx('blip');
+      return;
+    }
+
+    if (gameState.screen === 'PLAYING' && !gameState.slide.active && !gameState.dissolve.active) {
+      performWorldInteract();
+    }
+  }
+
+  function handleButtonB() {
+    const now = performance.now();
+    if (now - lastBtnBTime < 110) return;
+    lastBtnBTime = now;
+
+    if (gameState.screen === 'DIALOG') {
+      gameState.dialogQueue = [];
+      gameState.screen = 'PLAYING';
+      playSfx('blip');
+      return;
+    }
+
+    if (gameState.screen === 'ROSTER_UI' || gameState.screen === 'NOTEBOOK_UI' || gameState.screen === 'DOCKET_UI') {
+      gameState.screen = 'PLAYING';
+      playSfx('blip');
+      return;
+    }
+
+    if (gameState.screen === 'PLAYING') {
+      gameState.screen = 'NOTEBOOK_UI';
+      playSfx('blip');
+    }
+  }
+
+  function performWorldInteract() {
+    const p = gameState.player;
+
+    if (p.space === 'EXTERIOR') {
+      if (checkDoorwayPush(p.x, p.y, p.facing)) return;
+    } else {
+      const bldg = BUILDINGS[p.space];
+      if (isAtInteriorExitMat(p, bldg)) {
+        const outPt = worldTileCenter(bldg.exitWorld.c, bldg.exitWorld.r);
+        startPixelDissolve('EXTERIOR', 0, outPt.x + bldg.exitWorld.offsetX, outPt.y + bldg.exitWorld.offsetY);
+        return;
+      }
+
+      if (p.space === 'BLDG_CLERKS_OFFICE' && p.roomIdx === 0 && p.y < 86 && Math.abs(p.x - 165) < 44) {
+        gameState.screen = 'ROSTER_UI';
+        playSfx('blip');
+        return;
+      }
+
+      if (p.space === 'BLDG_COURTHOUSE' && p.roomIdx === 0 && p.y < 86 && Math.abs(p.x - 165) < 44) {
+        gameState.screen = 'DOCKET_UI';
+        playSfx('clue');
+        return;
+      }
+    }
+
+    const clue = gameState.clues.find(
+      (c) => c.space === p.space && (c.roomIdx || 0) === p.roomIdx && Math.hypot(c.x - p.x, c.y - p.y) <= 32
+    );
+    if (clue) {
+      if (!clue.discovered) {
+        clue.discovered = true;
+        advanceTime(25);
+        playSfx('clue');
+      } else {
+        playSfx('blip');
+      }
+      openDialog([`[${clue.label}]`, clue.text]);
+      return;
+    }
+
+    const mentor = HBC_MENTORS.find(
+      (m) => m.space === p.space && (m.roomIdx || 0) === p.roomIdx && Math.hypot(m.x - p.x, m.y - p.y) <= 32
+    );
+    if (mentor) {
+      openDialog([`${mentor.name} (${mentor.roleTitle}):`, ...mentor.lines]);
+      return;
+    }
+
+    const npc = gameState.tripmen.find(
+      (t) => t.space === p.space && t.roomIdx === p.roomIdx && Math.hypot(t.x - p.x, t.y - p.y) <= 30
+    );
+    if (npc) {
+      const phaseId = PHASES[getCurrentPhaseIndex()].id;
+      const sched = npc.schedule[phaseId];
+      const kinNames = npc.kinshipIds
+        .map((kid) => gameState.tripmen.find((t) => t.id === kid)?.name)
+        .filter(Boolean);
+      const kinLine = kinNames.length > 0 ? ` Kin on crew: ${kinNames.join(', ')}.` : '';
+      const statusTag = npc.onRoster ? '[ON ROSTER]' : (npc.isReserve ? '[GATE RESERVE]' : '[CUT]');
+
+      const socialClue = npc.secret.clues.find((c) => c.medium === 'RUMOR' && !c.discovered);
+      if (socialClue) {
+        socialClue.discovered = true;
+        playSfx('clue');
+      }
+      advanceTime(20);
+
+      openDialog([
+        `${npc.name} — ${npc.role} (${npc.parish}) ${statusTag}`,
+        `"${sched.note}"${kinLine}`
+      ]);
+      return;
+    }
+  }
+
+  function updateSimulation() {
+    if (isPaused) return;
+    gameState.frame++;
+
+    if (gameState.screen === 'ROSTER_UI' && gameState.frame % 10 === 0) {
+      if (keys.up) handleMenuNav('up');
+      if (keys.down) handleMenuNav('down');
+    }
+
+    if (gameState.slide.active) {
+      gameState.slide.progress += 0.085;
+      if (gameState.slide.progress >= 1) {
+        gameState.slide.progress = 1;
+        gameState.slide.active = false;
+      }
+      return;
+    }
+
+    if (gameState.dissolve.active) {
+      gameState.dissolve.progress += 0.07;
+      if (gameState.dissolve.progress >= 0.5 && !gameState.dissolve.switched) {
+        gameState.dissolve.switched = true;
+        gameState.player.space = gameState.dissolve.targetSpace;
+        gameState.player.roomIdx = gameState.dissolve.targetRoom;
+        gameState.player.x = gameState.dissolve.targetX;
+        gameState.player.y = gameState.dissolve.targetY;
+        gameState.player.doorCooldown = 18;
+        if (gameState.dissolve.targetSpace === 'EXTERIOR') {
+          gameState.view.scX = Math.floor(gameState.dissolve.targetX / SCREEN_W);
+          gameState.view.scY = Math.floor(gameState.dissolve.targetY / SCREEN_H);
+        }
+      }
+      if (gameState.dissolve.progress >= 1) {
+        gameState.dissolve.active = false;
+      }
+      return;
+    }
+
+    if (gameState.screen !== 'PLAYING') return;
+
+    if (gameState.frame % 45 === 0) {
+      advanceTime(1);
+    }
+
+    const p = gameState.player;
+    if (p.doorCooldown > 0) p.doorCooldown--;
+
+    let vx = 0, vy = 0;
+    const speed = 2.15;
+    if (keys.up) { vy -= speed; p.facing = 'UP'; }
+    if (keys.down) { vy += speed; p.facing = 'DOWN'; }
+    if (keys.left) { vx -= speed; p.facing = 'LEFT'; }
+    if (keys.right) { vx += speed; p.facing = 'RIGHT'; }
+
+    p.isMoving = vx !== 0 || vy !== 0;
+
+    if (p.isMoving) {
+      p.walkFrame += 0.22;
+
+      if (p.space === 'EXTERIOR') {
+        const nextX = p.x + vx;
+        const nextY = p.y + vy;
+
+        if (checkDoorwayPush(nextX, nextY, p.facing)) {
+          p.isMoving = false;
+        } else {
+          if (canWalkExterior(nextX, p.y)) p.x = nextX;
+          if (canWalkExterior(p.x, nextY)) p.y = nextY;
+
+          const curMinX = gameState.view.scX * SCREEN_W;
+          const curMaxX = curMinX + SCREEN_W;
+          const curMinY = gameState.view.scY * SCREEN_H;
+          const curMaxY = curMinY + SCREEN_H;
+
+          if (p.x < curMinX + 4 && gameState.view.scX > 0) {
+            p.x = curMinX - 10;
+            startScreenSlide('LEFT', gameState.view.scX - 1, gameState.view.scY, 0);
+          } else if (p.x > curMaxX - 4 && gameState.view.scX < 3) {
+            p.x = curMaxX + 10;
+            startScreenSlide('RIGHT', gameState.view.scX + 1, gameState.view.scY, 0);
+          } else if (p.y < curMinY + 4 && gameState.view.scY > 0) {
+            p.y = curMinY - 10;
+            startScreenSlide('UP', gameState.view.scX, gameState.view.scY - 1, 0);
+          } else if (p.y > curMaxY - 4 && gameState.view.scY < 3) {
+            p.y = curMaxY + 10;
+            startScreenSlide('DOWN', gameState.view.scX, gameState.view.scY + 1, 0);
+          }
+        }
+      } else {
+        const bldg = BUILDINGS[p.space];
+        const nextX = p.x + vx;
+        const nextY = p.y + vy;
+
+        if (p.doorCooldown === 0 && p.roomIdx === 0) {
+          const w = bldg.entryWall;
+          const wantsExit =
+            (w === 'NORTH' && keys.up && nextY < 54 && Math.abs(p.x - 240) < 38) ||
+            (w === 'SOUTH' && keys.down && nextY > SCREEN_H - 22 && Math.abs(p.x - 240) < 38) ||
+            (w === 'EAST' && keys.right && nextX > SCREEN_W - 54 && Math.abs(p.y - 175) < 38) ||
+            (w === 'WEST' && keys.left && nextX < 54 && Math.abs(p.y - 175) < 38);
+
+          if (wantsExit) {
+            const outPt = worldTileCenter(bldg.exitWorld.c, bldg.exitWorld.r);
+            startPixelDissolve('EXTERIOR', 0, outPt.x + bldg.exitWorld.offsetX, outPt.y + bldg.exitWorld.offsetY);
+            return;
+          }
+        }
+
+        if (bldg.depthFrames === 2) {
+          if (bldg.entryWall === 'NORTH') {
+            if (p.roomIdx === 0 && nextY > SCREEN_H - 22 && Math.abs(p.x - 240) < 38 && keys.down) {
+              p.y = 66;
+              startScreenSlide('DOWN', 0, 0, 1);
+              return;
+            }
+            if (p.roomIdx === 1 && nextY < 54 && Math.abs(p.x - 240) < 38 && keys.up) {
+              p.y = SCREEN_H - 36;
+              startScreenSlide('UP', 0, 0, 0);
+              return;
+            }
+          } else {
+            if (p.roomIdx === 0 && nextY < 54 && Math.abs(p.x - 240) < 38 && keys.up) {
+              p.y = SCREEN_H - 36;
+              startScreenSlide('UP', 0, 0, 1);
+              return;
+            }
+            if (p.roomIdx === 1 && nextY > SCREEN_H - 22 && Math.abs(p.x - 240) < 38 && keys.down) {
+              p.y = 66;
+              startScreenSlide('DOWN', 0, 0, 0);
+              return;
+            }
+          }
+        }
+
+        if (canWalkInterior(nextX, p.y)) p.x = nextX;
+        if (canWalkInterior(p.x, nextY)) p.y = nextY;
+      }
+    }
+
+    const phaseId = PHASES[getCurrentPhaseIndex()].id;
+    for (const npc of gameState.tripmen) {
+      const target = npc.schedule[phaseId];
+
+      if (npc.space !== target.space || npc.roomIdx !== (target.roomIdx || 0)) {
+        npc.space = target.space;
+        npc.roomIdx = target.roomIdx || 0;
+        npc.x = target.x;
+        npc.y = target.y;
+        npc.goalX = target.x;
+        npc.goalY = target.y;
+      }
+
+      npc.wanderTimer--;
+      if (npc.wanderTimer <= 0) {
+        npc.wanderTimer = 50 + Math.floor(Math.random() * 80);
+        const radius = npc.isReserve ? 26 : 58;
+        const candX = target.x + (Math.random() - 0.5) * radius * 2;
+        const candY = target.y + (Math.random() - 0.5) * radius * 2;
+        const walkOk = npc.space === 'EXTERIOR' ? canWalkExterior(candX, candY) : canWalkInterior(candX, candY);
+        if (walkOk) {
+          npc.goalX = candX;
+          npc.goalY = candY;
+        }
+      }
+
+      const dx = npc.goalX - npc.x;
+      const dy = npc.goalY - npc.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > 2) {
+        npc.isMoving = true;
+        npc.walkPhase += 0.16;
+        if (Math.abs(dx) > Math.abs(dy)) {
+          npc.facing = dx > 0 ? 'RIGHT' : 'LEFT';
+        } else {
+          npc.facing = dy > 0 ? 'DOWN' : 'UP';
+        }
+        npc.x += (dx / dist) * 0.75;
+        npc.y += (dy / dist) * 0.75;
+      } else {
+        npc.isMoving = false;
+      }
+    }
+  }
+
+  // =========================================================================
+  // 8. PUSHED SNES 16-BIT RENDERER
+  // =========================================================================
+  function drawCharacter16Bit(x, y, isPlayer, palette, facing, walkPhase, isMoving, hasLantern, label, shadowShiftX = 0) {
+    const px = Math.round(x);
+    const py = Math.round(y);
+    const step = isMoving ? Math.sin(walkPhase) : 0;
+    const bob = isMoving ? Math.abs(Math.sin(walkPhase)) * 1.5 : 0;
+    const leftLegOff = isMoving ? Math.round(step * 2) : 0;
+    const rightLegOff = isMoving ? Math.round(-step * 2) : 0;
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.42)';
+    ctx.fillRect(px - 6 + Math.round(shadowShiftX * 0.4), py + 2, 12, 4);
+
+    ctx.fillStyle = '#1b2234';
+    if (facing === 'LEFT' || facing === 'RIGHT') {
+      ctx.fillRect(px - 3 + leftLegOff, py - 4, 3, 5);
+      ctx.fillRect(px + rightLegOff, py - 4, 3, 5);
+    } else {
+      ctx.fillRect(px - 4, py - 4 + leftLegOff * 0.5, 3, 5);
+      ctx.fillRect(px + 1, py - 4 + rightLegOff * 0.5, 3, 5);
+    }
+
+    const coatMain = isPlayer ? '#f0efe9' : palette.coat;
+    ctx.fillStyle = coatMain;
+    ctx.fillRect(px - 5, py - 13 - bob, 10, 10);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+    if (facing === 'LEFT') ctx.fillRect(px + 2, py - 13 - bob, 3, 10);
+    else if (facing === 'RIGHT') ctx.fillRect(px - 5, py - 13 - bob, 3, 10);
+    else ctx.fillRect(px + 2, py - 13 - bob, 3, 10);
+
+    ctx.fillStyle = isPlayer ? '#d31a1a' : palette.sash;
+    ctx.fillRect(px - 5, py - 7 - bob, 10, 2);
+    ctx.fillStyle = '#f7c844';
+    ctx.fillRect(px - 2, py - 7 - bob, 4, 2);
+
+    ctx.fillStyle = '#c99665';
+    ctx.fillRect(px - 4, py - 20 - bob, 8, 7);
+
+    const beardCol = isPlayer ? '#1c1c1c' : (palette.beard || '#2b1e16');
+    if (facing === 'UP') {
+      ctx.fillStyle = beardCol;
+      ctx.fillRect(px - 4, py - 20 - bob, 8, 7);
+    } else if (facing === 'DOWN') {
+      ctx.fillStyle = beardCol;
+      ctx.fillRect(px - 4, py - 16 - bob, 8, 3);
+      ctx.fillStyle = '#111';
+      ctx.fillRect(px - 2, py - 18 - bob, 1, 2);
+      ctx.fillRect(px + 1, py - 18 - bob, 1, 2);
+    } else if (facing === 'LEFT') {
+      ctx.fillStyle = beardCol;
+      ctx.fillRect(px - 4, py - 16 - bob, 6, 3);
+      ctx.fillRect(px + 1, py - 20 - bob, 3, 7);
+      ctx.fillStyle = '#111';
+      ctx.fillRect(px - 3, py - 18 - bob, 1, 2);
+    } else if (facing === 'RIGHT') {
+      ctx.fillStyle = beardCol;
+      ctx.fillRect(px - 2, py - 16 - bob, 6, 3);
+      ctx.fillRect(px - 4, py - 20 - bob, 3, 7);
+      ctx.fillStyle = '#111';
+      ctx.fillRect(px + 2, py - 18 - bob, 1, 2);
+    }
+
+    if (palette.hat === 'NONE') {
+      ctx.fillStyle = '#2c1e16';
+      ctx.fillRect(px - 4, py - 22 - bob, 8, 3);
+    } else {
+      const hatCol = isPlayer ? '#d31a1a' : (palette.hat || '#1c4596');
+      ctx.fillStyle = hatCol;
+      ctx.fillRect(px - 4, py - 23 - bob, 8, 4);
+      ctx.fillStyle = isPlayer ? '#8f0e0e' : 'rgba(0,0,0,0.3)';
+      if (facing === 'LEFT') ctx.fillRect(px + 3, py - 23 - bob, 3, 4);
+      else if (facing === 'RIGHT') ctx.fillRect(px - 6, py - 23 - bob, 3, 4);
+      else ctx.fillRect(px + 2, py - 24 - bob, 3, 3);
+    }
+
+    if (label) {
+      ctx.font = 'bold 6px Courier New';
+      const tw = ctx.measureText(label).width + 4;
+      ctx.fillStyle = 'rgba(15, 19, 36, 0.82)';
+      ctx.fillRect(px - tw / 2, py + 7, tw, 8);
+      ctx.fillStyle = '#f4f1de';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, px, py + 13);
+    }
+
+    if (hasLantern) {
+      const grad = ctx.createRadialGradient(px + 6, py - 10, 2, px + 6, py - 10, 34);
+      grad.addColorStop(0, 'rgba(255, 210, 110, 0.58)');
+      grad.addColorStop(1, 'rgba(255, 170, 50, 0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(px + 6, py - 10, 34, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function drawRichGrassTile(x, y, w, h, c, r) {
+    ctx.fillStyle = '#4c7036';
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#5e8744';
+    for (let gy = y + 8; gy < y + h - 4; gy += 16) {
+      for (let gx = x + 10; gx < x + w - 8; gx += 24) {
+        const jx = gx + ((gy / 16 + c) % 2) * 9;
+        ctx.fillRect(jx, gy, 4, 2);
+        ctx.fillRect(jx + 2, gy - 2, 2, 2);
+      }
+    }
+    ctx.fillStyle = '#3b5928';
+    ctx.fillRect(x + ((c * 37 + r * 19) % 120) + 12, y + ((r * 29 + c * 13) % 70) + 12, 6, 3);
+    ctx.fillStyle = '#8c867a';
+    ctx.fillRect(x + ((c * 53 + r * 31) % 130) + 10, y + ((r * 41 + c * 17) % 80) + 10, 3, 2);
+  }
+
+  function drawDirtPathTile(x, y, w, h, c, r, mask) {
+    drawRichGrassTile(x, y, w, h, c, r);
+
+    const padX = 48;
+    const padY = 34;
+    const cx1 = mask.w ? x : x + padX;
+    const cx2 = mask.e ? x + w : x + w - padX;
+    const cy1 = mask.n ? y : y + padY;
+    const cy2 = mask.s ? y + h : y + h - padY;
+
+    ctx.fillStyle = '#395726';
+    ctx.fillRect(cx1 - 2, cy1 - 2, (cx2 - cx1) + 4, (cy2 - cy1) + 4);
+
+    ctx.fillStyle = '#8f7453';
+    ctx.fillRect(cx1, cy1, cx2 - cx1, cy2 - cy1);
+
+    ctx.fillStyle = '#a38662';
+    ctx.fillRect(cx1 + 4, cy1 + 4, Math.max(4, (cx2 - cx1) - 8), Math.max(4, (cy2 - cy1) - 8));
+
+    ctx.fillStyle = '#735b3f';
+    if (mask.n || mask.s) {
+      ctx.fillRect(x + w / 2 - 9, cy1, 3, cy2 - cy1);
+      ctx.fillRect(x + w / 2 + 6, cy1, 3, cy2 - cy1);
+    }
+    if (mask.e || mask.w) {
+      ctx.fillRect(cx1, y + h / 2 - 7, cx2 - cx1, 2);
+      ctx.fillRect(cx1, y + h / 2 + 5, cx2 - cx1, 2);
+    }
+
+    const seed = c * 17 + r * 31;
+    ctx.fillStyle = '#696259';
+    ctx.fillRect(cx1 + 3 + (seed % 10), cy1 + 4 + ((seed * 3) % 10), 3, 2);
+    ctx.fillStyle = '#b8b0a2';
+    ctx.fillRect(cx2 - 8 - (seed % 8), cy2 - 7 - ((seed * 5) % 8), 3, 2);
+  }
+
+  function drawDetailedYorkBoat(bx, by) {
+    ctx.fillStyle = 'rgba(28, 22, 14, 0.45)';
+    ctx.fillRect(bx + 6, by + 26, 76, 8);
+
+    ctx.fillStyle = '#4a2b14';
+    ctx.beginPath();
+    ctx.moveTo(bx, by + 16);
+    ctx.lineTo(bx + 14, by + 4);
+    ctx.lineTo(bx + 72, by + 4);
+    ctx.lineTo(bx + 86, by + 16);
+    ctx.lineTo(bx + 72, by + 28);
+    ctx.lineTo(bx + 14, by + 28);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#8c5830';
+    ctx.fillRect(bx + 14, by + 6, 58, 20);
+    ctx.fillStyle = '#a86e3e';
+    ctx.fillRect(bx + 16, by + 8, 54, 6);
+    ctx.fillStyle = '#6e4220';
+    ctx.fillRect(bx + 14, by + 21, 58, 5);
+
+    ctx.fillStyle = '#3d220e';
+    for (let tx = bx + 20; tx <= bx + 64; tx += 11) {
+      ctx.fillRect(tx, by + 6, 3, 20);
+    }
+
+    ctx.fillStyle = '#d4c39a';
+    ctx.fillRect(bx + 2, by + 13, 6, 6);
+    ctx.fillRect(bx + 78, by + 13, 6, 6);
+
+    ctx.fillStyle = '#cfa96e';
+    ctx.fillRect(bx + 18, by + 1, 46, 2);
+    ctx.fillRect(bx + 22, by + 29, 46, 2);
+
+    ctx.fillStyle = '#d4c39a';
+    ctx.fillRect(bx + 90, by + 8, 16, 13);
+    ctx.strokeStyle = '#5c3c24';
+    ctx.strokeRect(bx + 90, by + 8, 16, 13);
+    ctx.fillStyle = '#8a3324';
+    ctx.fillRect(bx + 96, by + 8, 3, 13);
+  }
+
+  function drawDetailedCanoe(cx, cy) {
+    ctx.fillStyle = 'rgba(28, 22, 14, 0.38)';
+    ctx.fillRect(cx + 4, cy + 15, 56, 5);
+
+    ctx.fillStyle = '#c9a463';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy + 6);
+    ctx.lineTo(cx + 10, cy + 3);
+    ctx.lineTo(cx + 52, cy + 3);
+    ctx.lineTo(cx + 62, cy + 6);
+    ctx.lineTo(cx + 50, cy + 16);
+    ctx.lineTo(cx + 12, cy + 16);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = '#3b2412';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = '#24180e';
+    ctx.fillRect(cx + 22, cy + 4, 2, 11);
+    ctx.fillRect(cx + 40, cy + 4, 2, 11);
+
+    ctx.fillStyle = '#8f5930';
+    ctx.fillRect(cx + 12, cy + 6, 38, 7);
+    ctx.fillStyle = '#cfa96e';
+    ctx.fillRect(cx + 18, cy + 4, 2, 11);
+    ctx.fillRect(cx + 31, cy + 4, 2, 11);
+    ctx.fillRect(cx + 44, cy + 4, 2, 11);
+
+    ctx.fillStyle = '#b57b4a';
+    ctx.fillRect(cx + 12, cy + 19, 34, 2);
+    ctx.fillRect(cx + 44, cy + 18, 10, 4);
+  }
+
+  function drawCircularLimestoneBastion(bx, by) {
+    ctx.fillStyle = 'rgba(20, 24, 18, 0.35)';
+    ctx.beginPath();
+    ctx.arc(bx + 3, by + 4, 43, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#cfc9bc';
+    ctx.beginPath();
+    ctx.arc(bx, by, 42, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#7d7669';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.strokeStyle = '#9c9486';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(bx, by, 33, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = '#a8a092';
+    ctx.beginPath();
+    ctx.arc(bx, by, 25, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ded8ca';
+    ctx.beginPath();
+    ctx.arc(bx - 2, by - 2, 16, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#3b3731';
+    ctx.fillRect(bx - 2, by - 38, 4, 7);
+    ctx.fillRect(bx - 2, by + 31, 4, 7);
+    ctx.fillRect(bx - 38, by - 2, 7, 4);
+    ctx.fillRect(bx + 31, by - 2, 7, 4);
+    ctx.lineWidth = 1;
+  }
+
+  function drawVictorianGovernorsMansion(bx, by, bw, bh, cel) {
+    ctx.fillStyle = 'rgba(18, 20, 26, 0.36)';
+    ctx.fillRect(bx + 4 + cel.shadowShiftX, by + 6, bw, bh);
+
+    ctx.fillStyle = '#9c9486';
+    ctx.fillRect(bx, by + bh - 8, bw, 8);
+
+    ctx.fillStyle = '#eae4d3';
+    ctx.fillRect(bx, by + 18, bw, bh - 26);
+
+    ctx.fillStyle = '#c4bba6';
+    for (let sy = by + 22; sy < by + bh - 8; sy += 5) {
+      ctx.fillRect(bx + 4, sy, bw - 8, 1);
+    }
+
+    ctx.fillStyle = '#2b4c7e';
+    ctx.fillRect(bx, by + 18, 5, bh - 26);
+    ctx.fillRect(bx + bw - 5, by + 18, 5, bh - 26);
+    ctx.fillStyle = '#f4f1de';
+    ctx.fillRect(bx - 2, by + 16, bw + 4, 4);
+
+    const roofY = by + bh - 42;
+    ctx.fillStyle = '#26384d';
+    ctx.fillRect(bx - 3, roofY, bw + 6, 36);
+    ctx.fillStyle = '#1a2736';
+    for (let ry = roofY + 6; ry < roofY + 34; ry += 6) {
+      ctx.fillRect(bx - 2, ry, bw + 4, 2);
+    }
+    ctx.fillStyle = '#4e6d8f';
+    ctx.fillRect(bx + 8, roofY + 8, bw - 16, 3);
+    ctx.fillStyle = '#181a22';
+    for (let ix = bx + 12; ix < bx + bw - 12; ix += 8) {
+      ctx.fillRect(ix, roofY + 4, 2, 4);
+    }
+
+    ctx.fillStyle = '#7a2e22';
+    ctx.fillRect(bx + 14, roofY + 10, 10, 14);
+    ctx.fillRect(bx + bw - 24, roofY + 10, 10, 14);
+
+    ctx.fillStyle = '#eae4d3';
+    ctx.fillRect(bx + bw / 2 - 12, roofY + 14, 24, 16);
+    ctx.fillStyle = cel.windowGlow ? '#ffcd75' : '#1e2c3d';
+    ctx.fillRect(bx + bw / 2 - 7, roofY + 18, 14, 9);
+
+    const winCol = cel.windowGlow ? '#ffcd75' : '#1e2c3d';
+    for (const wx of [bx + 14, bx + bw - 34]) {
+      ctx.fillStyle = '#2b4c7e';
+      ctx.fillRect(wx - 2, by + 22, 24, 18);
+      ctx.fillStyle = winCol;
+      ctx.fillRect(wx, by + 24, 20, 14);
+      ctx.fillStyle = '#f4f1de';
+      ctx.fillRect(wx + 9, by + 24, 2, 14);
+      ctx.fillRect(wx, by + 30, 20, 2);
+    }
+
+    ctx.fillStyle = '#24170e';
+    ctx.fillRect(bx + bw / 2 - 14, by, 28, 22);
+    ctx.strokeStyle = '#f7c844';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(bx + bw / 2 - 14, by, 28, 22);
+    ctx.lineWidth = 1;
+    ctx.fillStyle = '#f4f1de';
+    ctx.fillRect(bx + bw / 2 - 18, by + 2, 4, 22);
+    ctx.fillRect(bx + bw / 2 + 14, by + 2, 4, 22);
+  }
+
+  function drawWoodPaneledBuilding(bx, by, bw, bh, cell, x, y, w, h, cel) {
+    const isCourthouse = cell.buildingId === 'BLDG_COURTHOUSE';
+    const roofMain = isCourthouse ? '#3a4b5c' : '#7a2e22';
+    const roofShadow = isCourthouse ? '#263340' : '#571e15';
+    const wallBase = isCourthouse ? '#cfc7b6' : '#c9b393';
+    const sidingLine = isCourthouse ? '#a89f8e' : '#9e8462';
+    const trimCol = isCourthouse ? '#2b4c7e' : '#5c3822';
+
+    ctx.fillStyle = 'rgba(18, 20, 26, 0.34)';
+    ctx.fillRect(bx + 3 + cel.shadowShiftX, by + 4, bw, bh);
+
+    ctx.fillStyle = wallBase;
+    ctx.fillRect(bx, by, bw, bh);
+
+    ctx.fillStyle = sidingLine;
+    for (let sy = by + 6; sy < by + bh - 4; sy += 6) {
+      ctx.fillRect(bx + 3, sy, bw - 6, 1);
+    }
+    ctx.fillStyle = trimCol;
+    if (cell.multiRole !== 'RIGHT') ctx.fillRect(bx, by, 4, bh);
+    if (cell.multiRole !== 'LEFT') ctx.fillRect(bx + bw - 4, by, 4, bh);
+    if (cell.multiRole !== 'BOT') ctx.fillRect(bx, by, bw, 3);
+    if (cell.multiRole !== 'TOP') ctx.fillRect(bx, by + bh - 3, bw, 3);
+
+    if (cell.multiRole !== 'BOT') {
+      const roofH = Math.floor(bh * 0.42);
+      ctx.fillStyle = roofMain;
+      ctx.fillRect(bx, by, bw, roofH);
+      ctx.fillStyle = roofShadow;
+      for (let ry = by + 8; ry < by + roofH; ry += 7) {
+        ctx.fillRect(bx + 2, ry, bw - 4, 2);
+      }
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
+      ctx.fillRect(bx + 2, by + 4, bw - 4, 2);
+    }
+
+    const winCol = cel.windowGlow ? '#ffcd75' : '#232c3d';
+    if (cell.doorFace === 'SOUTH' || cell.doorFace === 'NORTH') {
+      const winY = by + Math.floor(bh * 0.52);
+      for (const wx of [bx + 16, bx + bw - 34]) {
+        if (Math.abs(wx - (bx + bw / 2)) > 20) {
+          ctx.fillStyle = trimCol;
+          ctx.fillRect(wx - 2, winY - 2, 20, 16);
+          ctx.fillStyle = winCol;
+          ctx.fillRect(wx, winY, 16, 12);
+          ctx.fillStyle = '#eae4d3';
+          ctx.fillRect(wx + 7, winY, 2, 12);
+        }
+      }
+    } else if (cell.doorFace === 'EAST' || cell.doorFace === 'WEST') {
+      const winX = cell.doorFace === 'EAST' ? (bx + 14) : (bx + bw - 30);
+      for (const wy of [by + Math.floor(bh * 0.50)]) {
+        ctx.fillStyle = trimCol;
+        ctx.fillRect(winX - 2, wy - 2, 20, 16);
+        ctx.fillStyle = winCol;
+        ctx.fillRect(winX, wy, 16, 12);
+        ctx.fillStyle = '#eae4d3';
+        ctx.fillRect(winX + 7, wy, 2, 12);
+      }
+    }
+
+    const bldg = cell.buildingId ? BUILDINGS[cell.buildingId] : null;
+    if (bldg && cell.doorFace) {
+      const locked = bldg.isLocked;
+      const frameCol = locked ? '#e88378' : '#f7c844';
+      const fillCol = locked ? '#4a1c17' : '#24170e';
+
+      if (cell.doorFace === 'SOUTH') {
+        if (cell.multiRole === 'LEFT') {
+          ctx.fillStyle = fillCol;
+          ctx.fillRect(x + w - 16, by + bh - 26, 32, 26);
+          ctx.strokeStyle = frameCol;
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x + w - 16, by + bh - 26, 32, 26);
+        } else if (cell.multiRole !== 'RIGHT') {
+          ctx.fillStyle = fillCol;
+          ctx.fillRect(bx + bw / 2 - 14, by + bh - 26, 28, 26);
+          ctx.strokeStyle = frameCol;
+          ctx.lineWidth = 2;
+          ctx.strokeRect(bx + bw / 2 - 14, by + bh - 26, 28, 26);
+        }
+      } else if (cell.doorFace === 'EAST') {
+        if (cell.multiRole === 'TOP') {
+          ctx.fillStyle = fillCol;
+          ctx.fillRect(bx + bw - 20, y + h - 16, 20, 32);
+          ctx.strokeStyle = frameCol;
+          ctx.lineWidth = 2;
+          ctx.strokeRect(bx + bw - 20, y + h - 16, 20, 32);
+        } else if (cell.multiRole !== 'BOT') {
+          ctx.fillStyle = fillCol;
+          ctx.fillRect(bx + bw - 20, by + bh / 2 - 14, 20, 28);
+          ctx.strokeStyle = frameCol;
+          ctx.lineWidth = 2;
+          ctx.strokeRect(bx + bw - 20, by + bh / 2 - 14, 20, 28);
+        }
+      } else if (cell.doorFace === 'WEST') {
+        ctx.fillStyle = fillCol;
+        ctx.fillRect(bx, by + bh / 2 - 14, 20, 28);
+        ctx.strokeStyle = frameCol;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(bx, by + bh / 2 - 14, 20, 28);
+      }
+      ctx.lineWidth = 1;
+    }
+  }
+
+  function renderExteriorScreen(scX, scY, ox, oy) {
+    const cel = getCelestialState(gameState.clockMinutes);
+    const startC = scX * SUB_COLS;
+    const startR = scY * SUB_ROWS;
+    let flagpoleDrawObj = null;
+    let northGateBridgeObj = null;
+
+    ctx.save();
+    ctx.translate(ox, oy);
+
+    for (let lr = 0; lr < SUB_ROWS; lr++) {
+      for (let lc = 0; lc < SUB_COLS; lc++) {
+        const c = startC + lc;
+        const r = startR + lr;
+        const x = Math.round(lc * TILE_W);
+        const y = Math.round(lr * TILE_H);
+        const w = Math.ceil(TILE_W);
+        const h = Math.ceil(TILE_H);
+        const cell = worldTiles[r]?.[c] || { type: 'PRAIRIE', zoneName: 'Red River Settlement', pathMask: {} };
+
+        if (cell.type === 'PRAIRIE' || cell.type === 'FORT_GRASS') {
+          drawRichGrassTile(x, y, w, h, c, r);
+        } else if (cell.type === 'DIRT_PATH') {
+          drawDirtPathTile(x, y, w, h, c, r, cell.pathMask);
+        } else if (cell.type === 'RIVERBANK') {
+          drawRichGrassTile(x, y, w, Math.floor(h * 0.36), c, r);
+          ctx.fillStyle = '#a38963';
+          ctx.fillRect(x, y + Math.floor(h * 0.36), w, Math.ceil(h * 0.64));
+          ctx.fillStyle = '#876f4d';
+          ctx.fillRect(x, y + h - 12, w, 12);
+          ctx.fillStyle = '#6e685f';
+          ctx.fillRect(x + 14, y + 42, 6, 4);
+          ctx.fillRect(x + 132, y + 48, 5, 3);
+          ctx.fillStyle = '#bdb5a6';
+          ctx.fillRect(x + 22, y + 45, 4, 3);
+
+          if (c === 5 || c === 6 || c === 8) {
+            drawDetailedYorkBoat(x + 22, y + h - 42);
+          }
+          if (c === 1 || c === 2 || c === 7) {
+            drawDetailedCanoe(x + 34, y + h - 30);
+          }
+        } else if (cell.type === 'GATE_SOUTH') {
+          drawDirtPathTile(x, y, w, h, c, r, cell.pathMask);
+          ctx.fillStyle = '#cfc9bc';
+          ctx.fillRect(x, y, 32, h);
+          ctx.fillRect(x + w - 32, y, 32, h);
+          ctx.fillStyle = '#9c9486';
+          ctx.fillRect(x + 26, y, 6, h);
+          ctx.fillRect(x + w - 32, y, 6, h);
+          for (let py = y + 16; py < y + h; py += 16) {
+            ctx.fillRect(x, py, 32, 2);
+            ctx.fillRect(x + w - 32, py, 32, 2);
+          }
+        } else if (cell.type === 'GATE_EAST') {
+          drawDirtPathTile(x, y, w, h, c, r, cell.pathMask);
+          ctx.fillStyle = '#cfc9bc';
+          ctx.fillRect(x, y, w, 20);
+          ctx.fillRect(x, y + h - 20, w, 20);
+          ctx.fillStyle = '#9c9486';
+          ctx.fillRect(x, y + 16, w, 4);
+          ctx.fillRect(x, y + h - 20, w, 4);
+        } else if (cell.type === 'GATE_NORTH') {
+          drawDirtPathTile(x, y, w, h, c, r, cell.pathMask);
+
+          ctx.fillStyle = '#cfc9bc';
+          ctx.fillRect(x, y, 34, h);
+          ctx.fillRect(x + w - 34, y, 34, h);
+          ctx.fillStyle = '#9c9486';
+          ctx.fillRect(x + 28, y, 6, h);
+          ctx.fillRect(x + w - 34, y, 6, h);
+          for (let py = y + 14; py < y + h; py += 16) {
+            ctx.fillRect(x, py, 34, 2);
+            ctx.fillRect(x + w - 34, py, 34, 2);
+          }
+
+          ctx.fillStyle = 'rgba(18, 20, 26, 0.34)';
+          ctx.fillRect(x + 34, y + 20, w - 68, 42);
+
+          const gateBottomY = r * TILE_H + 54;
+          northGateBridgeObj = {
+            y: gateBottomY,
+            draw: () => {
+              ctx.fillStyle = '#ded8ca';
+              ctx.fillRect(x + 4, y + 6, w - 8, 36);
+              ctx.strokeStyle = '#6e6659';
+              ctx.lineWidth = 2;
+              ctx.strokeRect(x + 4, y + 6, w - 8, 36);
+              ctx.lineWidth = 1;
+
+              ctx.fillStyle = '#9c9486';
+              ctx.fillRect(x + 34, y + 36, w - 68, 6);
+              ctx.fillStyle = '#f4f1de';
+              ctx.fillRect(x + w / 2 - 6, y + 32, 12, 11);
+
+              ctx.fillStyle = '#cfc9bc';
+              for (let bx = x + 8; bx < x + w - 16; bx += 22) {
+                ctx.fillRect(bx, y, 14, 7);
+                ctx.strokeStyle = '#7d7669';
+                ctx.strokeRect(bx, y, 14, 7);
+              }
+
+              ctx.fillStyle = '#5c3c24';
+              ctx.fillRect(x + 12, y + 14, w - 24, 12);
+              ctx.fillStyle = '#9c9486';
+              ctx.fillRect(x + 16, y + 16, w - 32, 8);
+            }
+          };
+        } else if (cell.type === 'PLAZA') {
+          drawRichGrassTile(x, y, w, h, c, r);
+
+          const cx = x + w / 2;
+          const cy = y + h / 2;
+
+          ctx.fillStyle = '#395726';
+          ctx.fillRect(cx - 20, y, 40, h);
+          ctx.fillStyle = '#8f7453';
+          ctx.fillRect(cx - 18, y, 36, h);
+
+          ctx.fillStyle = '#395726';
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, 74, 48, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#8f7453';
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, 72, 46, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#a38662';
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, 67, 42, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = '#3b5e28';
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, 46, 28, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#538239';
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, 43, 25, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#ded8ca';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, 44, 26, 0, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.lineWidth = 1;
+
+          const poleWorldY = r * TILE_H + TILE_H / 2;
+          flagpoleDrawObj = {
+            y: poleWorldY,
+            draw: () => {
+              ctx.fillStyle = '#9c9486';
+              ctx.fillRect(cx - 13, cy - 8, 26, 15);
+              ctx.fillStyle = '#ded8ca';
+              ctx.fillRect(cx - 11, cy - 7, 22, 12);
+              ctx.strokeStyle = '#5c5449';
+              ctx.strokeRect(cx - 13, cy - 8, 26, 15);
+              ctx.fillStyle = '#f4f1de';
+              ctx.fillRect(cx - 2, cy - 62, 4, 58);
+              ctx.fillStyle = '#c81d25';
+              ctx.fillRect(cx + 2, cy - 60, 28, 16);
+              ctx.fillStyle = '#1b4f8c';
+              ctx.fillRect(cx + 2, cy - 60, 11, 8);
+              ctx.fillStyle = '#f4f1de';
+              ctx.fillRect(cx + 6, cy - 60, 3, 8);
+              ctx.fillRect(cx + 2, cy - 57, 11, 2);
+            }
+          };
+        } else if (cell.type === 'GARDEN') {
+          drawRichGrassTile(x, y, w, h, c, r);
+          ctx.fillStyle = '#3d6e2e';
+          ctx.fillRect(x + 8, y + 8, w - 16, h - 16);
+          ctx.strokeStyle = '#ded8ca';
+          ctx.strokeRect(x + 8, y + 8, w - 16, h - 16);
+          ctx.fillStyle = '#9b9182';
+          ctx.fillRect(x + w / 2 - 6, y + 8, 12, h - 16);
+        } else if (cell.type === 'WALL_STONE' || cell.type === 'WALL_OAK') {
+          const isOak = cell.type === 'WALL_OAK';
+          ctx.fillStyle = isOak ? '#5c3c24' : '#cfc9bc';
+          ctx.fillRect(x, y, w, h);
+          ctx.fillStyle = isOak ? '#3d2615' : '#9c9486';
+          ctx.fillRect(x, y + h - 12, w, 12);
+          if (isOak) {
+            for (let lx = x; lx < x + w; lx += 10) ctx.fillRect(lx, y, 2, h);
+          } else {
+            for (let by = y + 14; by < y + h - 12; by += 14) ctx.fillRect(x, by, w, 2);
+          }
+        } else if (cell.type === 'PARTITION_WALL') {
+          drawRichGrassTile(x, y, w, h, c, r);
+          ctx.fillStyle = '#cfc9bc';
+          ctx.fillRect(x, y + 26, w, 46);
+          ctx.fillStyle = '#8a3324';
+          ctx.fillRect(x, y + 22, w, 6);
+          for (let px = x + 8; px < x + w; px += 16) {
+            ctx.fillStyle = '#252838';
+            ctx.fillRect(px, y + 10, 3, 14);
+          }
+        } else if (cell.type === 'BASTION') {
+          drawRichGrassTile(x, y, w, h, c, r);
+          const isNorth = cell.bastionCorner === 'NW' || cell.bastionCorner === 'NE';
+          ctx.fillStyle = isNorth ? '#5c3c24' : '#cfc9bc';
+          if (cell.bastionCorner === 'NW') {
+            ctx.fillRect(x + 38, y + 24, w - 38, h - 24);
+          } else if (cell.bastionCorner === 'NE') {
+            ctx.fillRect(x, y + 24, w - 38, h - 24);
+          } else if (cell.bastionCorner === 'SW') {
+            ctx.fillRect(x + 38, y, w - 38, h - 24);
+          } else if (cell.bastionCorner === 'SE') {
+            ctx.fillRect(x, y, w - 38, h - 24);
+          }
+        } else if (cell.type === 'RIVER') {
+          ctx.fillStyle = '#1b5e82';
+          ctx.fillRect(x, y, w, h);
+          ctx.fillStyle = '#3898c2';
+          const flow = Math.floor((gameState.frame * 0.6 + r * 9) % 32);
+          for (let ry = y + 14; ry < y + h; ry += 26) {
+            ctx.fillRect(x + 16 + flow, ry, 14, 2);
+            ctx.fillRect(x + 84 + flow, ry + 10, 12, 2);
+          }
+        } else if (cell.type === 'BUILDING') {
+          drawRichGrassTile(x, y, w, h, c, r);
+
+          const box = getBuildingTileBox(c, r);
+          const bx = box.bx - scX * SCREEN_W;
+          const by = box.by - scY * SCREEN_H;
+          const bw = box.bw;
+          const bh = box.bh;
+
+          if (cell.buildingId === 'BLDG_GOVERNORS_HOUSE') {
+            drawVictorianGovernorsMansion(bx, by, bw, bh, cel);
+          } else {
+            drawWoodPaneledBuilding(bx, by, bw, bh, cell, x, y, w, h, cel);
+          }
+        }
+      }
+    }
+
+    const minWX = scX * SCREEN_W;
+    const minWY = scY * SCREEN_H;
+
+    const bastionCoords = [
+      { c: 0, r: 1, corner: 'NW' },
+      { c: 9, r: 1, corner: 'NE' },
+      { c: 0, r: 9, corner: 'SW' },
+      { c: 9, r: 9, corner: 'SE' }
+    ];
+    for (const b of bastionCoords) {
+      const { bx, by } = getBastionWorldCenter(b.c, b.r, b.corner);
+      if (bx >= minWX - 48 && bx <= minWX + SCREEN_W + 48 && by >= minWY - 48 && by <= minWY + SCREEN_H + 48) {
+        drawCircularLimestoneBastion(bx - minWX, by - minWY);
+      }
+    }
+
+    for (const clue of gameState.clues) {
+      if (clue.space === 'EXTERIOR' && clue.x >= minWX && clue.x < minWX + SCREEN_W && clue.y >= minWY && clue.y < minWY + SCREEN_H) {
+        const lx = clue.x - minWX;
+        const ly = clue.y - minWY;
+        ctx.fillStyle = '#5c3c24';
+        ctx.fillRect(lx - 7, ly - 5, 14, 10);
+        if (Math.floor(gameState.frame / 12) % 2 === 0) {
+          ctx.fillStyle = clue.discovered ? '#73eff7' : '#ffcd75';
+          ctx.fillRect(lx - 3, ly - 3, 6, 6);
+        }
+      }
+    }
+
+    const entities = [];
+    if (flagpoleDrawObj) entities.push(flagpoleDrawObj);
+    if (northGateBridgeObj) entities.push(northGateBridgeObj);
+
+    const p = gameState.player;
+    if (p.space === 'EXTERIOR' && p.x >= minWX - 20 && p.x <= minWX + SCREEN_W + 20 && p.y >= minWY - 20 && p.y <= minWY + SCREEN_H + 20) {
+      entities.push({
+        y: p.y,
+        draw: () => drawCharacter16Bit(p.x - minWX, p.y - minWY, true, {}, p.facing, p.walkFrame, p.isMoving, cel.isNight, null, cel.shadowShiftX)
+      });
+    }
+
+    for (const m of HBC_MENTORS) {
+      if (m.space === 'EXTERIOR' && m.x >= minWX && m.x < minWX + SCREEN_W && m.y >= minWY && m.y < minWY + SCREEN_H) {
+        entities.push({
+          y: m.y,
+          draw: () => drawCharacter16Bit(m.x - minWX, m.y - minWY, false, m.palette, m.facing, 0, false, cel.isNight, m.name.split(' ').pop(), cel.shadowShiftX)
+        });
+      }
+    }
+
+    for (const t of gameState.tripmen) {
+      if (t.space === 'EXTERIOR' && t.x >= minWX - 16 && t.x <= minWX + SCREEN_W + 16 && t.y >= minWY - 16 && t.y <= minWY + SCREEN_H + 16) {
+        entities.push({
+          y: t.y,
+          draw: () => drawCharacter16Bit(t.x - minWX, t.y - minWY, false, t.palette, t.facing, t.walkPhase, t.isMoving, cel.isNight && !t.isReserve, t.name.split(' ')[0], cel.shadowShiftX)
+        });
+      }
+    }
+
+    entities.sort((a, b) => a.y - b.y);
+    for (const ent of entities) ent.draw();
+
+    ctx.restore();
+  }
+
+  function renderInteriorScreen(space, roomIdx, ox, oy) {
+    const bldg = BUILDINGS[space];
+    const cel = getCelestialState(gameState.clockMinutes);
+    const isVictorian = bldg.style === 'VICTORIAN_MANSION';
+    const isCourthouse = bldg.style === 'COURTHOUSE';
+
+    ctx.save();
+    ctx.translate(ox, oy);
+
+    if (isVictorian) {
+      ctx.fillStyle = '#241518';
+      ctx.fillRect(0, 0, SCREEN_W, SCREEN_H);
+
+      ctx.fillStyle = '#6e3b26';
+      ctx.fillRect(36, 48, SCREEN_W - 72, SCREEN_H - 68);
+      ctx.fillStyle = '#522919';
+      for (let fy = 56; fy < SCREEN_H - 20; fy += 14) {
+        ctx.fillRect(36, fy, SCREEN_W - 72, 2);
+      }
+
+      ctx.fillStyle = '#7d1d24';
+      ctx.fillRect(96, 86, 288, 176);
+      ctx.strokeStyle = '#d4a238';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(102, 92, 276, 164);
+      ctx.lineWidth = 1;
+
+      ctx.fillStyle = '#2c4a3e';
+      ctx.fillRect(36, 12, SCREEN_W - 72, 24);
+      ctx.fillStyle = '#4a2518';
+      ctx.fillRect(36, 36, SCREEN_W - 72, 14);
+
+      if (roomIdx === 0) {
+        ctx.fillStyle = '#ded8ca';
+        ctx.fillRect(68, 18, 44, 32);
+        ctx.fillStyle = '#181414';
+        ctx.fillRect(78, 30, 24, 20);
+        ctx.fillStyle = '#f57e20';
+        ctx.fillRect(83, 38, 14, 10);
+      } else {
+        ctx.fillStyle = '#d4a238';
+        ctx.fillRect(222, 16, 36, 26);
+        ctx.fillStyle = '#1e283a';
+        ctx.fillRect(225, 19, 30, 20);
+      }
+
+      ctx.fillStyle = '#3d1c12';
+      ctx.fillRect(110, 118, 96, 44);
+      ctx.fillRect(274, 118, 96, 44);
+      ctx.fillStyle = '#1f5c3e';
+      ctx.fillRect(116, 124, 84, 26);
+      ctx.fillRect(280, 124, 84, 26);
+    } else if (isCourthouse) {
+      ctx.fillStyle = '#1e2029';
+      ctx.fillRect(0, 0, SCREEN_W, SCREEN_H);
+
+      ctx.fillStyle = '#785a3e';
+      ctx.fillRect(36, 48, SCREEN_W - 72, SCREEN_H - 68);
+      ctx.fillStyle = 'rgba(0,0,0,0.22)';
+      for (let fy = 64; fy < SCREEN_H - 20; fy += 16) ctx.fillRect(36, fy, SCREEN_W - 72, 2);
+
+      ctx.fillStyle = '#cfc9bc';
+      ctx.fillRect(36, 12, SCREEN_W - 72, 22);
+      ctx.fillStyle = '#4a2e18';
+      ctx.fillRect(36, 34, SCREEN_W - 72, 16);
+
+      if (roomIdx === 0) {
+        ctx.fillStyle = '#f4f1de';
+        ctx.fillRect(132, 14, 64, 34);
+        ctx.strokeStyle = '#2b4c7e';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(132, 14, 64, 34);
+        ctx.lineWidth = 1;
+        ctx.fillStyle = '#c81d25';
+        ctx.fillRect(140, 22, 18, 4);
+        ctx.fillStyle = '#2b4c7e';
+        ctx.fillRect(140, 30, 46, 3);
+        ctx.fillRect(140, 37, 38, 3);
+      } else {
+        ctx.fillStyle = '#252838';
+        for (let bx = 70; bx < 410; bx += 18) ctx.fillRect(bx, 14, 4, 36);
+      }
+
+      ctx.fillStyle = '#3d2414';
+      ctx.fillRect(110, 118, 96, 44);
+      ctx.fillRect(274, 118, 96, 44);
+      ctx.fillStyle = '#8f5e38';
+      ctx.fillRect(114, 122, 88, 30);
+      ctx.fillRect(278, 122, 88, 30);
+    } else {
+      ctx.fillStyle = '#261a11';
+      ctx.fillRect(0, 0, SCREEN_W, SCREEN_H);
+
+      ctx.fillStyle = '#734f32';
+      ctx.fillRect(36, 48, SCREEN_W - 72, SCREEN_H - 68);
+      ctx.fillStyle = 'rgba(0,0,0,0.26)';
+      for (let fy = 64; fy < SCREEN_H - 20; fy += 16) {
+        ctx.fillRect(36, fy, SCREEN_W - 72, 2);
+      }
+
+      ctx.fillStyle = '#4f3522';
+      ctx.fillRect(36, 12, SCREEN_W - 72, 38);
+      ctx.fillStyle = '#382416';
+      for (let wy = 20; wy < 48; wy += 9) ctx.fillRect(36, wy, SCREEN_W - 72, 2);
+
+      ctx.fillStyle = '#5c3822';
+      ctx.fillRect(66, 18, 18, 24);
+      ctx.fillRect(92, 18, 18, 24);
+      ctx.fillStyle = '#f0efe9';
+      ctx.fillRect(374, 22, 42, 18);
+      ctx.fillStyle = '#1b5e82';
+      ctx.fillRect(374, 25, 42, 3);
+      ctx.fillStyle = '#c81d25';
+      ctx.fillRect(374, 30, 42, 3);
+      ctx.fillStyle = '#cca010';
+      ctx.fillRect(374, 35, 42, 3);
+
+      ctx.fillStyle = '#4a2e18';
+      ctx.fillRect(110, 118, 96, 44);
+      ctx.fillRect(274, 118, 96, 44);
+      ctx.fillStyle = '#8f5e38';
+      ctx.fillRect(114, 122, 88, 30);
+      ctx.fillRect(278, 122, 88, 30);
+
+      ctx.fillStyle = '#5c3c24';
+      ctx.fillRect(52, 64, 24, 28);
+      ctx.fillRect(404, 64, 24, 28);
+      ctx.strokeStyle = '#1e2229';
+      ctx.strokeRect(52, 64, 24, 28);
+      ctx.strokeRect(404, 64, 24, 28);
+    }
+
+    if (bldg.depthFrames === 2) {
+      if (bldg.entryWall === 'NORTH') {
+        if (roomIdx === 0) {
+          ctx.fillStyle = '#f7c844';
+          ctx.fillRect(204, SCREEN_H - 24, 72, 8);
+        } else {
+          ctx.fillStyle = '#140e0a';
+          ctx.fillRect(204, 14, 72, 36);
+          ctx.strokeStyle = '#f7c844';
+          ctx.strokeRect(204, 14, 72, 36);
+        }
+      } else {
+        if (roomIdx === 0) {
+          ctx.fillStyle = '#140e0a';
+          ctx.fillRect(204, 14, 72, 36);
+          ctx.strokeStyle = '#f7c844';
+          ctx.strokeRect(204, 14, 72, 36);
+        } else {
+          ctx.fillStyle = '#f7c844';
+          ctx.fillRect(204, SCREEN_H - 24, 72, 8);
+        }
+      }
+    }
+
+    if (roomIdx === 0) {
+      ctx.fillStyle = '#f7c844';
+      if (bldg.entryWall === 'NORTH') {
+        ctx.fillRect(204, 48, 72, 7);
+      } else if (bldg.entryWall === 'EAST') {
+        ctx.fillRect(SCREEN_W - 44, 140, 8, 70);
+      } else if (bldg.entryWall === 'WEST') {
+        ctx.fillRect(36, 140, 8, 70);
+      } else {
+        ctx.fillRect(204, SCREEN_H - 24, 72, 8);
+      }
+    }
+
+    if (space === 'BLDG_CLERKS_OFFICE' && roomIdx === 0) {
+      ctx.fillStyle = '#f4f1de';
+      ctx.fillRect(132, 14, 64, 34);
+      ctx.strokeStyle = '#8a3324';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(132, 14, 64, 34);
+      ctx.lineWidth = 1;
+      ctx.fillStyle = '#8a3324';
+      ctx.fillRect(140, 20, 48, 3);
+      ctx.fillStyle = '#2c251d';
+      for (let ly = 27; ly <= 41; ly += 5) {
+        ctx.fillRect(140, ly, 44, 2);
+      }
+    }
+
+    for (const clue of gameState.clues) {
+      if (clue.space === space && (clue.roomIdx || 0) === roomIdx) {
+        if (Math.floor(gameState.frame / 12) % 2 === 0) {
+          ctx.fillStyle = clue.discovered ? '#73eff7' : '#ffcd75';
+          ctx.fillRect(clue.x - 4, clue.y - 4, 8, 8);
+        }
+      }
+    }
+
+    const entities = [];
+    const p = gameState.player;
+    if (p.space === space && p.roomIdx === roomIdx) {
+      entities.push({
+        y: p.y,
+        draw: () => drawCharacter16Bit(p.x, p.y, true, {}, p.facing, p.walkFrame, p.isMoving, cel.isNight, null, 0)
+      });
+    }
+    for (const m of HBC_MENTORS) {
+      if (m.space === space && (m.roomIdx || 0) === roomIdx) {
+        entities.push({
+          y: m.y,
+          draw: () => drawCharacter16Bit(m.x, m.y, false, m.palette, m.facing, 0, false, cel.isNight, m.name.split(' ').pop(), 0)
+        });
+      }
+    }
+    for (const t of gameState.tripmen) {
+      if (t.space === space && t.roomIdx === roomIdx) {
+        entities.push({
+          y: t.y,
+          draw: () => drawCharacter16Bit(t.x, t.y, false, t.palette, t.facing, t.walkPhase, t.isMoving, cel.isNight, t.name.split(' ')[0], 0)
+        });
+      }
+    }
+    entities.sort((a, b) => a.y - b.y);
+    for (const ent of entities) ent.draw();
+
+    ctx.restore();
+  }
+
+  function renderPlayfield() {
+    const cel = getCelestialState(gameState.clockMinutes);
+    const p = gameState.player;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, HUD_H, SCREEN_W, SCREEN_H);
+    ctx.clip();
+
+    if (gameState.slide.active) {
+      const t = gameState.slide.progress;
+      const ease = 1 - Math.pow(1 - t, 3);
+      const dir = gameState.slide.dir;
+
+      let fromOx = 0, fromOy = HUD_H;
+      let toOx = 0, toOy = HUD_H;
+
+      if (dir === 'UP') {
+        fromOy = HUD_H + Math.round(ease * SCREEN_H);
+        toOy = HUD_H - SCREEN_H + Math.round(ease * SCREEN_H);
+      } else if (dir === 'DOWN') {
+        fromOy = HUD_H - Math.round(ease * SCREEN_H);
+        toOy = HUD_H + SCREEN_H - Math.round(ease * SCREEN_H);
+      } else if (dir === 'LEFT') {
+        fromOx = Math.round(ease * SCREEN_W);
+        toOx = -SCREEN_W + Math.round(ease * SCREEN_W);
+      } else if (dir === 'RIGHT') {
+        fromOx = -Math.round(ease * SCREEN_W);
+        toOx = SCREEN_W - Math.round(ease * SCREEN_W);
+      }
+
+      if (p.space === 'EXTERIOR') {
+        renderExteriorScreen(gameState.slide.fromScX, gameState.slide.fromScY, fromOx, fromOy);
+        renderExteriorScreen(gameState.view.scX, gameState.view.scY, toOx, toOy);
+      } else {
+        renderInteriorScreen(p.space, gameState.slide.fromRoom, fromOx, fromOy);
+        renderInteriorScreen(p.space, p.roomIdx, toOx, toOy);
+      }
+    } else {
+      if (p.space === 'EXTERIOR') {
+        renderExteriorScreen(gameState.view.scX, gameState.view.scY, 0, HUD_H);
+      } else {
+        renderInteriorScreen(p.space, p.roomIdx, 0, HUD_H);
+      }
+    }
+
+    if (cel.tintCss) {
+      ctx.fillStyle = cel.tintCss;
+      ctx.fillRect(0, HUD_H, SCREEN_W, SCREEN_H);
+    }
+
+    if (gameState.dissolve.active) {
+      const dp = gameState.dissolve.progress;
+      const intensity = 1 - Math.abs(dp - 0.5) * 2;
+      const cellSize = 8;
+      ctx.fillStyle = '#0b0d14';
+      for (let py = HUD_H; py < 336; py += cellSize) {
+        for (let px = 0; px < SCREEN_W; px += cellSize) {
+          const hash = (((px / cellSize) * 7 + (py / cellSize) * 13) % 16) / 16;
+          if (hash < intensity) {
+            ctx.fillRect(px, py, cellSize, cellSize);
+          }
+        }
+      }
+    }
+
+    ctx.restore();
+  }
+
+  function renderHud() {
+    const phase = PHASES[getCurrentPhaseIndex()];
+    const cel = getCelestialState(gameState.clockMinutes);
+    const stats = getRosterStats();
+    const foundCount = gameState.clues.filter((c) => c.discovered).length;
+
+    ctx.fillStyle = 'rgba(15, 19, 36, 0.96)';
+    ctx.fillRect(0, 0, 480, HUD_H);
+
+    const skyGrad = ctx.createLinearGradient(0, 2, 0, HUD_H - 2);
+    skyGrad.addColorStop(0, cel.skyTopCss);
+    skyGrad.addColorStop(1, cel.skyBotCss);
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(4, 2, 146, HUD_H - 4);
+    ctx.strokeStyle = '#5c5449';
+    ctx.strokeRect(4, 2, 146, HUD_H - 4);
+
+    if (cel.isNight) {
+      ctx.fillStyle = '#f4f1de';
+      ctx.fillRect(16, 5, 1, 1);
+      ctx.fillRect(48, 4, 1, 1);
+      ctx.fillRect(96, 6, 1, 1);
+      ctx.fillRect(132, 4, 1, 1);
+    }
+
+    const arcX = Math.round(12 + cel.bodyProgress * 130);
+    const arcY = Math.round(16 - Math.sin(cel.bodyProgress * Math.PI) * 10);
+    if (cel.isDay) {
+      ctx.fillStyle = '#ffcd75';
+      ctx.fillRect(arcX - 3, arcY - 3, 6, 6);
+      ctx.fillStyle = '#fff5cc';
+      ctx.fillRect(arcX - 2, arcY - 2, 4, 4);
+    } else {
+      ctx.fillStyle = '#e6eef8';
+      ctx.fillRect(arcX - 3, arcY - 3, 5, 5);
+      ctx.fillStyle = cel.skyTopCss;
+      ctx.fillRect(arcX - 1, arcY - 3, 3, 3);
+    }
+
+    ctx.fillStyle = '#f7c844';
+    ctx.fillRect(0, HUD_H - 1, 480, 1);
+
+    ctx.font = 'bold 9px Courier New';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#0b0d14';
+    ctx.fillText(`${formatClock(gameState.clockMinutes)} ${phase.label.split(' ')[1]}`, 11, 15);
+    ctx.fillStyle = '#f4f1de';
+    ctx.fillText(`${formatClock(gameState.clockMinutes)} ${phase.label.split(' ')[1]}`, 10, 14);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = stats.count === 12 ? '#73eff7' : '#ff7b72';
+    ctx.fillText(`ROSTER ${stats.count}/12 (${stats.steersmen}B/${stats.bowsmen}A/${stats.middlemen}M)`, 258, 14);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = gameState.morale >= 65 ? '#a3e635' : '#ff7b72';
+    ctx.fillText(`MORALE ${gameState.morale}%  CLUES ${foundCount}`, 472, 14);
+
+    if (gameState.screen === 'PLAYING' && !gameState.slide.active && !gameState.dissolve.active) {
+      const prompt = getNearbyPrompt();
+      if (prompt) {
+        ctx.fillStyle = 'rgba(15, 19, 36, 0.92)';
+        ctx.fillRect(105, 312, 270, 18);
+        ctx.strokeStyle = '#f7c844';
+        ctx.strokeRect(105, 312, 270, 18);
+        ctx.fillStyle = '#f4f1de';
+        ctx.font = 'bold 9px Courier New';
+        ctx.textAlign = 'center';
+        ctx.fillText(prompt, 240, 324);
+      }
+    }
+  }
+
+  function getNearbyPrompt() {
+    const p = gameState.player;
+    if (p.space === 'BLDG_CLERKS_OFFICE' && p.roomIdx === 0 && p.y < 86 && Math.abs(p.x - 165) < 44) {
+      return '[A] Final Brigade Roster';
+    }
+    if (p.space === 'BLDG_COURTHOUSE' && p.roomIdx === 0 && p.y < 86 && Math.abs(p.x - 165) < 44) {
+      return '[A] Quarterly Court Docket';
+    }
+    const clue = gameState.clues.find(
+      (c) => c.space === p.space && (c.roomIdx || 0) === p.roomIdx && Math.hypot(c.x - p.x, c.y - p.y) <= 32
+    );
+    if (clue) return `[A] Inspect ${clue.label}`;
+    const mentor = HBC_MENTORS.find(
+      (m) => m.space === p.space && (m.roomIdx || 0) === p.roomIdx && Math.hypot(m.x - p.x, m.y - p.y) <= 32
+    );
+    if (mentor) return `[A] Speak: ${mentor.name}`;
+    const npc = gameState.tripmen.find(
+      (t) => t.space === p.space && t.roomIdx === p.roomIdx && Math.hypot(t.x - p.x, t.y - p.y) <= 30
+    );
+    if (npc) return `[A] Speak: ${npc.name} (${npc.role})`;
+    return null;
+  }
+
+  function renderDialog() {
+    const line = gameState.dialogQueue[0] || '';
+    ctx.fillStyle = 'rgba(15, 19, 36, 0.95)';
+    ctx.fillRect(28, 244, 424, 78);
+    ctx.strokeStyle = '#f7c844';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(28, 244, 424, 78);
+    ctx.lineWidth = 1;
+
+    ctx.fillStyle = '#f4f1de';
+    ctx.font = 'bold 10px Courier New';
+    ctx.textAlign = 'left';
+
+    const words = line.split(' ');
+    let cur = '';
+    let wy = 264;
+    for (const w of words) {
+      if ((cur + w).length > 56) {
+        ctx.fillText(cur.trim(), 42, wy);
+        cur = w + ' ';
+        wy += 14;
+      } else {
+        cur += w + ' ';
+      }
+    }
+    if (cur.trim()) ctx.fillText(cur.trim(), 42, wy);
+
+    ctx.fillStyle = '#f7c844';
+    ctx.textAlign = 'right';
+    ctx.fillText('[A] NEXT', 440, 312);
+  }
+
+  function renderDocketOverlay() {
+    ctx.fillStyle = 'rgba(15, 19, 36, 0.96)';
+    ctx.fillRect(24, 28, 432, 286);
+    ctx.strokeStyle = '#f7c844';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(24, 28, 432, 286);
+    ctx.lineWidth = 1;
+
+    ctx.fillStyle = '#f7c844';
+    ctx.font = 'bold 11px Courier New';
+    ctx.textAlign = 'left';
+    ctx.fillText('GENERAL QUARTERLY COURT DOCKET — ASSINIBOIA', 38, 46);
+
+    ctx.fillStyle = '#d4d0c5';
+    ctx.font = 'bold 8px Courier New';
+    ctx.fillText('SUMMER sittings require personal attendance; WINTER sittings follow brigade return.', 38, 60);
+
+    gameState.courtDocket.forEach((entry, i) => {
+      const dy = 82 + i * 68;
+      const isSummer = entry.season === 'SUMMER';
+      ctx.fillStyle = isSummer ? 'rgba(138, 51, 36, 0.35)' : 'rgba(43, 76, 126, 0.35)';
+      ctx.fillRect(36, dy - 12, 408, 56);
+      ctx.strokeStyle = isSummer ? '#ff7b72' : '#73eff7';
+      ctx.strokeRect(36, dy - 12, 408, 56);
+
+      ctx.fillStyle = isSummer ? '#ff7b72' : '#73eff7';
+      ctx.font = 'bold 9px Courier New';
+      ctx.fillText(`[${entry.sitting}] — ${entry.litigant} (${entry.parish})`, 44, dy + 2);
+
+      ctx.fillStyle = '#f4f1de';
+      ctx.font = 'bold 8px Courier New';
+      ctx.fillText(entry.matter.slice(0, 66), 44, dy + 18);
+      if (entry.matter.length > 66) {
+        ctx.fillText(entry.matter.slice(66), 44, dy + 30);
+      }
+    });
+
+    ctx.fillStyle = '#f7c844';
+    ctx.textAlign = 'center';
+    ctx.fillText('[A / B] CLOSE DOCKET', 240, 302);
+  }
+
+  function renderRosterOverlay() {
+    const stats = getRosterStats();
+    ctx.fillStyle = 'rgba(15, 19, 36, 0.96)';
+    ctx.fillRect(24, 28, 432, 286);
+    ctx.strokeStyle = '#f7c844';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(24, 28, 432, 286);
+    ctx.lineWidth = 1;
+
+    ctx.fillStyle = '#f7c844';
+    ctx.font = 'bold 11px Courier New';
+    ctx.textAlign = 'left';
+    ctx.fillText("FINAL BRIGADE ROSTER — CLERK'S QUARTERS", 38, 46);
+
+    ctx.font = 'bold 9px Courier New';
+    ctx.fillStyle = stats.count === 12 ? '#73eff7' : '#ff7b72';
+    ctx.fillText(
+      `SIGNED: ${stats.count}/12   BOUTS: ${stats.steersmen}/2   AVANTS: ${stats.bowsmen}/2   MILIEUX: ${stats.middlemen}/8`,
+      38, 60
+    );
+
+    const startIdx = Math.max(0, Math.min(10, gameState.rosterCursor - 4));
+    for (let i = 0; i < 10; i++) {
+      const idx = startIdx + i;
+      const t = gameState.tripmen[idx];
+      const ry = 78 + i * 20;
+      const isCursor = idx === gameState.rosterCursor;
+
+      if (isCursor) {
+        ctx.fillStyle = '#29366f';
+        ctx.fillRect(34, ry - 11, 412, 16);
+      }
+
+      ctx.fillStyle = t.onRoster ? '#a3e635' : (t.isReserve ? '#73eff7' : '#8d96a5');
+      ctx.font = 'bold 9px Courier New';
+      ctx.textAlign = 'left';
+      const mark = t.onRoster ? '[X]' : '[ ]';
+      const tag = t.isReserve ? 'RES' : t.role.slice(0, 5).toUpperCase();
+      ctx.fillText(`${isCursor ? '►' : ' '} ${mark} ${t.name.padEnd(19, ' ')} ${tag.padEnd(6, ' ')} ${t.parish}`, 38, ry);
+    }
+
+    ctx.fillStyle = '#f7c844';
+    ctx.textAlign = 'center';
+    ctx.fillText('[UP/DOWN] SELECT   [A] TOGGLE SIGN-ON   [B] CLOSE', 240, 302);
+  }
+
+  function renderNotebookOverlay() {
+    const found = gameState.clues.filter((c) => c.discovered);
+    ctx.fillStyle = 'rgba(15, 19, 36, 0.96)';
+    ctx.fillRect(24, 28, 432, 286);
+    ctx.strokeStyle = '#73eff7';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(24, 28, 432, 286);
+    ctx.lineWidth = 1;
+
+    ctx.fillStyle = '#73eff7';
+    ctx.font = 'bold 11px Courier New';
+    ctx.textAlign = 'left';
+    ctx.fillText(`GUIDE'S FIELD NOTEBOOK (${found.length} NOTES RECORDED)`, 38, 46);
+
+    if (found.length === 0) {
+      ctx.fillStyle = '#d4d0c5';
+      ctx.font = 'bold 10px Courier New';
+      ctx.fillText('No field notes recorded yet. Inspect ledgers, cargo, and talk to the men.', 38, 82);
+    } else {
+      const recent = found.slice(-7);
+      recent.forEach((c, i) => {
+        const ny = 70 + i * 31;
+        ctx.fillStyle = '#f7c844';
+        ctx.font = 'bold 8px Courier New';
+        ctx.fillText(`• ${c.label}`, 38, ny);
+        ctx.fillStyle = '#f4f1de';
+        ctx.fillText(c.text.slice(0, 68), 46, ny + 11);
+      });
+    }
+
+    ctx.fillStyle = '#73eff7';
+    ctx.textAlign = 'center';
+    ctx.fillText('[A / B] RETURN TO FORT GARRY', 240, 302);
+  }
+
+  // Pushed 16-bit SNES Sundown Title Screen: Looking West across the Forks of the Red & Assiniboine Rivers from St. Boniface
+  function renderTitleScreen() {
+    const f = gameState.frame;
+
+    // 1. Sundown Sky Gradient (Deep twilight indigo top -> warm crimson-gold western horizon)
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, 178);
+    skyGrad.addColorStop(0, '#161b3d');
+    skyGrad.addColorStop(0.32, '#3d285c');
+    skyGrad.addColorStop(0.62, '#8f394b');
+    skyGrad.addColorStop(0.84, '#d96b38');
+    skyGrad.addColorStop(1, '#f7b955');
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, 480, 178);
+
+    // 16-bit Ordered Dither Bands along horizon transition
+    ctx.fillStyle = '#8f394b';
+    for (let dx = 0; dx < 480; dx += 4) {
+      ctx.fillRect(dx, 108 + (dx % 8 === 0 ? 2 : 0), 2, 2);
+    }
+    ctx.fillStyle = '#f7b955';
+    for (let dx = 0; dx < 480; dx += 4) {
+      ctx.fillRect(dx, 146 + (dx % 8 === 0 ? -2 : 0), 2, 2);
+    }
+
+    // Early evening stars in upper indigo sky
+    ctx.fillStyle = '#f4f1de';
+    const stars = [
+      [34, 18], [88, 12], [142, 28], [210, 14], [295, 22], [358, 12], [426, 24], [456, 36]
+    ];
+    for (const [sx, sy] of stars) {
+      ctx.fillRect(sx, sy, 2, 2);
+    }
+
+    // 2. Lowering Western Sun setting behind Upper Fort Garry & the Forks
+    const sunX = 186;
+    const sunY = 152;
+    const sunHalo = ctx.createRadialGradient(sunX, sunY, 8, sunX, sunY, 76);
+    sunHalo.addColorStop(0, 'rgba(255, 236, 153, 0.72)');
+    sunHalo.addColorStop(0.45, 'rgba(247, 132, 56, 0.32)');
+    sunHalo.addColorStop(1, 'rgba(247, 132, 56, 0)');
+    ctx.fillStyle = sunHalo;
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, 76, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Crisp pixelated sun disc sliced by thin sunset cloud bands
+    ctx.fillStyle = '#fff0a6';
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, 22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#f7b955';
+    ctx.fillRect(sunX - 24, sunY + 4, 48, 2);
+    ctx.fillRect(sunX - 22, sunY + 11, 44, 2);
+
+    // Distant Red River Prairie Tree Line along Western Horizon
+    ctx.fillStyle = '#241e30';
+    for (let tx = 0; tx < 480; tx += 12) {
+      const th = 10 + ((tx * 17) % 11);
+      ctx.fillRect(tx, 174 - th, 13, th + 4);
+    }
+
+    // 3. UPPER FORT GARRY SITTING ON THE PENINSULA AT THE FORKS (Midground)
+    // Elevated limestone & grassy point between the Assiniboine (left) and Red River (right)
+    ctx.fillStyle = '#2f4526';
+    ctx.beginPath();
+    ctx.moveTo(46, 178);
+    ctx.lineTo(366, 178);
+    ctx.lineTo(392, 198);
+    ctx.lineTo(28, 198);
+    ctx.closePath();
+    ctx.fill();
+
+    // Sandy/pebbled riverbank lip along the Forks
+    ctx.fillStyle = '#7d6344';
+    ctx.fillRect(32, 195, 356, 5);
+
+    // Fort Perimeter Limestone Walls & Oak Palisade
+    ctx.fillStyle = '#b8b0a0'; // Sun-warmed limestone face
+    ctx.fillRect(88, 162, 236, 24);
+    ctx.fillStyle = '#7d7567'; // Shaded east face
+    ctx.fillRect(286, 162, 38, 24);
+    ctx.strokeStyle = '#3b352e';
+    ctx.strokeRect(88, 162, 236, 24);
+
+    // Interior Mansard Roofs & Chimneys peeking over the Fort Walls
+    // Governor's Victorian Mansion Roof & Dormer
+    ctx.fillStyle = '#26384d';
+    ctx.fillRect(114, 144, 58, 18);
+    ctx.fillStyle = '#eae4d3';
+    ctx.fillRect(137, 148, 12, 10);
+    ctx.fillStyle = '#ffcd75'; // Warm glowing dormer window
+    ctx.fillRect(141, 151, 4, 5);
+    ctx.fillStyle = '#7a2e22'; // Brick chimneys
+    ctx.fillRect(120, 137, 5, 8);
+    ctx.fillRect(161, 137, 5, 8);
+
+    // Clerk's Quarters & Store Pitched Roofs
+    ctx.fillStyle = '#6e261c';
+    ctx.fillRect(222, 148, 66, 14);
+    ctx.fillStyle = '#8f3528';
+    ctx.fillRect(224, 150, 62, 4);
+
+    // Central Flagstaff & Waving HBC Red Ensign catching the sunset breeze
+    ctx.fillStyle = '#f4f1de';
+    ctx.fillRect(204, 118, 3, 46);
+    const flagWave = Math.round(Math.sin(f * 0.12) * 1.5);
+    ctx.fillStyle = '#c81d25';
+    ctx.fillRect(207, 120, 22, 12);
+    ctx.fillRect(225, 121 + flagWave, 6, 10);
+    ctx.fillStyle = '#1b4f8c';
+    ctx.fillRect(207, 120, 9, 6);
+    ctx.fillStyle = '#f4f1de';
+    ctx.fillRect(210, 120, 2, 6);
+    ctx.fillRect(207, 122, 9, 2);
+
+    // Iconic Crenelated Stone Gatehouse (Center-Front of Fort)
+    ctx.fillStyle = '#ded8ca';
+    ctx.fillRect(184, 152, 34, 34);
+    ctx.strokeStyle = '#4a4339';
+    ctx.strokeRect(184, 152, 34, 34);
+    // Battlements
+    for (let gx = 185; gx <= 211; gx += 8) {
+      ctx.fillStyle = '#ded8ca';
+      ctx.fillRect(gx, 148, 5, 4);
+    }
+    // Dark stone archway opening
+    ctx.fillStyle = '#1c1815';
+    ctx.fillRect(195, 168, 12, 18);
+
+    // Circular Limestone Corner Bastions (Left, Center-West, Right)
+    for (const bx of [82, 282, 322]) {
+      ctx.fillStyle = '#cfc9bc';
+      ctx.fillRect(bx - 8, 156, 16, 32);
+      ctx.fillStyle = '#8f8778';
+      ctx.fillRect(bx + 2, 156, 6, 32);
+      // Conical bastion roof
+      ctx.fillStyle = '#4a4e58';
+      ctx.beginPath();
+      ctx.moveTo(bx - 10, 156);
+      ctx.lineTo(bx, 146);
+      ctx.lineTo(bx + 10, 156);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // Warm Amber Lantern Glow along the Fort Wall & Gate
+    ctx.fillStyle = '#ffcd75';
+    ctx.fillRect(191, 171, 2, 3);
+    ctx.fillRect(209, 171, 2, 3);
+    ctx.fillRect(132, 170, 4, 4);
+    ctx.fillRect(254, 170, 4, 4);
+
+    // Drawn-ashore York Boats & Birchbark Canoe on the Fort Landing
+    ctx.fillStyle = '#4a2b14';
+    ctx.fillRect(118, 192, 38, 6);
+    ctx.fillRect(166, 193, 34, 5);
+    ctx.fillStyle = '#c9a463';
+    ctx.fillRect(246, 194, 24, 4);
+
+    // 4. THE FORKS OF THE ASSINIBOINE & RED RIVERS (Broad Sundown Water)
+    const waterGrad = ctx.createLinearGradient(0, 198, 0, 310);
+    waterGrad.addColorStop(0, '#2a3b63');
+    waterGrad.addColorStop(0.45, '#1d3257');
+    waterGrad.addColorStop(1, '#12203b');
+    ctx.fillStyle = waterGrad;
+    ctx.fillRect(0, 198, 480, 114);
+
+    // Shimmering Sunset Reflection Path on the Water below the Western Sun
+    for (let wy = 202; wy < 306; wy += 5) {
+      const spread = 18 + (wy - 200) * 0.42;
+      const shimmer = Math.sin(f * 0.08 + wy * 0.3) * 8;
+      ctx.fillStyle = wy < 236 ? 'rgba(247, 185, 85, 0.55)' : 'rgba(217, 107, 56, 0.35)';
+      ctx.fillRect(Math.round(sunX - spread / 2 + shimmer), wy, Math.round(spread), 2);
+    }
+
+    // Animated 16-bit River Current Ripples across the Forks
+    ctx.fillStyle = '#4b6fa3';
+    const flow = (f * 0.5) % 48;
+    for (let ry = 208; ry < 302; ry += 16) {
+      for (let rx = 18; rx < 450; rx += 64) {
+        ctx.fillRect(Math.round((rx + flow) % 465), ry, 14, 1);
+      }
+    }
+
+    // Silhouette of a North Canoe crossing the Red River from St. Boniface
+    const canoeX = 338 + Math.round(Math.sin(f * 0.03) * 10);
+    const canoeY = 234;
+    ctx.fillStyle = '#181c2e';
+    ctx.beginPath();
+    ctx.moveTo(canoeX - 24, canoeY);
+    ctx.lineTo(canoeX - 18, canoeY - 4);
+    ctx.lineTo(canoeX + 18, canoeY - 4);
+    ctx.lineTo(canoeX + 24, canoeY);
+    ctx.lineTo(canoeX + 16, canoeY + 5);
+    ctx.lineTo(canoeX - 16, canoeY + 5);
+    ctx.closePath();
+    ctx.fill();
+    // Paddlers silhouette
+    ctx.fillRect(canoeX - 10, canoeY - 10, 4, 6);
+    ctx.fillRect(canoeX + 6, canoeY - 10, 4, 6);
+
+    // 5. ST. BONIFACE FOREGROUND RIVERBANK (Standing across the Red River looking West)
+    ctx.fillStyle = '#1b2b18';
+    ctx.beginPath();
+    ctx.moveTo(0, 294);
+    ctx.quadraticCurveTo(180, 286, 480, 300);
+    ctx.lineTo(480, 336);
+    ctx.lineTo(0, 336);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#283d22';
+    ctx.fillRect(0, 304, 480, 32);
+
+    // Foreground cattails, reeds & prairie grass silhouettes on St. Boniface shore
+    ctx.fillStyle = '#121c10';
+    for (let gx = 6; gx < 476; gx += 14) {
+      const gh = 10 + ((gx * 13) % 14);
+      ctx.fillRect(gx, 306 - gh, 2, gh);
+      ctx.fillRect(gx + 4, 308 - gh * 0.7, 2, gh * 0.7);
+      if (gx % 42 === 0) {
+        // Cattail seed head
+        ctx.fillStyle = '#3b2414';
+        ctx.fillRect(gx - 1, 302 - gh, 4, 6);
+        ctx.fillStyle = '#121c10';
+      }
+    }
+
+    // 6. PUSHED SNES PIXEL-STYLIZED WORDMARK
+    ctx.textAlign = 'center';
+
+    // Decorative gold & crimson pixel banner frame behind wordmark
+    ctx.fillStyle = 'rgba(15, 19, 36, 0.74)';
+    ctx.fillRect(62, 34, 356, 54);
+    ctx.strokeStyle = '#f7c844';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(62, 34, 356, 54);
+    ctx.strokeStyle = '#8a3324';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(66, 38, 348, 46);
+
+    // Multi-layered extruded 16-bit pixel block title
+    ctx.font = 'bold 28px Courier New';
+    ctx.fillStyle = '#0b0d14';
+    ctx.fillText('LA LOCHE BRIGADE', 243, 66);
+    ctx.fillStyle = '#8a3324';
+    ctx.fillText('LA LOCHE BRIGADE', 241, 64);
+    ctx.fillStyle = '#f7c844';
+    ctx.fillText('LA LOCHE BRIGADE', 240, 62);
+
+    // Subtle cream highlight pass on top edge of letters
+    ctx.fillStyle = '#fff3c4';
+    ctx.fillText('LA LOCHE BRIGADE', 240, 61);
+
+    // Historical subtitle inside plaque
+    ctx.font = 'bold 9px Courier New';
+    ctx.fillStyle = '#73eff7';
+    ctx.fillText('UPPER FORT GARRY  •  JUNE 1855', 240, 78);
+
+    // 7. CLEAN BLINKING "PRESS 'A' TO START" PROMPT
+    if (Math.floor(f / 22) % 2 === 0) {
+      ctx.fillStyle = 'rgba(11, 13, 20, 0.85)';
+      ctx.fillRect(136, 302, 208, 22);
+      ctx.strokeStyle = '#f7c844';
+      ctx.strokeRect(136, 302, 208, 22);
+
+      ctx.font = 'bold 12px Courier New';
+      ctx.fillStyle = '#0b0d14';
+      ctx.fillText("PRESS 'A' TO START", 241, 317);
+      ctx.fillStyle = '#f7c844';
+      ctx.fillText("PRESS 'A' TO START", 240, 316);
+    }
+  }
+
+  function renderOutcomeScreen() {
+    const out = gameState.outcome;
+    ctx.fillStyle = 'rgba(11, 13, 20, 0.96)';
+    ctx.fillRect(0, 0, 480, 336);
+
+    ctx.strokeStyle = out.won ? '#a3e635' : '#ff7b72';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(24, 24, 432, 288);
+    ctx.lineWidth = 1;
+
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 20px Courier New';
+    ctx.fillStyle = out.won ? '#a3e635' : '#ff7b72';
+    ctx.fillText(out.won ? 'BRIGADE SHOVES OFF!' : 'BRIGADE COMPROMISED', 240, 68);
+
+    ctx.font = 'bold 11px Courier New';
+    ctx.fillStyle = '#f7c844';
+    ctx.fillText(`THE FOX: ${out.fox.name} (${out.fox.secret.codename})`, 240, 98);
+
+    ctx.fillStyle = '#f4f1de';
+    ctx.font = 'bold 10px Courier New';
+    const words = out.reason.split(' ');
+    let line = '';
+    let y = 132;
+    for (const w of words) {
+      if ((line + w).length > 52) {
+        ctx.fillText(line.trim(), 240, y);
+        line = w + ' ';
+        y += 16;
+      } else {
+        line += w + ' ';
+      }
+    }
+    if (line.trim()) ctx.fillText(line.trim(), 240, y);
+
+    ctx.fillStyle = '#73eff7';
+    ctx.fillText(
+      `FINAL CREW: ${out.stats.count}/12   MORALE: ${gameState.morale}%`,
+      240, 224
+    );
+
+    if (Math.floor(gameState.frame / 24) % 2 === 0) {
+      ctx.fillStyle = '#f7c844';
+      ctx.font = 'bold 12px Courier New';
+      ctx.fillText("PRESS 'A' FOR NEW CASE", 240, 280);
+    }
+  }
+
+  function renderPauseBanner() {
+    ctx.fillStyle = 'rgba(11, 13, 20, 0.72)';
+    ctx.fillRect(0, 0, 480, 336);
+    ctx.fillStyle = '#f7c844';
+    ctx.font = 'bold 16px Courier New';
+    ctx.textAlign = 'center';
+    ctx.fillText('PAUSED', 240, 172);
+  }
+
+  // =========================================================================
+  // 9. MAIN LOOP
+  // =========================================================================
+  function loop() {
+    updateSimulation();
+
+    if (gameState.screen === 'TITLE') {
+      renderTitleScreen();
+    } else if (gameState.screen === 'OUTCOME') {
+      renderOutcomeScreen();
+    } else {
+      renderPlayfield();
+      renderHud();
+
+      if (gameState.screen === 'DIALOG') renderDialog();
+      else if (gameState.screen === 'ROSTER_UI') renderRosterOverlay();
+      else if (gameState.screen === 'NOTEBOOK_UI') renderNotebookOverlay();
+      else if (gameState.screen === 'DOCKET_UI') renderDocketOverlay();
+    }
+
+    if (isPaused) renderPauseBanner();
+
+    requestAnimationFrame(loop);
+  }
+
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
