@@ -40,11 +40,10 @@
 /**
  * ᐊᐦᒐᐲᔑᐡ // ahcāpīshish (Hudson Bay Lowlands • Severn River Progression)
  * - Full-Screen, Full-Bleed Embedded Arcade Viewport (Dynamic Logical Aspect Scaling via resizeViewport)
- * - Exclusive Parent Arcade Cabinet postMessage Bridge:
- *     * True Press-Hold-Release Button A Bow Draw (420ms pulse bridge across cabinet repeat threshold + BUTTON_A_PRESS/RELEASE)
- *     * Steady, deliberate bow draw speed (+0.38/s) so shorter shots are controlled and never rushed
- *     * 145ms D-Pad Hold Window for live Up/Down angle adjustment before & during draw
- *     * 110ms Button B Debounce for Downfield Look
+ * - Clean Arcade Cabinet postMessage Bridge:
+ *     * BUTTON_A: Press once to begin steady bow draw -> press again to snap & release (plus direct PRESS/RELEASE support)
+ *     * Up/Down D-Pad: Live launch angle adjustment before & during draw
+ *     * BUTTON_B: Cancel active draw or trigger Downfield Look
  * - Aspect-Ratio-Safe Opening Cutscene Camera Follow (4:3, 3:4 & Widescreen CRT Ready)
  * - 62 BPM 4/4 Backing Track: Hand Drum on Beat 1 (x - - -) + Stone-in-Hide Rattle on Every Beat (x x x x)
  */
@@ -584,10 +583,7 @@ const TOTAL_WORLD_WIDTH = 4400;
 const NO_BLOCK_DEPARTURE_RADIUS = 56;
 
 // --- INPUT STATE (PARENT ARCADE CABINET postMessage BRIDGE) ---
-const keys = { up: false, down: false, left: false, right: false, a: false, b: false };
-let aJustPressed = false;
-let aJustReleased = false;
-let bJustPressed = false;
+const keys = { up: false, down: false, left: false, right: false };
 
 // --- STATE MACHINE ---
 let state = 'TITLE';
@@ -636,7 +632,9 @@ let embeddedArrows = [];
 let lastOutcomeHit = false;
 let activeWind = WIND_PRESETS[2];
 
-// Slingshot-Compatible Aiming Controls:
+// Bow Aiming & Draw Controls:
+// - Up/Down adjusts launch angle (live both before and while bowstring is drawn)
+// - BUTTON_A begins drawing the bowstring back; pressing BUTTON_A again (or reaching 100% full draw) releases!
 let aimAngleDeg = 32;
 let isDrawing = false;
 let drawPower = 0;
@@ -2597,11 +2595,7 @@ function update(dt) {
   // =========================================================================
   // TITLE SCREEN -> FADE OUT LOGO/STARS -> BAYER DITHER REVEAL OF 1/4 FRAME
   // =========================================================================
-  if (state === 'TITLE') {
-    if (aJustPressed) {
-      startTitleFadeOut();
-    }
-  } else if (state === 'TITLE_FADE_OUT') {
+  if (state === 'TITLE_FADE_OUT') {
     titleFadeAlpha = Math.min(1.0, titleFadeAlpha + dt * 1.15);
     if (titleFadeAlpha >= 1.0) {
       beginCutsceneBeat1();
@@ -2747,24 +2741,12 @@ function update(dt) {
   }
 
   // =========================================================================
-  // INTERACTIVE PHASE: 2-AXIS SLINGSHOT-COMPATIBLE AIM & CLICK-HOLD-RELEASE DRAW
+  // INTERACTIVE PHASE: 2-AXIS AIM & STEADY BOW DRAW
   // =========================================================================
   else if (state === 'AIM_AND_SHOOT') {
     playerFacing = 1;
     const baseCam = getCameraBaseForArcher(archerX);
     const maxScoutCam = clamp(partridge.x - VIEW_W * 0.45, baseCam, Math.max(0, TOTAL_WORLD_WIDTH - VIEW_W));
-
-    if (bJustPressed && !isDrawing) {
-      if (scoutMode === 'OFF') {
-        scoutMode = 'PRE_LOOK';
-        scoutTimer = 0.55;
-        playerStance = 'SCAN_BROW';
-        sfx.playScoutPan();
-      } else if (scoutMode === 'PRE_LOOK' || scoutMode === 'PAN_OUT' || scoutMode === 'HOLD_END') {
-        scoutMode = 'PAN_BACK';
-        sfx.playScoutPan();
-      }
-    }
 
     if (scoutMode === 'PRE_LOOK') {
       playerStance = 'SCAN_BROW';
@@ -2803,32 +2785,18 @@ function update(dt) {
       angleTickCooldown = 0.1;
     }
 
-    // Click-hold-release bow draw:
-    // - Holding Button A draws the bowstring back steadily (+0.38/s) so shorter shots are controlled
-    // - Releasing Button A snaps the arrow forward at the drawn power & angle
-    if (aJustPressed && !isDrawing && arrowsInQuiver > 0) {
-      isDrawing = true;
-      drawPower = 0.04;
-      lastCreakStep = 0;
-      if (scoutMode !== 'OFF') {
-        scoutMode = 'OFF';
-        cameraX = baseCam;
-        playerStance = 'BOW_AIM';
-      }
-      sfx.playBowCreak(drawPower);
-    }
-
-    if (isDrawing && keys.a) {
-      drawPower = Math.min(1.0, drawPower + 0.38 * dt);
+    // Steady, unhurried bow draw when isDrawing is active
+    if (isDrawing) {
+      drawPower = Math.min(1.0, drawPower + 0.36 * dt);
       const step = Math.floor(drawPower * 5);
       if (step > lastCreakStep) {
         lastCreakStep = step;
         sfx.playBowCreak(drawPower);
       }
-    }
-
-    if (isDrawing && (!keys.a || aJustReleased)) {
-      launchArrow();
+      // Auto-releases cleanly if drawn all the way to 100% full tension
+      if (drawPower >= 1.0) {
+        launchArrow();
+      }
     }
   } else if (state === 'FLYING') {
     updateArrowFlight(stepScale);
@@ -3098,10 +3066,6 @@ function update(dt) {
       }
     }
   }
-
-  aJustPressed = false;
-  aJustReleased = false;
-  bJustPressed = false;
 }
 
 function launchArrow() {
@@ -3265,14 +3229,11 @@ function gameLoop(timestamp) {
   requestAnimationFrame(gameLoop);
 }
 
-// --- ARCADE CABINET postMessage BRIDGE (TRUE HOLD-TO-DRAW BUTTON A) ---
+// --- ARCADE CABINET postMessage BRIDGE ---
+let lastBtnATime = 0;
 let lastBtnBTime = 0;
-let btnAPulseTimer = null;
 const BUTTON_DEBOUNCE_MS = 110;
 const DPAD_HOLD_WINDOW_MS = 145;
-// 420ms pulse bridge spans the cabinet's initial 300ms hold-delay + 100ms repeat interval
-// so holding Button A continuously draws the bowstring without prematurely firing!
-const BUTTON_A_HOLD_BRIDGE_MS = 420;
 const dpadHoldTimers = { up: null, down: null, left: null, right: null };
 
 function pulseDirection(dirKey, ms = DPAD_HOLD_WINDOW_MS) {
@@ -3288,25 +3249,67 @@ function setDirectionHold(dirKey, pressed) {
   keys[dirKey] = pressed;
 }
 
-function setButtonA(pressed) {
-  if (isPaused) return;
-  sfx.init();
-  clearTimeout(btnAPulseTimer);
-  if (pressed && !keys.a) aJustPressed = true;
-  if (!pressed && keys.a) aJustReleased = true;
-  keys.a = pressed;
+function beginBowDraw() {
+  if (isDrawing || arrowsInQuiver <= 0) return;
+  isDrawing = true;
+  drawPower = 0.05;
+  lastCreakStep = 0;
+  if (scoutMode !== 'OFF') {
+    scoutMode = 'OFF';
+    cameraX = getCameraBaseForArcher(archerX);
+    playerStance = 'BOW_AIM';
+  }
+  sfx.playBowCreak(drawPower);
 }
 
-function setButtonB(pressed) {
+function handleButtonA_Signal(mode) {
   if (isPaused) return;
   sfx.init();
-  if (pressed && !keys.b) bJustPressed = true;
-  keys.b = pressed;
-  if (pressed && isDrawing) {
+
+  if (state === 'TITLE') {
+    if (mode !== 'RELEASE') startTitleFadeOut();
+    return;
+  }
+
+  if (state !== 'AIM_AND_SHOOT') return;
+
+  if (mode === 'PRESS') {
+    beginBowDraw();
+  } else if (mode === 'RELEASE') {
+    if (isDrawing) launchArrow();
+  } else {
+    // Standard cabinet BUTTON_A discrete signal:
+    // 1st press begins drawing the bowstring back; 2nd press releases & snaps the arrow!
+    if (!isDrawing) {
+      beginBowDraw();
+    } else {
+      launchArrow();
+    }
+  }
+}
+
+function handleButtonB_Signal() {
+  if (isPaused) return;
+  sfx.init();
+
+  if (isDrawing) {
+    // Cancel an active draw cleanly without firing
     isDrawing = false;
     drawPower = 0;
     lastCreakStep = 0;
-    bJustPressed = false;
+    return;
+  }
+
+  if (state === 'AIM_AND_SHOOT') {
+    if (scoutMode === 'OFF') {
+      scoutMode = 'PRE_LOOK';
+      scoutTimer = 0.55;
+      playerStance = 'SCAN_BROW';
+      sfx.playScoutPan();
+    } else if (scoutMode === 'PRE_LOOK' || scoutMode === 'PAN_OUT' || scoutMode === 'HOLD_END') {
+      scoutMode = 'PAN_BACK';
+      sfx.playScoutPan();
+    }
   }
 }
 
@@ -3315,12 +3318,6 @@ function clearAllInputs() {
     clearTimeout(dpadHoldTimers[dir]);
     keys[dir] = false;
   }
-  clearTimeout(btnAPulseTimer);
-  keys.a = false;
-  keys.b = false;
-  aJustPressed = false;
-  aJustReleased = false;
-  bJustPressed = false;
   isDrawing = false;
   drawPower = 0;
 }
@@ -3385,36 +3382,25 @@ window.addEventListener('message', (event) => {
   else if (cmd === 'DPAD_LEFT') pulseDirection('left');
   else if (cmd === 'DPAD_RIGHT') pulseDirection('right');
 
-  // Press-Hold-Release Action Button A:
-  // - Supports explicit BUTTON_A_PRESS / BUTTON_A_RELEASE pairs AND cabinet BUTTON_A repeat pulses
   else if (cmd === 'BUTTON_A_PRESS') {
-    setButtonA(true);
+    const now = performance.now();
+    if (now - lastBtnATime < BUTTON_DEBOUNCE_MS) return;
+    lastBtnATime = now;
+    handleButtonA_Signal('PRESS');
   } else if (cmd === 'BUTTON_A_RELEASE') {
-    setButtonA(false);
+    handleButtonA_Signal('RELEASE');
   } else if (cmd === 'BUTTON_A') {
-    if (state === 'TITLE') {
-      setButtonA(true);
-      btnAPulseTimer = setTimeout(() => setButtonA(false), 60);
-    } else if (state === 'AIM_AND_SHOOT') {
-      if (!keys.a) setButtonA(true);
-      clearTimeout(btnAPulseTimer);
-      btnAPulseTimer = setTimeout(() => setButtonA(false), BUTTON_A_HOLD_BRIDGE_MS);
-    }
+    const now = performance.now();
+    if (now - lastBtnATime < BUTTON_DEBOUNCE_MS) return;
+    lastBtnATime = now;
+    handleButtonA_Signal('TAP');
   }
 
-  else if (cmd === 'BUTTON_B_PRESS') {
+  else if (cmd === 'BUTTON_B' || cmd === 'BUTTON_B_PRESS') {
     const now = performance.now();
     if (now - lastBtnBTime < BUTTON_DEBOUNCE_MS) return;
     lastBtnBTime = now;
-    setButtonB(true);
-  } else if (cmd === 'BUTTON_B_RELEASE') {
-    setButtonB(false);
-  } else if (cmd === 'BUTTON_B') {
-    const now = performance.now();
-    if (now - lastBtnBTime < BUTTON_DEBOUNCE_MS) return;
-    lastBtnBTime = now;
-    setButtonB(true);
-    setTimeout(() => setButtonB(false), 60);
+    handleButtonB_Signal();
   }
 });
 
