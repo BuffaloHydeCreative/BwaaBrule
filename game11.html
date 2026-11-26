@@ -40,8 +40,11 @@
 /**
  * ᐊᐦᒐᐲᔑᐡ // ahcāpīshish (Hudson Bay Lowlands • Severn River Progression)
  * - Full-Screen, Full-Bleed Embedded Arcade Viewport (Dynamic Logical Aspect Scaling via resizeViewport)
- * - Exclusive Parent Arcade Cabinet postMessage Bridge (145ms D-Pad Hold Window, 110ms A/B Debounce, PAUSE/RESUME)
- * - Slingshot-Compatible 2-Parameter Aiming: Up/Down = Launch Angle (live even while drawn), Hold/Release A = Draw Power
+ * - Exclusive Parent Arcade Cabinet postMessage Bridge:
+ *     * Click/Press-Hold-Release Button A Bow Draw (BUTTON_A_PRESS -> draw, BUTTON_A_RELEASE -> snap arrow)
+ *     * 145ms D-Pad Hold Window for live Up/Down angle adjustment before & during draw
+ *     * 110ms Button B Debounce for Downfield Look
+ * - Aspect-Ratio-Safe Opening Cutscene Camera Follow (4:3, 3:4 & Widescreen CRT Ready)
  * - 62 BPM 4/4 Backing Track: Hand Drum on Beat 1 (x - - -) + Stone-in-Hide Rattle on Every Beat (x x x x)
  */
 
@@ -58,7 +61,7 @@ function resizeViewport() {
   const w = Math.max(1, rect.width || window.innerWidth);
   const h = Math.max(1, rect.height || window.innerHeight);
   const aspect = w / h;
-  VIEW_W = Math.max(240, Math.round(VIEW_H * aspect));
+  VIEW_W = Math.max(180, Math.round(VIEW_H * aspect));
   if (cvs.width !== VIEW_W || cvs.height !== VIEW_H) {
     cvs.width = VIEW_W;
     cvs.height = VIEW_H;
@@ -698,7 +701,8 @@ function getGroundY(worldX) {
 }
 
 function getCameraBaseForArcher(ax) {
-  return clamp(ax - 58, 0, Math.max(0, TOTAL_WORLD_WIDTH - VIEW_W));
+  const leftMargin = clamp(Math.round(VIEW_W * 0.24), 44, 68);
+  return clamp(ax - leftMargin, 0, Math.max(0, TOTAL_WORLD_WIDTH - VIEW_W));
 }
 
 function buildSevernWorld() {
@@ -907,7 +911,7 @@ function beginCutsceneBeat1() {
   cameraX = 0;
   targetCameraX = 0;
   firstCardDither = 0.0;
-  revealEdgeX = Math.max(80, Math.round(VIEW_W * 0.25));
+  revealEdgeX = Math.max(76, Math.round(VIEW_W * 0.25));
   playerStance = 'EMERGE';
   beatTimer = 0;
   activeWind = WIND_PRESETS[2];
@@ -1034,8 +1038,8 @@ function drawTitleScreen() {
   ctx.globalAlpha = fadeOutMult;
   const centerX = Math.round(VIEW_W * 0.5);
   const logoY = 82;
-  const pxScale = 4;
-  const charGap = 5;
+  const pxScale = VIEW_W < 230 ? 3 : 4;
+  const charGap = VIEW_W < 230 ? 4 : 5;
   let totalW = 0;
   for (const g of SYLLABIC_GLYPHS) totalW += g[0].length * pxScale + charGap;
   totalW -= charGap;
@@ -1061,9 +1065,10 @@ function drawTitleScreen() {
     curX += cols * pxScale + charGap;
   }
 
-  const barY = logoY + 34;
+  const barHalf = Math.min(80, Math.round(VIEW_W * 0.36));
+  const barY = logoY + (pxScale * 7) + 6;
   ctx.fillStyle = PAL.TRADE_SCARLET;
-  ctx.fillRect(centerX - 80, barY, 160, 2);
+  ctx.fillRect(centerX - barHalf, barY, barHalf * 2, 2);
   ctx.fillStyle = PAL.UI_GOLD;
   ctx.fillRect(centerX - 3, barY - 1, 6, 4);
 
@@ -1082,7 +1087,7 @@ function drawPushRevealMask(edgeX, firstQuarterFrac) {
   const blockSize = 4;
   const rows = Math.ceil(VIEW_H / blockSize);
   const cols = Math.ceil(VIEW_W / blockSize);
-  const q1Width = Math.max(80, Math.round(VIEW_W * 0.25));
+  const q1Width = Math.max(76, Math.round(VIEW_W * 0.25));
 
   ctx.fillStyle = PAL.BLACKOUT;
 
@@ -2364,8 +2369,8 @@ function drawPartridge(camX, env) {
   }
 
   if (partridge.state === 'FLEEING') {
-    // Base art faces left (-x), so scale(1, 1) flips/mirrors it horizontally to face right (+x) along its top-right flight path!
-    ctx.scale(1, 1);
+    // Flipped horizontally so the fleeing bird faces right (+x) along its top-right ascent
+    ctx.scale(-1, 1);
     const flap = Math.floor(elapsed * 22) % 2;
     ctx.fillStyle = PAL.GROUSE_DARK;
     ctx.fillRect(-5, -10, 11, 6);
@@ -2604,10 +2609,10 @@ function update(dt) {
   }
 
   // =========================================================================
-  // 1:1 OPENING CUTSCENE: PLAYER-X PUSH-TO-REVEAL + SMOOTH PAN-SCROLL TO LEVEL 1
+  // 1:1 OPENING CUTSCENE: ASPECT-SAFE PUSH-TO-REVEAL + SMOOTH CAMERA FOLLOW
   // =========================================================================
   else if (state === 'CUTSCENE_REVEAL_1') {
-    const q1Width = Math.max(80, Math.round(VIEW_W * 0.25));
+    const q1Width = Math.max(76, Math.round(VIEW_W * 0.25));
     beatTimer += dt;
     cameraX = 0;
     firstCardDither = Math.min(1.0, beatTimer / 1.1);
@@ -2621,7 +2626,7 @@ function update(dt) {
       advanceWalkMotion(nextX - archerX);
       archerX = nextX;
     }
-    revealEdgeX = Math.max(q1Width, Math.round(archerX + 38));
+    revealEdgeX = Math.max(q1Width, Math.round((archerX - cameraX) + 38));
 
     if (beatTimer >= 4.2) {
       beatTimer = 0;
@@ -2646,7 +2651,10 @@ function update(dt) {
       }
       bowPluckVib = Math.max(0, bowPluckVib - dt * 1.2);
     }
-    revealEdgeX = Math.max(revealEdgeX, Math.round(archerX + 38));
+
+    const desiredCam2 = Math.max(0, (archerX + 34) - VIEW_W * 0.72);
+    cameraX += (desiredCam2 - cameraX) * Math.min(1, 6.0 * dt);
+    revealEdgeX = Math.max(revealEdgeX, Math.round((archerX - cameraX) + 38));
 
     if (beatTimer >= 4.2) {
       beatTimer = 0;
@@ -2663,11 +2671,14 @@ function update(dt) {
       advanceWalkMotion(nextX - archerX);
       archerX = nextX;
     }
-    revealEdgeX = Math.min(VIEW_W, Math.max(revealEdgeX, Math.round(archerX + 56)));
+
+    const harvestFrameCamX = Math.max(0, 298 - VIEW_W);
+    const desiredCam3 = Math.max(0, (archerX + 42) - VIEW_W * 0.82);
+    cameraX += (Math.min(harvestFrameCamX, desiredCam3) - cameraX) * Math.min(1, 6.5 * dt);
+    revealEdgeX = Math.min(VIEW_W, Math.max(revealEdgeX, Math.round((archerX - cameraX) + 46)));
 
     if (archerX >= 264) {
       archerX = 264;
-      revealEdgeX = VIEW_W;
       beatTimer = 0;
       spawnPartridgeForEncounter(0, archerX);
       triggerPartridgeFlyIn();
@@ -2676,8 +2687,11 @@ function update(dt) {
   } else if (state === 'CUTSCENE_REVEAL_4_HARVEST') {
     const prevT = beatTimer;
     beatTimer += dt;
-    revealEdgeX = VIEW_W;
-    cameraX = 0;
+
+    const harvestFrameCamX = Math.max(0, 298 - VIEW_W);
+    cameraX += (harvestFrameCamX - cameraX) * Math.min(1, 8.0 * dt);
+    revealEdgeX = Math.min(VIEW_W, Math.max(revealEdgeX, Math.round((278 - cameraX) + 24)));
+    if (beatTimer >= 0.45) revealEdgeX = VIEW_W;
 
     if (beatTimer < 5.0) {
       playerStance = 'KNEEL_BERRY';
@@ -2733,7 +2747,7 @@ function update(dt) {
   }
 
   // =========================================================================
-  // INTERACTIVE PHASE: 2-AXIS SLINGSHOT-COMPATIBLE AIM & DRAW
+  // INTERACTIVE PHASE: 2-AXIS SLINGSHOT-COMPATIBLE AIM & CLICK-HOLD-RELEASE DRAW
   // =========================================================================
   else if (state === 'AIM_AND_SHOOT') {
     playerFacing = 1;
@@ -2789,6 +2803,7 @@ function update(dt) {
       angleTickCooldown = 0.1;
     }
 
+    // Click-hold-release bow draw: holding A pulls back bowstring; releasing A snaps arrow forward
     if (aJustPressed && !isDrawing && arrowsInQuiver > 0) {
       isDrawing = true;
       drawPower = 0.06;
@@ -3248,9 +3263,9 @@ function gameLoop(timestamp) {
   requestAnimationFrame(gameLoop);
 }
 
-// --- ARCADE CABINET postMessage BRIDGE (SINGLE SOURCE OF TRUTH FOR CONTROLS) ---
-let lastBtnATime = 0;
+// --- ARCADE CABINET postMessage BRIDGE (CLICK-HOLD-RELEASE BUTTON A DRAW) ---
 let lastBtnBTime = 0;
+let btnAPulseTimer = null;
 const BUTTON_DEBOUNCE_MS = 110;
 const DPAD_HOLD_WINDOW_MS = 145;
 const dpadHoldTimers = { up: null, down: null, left: null, right: null };
@@ -3271,6 +3286,7 @@ function setDirectionHold(dirKey, pressed) {
 function setButtonA(pressed) {
   if (isPaused) return;
   sfx.init();
+  clearTimeout(btnAPulseTimer);
   if (pressed && !keys.a) aJustPressed = true;
   if (!pressed && keys.a) aJustReleased = true;
   keys.a = pressed;
@@ -3294,6 +3310,7 @@ function clearAllInputs() {
     clearTimeout(dpadHoldTimers[dir]);
     keys[dir] = false;
   }
+  clearTimeout(btnAPulseTimer);
   keys.a = false;
   keys.b = false;
   aJustPressed = false;
@@ -3363,24 +3380,22 @@ window.addEventListener('message', (event) => {
   else if (cmd === 'DPAD_LEFT') pulseDirection('left');
   else if (cmd === 'DPAD_RIGHT') pulseDirection('right');
 
+  // Click-Hold-Release Action Button A:
+  // - BUTTON_A_PRESS engages draw immediately; BUTTON_A_RELEASE snaps arrow forward.
+  // - If parent cabinet emits repeated BUTTON_A pulses while held, a 170ms hold-window keeps the bow
+  //   drawing continuously and releases cleanly the moment pulses stop.
   else if (cmd === 'BUTTON_A_PRESS') {
-    const now = performance.now();
-    if (now - lastBtnATime < BUTTON_DEBOUNCE_MS) return;
-    lastBtnATime = now;
     setButtonA(true);
   } else if (cmd === 'BUTTON_A_RELEASE') {
     setButtonA(false);
   } else if (cmd === 'BUTTON_A') {
-    const now = performance.now();
-    if (now - lastBtnATime < BUTTON_DEBOUNCE_MS) return;
-    lastBtnATime = now;
-
     if (state === 'TITLE') {
       setButtonA(true);
-      setTimeout(() => setButtonA(false), 60);
+      btnAPulseTimer = setTimeout(() => setButtonA(false), 60);
     } else if (state === 'AIM_AND_SHOOT') {
-      if (!isDrawing) setButtonA(true);
-      else setButtonA(false);
+      if (!keys.a) setButtonA(true);
+      clearTimeout(btnAPulseTimer);
+      btnAPulseTimer = setTimeout(() => setButtonA(false), 170);
     }
   }
 
