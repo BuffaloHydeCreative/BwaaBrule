@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>li rassad di fleur - Assiniboine Bend & Tipi Studio</title>
+    <title>li rassad di fleur</title>
     <style>
         html, body, #game-container {
             width: 100vw;
@@ -11,7 +11,7 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background-color: #120905;
+            background-color: #000000;
             color: #f6e7c8;
             font-family: 'Courier New', Courier, monospace;
             touch-action: none;
@@ -23,7 +23,7 @@
             display: block;
             width: 100vw;
             height: 100vh;
-            background-color: #120905;
+            background-color: #000000;
             image-rendering: pixelated;
             image-rendering: crisp-edges;
         }
@@ -39,7 +39,7 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        // Offscreen static backdrop buffers (Title River Bend, Wide Pannable Tipi, Lane's Post)
+        // Offscreen static backdrop buffers (Title Lane's Post & Tipi, Wide Pannable Tipi, Lane's Post Interior)
         const titleBgCanvas = document.createElement('canvas');
         const titleBgCtx = titleBgCanvas.getContext('2d');
         const tipiBgCanvas = document.createElement('canvas');
@@ -51,14 +51,16 @@
         let VIEW_W = 400;
         let VIEW_H = 533;
         let TIPI_WORLD_W = 600;
-        const HUD_TOP_H = 64;
+        const HUD_TOP_H = 64; // Used for Lane's Post only
         const HUD_BOT_H = 26;
 
-        // Odd-numbered 9x9 Grid for Freeform Studio
+        // Odd-numbered 9x9 Grid
         const COLS = 9;
         const ROWS = 9;
 
-        // Cached scenic anchor coordinates (in world space for Tipi)
+        // Cached scenic anchor coordinates
+        let titleSmokePoints = [];
+        let titleRiverBounds = { y: 340, h: 64 };
         let tipiLayout = {
             doorX: 60, doorY: 300, doorW: 44, doorH: 56,
             stashX: 255, stashY: 365,
@@ -101,7 +103,7 @@
         // ==========================================
         const HIDES = [
             {
-                id: 0, name: 'Deer / Buckskin', shortName: 'BUCKSKIN',
+                id: 0, name: 'Buckskin', shortName: 'BUCKSKIN',
                 light: '#d9a96a', mid: '#c69253', dark: '#9c6c36', edge: '#6b451d',
                 outerLight: '#b37f42', outerMid: '#91622d', outerDark: '#593916',
                 sinew: '#f7ecd6', guideDot: 'rgba(66, 36, 10, 0.45)',
@@ -386,7 +388,7 @@
         // MASTER STATE MACHINE
         // ==========================================
         let gameState = 'MODE_SELECT';
-        let menuSelection = 0; // 0 = Lane's Post, 1 = Tipi Studio
+        let menuSelection = 0; // 0 = Lane's Post, 1 = The Tipi
         let isPaused = false;
         let lastFrameTime = 0;
 
@@ -413,11 +415,11 @@
         let feedbackColor = '#ffe169';
         let feedbackTimerMs = 0;
 
-        // --- TIPI FREEFORM STUDIO STATE ---
+        // --- TIPI FREEFORM BEADING STATE ---
         let selectedHideId = 1;
         let selectedPaletteId = 0;
-        let selectedStudioFurId = 0;
-        let selectedStudioTemplate = -1;
+        let selectedTipiFurId = 0;
+        let selectedTipiTemplate = -1;
         let prepRow = 0;
         let board = [];
         let cursor = { x: 4, y: 4, color: 1 };
@@ -471,22 +473,22 @@
             postBgCanvas.width = VIEW_W; postBgCanvas.height = VIEW_H;
             postBgCtx.imageSmoothingEnabled = false;
 
-            renderStaticAssiniboineBendBackdrop();
+            renderStaticLanesPostTitleBackdrop();
             renderStaticTipiBackdrop();
             renderStaticLanesPostBackdrop();
         }
 
         function getGridMetrics() {
             const padX = VIEW_W > 540 ? 150 : 48;
-            const topMoccPad = 56;
-            const botMoccPad = 68;
+            const topMoccPad = 76;
+            const botMoccPad = 72;
             const availW = VIEW_W - padX * 2;
-            const availH = VIEW_H - HUD_TOP_H - HUD_BOT_H - topMoccPad - botMoccPad;
-            const cellSize = Math.max(18, Math.min(31, Math.floor(Math.min(availW / COLS, availH / ROWS))));
+            const availH = VIEW_H - HUD_BOT_H - topMoccPad - botMoccPad;
+            const cellSize = Math.max(18, Math.min(32, Math.floor(Math.min(availW / COLS, availH / ROWS))));
             const gridW = cellSize * COLS;
             const gridH = cellSize * ROWS;
             const offsetX = Math.floor((VIEW_W - gridW) / 2);
-            const offsetY = HUD_TOP_H + topMoccPad + Math.floor((availH - gridH) / 2);
+            const offsetY = topMoccPad + Math.floor((availH - gridH) / 2);
             return { cellSize, gridW, gridH, offsetX, offsetY };
         }
 
@@ -502,80 +504,258 @@
         }
 
         // ------------------------------------------
-        // SCENE 0: TITLE SCREEN — ASSINIBOINE RIVER BEND
+        // SCENE 0: TITLE SCREEN — LANE'S POST ALONG THE ASSINIBOINE RIVER
+        // WITH OUR TIPI CAMPED NEARBY UP THE BANKING (SQUARE 16/32-BIT PIXEL STYLE)
         // ------------------------------------------
-        function renderStaticAssiniboineBendBackdrop() {
+        function drawPixelCampTipi(c, cx, baseY, w, h) {
+            const halfW = Math.floor(w / 2);
+            c.fillStyle = 'rgba(26, 20, 12, 0.45)';
+            c.fillRect(cx - halfW - 2, baseY - 2, w + 8, 5);
+
+            c.fillStyle = '#4a321d';
+            c.fillRect(cx - 5, baseY - h - 10, 2, 12);
+            c.fillRect(cx + 3, baseY - h - 10, 2, 12);
+            c.fillRect(cx - 1, baseY - h - 12, 2, 14);
+
+            for (let row = 0; row < h; row += 2) {
+                const frac = row / h;
+                const rw = Math.max(4, Math.floor(frac * w));
+                const lx = cx - Math.floor(rw / 2);
+                const py = baseY - h + row;
+                const lightCol = frac < 0.22 ? '#6e5239' : (frac > 0.80 ? '#a67d4e' : '#dfd0b4');
+                const midCol   = frac < 0.22 ? '#543c28' : (frac > 0.80 ? '#876138' : '#c2af8e');
+                const darkCol  = frac < 0.22 ? '#3b291a' : (frac > 0.80 ? '#634424' : '#8f7958');
+
+                const split1 = Math.floor(rw * 0.45);
+                const split2 = Math.floor(rw * 0.78);
+                c.fillStyle = lightCol; c.fillRect(lx, py, split1, 2);
+                c.fillStyle = midCol;   c.fillRect(lx + split1, py, split2 - split1, 2);
+                c.fillStyle = darkCol;  c.fillRect(lx + split2, py, rw - split2, 2);
+            }
+            const bandY = baseY - Math.floor(h * 0.22);
+            const bandW = Math.floor(w * 0.78);
+            c.fillStyle = '#8f2424';
+            c.fillRect(cx - Math.floor(bandW / 2), bandY, bandW, 3);
+            c.fillStyle = '#24150c';
+            c.fillRect(cx - 3, baseY - 12, 6, 12);
+        }
+
+        function drawPixelLanesPostExterior(c, x, baseY) {
+            // Ground shadow
+            c.fillStyle = 'rgba(20, 14, 8, 0.48)';
+            c.fillRect(x - 6, baseY - 2, 118, 6);
+
+            // Squared timber palisade fence flanking the trading house
+            c.fillStyle = '#3b2412';
+            for (let px = x - 14; px < x + 114; px += 5) {
+                c.fillRect(px, baseY - 22, 4, 22);
+                c.fillStyle = '#5c3a1e'; c.fillRect(px, baseY - 22, 2, 20);
+                c.fillStyle = '#3b2412';
+            }
+            // Horizontal palisade rail
+            c.fillStyle = '#2b180b'; c.fillRect(x - 14, baseY - 14, 128, 2);
+
+            // Main Red River Frame HBC Trading House
+            const hx = x + 6, hy = baseY - 40, hw = 72, hh = 40;
+            // Squared timber walls (sunlit left, shaded right)
+            c.fillStyle = '#6b4426'; c.fillRect(hx, hy, hw, hh);
+            c.fillStyle = '#523219'; c.fillRect(hx + hw - 18, hy, 18, hh);
+            // Horizontal log chinking lines
+            c.fillStyle = '#b5a68c';
+            for (let ly = hy + 6; ly < baseY; ly += 6) {
+                c.fillRect(hx + 2, ly, hw - 4, 1);
+            }
+            // Corner timber posts
+            c.fillStyle = '#361e0d';
+            c.fillRect(hx, hy, 4, hh); c.fillRect(hx + hw - 4, hy, 4, hh);
+
+            // Stepped Pitched Shingle Roof
+            for (let r = 0; r < 18; r += 2) {
+                const inset = Math.floor((1 - r / 18) * 14);
+                c.fillStyle = r < 6 ? '#3a2d24' : '#4f3d30';
+                c.fillRect(hx - 4 + inset, hy - 18 + r, hw + 8 - inset * 2, 2);
+                c.fillStyle = '#261d17';
+                c.fillRect(hx + hw - 16 - inset + 4, hy - 18 + r, 16, 2);
+            }
+
+            // Stone Chimney on left gable
+            const chX = hx + 8, chY = hy - 26;
+            c.fillStyle = '#4d4640'; c.fillRect(chX, chY, 10, 18);
+            c.fillStyle = '#73685e'; c.fillRect(chX + 1, chY + 2, 4, 12);
+            c.fillStyle = '#2b2622'; c.fillRect(chX - 1, chY, 12, 3);
+            titleSmokePoints.push({ x: chX + 4, y: chY - 3 });
+
+            // Warm glowing multi-pane trading post windows & plank door
+            const drawPostWin = (wx, wy) => {
+                c.fillStyle = '#2b180b'; c.fillRect(wx, wy, 12, 12);
+                c.fillStyle = '#f5ca69'; c.fillRect(wx + 2, wy + 2, 8, 8);
+                c.fillStyle = '#2b180b'; c.fillRect(wx + 5, wy + 2, 2, 8); c.fillRect(wx + 2, wy + 5, 8, 2);
+            };
+            drawPostWin(hx + 10, hy + 12);
+            drawPostWin(hx + 46, hy + 12);
+
+            // Heavy timber door
+            c.fillStyle = '#2b180b'; c.fillRect(hx + 28, hy + 16, 12, 24);
+            c.fillStyle = '#4a2b14'; c.fillRect(hx + 30, hy + 18, 8, 22);
+
+            // HBC Flagpole & Red Ensign flying beside the post
+            const fpX = hx + hw + 12;
+            c.fillStyle = '#3b2412'; c.fillRect(fpX, baseY - 64, 2, 64);
+            c.fillStyle = '#b81d2a'; c.fillRect(fpX + 2, baseY - 62, 16, 9);
+            c.fillStyle = '#1d4e9e'; c.fillRect(fpX + 2, baseY - 62, 7, 5);
+            c.fillStyle = '#f2efe9'; c.fillRect(fpX + 5, baseY - 62, 1, 5); c.fillRect(fpX + 2, baseY - 60, 7, 1);
+        }
+
+        function drawPixelRedRiverCart(c, x, y) {
+            c.fillStyle = 'rgba(26, 20, 12, 0.48)'; c.fillRect(x - 20, y + 1, 44, 4);
+            c.fillStyle = '#4f331c'; c.fillRect(x - 14, y - 20, 28, 10);
+            c.fillStyle = '#734d2c'; c.fillRect(x - 13, y - 19, 26, 3);
+            c.fillStyle = '#5c3c20'; c.fillRect(x - 26, y - 12, 12, 2);
+            const wx = x + 1, wy = y - 10;
+            c.fillStyle = '#362110';
+            c.fillRect(wx - 8, wy - 10, 16, 2); c.fillRect(wx - 8, wy + 8, 16, 2);
+            c.fillRect(wx - 10, wy - 8, 2, 16); c.fillRect(wx + 8, wy - 8, 2, 16);
+            c.fillStyle = '#4f331c';
+            c.fillRect(wx - 1, wy - 8, 2, 16); c.fillRect(wx - 8, wy - 1, 16, 2);
+            c.fillStyle = '#8f6338'; c.fillRect(wx - 2, wy - 2, 4, 4);
+        }
+
+        function renderStaticLanesPostTitleBackdrop() {
             const c = titleBgCtx;
-            const horizonY = Math.floor(VIEW_H * 0.44);
+            const horizonY = Math.floor(VIEW_H * 0.42);
+            titleSmokePoints = [];
 
-            const sky = c.createLinearGradient(0, 0, 0, horizonY);
-            sky.addColorStop(0.0, '#1c355c'); sky.addColorStop(0.38, '#466a94');
-            sky.addColorStop(0.70, '#c78c5c'); sky.addColorStop(0.92, '#edb974'); sky.addColorStop(1.0, '#f7d89c');
-            c.fillStyle = sky; c.fillRect(0, 0, VIEW_W, horizonY);
+            // 1. Wide Manitoba Golden-Hour Sky (Stepped & dithered bands)
+            const skyBands = [
+                { y: 0.00, h: 0.24, col: '#24416b' },
+                { y: 0.24, h: 0.22, col: '#3e628f' },
+                { y: 0.46, h: 0.20, col: '#6d8ca8' },
+                { y: 0.66, h: 0.16, col: '#b89f7d' },
+                { y: 0.82, h: 0.18, col: '#e3c083' }
+            ];
+            skyBands.forEach((b, i) => {
+                const by = Math.floor(b.y * horizonY);
+                const bh = Math.ceil(b.h * horizonY) + 2;
+                c.fillStyle = b.col; c.fillRect(0, by, VIEW_W, bh);
+                if (i > 0) drawDitherBand(c, 0, by - 4, VIEW_W, 8, b.col, 2);
+            });
 
-            c.fillStyle = 'rgba(255, 224, 172, 0.38)';
-            for (let i = 0; i < 5; i++) {
-                const cx = Math.floor((i * 0.24 + 0.08) * VIEW_W);
-                const cy = Math.floor(horizonY * (0.34 + (i % 3) * 0.14));
-                c.fillRect(cx - 28, cy, 56, 6); c.fillRect(cx - 18, cy - 4, 36, 4);
+            // Painterly square-pixel prairie clouds
+            [
+                { x: VIEW_W * 0.20, y: horizonY * 0.26, w: 74, h: 16 },
+                { x: VIEW_W * 0.64, y: horizonY * 0.20, w: 92, h: 20 },
+                { x: VIEW_W * 0.85, y: horizonY * 0.45, w: 66, h: 14 },
+                { x: VIEW_W * 0.36, y: horizonY * 0.56, w: 78, h: 12 }
+            ].forEach(cl => {
+                const cx = Math.floor(cl.x), cy = Math.floor(cl.y);
+                c.fillStyle = '#c4a682'; c.fillRect(cx - cl.w / 2, cy + 4, cl.w, cl.h - 4);
+                c.fillStyle = '#e8d7b7'; c.fillRect(cx - cl.w / 2 + 4, cy, cl.w - 8, cl.h - 4);
+                c.fillStyle = '#fff5de'; c.fillRect(cx - cl.w / 2 + 12, cy - 4, cl.w - 24, 6);
+            });
+
+            // 2. Distant Horizon & Assiniboine Oak/Cottonwood Treeline
+            c.fillStyle = '#475742'; c.fillRect(0, horizonY - 4, VIEW_W, 10);
+            for (let tx = 0; tx < VIEW_W; tx += 10) {
+                const h = 5 + ((tx * 13) % 11);
+                c.fillStyle = (tx % 20 === 0) ? '#2f402b' : '#3d4f37';
+                c.fillRect(tx, horizonY - h, 10, h + 2);
             }
 
-            c.fillStyle = '#384f34'; c.fillRect(0, horizonY - 4, VIEW_W, 18);
+            // 3. Upper Grassy Banking (where Lane's Post & our Tipi sit)
+            const riverTopY = horizonY + 116;
+            const riverH = 56;
+            titleRiverBounds = { y: riverTopY, h: riverH };
 
-            for (let tx = -8; tx < VIEW_W + 12; tx += 12) {
-                const wave = Math.sin(tx * 0.03) * 8 + ((tx * 17) % 11);
-                const treeH = 18 + Math.floor(Math.abs(wave));
-                c.fillStyle = '#20331e'; c.fillRect(tx - Math.floor(treeH * 0.5), horizonY - Math.floor(treeH * 0.6), Math.floor(treeH), Math.floor(treeH * 0.65));
-                c.fillStyle = '#344f2d'; c.fillRect(tx - Math.floor(treeH * 0.38), horizonY - Math.floor(treeH * 0.72), Math.floor(treeH * 0.76), Math.floor(treeH * 0.48));
-                c.fillStyle = '#63783d'; c.fillRect(tx - Math.floor(treeH * 0.24), horizonY - Math.floor(treeH * 0.78), Math.floor(treeH * 0.44), Math.floor(treeH * 0.24));
-            }
+            const bankBands = [
+                { y: horizonY + 2,  h: 40, col: '#767d42' },
+                { y: horizonY + 42, h: 42, col: '#5c6632' },
+                { y: horizonY + 84, h: 36, col: '#4a5428' }
+            ];
+            bankBands.forEach((b, i) => {
+                c.fillStyle = b.col; c.fillRect(0, b.y, VIEW_W, b.h);
+                if (i > 0) drawDitherBand(c, 0, b.y - 5, VIEW_W, 10, b.col, 2);
+            });
 
-            const groundGrad = c.createLinearGradient(0, horizonY, 0, VIEW_H);
-            groundGrad.addColorStop(0.0, '#4f6934'); groundGrad.addColorStop(0.45, '#3b5227'); groundGrad.addColorStop(1.0, '#223316');
-            c.fillStyle = groundGrad; c.fillRect(0, horizonY + 4, VIEW_W, VIEW_H - horizonY);
-            drawDitherBand(c, 0, horizonY + 8, VIEW_W, VIEW_H - horizonY, 'rgba(22, 36, 14, 0.22)', 2);
+            // Slightly elevated grassy rise on the right banking for our tipi
+            const riseX = Math.floor(VIEW_W * 0.56);
+            c.fillStyle = '#656e37';
+            c.fillRect(riseX, horizonY + 56, VIEW_W - riseX, 34);
+            drawDitherBand(c, riseX - 12, horizonY + 54, 16, 36, '#656e37', 2);
 
-            c.save();
-            c.beginPath();
-            c.moveTo(VIEW_W * 0.44, horizonY + 4);
-            c.bezierCurveTo(VIEW_W * 0.68, horizonY + 26, VIEW_W * 0.92, VIEW_H * 0.60, VIEW_W * 0.56, VIEW_H * 0.74);
-            c.bezierCurveTo(VIEW_W * 0.20, VIEW_H * 0.86, VIEW_W * 0.14, VIEW_H * 0.94, VIEW_W * 0.34, VIEW_H);
-            c.lineTo(VIEW_W * 0.0, VIEW_H); c.lineTo(VIEW_W * 0.0, VIEW_H * 0.88);
-            c.bezierCurveTo(VIEW_W * 0.04, VIEW_H * 0.78, VIEW_W * 0.34, VIEW_H * 0.72, VIEW_W * 0.48, VIEW_H * 0.64);
-            c.bezierCurveTo(VIEW_W * 0.64, VIEW_H * 0.54, VIEW_W * 0.42, horizonY + 22, VIEW_W * 0.34, horizonY + 4);
-            c.closePath();
+            // 4. Lane's Post along the Assiniboine (left/center-left)
+            const postX = Math.floor(VIEW_W * 0.14);
+            const postBaseY = riverTopY - 12;
+            drawPixelLanesPostExterior(c, postX, postBaseY);
 
-            c.lineWidth = 8; c.strokeStyle = '#6b5335'; c.stroke();
-            const riverGrad = c.createLinearGradient(0, horizonY, 0, VIEW_H);
-            riverGrad.addColorStop(0.0, '#c79e72'); riverGrad.addColorStop(0.32, '#5a84a3');
-            riverGrad.addColorStop(0.72, '#345d7d'); riverGrad.addColorStop(1.0, '#1f3d57');
-            c.fillStyle = riverGrad; c.fill();
-            c.restore();
+            // 5. Our Tipi camped nearby a little up the banking (right)
+            const tipiX = Math.floor(VIEW_W * 0.78);
+            const tipiBaseY = riverTopY - 30;
+            drawPixelCampTipi(c, tipiX, tipiBaseY, 60, 70);
+            titleSmokePoints.push({ x: tipiX, y: tipiBaseY - 72 });
 
-            for (let gx = 4; gx < VIEW_W; gx += 7) {
-                const gh = 10 + ((gx * 13) % 14);
-                const gy = VIEW_H - gh - ((gx * 7) % 18);
-                c.fillStyle = (gx % 2 === 0) ? '#293d19' : '#4a6129';
+            // Small Red River cart parked between the post and tipi
+            drawPixelRedRiverCart(c, Math.floor(VIEW_W * 0.58), tipiBaseY + 10);
+
+            // 6. Muddy-Gold Clay Riverbank & Flowing Assiniboine River
+            c.fillStyle = '#755e3d'; c.fillRect(0, riverTopY - 8, VIEW_W, 10);
+            drawDitherBand(c, 0, riverTopY - 10, VIEW_W, 6, '#755e3d', 2);
+
+            c.fillStyle = '#3d6685'; c.fillRect(0, riverTopY, VIEW_W, riverH);
+            c.fillStyle = '#527fa1'; c.fillRect(0, riverTopY + 8, VIEW_W, 18);
+            c.fillStyle = '#2d4f6b'; c.fillRect(0, riverTopY + riverH - 14, VIEW_W, 14);
+            drawDitherBand(c, 0, riverTopY + 6, VIEW_W, 6, '#527fa1', 2);
+
+            // Birchbark canoe pulled up on the muddy landing below Lane's Post
+            const canX = postX + 26, canY = riverTopY - 2;
+            c.fillStyle = '#c49b66'; c.fillRect(canX, canY, 24, 5);
+            c.fillStyle = '#8f6738'; c.fillRect(canX + 2, canY + 3, 20, 2);
+            c.fillStyle = '#c49b66'; c.fillRect(canX - 2, canY - 2, 3, 4); c.fillRect(canX + 23, canY - 2, 3, 4);
+
+            // 7. Near Grassy Foreground Bank below the river
+            const nearY = riverTopY + riverH;
+            c.fillStyle = '#6b5638'; c.fillRect(0, nearY, VIEW_W, 6);
+            c.fillStyle = '#394520'; c.fillRect(0, nearY + 6, VIEW_W, VIEW_H - nearY);
+            drawDitherBand(c, 0, nearY + 4, VIEW_W, 8, '#394520', 2);
+            c.fillStyle = '#263015'; c.fillRect(0, nearY + 46, VIEW_W, VIEW_H - (nearY + 46));
+            drawDitherBand(c, 0, nearY + 40, VIEW_W, 12, '#263015', 2);
+
+            // Foreground prairie grasses & prairie roses
+            for (let gx = 2; gx < VIEW_W; gx += 6) {
+                const gh = 8 + ((gx * 17) % 14);
+                const gy = VIEW_H - HUD_BOT_H - gh - ((gx * 11) % 24);
+                c.fillStyle = (gx % 12 === 0) ? '#1f2910' : '#4a5724';
                 c.fillRect(gx, gy, 2, gh);
-                if (gx % 21 === 0) { c.fillStyle = '#e6c25a'; c.fillRect(gx - 1, gy - 2, 3, 3); }
+                if (gx % 24 === 0) { c.fillStyle = '#e6c25a'; c.fillRect(gx - 1, gy - 2, 3, 2); }
+                else if (gx % 36 === 0) { c.fillStyle = '#d47488'; c.fillRect(gx, gy - 2, 2, 2); }
             }
         }
 
-        function drawAnimatedAssiniboineBendEffects(now) {
-            const horizonY = Math.floor(VIEW_H * 0.44);
-            const shift = (Math.floor(now / 140) * 2) % 24;
-            ctx.fillStyle = 'rgba(255, 232, 184, 0.35)';
-            for (let i = 0; i < 14; i++) {
-                const t = i / 14;
-                const ry = snap2(horizonY + 18 + t * (VIEW_H - horizonY - 40));
-                const centerBendX = VIEW_W * (0.45 + Math.sin(t * Math.PI * 1.45) * 0.22 - t * 0.26);
-                const rx = snap2(centerBendX - 18 + ((shift + i * 7) % 24));
-                ctx.fillRect(rx, ry, 10 + (i % 3) * 4, 2);
+        function drawAnimatedTitleEffects(now) {
+            // 1. Stepped SNES pixel smoke rising from Lane's Post chimney & our Tipi
+            const tick = Math.floor(now / 180);
+            titleSmokePoints.forEach((pt, idx) => {
+                for (let i = 0; i < 4; i++) {
+                    const phase = (tick + i * 3 + idx * 5) % 12;
+                    const sx = snap2(pt.x + Math.floor(phase * 0.9) + (phase % 3 === 0 ? 2 : 0));
+                    const sy = snap2(pt.y - phase * 4);
+                    const sz = phase > 6 ? 6 : 4;
+                    ctx.fillStyle = phase > 8 ? 'rgba(230, 224, 212, 0.20)' : 'rgba(230, 224, 212, 0.42)';
+                    ctx.fillRect(sx, sy, sz, sz - 1);
+                }
+            });
+
+            // 2. Stepped pixel ripples drifting along the Assiniboine River
+            const rShift = (Math.floor(now / 150) * 2) % 32;
+            ctx.fillStyle = 'rgba(245, 220, 175, 0.36)';
+            for (let ry = titleRiverBounds.y + 8; ry < titleRiverBounds.y + titleRiverBounds.h - 6; ry += 10) {
+                for (let rx = -32 + rShift; rx < VIEW_W; rx += 32) {
+                    ctx.fillRect(snap2(rx + (ry % 12)), ry, 10, 2);
+                }
             }
         }
 
         // ------------------------------------------
-        // SCENE A: LANE'S POST (HBC TRADING POST ON THE ASSINIBOINE)
+        // SCENE A: LANE'S POST INTERIOR (HBC TRADING POST)
         // ------------------------------------------
         function renderStaticLanesPostBackdrop() {
             const c = postBgCtx;
@@ -697,7 +877,7 @@
         }
 
         // ------------------------------------------
-        // SCENE B: ZOOMED-IN, PANNABLE CONICAL 13-POLE TIPI INTERIOR
+        // SCENE B: ZOOMED-IN, PANNABLE CONICAL 13-POLE TIPI (FADES TO PURE BLACK AT y=0)
         // ------------------------------------------
         function getTipiWallBaseY(x, baseFloorY) {
             const norm = (x - TIPI_WORLD_W / 2) / (TIPI_WORLD_W / 2);
@@ -707,9 +887,9 @@
         function renderStaticTipiBackdrop() {
             const c = tipiBgCtx;
             const W = TIPI_WORLD_W;
-            const topY = HUD_TOP_H;
+            const topY = 0;
             const botY = VIEW_H - HUD_BOT_H;
-            const floorY = botY - Math.max(114, Math.floor((botY - topY) * 0.30));
+            const floorY = botY - Math.max(114, Math.floor(botY * 0.27));
 
             const doorW = Math.min(48, Math.max(40, Math.floor(VIEW_W * 0.11)));
             const doorH = 56;
@@ -734,12 +914,12 @@
 
             const wallGrad = c.createRadialGradient(
                 fireX, floorY - 12, 32,
-                W / 2, topY + 20, Math.max(W, VIEW_H) * 0.75
+                W / 2, 10, Math.max(W, VIEW_H) * 0.72
             );
             wallGrad.addColorStop(0.0, '#704120');
-            wallGrad.addColorStop(0.45, '#4c2812');
-            wallGrad.addColorStop(0.80, '#291408');
-            wallGrad.addColorStop(1.0, '#120804');
+            wallGrad.addColorStop(0.42, '#4c2812');
+            wallGrad.addColorStop(0.74, '#241106');
+            wallGrad.addColorStop(1.0, '#000000');
             c.fillStyle = wallGrad;
             c.fillRect(0, topY, W, botY - topY);
 
@@ -751,7 +931,7 @@
             }
 
             const apexX = W * 0.46;
-            const apexY = topY - 160;
+            const apexY = -120;
             const poleSpecs = [
                 { bx: W * 0.03,           w: 10,  shade: '#3b2110' },
                 { bx: doorX - 2,          w: 6.5, shade: '#5c361c' },
@@ -775,16 +955,16 @@
             });
 
             const hangX = Math.floor(W * 0.78);
-            const peltY = topY + 78;
+            const peltY = 128;
             c.fillStyle = '#8f441c'; c.fillRect(hangX - 10, peltY, 14, 42);
             c.fillStyle = '#bf642c'; c.fillRect(hangX - 7, peltY + 4, 8, 30);
             c.fillStyle = '#2b1307'; c.fillRect(hangX - 5, peltY + 38, 5, 10);
             c.fillStyle = '#f2e8d5'; c.fillRect(hangX - 4, peltY + 46, 3, 3);
 
             const fX = Math.floor(W * 0.56);
-            const fY = topY + 66;
+            const fY = 118;
             c.strokeStyle = '#efe0be'; c.lineWidth = 1.2;
-            c.beginPath(); c.moveTo(fX, topY + 44); c.lineTo(fX, fY + 4); c.stroke();
+            c.beginPath(); c.moveTo(fX, 96); c.lineTo(fX, fY + 4); c.stroke();
             for (let fi = -1; fi <= 1; fi++) {
                 const fx = fX + fi * 6, fy = fY + Math.abs(fi) * 3;
                 c.fillStyle = '#f2ede4'; c.fillRect(fx - 2, fy, 4, 14);
@@ -792,10 +972,11 @@
                 c.fillStyle = '#8B1E24'; c.fillRect(fx - 1, fy - 2, 2, 3);
             }
 
-            const wallH = floorY - topY;
-            drawDitherBand(c, 0, topY, W, Math.floor(wallH * 0.22), '#0d0603', 1);
-            drawDitherBand(c, 0, topY + Math.floor(wallH * 0.14), W, Math.floor(wallH * 0.20), 'rgba(14, 6, 3, 0.72)', 2);
-            drawDitherBand(c, 0, topY + Math.floor(wallH * 0.30), W, Math.floor(wallH * 0.22), 'rgba(18, 8, 3, 0.42)', 3);
+            c.fillStyle = '#000000';
+            c.fillRect(0, 0, W, 38);
+            drawDitherBand(c, 0, 34, W, 44, '#000000', 1);
+            drawDitherBand(c, 0, 68, W, 56, 'rgba(0, 0, 0, 0.78)', 2);
+            drawDitherBand(c, 0, 112, W, 64, 'rgba(10, 4, 2, 0.45)', 3);
 
             c.save();
             c.beginPath();
@@ -917,7 +1098,7 @@
             fireGlow.addColorStop(0.70, `rgba(120, 32, 8, ${0.09 * pulse})`);
             fireGlow.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
             ctx.fillStyle = fireGlow;
-            ctx.fillRect(0, HUD_TOP_H, TIPI_WORLD_W, VIEW_H - HUD_TOP_H - HUD_BOT_H);
+            ctx.fillRect(0, 0, TIPI_WORLD_W, VIEW_H - HUD_BOT_H);
 
             [
                 { dx: -24, dy: -6, w: 14, h: 10 }, { dx: -10, dy: -10, w: 16, h: 10 },
@@ -982,13 +1163,11 @@
             ctx.fillStyle = hideObj.mid; ctx.fillRect(px, py, 10, 6);
             ctx.fillStyle = hideObj.light; ctx.fillRect(px + 2, py + 1, 6, 3);
             if (facingLeft) {
-                // Toe points LEFT, fur cuff on RIGHT
                 ctx.fillStyle = palObj.beads[1].mid; ctx.fillRect(px + 3, py + 1, 2, 2);
                 ctx.fillStyle = palObj.beads[3].mid; ctx.fillRect(px + 1, py + 2, 2, 1);
                 ctx.fillStyle = furObj.base; ctx.fillRect(px + 5, py - 2, 5, 3);
                 ctx.fillStyle = furObj.hi; ctx.fillRect(px + 6, py - 2, 3, 1);
             } else {
-                // Toe points RIGHT, fur cuff on LEFT
                 ctx.fillStyle = palObj.beads[1].mid; ctx.fillRect(px + 4, py + 1, 2, 2);
                 ctx.fillStyle = palObj.beads[3].mid; ctx.fillRect(px + 6, py + 2, 2, 1);
                 ctx.fillStyle = furObj.base; ctx.fillRect(px, py - 2, 5, 3);
@@ -1044,6 +1223,7 @@
 
             const isDuck = (pose === 'duck');
             const isKneel = (pose === 'kneel' || pose === 'place_mocc');
+            const isBlush = (pose === 'blush');
             const yOff = isKneel ? 10 : (isDuck ? 16 + bob : bob);
             const headLeanX = isDuck ? 6 : 0;
             const legShift = (pose === 'walk' || pose === 'carry' || pose === 'carry_mocc' || isDuck) ? (stepFrame === 1 ? 4 : stepFrame === 3 ? -4 : 0) : 0;
@@ -1076,6 +1256,13 @@
             ctx.fillStyle = '#9E1B32'; ctx.fillRect(hx - 9, hy + 22, 4, 2);
 
             ctx.fillStyle = '#1a0f0a'; ctx.fillRect(hx + 1, hy + 8, 2, 2); ctx.fillRect(hx + 5, hy + 8, 2, 2);
+            if (isBlush) {
+                ctx.fillStyle = '#e86a7c';
+                ctx.fillRect(hx - 2, hy + 11, 4, 2);
+                ctx.fillRect(hx + 3, hy + 11, 3, 2);
+                ctx.fillStyle = '#ff99a8';
+                ctx.fillRect(hx - 1, hy + 11, 2, 1);
+            }
 
             if (pose === 'carry') {
                 const hCol = hideObj ? hideObj.mid : '#6B3E1D';
@@ -1099,7 +1286,6 @@
         function drawHusbandSprite(x, y, pose, now, wearingMocc, hideObj, palObj, furObj, jigPhase = 0) {
             ctx.save();
             const px = snap2(x), py = snap2(y);
-            const stepFrame = Math.floor(now / 140) % 4;
 
             ctx.fillStyle = 'rgba(10, 4, 2, 0.55)';
             ctx.fillRect(px - (pose === 'sit' ? 18 : 12), py + 2, pose === 'sit' ? 36 : 24, 6);
@@ -1125,10 +1311,9 @@
                 return;
             }
 
-            const isDuck = (pose === 'duck_left');
             const isJig = (pose === 'jig');
             const isKiss = (pose === 'kiss');
-            const facingLeft = (pose === 'walk_left' || pose === 'duck_left' || isKiss || isJig);
+            const facingLeft = (isKiss || isJig);
 
             let hopY = 0, leftFootY = 0, rightFootY = 0, kickX = 0;
             if (isJig) {
@@ -1137,33 +1322,29 @@
                 else if (beat === 1) { hopY = -4; rightFootY = -6; }
                 else if (beat === 2) { hopY = -4; leftFootY = -6; }
                 else { hopY = -8; rightFootY = -10; kickX = -10; }
-            } else if (pose === 'walk_left' || isDuck) {
-                hopY = (stepFrame % 2 === 1 ? -2 : 0);
             }
 
-            const yOff = (isDuck ? 16 : 0) + hopY;
-            const legShift = (pose === 'walk_left' || isDuck) ? (stepFrame === 1 ? 4 : stepFrame === 3 ? -4 : 0) : 0;
+            const yOff = hopY;
 
             ctx.fillStyle = '#26211d';
-            ctx.fillRect(px - 9 + legShift, py - 18 + yOff, 7, 15);
-            ctx.fillRect(px + 2 - legShift + kickX, py - 18 + yOff + Math.floor(rightFootY * 0.4), 7, 15);
+            ctx.fillRect(px - 9, py - 18 + yOff, 7, 15);
+            ctx.fillRect(px + 2 + kickX, py - 18 + yOff + Math.floor(rightFootY * 0.4), 7, 15);
 
-            // Feet properly face left when walking/ducking out or jigging toward his wife!
             if (wearingMocc) {
-                drawMini444MoccasinSprite(px - 12 + legShift, py - 5 + leftFootY, hideObj, palObj, furObj, facingLeft);
-                drawMini444MoccasinSprite(px + 1 - legShift + kickX, py - 5 + rightFootY, hideObj, palObj, furObj, facingLeft);
+                drawMini444MoccasinSprite(px - 12, py - 5 + leftFootY, hideObj, palObj, furObj, facingLeft);
+                drawMini444MoccasinSprite(px + 1 + kickX, py - 5 + rightFootY, hideObj, palObj, furObj, facingLeft);
             }
 
-            ctx.fillStyle = '#142f59'; ctx.fillRect(px - 13, py - 46 + yOff, 26, 30 - (isDuck ? 8 : 0));
-            ctx.fillStyle = '#214d8c'; ctx.fillRect(px - 10, py - 44 + yOff, 20, 24 - (isDuck ? 8 : 0));
-            ctx.fillStyle = '#3368b5'; ctx.fillRect(px - 8, py - 42 + yOff, 6, 18 - (isDuck ? 8 : 0));
+            ctx.fillStyle = '#142f59'; ctx.fillRect(px - 13, py - 46 + yOff, 26, 30);
+            ctx.fillStyle = '#214d8c'; ctx.fillRect(px - 10, py - 44 + yOff, 20, 24);
+            ctx.fillStyle = '#3368b5'; ctx.fillRect(px - 8, py - 42 + yOff, 6, 18);
 
             ctx.fillStyle = '#b81d2a'; ctx.fillRect(px - 13, py - 27 + yOff, 26, 5);
             ctx.fillStyle = '#f2c938'; ctx.fillRect(px - 11, py - 25 + yOff, 22, 1.5);
             ctx.fillStyle = '#b81d2a'; ctx.fillRect(px + 7, py - 22 + yOff, 4, 9);
 
-            const leanX = isKiss ? -6 : (isDuck ? -6 : 0);
-            const hx = px + leanX, hy = py - (isDuck ? 54 : 62) + yOff;
+            const leanX = isKiss ? -6 : 0;
+            const hx = px + leanX, hy = py - 62 + yOff;
             ctx.fillStyle = '#17100c'; ctx.fillRect(hx - 8, hy, 16, 16);
             ctx.fillStyle = '#b57b52'; ctx.fillRect(hx - 6, hy + 4, 12, 12);
             ctx.fillStyle = '#2b1b12'; ctx.fillRect(hx - 6, hy + 12, 12, 4);
@@ -1368,7 +1549,7 @@
         }
 
         // ==========================================
-        // TIPI STUDIO CUTSCENES (UNSKIPPABLE, STEPPED SNES TIMING)
+        // TIPI CUTSCENES (UNSKIPPABLE, STEPPED SNES TIMING)
         // ==========================================
         function startTipiIntroCutscene() {
             tipiCamX = 0;
@@ -1383,12 +1564,12 @@
             gameState = 'TIPI_SIT_CUTSCENE';
         }
 
-        function startStudioSession() {
+        function startBeadingSession() {
             board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
             cursor = { x: 4, y: 4, color: 1 };
             actionBarFocus = false;
             actionBarIdx = 1;
-            showChalkGuide = (selectedStudioTemplate >= 0);
+            showChalkGuide = (selectedTipiTemplate >= 0);
             beadingFadeAlpha = 1.0;
             gameState = 'BEADING';
         }
@@ -1411,7 +1592,7 @@
             } else if (gameState === 'TIPI_SIT_CUTSCENE') {
                 cutsceneElapsedMs += dtMs;
                 if (cutsceneElapsedMs >= 2700) {
-                    startStudioSession();
+                    startBeadingSession();
                 }
             } else if (gameState === 'BEADING' && beadingFadeAlpha > 0) {
                 beadingFadeAlpha = Math.max(0, beadingFadeAlpha - dtMs / 450);
@@ -1422,14 +1603,11 @@
                 if (cutsceneElapsedMs < 2400) {
                     const t = stepProgress((cutsceneElapsedMs - 500) / 1800, 16);
                     tipiCamX = snap2(t * maxCam);
-                } else if (cutsceneElapsedMs < 7200) {
-                    tipiCamX = snap2(maxCam);
                 } else {
-                    const t = stepProgress((cutsceneElapsedMs - 7200) / 1800, 16);
-                    tipiCamX = snap2(maxCam * (1 - t));
+                    tipiCamX = snap2(maxCam);
                 }
 
-                if (cutsceneElapsedMs >= 9600) {
+                if (cutsceneElapsedMs >= 9100) {
                     stopChiptuneTrack();
                     tipiCamX = 0;
                     gameState = 'MODE_SELECT';
@@ -1454,7 +1632,6 @@
             }
             if (isPaused) return;
 
-            // Cutscenes are unskippable
             if (gameState === 'TIPI_INTRO_CUTSCENE' || gameState === 'TIPI_SIT_CUTSCENE' || gameState === 'TIPI_OUTRO_CUTSCENE') {
                 return;
             }
@@ -1502,15 +1679,15 @@
                 if (cmd === 'DPAD_LEFT') {
                     if (prepRow === 0) selectedHideId = (selectedHideId + HIDES.length - 1) % HIDES.length;
                     if (prepRow === 1) selectedPaletteId = (selectedPaletteId + PALETTES.length - 1) % PALETTES.length;
-                    if (prepRow === 2) selectedStudioFurId = (selectedStudioFurId + FURS.length - 1) % FURS.length;
-                    if (prepRow === 3) selectedStudioTemplate = selectedStudioTemplate <= -1 ? PATTERNS.length - 1 : selectedStudioTemplate - 1;
+                    if (prepRow === 2) selectedTipiFurId = (selectedTipiFurId + FURS.length - 1) % FURS.length;
+                    if (prepRow === 3) selectedTipiTemplate = selectedTipiTemplate <= -1 ? PATTERNS.length - 1 : selectedTipiTemplate - 1;
                     playSfx('click');
                 }
                 if (cmd === 'DPAD_RIGHT') {
                     if (prepRow === 0) selectedHideId = (selectedHideId + 1) % HIDES.length;
                     if (prepRow === 1) selectedPaletteId = (selectedPaletteId + 1) % PALETTES.length;
-                    if (prepRow === 2) selectedStudioFurId = (selectedStudioFurId + 1) % FURS.length;
-                    if (prepRow === 3) selectedStudioTemplate = selectedStudioTemplate >= PATTERNS.length - 1 ? -1 : selectedStudioTemplate + 1;
+                    if (prepRow === 2) selectedTipiFurId = (selectedTipiFurId + 1) % FURS.length;
+                    if (prepRow === 3) selectedTipiTemplate = selectedTipiTemplate >= PATTERNS.length - 1 ? -1 : selectedTipiTemplate + 1;
                     playSfx('click');
                 }
                 if (cmd === 'BUTTON_A') {
@@ -1535,7 +1712,7 @@
                         actionBarIdx = actionBarIdx === 0 ? 1 : 0;
                     } else if (cmd === 'BUTTON_A') {
                         if (actionBarIdx === 0) {
-                            if (selectedStudioTemplate >= 0) showChalkGuide = !showChalkGuide;
+                            if (selectedTipiTemplate >= 0) showChalkGuide = !showChalkGuide;
                             else board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
                         } else {
                             startTipiOutroCutscene();
@@ -1559,7 +1736,7 @@
                         cursor.x = Math.max(minC, Math.min(maxC, cursor.x));
                     } else {
                         actionBarFocus = true;
-                        actionBarIdx = 1; // Highlight [STITCH]
+                        actionBarIdx = 1;
                     }
                 } else if (cmd === 'DPAD_LEFT') {
                     const { minC } = getRowColBounds(cursor.y);
@@ -1684,8 +1861,6 @@
         function drawFluffyFurTrim(x, y, width, height, furObj, bushy = false) {
             ctx.save();
             if (bushy) {
-                // Chunky, warm, bushy pixel fur puffs (less fine detail, plush moccasin feel)
-                // 1. Deep under-fur shadow silhouette
                 ctx.fillStyle = furObj.dark;
                 for (let fx = x - 6; fx <= x + width - 2; fx += 8) {
                     const seed = Math.abs(Math.sin(fx * 12.9898) * 43758.5453) % 1;
@@ -1694,7 +1869,6 @@
                     ctx.fillRect(fx, y - topJut, 10, height + topJut + botJut);
                 }
 
-                // 2. Main chunky bushy mid-tone fur puffs
                 ctx.fillStyle = furObj.base;
                 for (let fx = x - 4; fx <= x + width - 4; fx += 9) {
                     const seed = Math.abs(Math.sin(fx * 78.233) * 19341.23) % 1;
@@ -1704,7 +1878,6 @@
                     ctx.fillRect(fx - 2, ty + 3, 14, Math.max(4, th - 6));
                 }
 
-                // 3. Soft warm bushy highlight clusters
                 ctx.fillStyle = furObj.hi;
                 for (let fx = x - 2; fx <= x + width - 6; fx += 10) {
                     const seed = Math.abs(Math.sin(fx * 41.123) * 9182.77) % 1;
@@ -1716,7 +1889,6 @@
                 return;
             }
 
-            // Compact fuzzy trim for menu swatch & Lane's Post mini moccasin
             ctx.fillStyle = furObj.dark;
             for (let fx = x - 3; fx <= x + width + 3; fx += 4) {
                 const seed = Math.abs(Math.sin(fx * 12.9898) * 43758.5453) % 1;
@@ -1850,14 +2022,12 @@
 
             ctx.save();
 
-            // 1. Grounded drop shadow
             ctx.save();
             ctx.translate(5, 8);
             traceFlippedDomePath(ctx, cx, outerRX, outerTopY - 18, outerDomeCenterY, outerRY, 6);
             ctx.fillStyle = 'rgba(0, 0, 0, 0.58)'; ctx.fill();
             ctx.restore();
 
-            // 2. Outer puckered lower-hide toe wrap
             traceFlippedDomePath(ctx, cx, outerRX, outerTopY, outerDomeCenterY, outerRY, 6);
             ctx.save();
             ctx.clip();
@@ -1882,7 +2052,6 @@
             traceFlippedDomePath(ctx, cx, outerRX, outerTopY, outerDomeCenterY, outerRY, 6);
             ctx.strokeStyle = '#1c0c04'; ctx.lineWidth = 2.5; ctx.stroke();
 
-            // 3. Central Moccasin Vamp (Squared top, rounded toe dome at bottom)
             traceFlippedDomePath(ctx, cx, vampRX + 3, vampTopY - 2, vampDomeCenterY, vampRY + 3, 3);
             ctx.fillStyle = '#211005'; ctx.fill();
 
@@ -1900,20 +2069,16 @@
             traceFlippedDomePath(ctx, cx, vampRX, vampTopY, vampDomeCenterY, vampRY, 3);
             ctx.strokeStyle = '#261206'; ctx.lineWidth = 2; ctx.stroke();
 
-            // 4. Thick hand-stitched sinew around flipped vamp
             drawThickSinewSeamFlipped(cx, vampRX - 1, vampTopY, vampDomeCenterY, vampRY - 1, hideObj.sinew);
 
-            // 5. Turned-down ankle cuff + Warm Bushy Fur at the TOP (ends just before Row 0 of beads)
             const cuffH = 26;
             const cuffTopY = vampTopY - cuffH - 2;
             const cuffW = outerRX * 2 - 2, cuffX = cx - cuffW / 2;
             ctx.fillStyle = hideObj.cuffMain; ctx.fillRect(cuffX, cuffTopY, cuffW, cuffH);
             ctx.strokeStyle = '#1c0c04'; ctx.lineWidth = 2; ctx.strokeRect(cuffX, cuffTopY + 2, cuffW, cuffH - 2);
 
-            // Warm bushy fur covering the cuff and draping gently right up to the top seam above Row 0
             drawFluffyFurTrim(cuffX, cuffTopY - 2, cuffW, 24, furObj || FURS[0], true);
 
-            // 6. Playable 9x9 cells
             for (let r = 0; r < ROWS; r++) {
                 for (let c = 0; c < COLS; c++) {
                     if (!isPlayableCell(r, c)) continue;
@@ -1960,7 +2125,7 @@
             const y = VIEW_H - HUD_BOT_H;
             ctx.fillStyle = '#180c06'; ctx.fillRect(0, y, VIEW_W, HUD_BOT_H);
             ctx.fillStyle = '#8c5c2b'; ctx.fillRect(0, y, VIEW_W, 2);
-            drawPixelText(text, VIEW_W / 2, y + 17, '#d9c29c', 'bold 12px Courier New', 'center');
+            if (text) drawPixelText(text, VIEW_W / 2, y + 17, '#d9c29c', 'bold 12px Courier New', 'center');
         }
 
         function drawModalPanel(cx, cy, w, h) {
@@ -2032,16 +2197,46 @@
             drawPixelText(furObj.shortName, x + 28, y + 79, '#ffe169', 'bold 10px Courier New', 'left');
         }
 
-        function drawScene(now) {
-            const midY = Math.floor(HUD_TOP_H + (VIEW_H - HUD_TOP_H - HUD_BOT_H) / 2);
+        // Square SNES Pixel Iris-Out with Dithered Pixel Edge
+        function drawPixelSquareIrisOut(cx, cy, progress) {
+            if (progress >= 0.96) {
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+                return;
+            }
 
-            // 1. TITLE SCREEN — NATURAL ASSINIBOINE RIVER BEND
+            const maxHalf = Math.max(VIEW_W, VIEW_H) * 0.72;
+            const half = snap2(Math.max(0, maxHalf * (1 - progress)));
+            const left = snap2(cx - half);
+            const right = snap2(cx + half);
+            const top = snap2(cy - half);
+            const bot = snap2(cy + half);
+
+            ctx.fillStyle = '#000000';
+            if (top > 0) ctx.fillRect(0, 0, VIEW_W, top);
+            if (bot < VIEW_H) ctx.fillRect(0, bot, VIEW_W, VIEW_H - bot);
+            if (left > 0) ctx.fillRect(0, Math.max(0, top), left, Math.max(0, bot - top));
+            if (right < VIEW_W) ctx.fillRect(right, Math.max(0, top), VIEW_W - right, Math.max(0, bot - top));
+
+            const ditherW = 12;
+            if (half > 4) {
+                drawDitherBand(ctx, left, top, right - left, Math.min(ditherW, half), '#000000', 1);
+                drawDitherBand(ctx, left, Math.max(top, bot - ditherW), right - left, Math.min(ditherW, half), '#000000', 1);
+                drawDitherBand(ctx, left, top, Math.min(ditherW, half), bot - top, '#000000', 1);
+                drawDitherBand(ctx, Math.max(left, right - ditherW), top, Math.min(ditherW, half), bot - top, '#000000', 1);
+            }
+        }
+
+        function drawScene(now) {
+            const midY = Math.floor((VIEW_H - HUD_BOT_H) / 2);
+
+            // 1. TITLE SCREEN — LANE'S POST ALONG THE ASSINIBOINE + OUR TIPI UP THE BANKING
             if (gameState === 'MODE_SELECT') {
                 ctx.drawImage(titleBgCanvas, 0, 0);
-                drawAnimatedAssiniboineBendEffects(now);
+                drawAnimatedTitleEffects(now);
 
-                drawPixelText("li rassad di fleur", VIEW_W / 2, 56, '#fff2cc', 'bold 26px Courier New');
-                drawPixelText("ASSINIBOINE RIVER • ST. FRANCOIS XAVIER", VIEW_W / 2, 80, '#f7e0b5', 'bold 11px Courier New');
+                // Clean title card (no location subtext)
+                drawPixelText("li rassad di fleur", VIEW_W / 2, 62, '#fff2cc', 'bold 26px Courier New');
 
                 const boxW = Math.min(168, Math.floor((VIEW_W - 44) / 2));
                 const boxH = 74, gap = 14, totalW = boxW * 2 + gap;
@@ -2050,7 +2245,7 @@
 
                 [
                     { title: "LANE'S POST", sub: "HBC CLERK RUSH", idx: 0 },
-                    { title: "TIPI STUDIO", sub: "FREEFORM BEADWORK", idx: 1 }
+                    { title: "THE TIPI",    sub: "FREEFORM BEADWORK", idx: 1 }
                 ].forEach((ch, i) => {
                     const bx = leftX + i * (boxW + gap);
                     const sel = (menuSelection === ch.idx);
@@ -2060,7 +2255,7 @@
                     drawPixelText(ch.sub, bx + boxW / 2, boxY + 54, sel ? '#f6e7c8' : '#8c7a66', 'bold 10px Courier New');
                 });
 
-                drawBottomHudBar("D-PAD: SELECT  |  A: ENTER");
+                drawBottomHudBar(null);
                 drawPauseOverlay();
                 return;
             }
@@ -2076,10 +2271,9 @@
 
                 const livesLeft = Math.max(0, MAX_STRIKES - orderStrikes);
                 drawPixelText(`LIVES: ${'♥'.repeat(livesLeft)}${'·'.repeat(orderStrikes)}`, VIEW_W - 12, 26, livesLeft <= 1 ? '#ff5252' : '#ff6b6b', 'bold 14px Courier New', 'right');
-                drawPixelText(
-                    orderCombo > 1 ? `LANE'S POST • STREAK x${orderCombo}!` : "LANE'S POST • MATCH HIDE + HANK + FUR",
-                    VIEW_W / 2, 52, orderCombo > 1 ? '#7bed9f' : '#d9c29c', 'bold 11px Courier New', 'center'
-                );
+                if (orderCombo > 1) {
+                    drawPixelText(`STREAK x${orderCombo}!`, VIEW_W / 2, 52, '#7bed9f', 'bold 11px Courier New', 'center');
+                }
 
                 const cardW = Math.min(122, Math.floor((VIEW_W - 28) / 3)), cardH = 90, gap = 8;
                 const totalRowW = activeOrders.length * cardW + Math.max(0, activeOrders.length - 1) * gap;
@@ -2113,24 +2307,21 @@
                 });
 
                 if (feedbackTimerMs > 0) drawPixelText(feedbackMsg, VIEW_W / 2, panelCY + panelH / 2 + 22, feedbackColor, 'bold 14px Courier New');
-                else drawPixelText("PRESS 'A' TO SERVE CUSTOMER", VIEW_W / 2, panelCY + panelH / 2 + 22, '#ffe169', 'bold 12px Courier New');
 
-                drawBottomHudBar("D-PAD: PICK 4-4-4  |  A: SERVE  |  B: NEXT");
+                drawBottomHudBar(null);
 
                 if (gameState === 'ORDER_GAMEOVER') {
-                    drawModalPanel(VIEW_W / 2, midY, Math.min(310, VIEW_W - 28), 210);
-                    drawPixelText("POST CLOSED!", VIEW_W / 2, midY - 62, '#ffe169', 'bold 22px Courier New');
-                    drawPixelText(`FINAL SCORE: ${orderScore}`, VIEW_W / 2, midY - 18, '#F2EFE9', 'bold 17px Courier New');
-                    drawPixelText(`ORDERS SERVED: ${orderServedCount}`, VIEW_W / 2, midY + 12, '#7BAFD4', 'bold 15px Courier New');
-                    drawPixelText("PRESS 'A' TO PLAY AGAIN", VIEW_W / 2, midY + 56, '#7bed9f', 'bold 14px Courier New');
-                    drawPixelText("PRESS 'B' FOR MAIN MENU", VIEW_W / 2, midY + 82, '#a3907a', 'bold 12px Courier New');
+                    drawModalPanel(VIEW_W / 2, midY, Math.min(310, VIEW_W - 28), 166);
+                    drawPixelText("POST CLOSED!", VIEW_W / 2, midY - 40, '#ffe169', 'bold 22px Courier New');
+                    drawPixelText(`FINAL SCORE: ${orderScore}`, VIEW_W / 2, midY + 6, '#F2EFE9', 'bold 17px Courier New');
+                    drawPixelText(`ORDERS SERVED: ${orderServedCount}`, VIEW_W / 2, midY + 38, '#7BAFD4', 'bold 15px Courier New');
                 }
 
                 drawPauseOverlay();
                 return;
             }
 
-            // 3. ZOOMED-IN PANNABLE CONICAL TIPI STUDIO SCENES
+            // 3. ZOOMED-IN PANNABLE CONICAL TIPI SCENES (NO TOP HUD BAR, NO LEVEL TITLES, NO CONTROL HINTS)
             ctx.save();
             ctx.translate(-Math.floor(tipiCamX), 0);
             ctx.drawImage(tipiBgCanvas, 0, 0);
@@ -2138,9 +2329,9 @@
 
             const chosenHide = HIDES[selectedHideId];
             const chosenPal = PALETTES[selectedPaletteId];
-            const chosenFur = FURS[selectedStudioFurId];
+            const chosenFur = FURS[selectedTipiFurId];
 
-            // 3A. TIPI INTRO CUTSCENE (UNSKIPPABLE)
+            // 3A. TIPI INTRO CUTSCENE
             if (gameState === 'TIPI_INTRO_CUTSCENE') {
                 const doorEntryX = tipiLayout.doorX + tipiLayout.doorW * 0.50;
                 const doorEntryY = tipiLayout.doorY + tipiLayout.doorH + 2;
@@ -2161,25 +2352,18 @@
                 drawCentralEmberHearth(now);
                 ctx.restore();
 
-                drawTopHudBar();
-                drawPixelText("TIPI BEAD STUDIO", VIEW_W / 2, 28, '#ffe49e', 'bold 18px Courier New');
-                drawPixelText("GATHERING HIDES & BEADS...", VIEW_W / 2, 52, '#d9c29c', 'bold 12px Courier New');
-                drawBottomHudBar("ASSINIBOINE RIVER TIPI");
+                drawBottomHudBar(null);
                 drawPauseOverlay();
                 return;
             }
 
-            // 3B. STASH-CRAFT SETUP SCREEN (MOTIF NAME ONLY — NO NATION LABELS)
+            // 3B. STASH-CRAFT SETUP SCREEN
             if (gameState === 'PREP_SELECT') {
                 drawMotherSprite(tipiLayout.stashX - 18, tipiLayout.stashY + 14, 'kneel', now);
                 drawCentralEmberHearth(now);
                 ctx.restore();
 
-                drawTopHudBar();
-                drawPixelText("STASH-CRAFT SUPPLIES", VIEW_W / 2, 28, '#ffe49e', 'bold 17px Courier New');
-                drawPixelText("HIDE • BEAD HANK • FUR • TEMPLATE", VIEW_W / 2, 52, '#d9c29c', 'bold 11px Courier New');
-
-                const boxW = Math.min(344, VIEW_W - 22), boxH = 372;
+                const boxW = Math.min(344, VIEW_W - 22), boxH = 352;
                 drawModalPanel(VIEW_W / 2, midY, boxW, boxH);
 
                 const topY = Math.floor(midY - boxH / 2);
@@ -2194,20 +2378,19 @@
                 drawPixelText(`< ${chosenFur.name} >`, VIEW_W / 2, topY + 124, prepRow === 2 ? '#ffe169' : '#c7b8a1', 'bold 15px Courier New');
                 drawFluffyFurTrim(VIEW_W / 2 - 28, topY + 131, 56, 8, chosenFur, false);
 
-                const selPat = selectedStudioTemplate >= 0 ? PATTERNS[selectedStudioTemplate] : null;
+                const selPat = selectedTipiTemplate >= 0 ? PATTERNS[selectedTipiTemplate] : null;
                 const tplLabel = selPat ? selPat.name : 'Blank';
                 drawPixelText(`< ${tplLabel} >`, VIEW_W / 2, topY + 170, prepRow === 3 ? '#ffe169' : '#c7b8a1', 'bold 15px Courier New');
                 drawGriddedPatternPreview(VIEW_W / 2, topY + 226, 9, selPat, chosenPal, chosenHide);
 
-                drawPixelText(prepRow === 4 ? "> SIT BY THE EMBERS <" : "  SIT BY THE EMBERS  ", VIEW_W / 2, topY + 314, prepRow === 4 ? '#7bed9f' : '#8c7a66', 'bold 16px Courier New');
-                drawPixelText("LEFT/RIGHT: CHANGE  |  A: NEXT", VIEW_W / 2, topY + 344, '#a3907a', 'bold 10px Courier New');
+                drawPixelText(prepRow === 4 ? "> SIT BY THE EMBERS <" : "  SIT BY THE EMBERS  ", VIEW_W / 2, topY + 318, prepRow === 4 ? '#7bed9f' : '#8c7a66', 'bold 16px Courier New');
 
-                drawBottomHudBar("D-PAD: PICK OPTIONS  |  A: GO");
+                drawBottomHudBar(null);
                 drawPauseOverlay();
                 return;
             }
 
-            // 3C. TIPI SIT CUTSCENE (UNSKIPPABLE)
+            // 3C. TIPI SIT CUTSCENE
             if (gameState === 'TIPI_SIT_CUTSCENE') {
                 const startX = tipiLayout.stashX - 18, startY = tipiLayout.stashY + 14;
                 const sitX = tipiLayout.robeSitX, sitY = tipiLayout.robeSitY + 8;
@@ -2224,24 +2407,19 @@
 
                 if (cutsceneElapsedMs > 2150) {
                     const fade = stepProgress((cutsceneElapsedMs - 2150) / 550, 6);
-                    ctx.fillStyle = `rgba(18, 9, 5, ${fade})`;
-                    ctx.fillRect(0, HUD_TOP_H, VIEW_W, VIEW_H - HUD_TOP_H - HUD_BOT_H);
+                    ctx.fillStyle = `rgba(0, 0, 0, ${fade})`;
+                    ctx.fillRect(0, 0, VIEW_W, VIEW_H - HUD_BOT_H);
                 }
 
-                drawTopHudBar();
-                drawPixelText("BY THE GLOWING EMBERS", VIEW_W / 2, 28, '#ffe49e', 'bold 17px Courier New');
-                drawPixelText("SETTLING IN TO BEAD...", VIEW_W / 2, 52, '#d9c29c', 'bold 12px Courier New');
-                drawBottomHudBar("ASSINIBOINE RIVER TIPI");
+                drawBottomHudBar(null);
                 drawPauseOverlay();
                 return;
             }
 
-            // 3D. POST-GAME OUTRO CUTSCENE (UNSKIPPABLE)
+            // 3D. POST-GAME OUTRO CUTSCENE
             if (gameState === 'TIPI_OUTRO_CUTSCENE') {
                 const sitX = tipiLayout.robeSitX, sitY = tipiLayout.robeSitY + 8;
                 const husX = tipiLayout.husbandX, husY = tipiLayout.husbandY + 8;
-                const doorExitX = tipiLayout.doorX + tipiLayout.doorW * 0.50;
-                const doorExitY = tipiLayout.doorY + tipiLayout.doorH + 2;
 
                 drawCentralEmberHearth(now);
 
@@ -2259,59 +2437,33 @@
                     const jigPhase = (cutsceneElapsedMs - 4300) / 900;
                     drawMotherSprite(husX - 36, husY, 'walk', 0);
                     drawHusbandSprite(husX, husY, 'jig', now, true, chosenHide, chosenPal, chosenFur, jigPhase);
-                } else if (cutsceneElapsedMs < 7200) {
-                    drawMotherSprite(husX - 32, husY, 'walk', 0);
-                    drawHusbandSprite(husX - 10, husY, 'kiss', now, true, chosenHide, chosenPal, chosenFur);
                 } else {
-                    drawMotherSprite(husX - 32, husY, 'walk', 0);
-                    const t = stepProgress((cutsceneElapsedMs - 7200) / 2100, 18);
-                    const hx = (husX - 10) + (doorExitX - (husX - 10)) * t;
-                    const hy = husY + (doorExitY - husY) * t;
-                    const hPose = t > 0.78 ? 'duck_left' : 'walk_left';
-                    if (t < 0.96) {
-                        drawHusbandSprite(hx, hy, hPose, now, true, chosenHide, chosenPal, chosenFur);
-                    }
+                    drawMotherSprite(husX - 32, husY, 'blush', now);
+                    drawHusbandSprite(husX - 10, husY, 'kiss', now, true, chosenHide, chosenPal, chosenFur);
                 }
 
                 ctx.restore();
 
-                if (cutsceneElapsedMs > 8400) {
-                    const fade = stepProgress((cutsceneElapsedMs - 8400) / 1100, 8);
-                    ctx.fillStyle = `rgba(0, 0, 0, ${fade})`;
-                    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+                drawBottomHudBar(null);
+
+                if (cutsceneElapsedMs > 6800) {
+                    const irisP = stepProgress((cutsceneElapsedMs - 6800) / 2000, 16);
+                    const irisScreenX = (husX - 24) - Math.floor(tipiCamX);
+                    const irisScreenY = husY - 46;
+                    drawPixelSquareIrisOut(irisScreenX, irisScreenY, irisP);
                 }
 
-                drawTopHudBar();
-                const caption = cutsceneElapsedMs < 2400 ? "FINISHING THE MOCCASINS..."
-                    : cutsceneElapsedMs < 4300 ? "A FRESH PAIR FOR THE TRAIL..."
-                    : cutsceneElapsedMs < 6100 ? "1 - 2 - 3 - KICK!"
-                    : cutsceneElapsedMs < 7200 ? "MERCI, MA CHERE!"
-                    : "OFF DOWN THE ASSINIBOINE...";
-                drawPixelText(caption, VIEW_W / 2, 38, '#ffe49e', 'bold 16px Courier New');
-                drawBottomHudBar("ASSINIBOINE RIVER TIPI");
                 drawPauseOverlay();
                 return;
             }
 
-            // 4. TIPI STUDIO BEADING WORKBENCH (FLIPPED VAMP + BUSHY FUR + GUIDE/STITCH ONLY)
+            // 4. FREEFORM BEADING WORKBENCH
             if (gameState === 'BEADING') {
                 drawCentralEmberHearth(now);
                 ctx.restore();
 
                 const m = getGridMetrics();
-                const guideGrid = (showChalkGuide && selectedStudioTemplate >= 0) ? PATTERNS[selectedStudioTemplate].grid : null;
-
-                drawTopHudBar();
-                const stTitle = selectedStudioTemplate >= 0 ? `TIPI: ${PATTERNS[selectedStudioTemplate].shortName}` : 'TIPI STUDIO';
-                drawPixelText(stTitle, 12, 26, '#ffe49e', 'bold 15px Courier New', 'left');
-
-                if (cursor.color === 0) {
-                    drawPixelText("BRUSH: ERASER", VIEW_W - 12, 26, '#ff6b6b', 'bold 14px Courier New', 'right');
-                } else {
-                    const bSt = chosenPal.beads[cursor.color];
-                    drawPixelText(`#${cursor.color} ${bSt.name}`, VIEW_W / 2, 52, bSt.hi, 'bold 13px Courier New', 'center');
-                    drawFlatBeadAt(VIEW_W - 22, 22, 9, bSt);
-                }
+                const guideGrid = (showChalkGuide && selectedTipiTemplate >= 0) ? PATTERNS[selectedTipiTemplate].grid : null;
 
                 const { moccBottomY } = drawMoccasin(m, chosenHide, guideGrid, chosenPal, chosenFur);
 
@@ -2334,9 +2486,8 @@
                 }
                 ctx.restore();
 
-                // Clean 2-Option Action Bar: [GUIDE: ON/OFF] (or [CLEAR]) and [STITCH]
                 const barY = Math.min(VIEW_H - HUD_BOT_H - 12, moccBottomY + 14);
-                const leftLabel = selectedStudioTemplate >= 0 ? (showChalkGuide ? 'Guide: ON' : 'Guide: OFF') : 'Clear';
+                const leftLabel = selectedTipiTemplate >= 0 ? (showChalkGuide ? 'Guide: ON' : 'Guide: OFF') : 'Clear';
                 const rightLabel = 'Stitch';
 
                 drawPixelText(
@@ -2352,11 +2503,20 @@
                     'bold 13px Courier New'
                 );
 
-                drawBottomHudBar("A: PLACE  |  B: BEAD COLOR  |  DOWN: STITCH");
+                // Bottom bar shows only the active bead swatch & name (no control hints)
+                drawBottomHudBar(null);
+                const botY = VIEW_H - HUD_BOT_H;
+                if (cursor.color === 0) {
+                    drawPixelText("ERASER", VIEW_W / 2, botY + 17, '#ff6b6b', 'bold 12px Courier New');
+                } else {
+                    const bSt = chosenPal.beads[cursor.color];
+                    drawFlatBeadAt(VIEW_W / 2 - 96, botY + 13, 6.5, bSt);
+                    drawPixelText(bSt.name, VIEW_W / 2 + 8, botY + 17, bSt.hi, 'bold 12px Courier New');
+                }
 
                 if (beadingFadeAlpha > 0) {
-                    ctx.fillStyle = `rgba(18, 9, 5, ${beadingFadeAlpha})`;
-                    ctx.fillRect(0, HUD_TOP_H, VIEW_W, VIEW_H - HUD_TOP_H - HUD_BOT_H);
+                    ctx.fillStyle = `rgba(0, 0, 0, ${beadingFadeAlpha})`;
+                    ctx.fillRect(0, 0, VIEW_W, VIEW_H - HUD_BOT_H);
                 }
             }
 
