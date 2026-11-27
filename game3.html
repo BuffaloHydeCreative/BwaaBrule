@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>li rassad di fleur - Moose Hide Cabin Edition</title>
+    <title>li rassad di fleur - Assiniboine Bend & Tipi Studio</title>
     <style>
         html, body, #game-container {
             width: 100vw;
@@ -11,7 +11,7 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background-color: #120a07;
+            background-color: #120905;
             color: #f6e7c8;
             font-family: 'Courier New', Courier, monospace;
             touch-action: none;
@@ -23,7 +23,7 @@
             display: block;
             width: 100vw;
             height: 100vh;
-            background-color: #120a07;
+            background-color: #120905;
             image-rendering: pixelated;
             image-rendering: crisp-edges;
         }
@@ -39,131 +39,409 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        // Offscreen static cabin backdrop buffer for smooth 60fps SNES detail
-        const bgCanvas = document.createElement('canvas');
-        const bgCtx = bgCanvas.getContext('2d');
+        // Offscreen static backdrop buffers (Title River Bend, Wide Pannable Tipi, Lane's Post)
+        const titleBgCanvas = document.createElement('canvas');
+        const titleBgCtx = titleBgCanvas.getContext('2d');
+        const tipiBgCanvas = document.createElement('canvas');
+        const tipiBgCtx = tipiBgCanvas.getContext('2d');
+        const postBgCanvas = document.createElement('canvas');
+        const postBgCtx = postBgCanvas.getContext('2d');
 
         // Dynamic Viewport & Layout Constants
         let VIEW_W = 400;
         let VIEW_H = 533;
+        let TIPI_WORLD_W = 600;
         const HUD_TOP_H = 64;
         const HUD_BOT_H = 26;
 
-        const COLS = 10;
-        const PUZZLE_ROWS = 10;
-        const STUDIO_ROWS = 11;
+        // Odd-numbered 9x9 Grid for Freeform Studio
+        const COLS = 9;
+        const ROWS = 9;
 
-        // Cached scenic anchor coordinates (updated on resize)
-        let cabinLayout = {
-            winX: 16, winY: 96, winW: 88, winH: 108,
-            stoveX: 296, stoveY: 310, stoveW: 76, stoveH: 96,
-            floorY: 420
+        // Cached scenic anchor coordinates (in world space for Tipi)
+        let tipiLayout = {
+            doorX: 60, doorY: 300, doorW: 44, doorH: 56,
+            stashX: 255, stashY: 365,
+            fireX: 260, fireY: 428,
+            robeSitX: 165, robeSitY: 430,
+            husbandX: 435, husbandY: 428,
+            floorY: 390
+        };
+        let postLayout = {
+            winX: 16, winY: 104, winW: 84, winH: 96,
+            lanternX: 330, lanternY: 108,
+            counterY: 390
         };
 
-        // Twinkling winter stars (normalized within window pane)
-        const WINTER_STARS = [
-            { nx: 0.16, ny: 0.18, phase: 0.2, size: 2 },
-            { nx: 0.34, ny: 0.12, phase: 1.4, size: 1 },
-            { nx: 0.52, ny: 0.22, phase: 2.7, size: 2 },
-            { nx: 0.78, ny: 0.15, phase: 0.9, size: 1 },
-            { nx: 0.86, ny: 0.32, phase: 3.8, size: 2 },
-            { nx: 0.24, ny: 0.38, phase: 4.5, size: 1 },
-            { nx: 0.64, ny: 0.36, phase: 5.1, size: 1 },
-            { nx: 0.42, ny: 0.44, phase: 2.0, size: 1 }
-        ];
+        // Tipi Camera X offset (stepped for crisp SNES panning)
+        let tipiCamX = 0;
 
-        // Floating stove embers
-        const EMBER_SPARKS = Array.from({ length: 7 }, (_, i) => ({
-            offset: i * 0.14,
-            drift: (i % 3 - 1) * 4
+        // Frame-by-frame SNES stepping helpers
+        function snap2(v) { return Math.round(v / 2) * 2; }
+        function stepProgress(t, frames) { return Math.floor(Math.min(1, Math.max(0, t)) * frames) / frames; }
+
+        // Floating hearth embers (Tipi)
+        const EMBER_SPARKS = Array.from({ length: 14 }, (_, i) => ({
+            offset: i * 0.075,
+            drift: ((i % 7) - 3) * 4.5
         }));
 
-        // 1830-1860 Trade Bead Palette (Shaded Glass Seed Beads)
-        // 1: Cranberry Red (#8B1E24) - Cornaline d'Aleppo
-        // 2: Sky Blue (#7BAFD4) - Greasy Robin's-Egg
-        // 3: Ochre Yellow (#D99B26) - Greasy Mustard Yellow
-        // 4: Chalk White (#F2EFE9) - Warm Off-White
-        // 5: Moss Green (#3B5E3A) - Translucent Leaf Green
-        const BEAD_STYLES = [
-            null,
-            { // 1: Cornaline d'Aleppo / Cranberry Red (#8B1E24)
-                name: 'CRANBERRY RED',
-                uiColor: '#d9535c',
-                highlight: '#d9666d',
-                mid: '#8B1E24',
-                deep: '#540d11',
-                rim: '#260406',
-                coreColor: 'rgba(242, 232, 215, 0.42)', // Classic pale Cornaline inner core
-                rimGlow: 'rgba(255, 175, 115, 0.30)'
+        // Detailed pixel coal positions inside central hearth
+        const HEARTH_COALS = [
+            { dx: -16, dy: 2, s: 3, ph: 0.2 }, { dx: -11, dy: -2, s: 4, ph: 1.5 },
+            { dx: -6,  dy: 3, s: 4, ph: 2.8 }, { dx: -2,  dy: -3, s: 3, ph: 0.9 },
+            { dx: 3,   dy: 2, s: 4, ph: 3.6 }, { dx: 8,   dy: -2, s: 4, ph: 4.9 },
+            { dx: 14,  dy: 1, s: 3, ph: 2.1 }, { dx: -13, dy: 5,  s: 3, ph: 5.2 },
+            { dx: 0,   dy: 5, s: 4, ph: 1.1 }, { dx: 10,  dy: 4,  s: 3, ph: 3.3 },
+            { dx: -4,  dy: 0, s: 5, ph: 0.5 }, { dx: 5,   dy: 0,  s: 4, ph: 4.1 }
+        ];
+
+        // ==========================================
+        // 1. FOUR HIDES / CLOTHS (BASE VAMP CANVAS)
+        // ==========================================
+        const HIDES = [
+            {
+                id: 0, name: 'Deer / Buckskin', shortName: 'BUCKSKIN',
+                light: '#d9a96a', mid: '#c69253', dark: '#9c6c36', edge: '#6b451d',
+                outerLight: '#b37f42', outerMid: '#91622d', outerDark: '#593916',
+                sinew: '#f7ecd6', guideDot: 'rgba(66, 36, 10, 0.45)',
+                cuffMain: '#7d1c22', cuffTrim: '#D99B26'
             },
-            { // 2: Greasy Robin's-Egg / Sky Blue (#7BAFD4)
-                name: 'SKY BLUE',
-                uiColor: '#7BAFD4',
-                highlight: '#c8e3f5',
-                mid: '#7BAFD4',
-                deep: '#44769c',
-                rim: '#1f3d57',
-                coreColor: 'rgba(18, 36, 52, 0.34)',
-                rimGlow: 'rgba(255, 215, 165, 0.24)'
+            {
+                id: 1, name: 'Smoked Moose', shortName: 'MOOSE',
+                light: '#7d4a25', mid: '#6B3E1D', dark: '#542f14', edge: '#381e0b',
+                outerLight: '#5e3518', outerMid: '#4b2911', outerDark: '#2b1507',
+                sinew: '#efe0be', guideDot: 'rgba(28, 12, 4, 0.50)',
+                cuffMain: '#5c1419', cuffTrim: '#7BAFD4'
             },
-            { // 3: Greasy Ochre / Mustard Yellow (#D99B26)
-                name: 'OCHRE YELLOW',
-                uiColor: '#D99B26',
-                highlight: '#fae09e',
-                mid: '#D99B26',
-                deep: '#8f5e0c',
-                rim: '#422903',
-                coreColor: 'rgba(54, 30, 4, 0.36)',
-                rimGlow: 'rgba(255, 230, 150, 0.32)'
+            {
+                id: 2, name: 'Wool Stroud', shortName: 'STROUD',
+                light: '#2e2c36', mid: '#1c1b22', dark: '#121117', edge: '#08070a',
+                outerLight: '#26242d', outerMid: '#18171d', outerDark: '#0a090d',
+                sinew: '#e8e2d5', guideDot: 'rgba(220, 210, 195, 0.25)',
+                cuffMain: '#8B1E24', cuffTrim: '#F2EFE9'
             },
-            { // 4: Chalk White (#F2EFE9)
-                name: 'CHALK WHITE',
-                uiColor: '#F2EFE9',
-                highlight: '#ffffff',
-                mid: '#F2EFE9',
-                deep: '#bab2a4',
-                rim: '#595247',
-                coreColor: 'rgba(64, 56, 46, 0.34)',
-                rimGlow: 'rgba(255, 220, 175, 0.28)'
-            },
-            { // 5: Translucent Leaf / Moss Green (#3B5E3A)
-                name: 'MOSS GREEN',
-                uiColor: '#6fa16d',
-                highlight: '#8ab888',
-                mid: '#3B5E3A',
-                deep: '#20381f',
-                rim: '#0d1a0d',
-                coreColor: 'rgba(155, 204, 145, 0.26)', // Subtle translucent glass depth
-                rimGlow: 'rgba(255, 200, 130, 0.24)'
+            {
+                id: 3, name: 'Unsmoked Hide', shortName: 'UNSMOKED',
+                light: '#f2e8d5', mid: '#e3d4b7', dark: '#c7b38f', edge: '#8f7b58',
+                outerLight: '#d6c4a3', outerMid: '#bfa984', outerDark: '#826e4e',
+                sinew: '#fffaf0', guideDot: 'rgba(92, 72, 46, 0.42)',
+                cuffMain: '#2c5475', cuffTrim: '#D99B26'
             }
         ];
 
-        // Master State Machine
-        let gameState = 'MODE_SELECT';
-        let currentMode = null;
-        let menuSelection = 0; // 0 = Puzzle, 1 = Studio
-        let isPaused = false;
-
-        // Puzzle Variables
-        let puzzleDifficulty = 2; // 1 = Single Bead, 2 = Double Bead
-        let puzBoard = [];
-        let score = 0;
-        let combo = 0;
-        let active = { x: 4, y: 0, c1: 1, c2: 1, dir: 0, isSingle: false };
-        let lastDropTime = 0;
-        let dropInterval = 800;
-
-        // Studio Variables
-        let studioBoard = [];
-        let cursor = { x: 4, y: 5, color: 1 };
-
-        // Button Debounce Guards (110ms)
-        let lastBtnATime = 0;
-        let lastBtnBTime = 0;
-        const BTN_DEBOUNCE_MS = 110;
+        // ==========================================
+        // 2. FOUR REGIONAL FORT BEAD PALETTES (7 ROLES EACH)
+        // ==========================================
+        const PALETTES = [
+            {
+                id: 0, name: 'Upper Fort Garry', shortName: 'UPPER FT.', pref: 'Michif',
+                beads: [
+                    null,
+                    { name: 'White-Heart Crimson', mid: '#9E1B32', hi: '#e36b7e', deep: '#630c1b', rim: '#2e040b', holeRim: '#f0e4d2' },
+                    { name: 'Dusty Rose Pink',     mid: '#D48494', hi: '#f7c8d2', deep: '#9c4e5e', rim: '#54212c', holeRim: '#f5dce1' },
+                    { name: 'Marigold / Ochre',    mid: '#E09F24', hi: '#fce097', deep: '#9e670b', rim: '#4f3003', holeRim: '#f5d284' },
+                    { name: 'Lilac / Violet',      mid: '#A386BD', hi: '#decbf0', deep: '#684c82', rim: '#322042', holeRim: '#d9c6eb' },
+                    { name: 'Sage Green',          mid: '#7A9A78', hi: '#bdd6bb', deep: '#496647', rim: '#20331f', holeRim: '#a8c7a5' },
+                    { name: 'Warm Antique Cream',  mid: '#F2E8D5', hi: '#ffffff', deep: '#bfb29b', rim: '#695f4e', holeRim: '#dcd2be' },
+                    { name: 'Deep Indigo Navy',    mid: '#1E2A4A', hi: '#5a6e9e', deep: '#10172b', rim: '#060912', holeRim: '#4a5c85' }
+                ]
+            },
+            {
+                id: 1, name: 'Lower Fort Garry', shortName: 'LOWER FT.', pref: 'Saulteaux',
+                beads: [
+                    null,
+                    { name: 'Cobalt Blue',         mid: '#1D4E9E', hi: '#6ea0eb', deep: '#0e2c61', rim: '#051430', holeRim: '#628ed1' },
+                    { name: 'Periwinkle Blue',     mid: '#7CA3D6', hi: '#c7defa', deep: '#466ca1', rim: '#1e3557', holeRim: '#a9c7ed' },
+                    { name: 'Vermilion Red',       mid: '#D93829', hi: '#ff8a7d', deep: '#8f1a0f', rim: '#420803', holeRim: '#f28c80' },
+                    { name: 'Sunlit Yellow',       mid: '#F2C938', hi: '#fff3a8', deep: '#b08b12', rim: '#574204', holeRim: '#fae389' },
+                    { name: 'Forest Green',        mid: '#2E663B', hi: '#6ca879', deep: '#163b1f', rim: '#081c0d', holeRim: '#5c9168' },
+                    { name: 'Chalk White',         mid: '#F5F3EE', hi: '#ffffff', deep: '#bdb9b0', rim: '#636059', holeRim: '#e0ddd5' },
+                    { name: 'Midnight Black',      mid: '#1C1C21', hi: '#5a5a66', deep: '#0d0d10', rim: '#030305', holeRim: '#4a4a54' }
+                ]
+            },
+            {
+                id: 2, name: 'Pembina', shortName: 'PEMBINA', pref: 'Dakota',
+                beads: [
+                    null,
+                    { name: 'Greasy Yellow',       mid: '#E6B422', hi: '#fff0a6', deep: '#a3770b', rim: '#4f3702', holeRim: '#f7db7e' },
+                    { name: 'Deep Ochre / Amber',  mid: '#B87314', hi: '#eba94d', deep: '#7a4706', rim: '#3b2002', holeRim: '#db9c44' },
+                    { name: 'Cherry Red',          mid: '#C82828', hi: '#ff7d7d', deep: '#821010', rim: '#3d0404', holeRim: '#f07878' },
+                    { name: 'Plains Turquoise',    mid: '#2BA8A0', hi: '#82ebe4', deep: '#166b65', rim: '#083633', holeRim: '#6fd4cd' },
+                    { name: 'Prairie Grass Green', mid: '#4A773C', hi: '#8ab87b', deep: '#2b4a21', rim: '#12240d', holeRim: '#76a668' },
+                    { name: 'Bone White',          mid: '#F4EFE6', hi: '#ffffff', deep: '#bfb8ab', rim: '#666055', holeRim: '#e3ddd1' },
+                    { name: 'Obsidian Black',      mid: '#1C1B1A', hi: '#595654', deep: '#0d0c0c', rim: '#030303', holeRim: '#474543' }
+                ]
+            },
+            {
+                id: 3, name: 'York Factory', shortName: 'YORK FACT.', pref: 'Cree',
+                beads: [
+                    null,
+                    { name: 'Boreal Turquoise',    mid: '#239B9B', hi: '#7be0e0', deep: '#106161', rim: '#053030', holeRim: '#66c9c9' },
+                    { name: 'Aqua Mist',           mid: '#8ED6CF', hi: '#d6faf6', deep: '#4f9992', rim: '#204f4b', holeRim: '#b5ebe5' },
+                    { name: 'Copper Orange',       mid: '#D96B27', hi: '#ffb07d', deep: '#8f3c0b', rim: '#451a03', holeRim: '#f29e68' },
+                    { name: 'Wild Rose Pink',      mid: '#DE7395', hi: '#ffbdd2', deep: '#993d5a', rim: '#4a1727', holeRim: '#f5a6bf' },
+                    { name: 'Spruce Needle Green', mid: '#25523B', hi: '#5e9679', deep: '#112e1f', rim: '#05170e', holeRim: '#4f8267' },
+                    { name: 'Pure Pearl White',    mid: '#FAFAFA', hi: '#ffffff', deep: '#c4c4c4', rim: '#6b6b6b', holeRim: '#e3e3e3' },
+                    { name: 'Jet Black',           mid: '#141417', hi: '#4d4d57', deep: '#08080a', rim: '#000000', holeRim: '#3d3d45' }
+                ]
+            }
+        ];
 
         // ==========================================
-        // VIEWPORT SCALING & 16-BIT CABIN RENDERER
+        // 3. FOUR FUR CUFF TRIMS
+        // ==========================================
+        const FURS = [
+            { id: 0, name: 'Snowshoe Hare', shortName: 'HARE',   base: '#cfc5b4', hi: '#f7f2e8', dark: '#8f8474' },
+            { id: 1, name: 'Beaver Pelt',   shortName: 'BEAVER', base: '#59331c', hi: '#8c5838', dark: '#291408' },
+            { id: 2, name: 'Red Fox',       shortName: 'FOX',    base: '#c75a24', hi: '#f5985b', dark: '#6e2808' },
+            { id: 3, name: 'Silver Mink',   shortName: 'MINK',   base: '#4e525c', hi: '#949aa8', dark: '#1f2126' }
+        ];
+
+        // ==========================================
+        // 4. TWELVE 9x9 BEAD PATTERNS (TOE AT BOTTOM / ROW 8, CUFF AT TOP / ROW 0)
+        // ==========================================
+        const ROLE_TO_HANK = [0, 1, 2, 3, 5, 6, 7];
+        function mapPatternGrid(rawGrid, keepTopToBottom = false) {
+            const ordered = keepTopToBottom ? rawGrid : rawGrid.slice().reverse();
+            return ordered.map(row => row.map(v => ROLE_TO_HANK[v] || 0));
+        }
+
+        const PATTERNS = [
+            {
+                id: 0, name: 'Rose', shortName: 'ROSE',
+                grid: mapPatternGrid([
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 1, 0, 1, 0, 0, 0],
+                    [0, 0, 1, 2, 1, 2, 1, 0, 0],
+                    [0, 1, 2, 5, 5, 5, 2, 1, 0],
+                    [0, 1, 5, 5, 6, 5, 5, 1, 0],
+                    [0, 0, 1, 6, 5, 6, 1, 0, 0],
+                    [0, 1, 5, 5, 6, 5, 5, 1, 0],
+                    [0, 1, 2, 5, 5, 5, 2, 1, 0],
+                    [0, 0, 1, 2, 1, 2, 1, 0, 0]
+                ])
+            },
+            {
+                id: 1, name: 'Fleur-de-lis', shortName: 'FLEUR-DE-LIS',
+                grid: mapPatternGrid([
+                    [0, 0, 0, 1, 1, 1, 0, 0, 0],
+                    [0, 0, 1, 0, 1, 0, 1, 0, 0],
+                    [0, 0, 0, 5, 5, 5, 0, 0, 0],
+                    [0, 1, 0, 0, 1, 0, 0, 1, 0],
+                    [1, 0, 1, 0, 1, 0, 1, 0, 1],
+                    [1, 0, 0, 1, 1, 1, 0, 0, 1],
+                    [0, 1, 0, 1, 1, 1, 0, 1, 0],
+                    [0, 0, 0, 0, 1, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 1, 0, 0, 0, 0]
+                ])
+            },
+            {
+                id: 2, name: 'Blossom', shortName: 'BLOSSOM',
+                grid: mapPatternGrid([
+                    [0, 0, 0, 0, 1, 0, 0, 0, 0],
+                    [0, 0, 0, 1, 5, 1, 0, 0, 0],
+                    [0, 0, 0, 1, 1, 1, 0, 0, 0],
+                    [0, 1, 1, 0, 5, 0, 1, 1, 0],
+                    [1, 5, 1, 5, 6, 5, 1, 5, 1],
+                    [0, 1, 1, 0, 5, 0, 1, 1, 0],
+                    [0, 0, 0, 1, 1, 1, 0, 0, 0],
+                    [0, 0, 0, 1, 5, 1, 0, 0, 0],
+                    [0, 0, 0, 0, 1, 0, 0, 0, 0]
+                ])
+            },
+            {
+                id: 3, name: 'Strawberry', shortName: 'STRAWBERRY',
+                grid: mapPatternGrid([
+                    [0, 0, 4, 0, 4, 0, 4, 0, 0],
+                    [0, 4, 4, 4, 4, 4, 4, 4, 0],
+                    [0, 0, 1, 1, 1, 1, 1, 0, 0],
+                    [0, 1, 1, 5, 1, 5, 1, 1, 0],
+                    [0, 1, 1, 1, 1, 1, 1, 1, 0],
+                    [0, 0, 1, 5, 1, 5, 1, 0, 0],
+                    [0, 0, 0, 1, 1, 1, 0, 0, 0],
+                    [0, 0, 0, 0, 1, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0]
+                ], true)
+            },
+            {
+                id: 4, name: 'Lily', shortName: 'LILY',
+                grid: mapPatternGrid([
+                    [0, 0, 0, 0, 4, 0, 0, 0, 0],
+                    [0, 4, 4, 4, 4, 4, 4, 4, 0],
+                    [4, 4, 4, 0, 4, 0, 4, 4, 4],
+                    [0, 4, 0, 0, 4, 0, 0, 4, 0],
+                    [0, 0, 0, 1, 1, 1, 0, 0, 0],
+                    [0, 0, 1, 1, 1, 1, 1, 0, 0],
+                    [0, 0, 1, 2, 2, 2, 1, 0, 0],
+                    [0, 0, 1, 2, 1, 2, 1, 0, 0],
+                    [0, 0, 1, 0, 1, 0, 1, 0, 0]
+                ])
+            },
+            {
+                id: 5, name: 'Tree', shortName: 'TREE',
+                grid: mapPatternGrid([
+                    [0, 0, 0, 0, 6, 0, 0, 0, 0],
+                    [0, 0, 0, 6, 6, 6, 0, 0, 0],
+                    [4, 4, 0, 0, 6, 0, 0, 4, 4],
+                    [0, 4, 4, 4, 4, 4, 4, 4, 0],
+                    [0, 0, 4, 4, 4, 4, 4, 0, 0],
+                    [0, 0, 0, 4, 4, 4, 0, 0, 0],
+                    [0, 0, 4, 4, 4, 4, 4, 0, 0],
+                    [0, 0, 0, 4, 4, 4, 0, 0, 0],
+                    [0, 0, 0, 0, 4, 0, 0, 0, 0]
+                ])
+            },
+            {
+                id: 6, name: 'Triangle', shortName: 'TRIANGLE',
+                grid: mapPatternGrid([
+                    [0, 0, 0, 0, 3, 0, 0, 0, 0],
+                    [0, 0, 0, 3, 5, 3, 0, 0, 0],
+                    [0, 0, 3, 0, 5, 0, 3, 0, 0],
+                    [0, 3, 0, 0, 5, 0, 0, 3, 0],
+                    [3, 3, 3, 3, 5, 3, 3, 3, 3],
+                    [0, 3, 0, 0, 5, 0, 0, 3, 0],
+                    [0, 0, 3, 0, 5, 0, 3, 0, 0],
+                    [0, 0, 0, 3, 5, 3, 0, 0, 0],
+                    [0, 0, 0, 0, 3, 0, 0, 0, 0]
+                ])
+            },
+            {
+                id: 7, name: 'Star', shortName: 'STAR',
+                grid: mapPatternGrid([
+                    [0, 0, 0, 0, 3, 0, 0, 0, 0],
+                    [0, 3, 0, 3, 5, 3, 0, 3, 0],
+                    [0, 0, 3, 3, 5, 3, 3, 0, 0],
+                    [0, 3, 3, 5, 6, 5, 3, 3, 0],
+                    [3, 5, 5, 6, 5, 6, 5, 5, 3],
+                    [0, 3, 3, 5, 6, 5, 3, 3, 0],
+                    [0, 0, 3, 3, 5, 3, 3, 0, 0],
+                    [0, 3, 0, 3, 5, 3, 0, 3, 0],
+                    [0, 0, 0, 0, 3, 0, 0, 0, 0]
+                ])
+            },
+            {
+                id: 8, name: 'Thunderbird', shortName: 'THUNDERBIRD',
+                grid: mapPatternGrid([
+                    [0, 0, 3, 0, 3, 0, 3, 0, 0],
+                    [0, 0, 0, 3, 3, 3, 0, 0, 0],
+                    [0, 0, 0, 0, 3, 0, 0, 0, 0],
+                    [3, 0, 3, 0, 3, 0, 3, 0, 3],
+                    [3, 0, 3, 0, 5, 0, 3, 0, 3],
+                    [3, 3, 3, 3, 3, 3, 3, 3, 3],
+                    [0, 0, 0, 0, 3, 0, 0, 0, 0],
+                    [0, 0, 0, 3, 5, 3, 3, 0, 0],
+                    [0, 0, 0, 3, 0, 0, 0, 0, 0]
+                ])
+            },
+            {
+                id: 9, name: 'Berries', shortName: 'BERRIES',
+                grid: mapPatternGrid([
+                    [0, 0, 0, 0, 1, 0, 0, 0, 0],
+                    [0, 0, 0, 1, 1, 1, 0, 0, 0],
+                    [0, 0, 4, 0, 5, 0, 4, 0, 0],
+                    [0, 1, 1, 5, 5, 5, 1, 1, 0],
+                    [1, 1, 1, 1, 0, 1, 1, 1, 1],
+                    [0, 1, 1, 0, 5, 0, 1, 1, 0],
+                    [0, 0, 4, 5, 5, 5, 4, 0, 0],
+                    [0, 0, 0, 1, 1, 1, 0, 0, 0],
+                    [0, 0, 0, 0, 1, 0, 0, 0, 0]
+                ])
+            },
+            {
+                id: 10, name: 'Northstar', shortName: 'NORTHSTAR',
+                grid: mapPatternGrid([
+                    [0, 0, 0, 0, 5, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 5, 0, 0, 0, 0],
+                    [0, 0, 0, 3, 5, 3, 0, 0, 0],
+                    [0, 0, 3, 5, 5, 5, 3, 0, 0],
+                    [5, 5, 5, 5, 5, 5, 5, 5, 5],
+                    [0, 0, 3, 5, 5, 5, 3, 0, 0],
+                    [0, 0, 0, 3, 5, 3, 0, 0, 0],
+                    [0, 0, 0, 0, 5, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 5, 0, 0, 0, 0]
+                ])
+            },
+            {
+                id: 11, name: 'Chevron', shortName: 'CHEVRON',
+                grid: mapPatternGrid([
+                    [0, 0, 5, 0, 0, 0, 5, 0, 0],
+                    [0, 0, 5, 0, 5, 0, 5, 0, 0],
+                    [0, 0, 0, 5, 3, 5, 0, 0, 0],
+                    [0, 0, 5, 3, 6, 3, 5, 0, 0],
+                    [0, 5, 3, 6, 0, 6, 3, 5, 0],
+                    [5, 3, 6, 0, 0, 0, 6, 3, 5],
+                    [0, 6, 0, 0, 0, 0, 0, 6, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0]
+                ])
+            }
+        ];
+
+        const POST_VISITORS = [
+            'Baptiste', 'Marie', 'Angelique', 'Gabriel', 'Josette', 'Pierre', 'Marguerite', 'Louis'
+        ];
+
+        // ==========================================
+        // MASTER STATE MACHINE
+        // ==========================================
+        let gameState = 'MODE_SELECT';
+        let menuSelection = 0; // 0 = Lane's Post, 1 = Tipi Studio
+        let isPaused = false;
+        let lastFrameTime = 0;
+
+        // --- TIPI CUTSCENE STATE ---
+        let cutsceneElapsedMs = 0;
+        let beadingFadeAlpha = 0;
+
+        // --- LANE'S POST (4-4-4 CLERK RUSH) STATE ---
+        const MAX_ACTIVE_ORDERS = 3;
+        const MAX_STRIKES = 3;
+        let activeOrders = [];
+        let orderScore = 0;
+        let orderCombo = 0;
+        let orderServedCount = 0;
+        let orderStrikes = 0;
+        let orderSpawnTimerMs = 0;
+
+        let craftHideId = 0;
+        let craftPalId = 0;
+        let craftFurId = 0;
+        let craftRow = 0;
+
+        let feedbackMsg = '';
+        let feedbackColor = '#ffe169';
+        let feedbackTimerMs = 0;
+
+        // --- TIPI FREEFORM STUDIO STATE ---
+        let selectedHideId = 1;
+        let selectedPaletteId = 0;
+        let selectedStudioFurId = 0;
+        let selectedStudioTemplate = -1;
+        let prepRow = 0;
+        let board = [];
+        let cursor = { x: 4, y: 4, color: 1 };
+        let actionBarFocus = false;
+        let actionBarIdx = 1; // 0 = Guide/Clear, 1 = Stitch
+        let showChalkGuide = true;
+
+        // ==========================================
+        // 9x9 ROUNDED MOCCASIN MASK (FLIPPED: SQUARED CUFF TOP, ROUNDED TOE BOTTOM)
+        // ==========================================
+        function getRowColBounds(r) {
+            if (r === ROWS - 1) return { minC: 2, maxC: 6 };
+            if (r === ROWS - 2) return { minC: 1, maxC: 7 };
+            return { minC: 0, maxC: COLS - 1 };
+        }
+
+        function isPlayableCell(r, c) {
+            if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return false;
+            const { minC, maxC } = getRowColBounds(r);
+            return c >= minC && c <= maxC;
+        }
+
+        // ==========================================
+        // VIEWPORT SCALING & THREE 16/32-BIT BACKDROPS
         // ==========================================
         function resizeViewport() {
             const w = window.innerWidth || 400;
@@ -178,35 +456,43 @@
                 VIEW_W = Math.round(533 * aspect);
             }
 
+            TIPI_WORLD_W = Math.floor(VIEW_W * 1.48);
+
             canvas.width = VIEW_W;
             canvas.height = VIEW_H;
             ctx.imageSmoothingEnabled = false;
 
-            bgCanvas.width = VIEW_W;
-            bgCanvas.height = VIEW_H;
-            bgCtx.imageSmoothingEnabled = false;
+            titleBgCanvas.width = VIEW_W; titleBgCanvas.height = VIEW_H;
+            titleBgCtx.imageSmoothingEnabled = false;
 
-            renderStaticCabinBackdrop();
+            tipiBgCanvas.width = TIPI_WORLD_W; tipiBgCanvas.height = VIEW_H;
+            tipiBgCtx.imageSmoothingEnabled = false;
+
+            postBgCanvas.width = VIEW_W; postBgCanvas.height = VIEW_H;
+            postBgCtx.imageSmoothingEnabled = false;
+
+            renderStaticAssiniboineBendBackdrop();
+            renderStaticTipiBackdrop();
+            renderStaticLanesPostBackdrop();
         }
 
-        function getGridMetrics(rows) {
-            const padX = VIEW_W > 520 ? 136 : 36;
-            const topVampArchPad = 36; // Headroom for rounded/puckered moccasin vamp toe
-            const botVampPad = 20;
+        function getGridMetrics() {
+            const padX = VIEW_W > 540 ? 150 : 48;
+            const topMoccPad = 56;
+            const botMoccPad = 68;
             const availW = VIEW_W - padX * 2;
-            const availH = VIEW_H - HUD_TOP_H - HUD_BOT_H - topVampArchPad - botVampPad;
-            const cellSize = Math.max(18, Math.floor(Math.min(availW / COLS, availH / rows)));
+            const availH = VIEW_H - HUD_TOP_H - HUD_BOT_H - topMoccPad - botMoccPad;
+            const cellSize = Math.max(18, Math.min(31, Math.floor(Math.min(availW / COLS, availH / ROWS))));
             const gridW = cellSize * COLS;
-            const gridH = cellSize * rows;
+            const gridH = cellSize * ROWS;
             const offsetX = Math.floor((VIEW_W - gridW) / 2);
-            const offsetY = HUD_TOP_H + topVampArchPad + Math.floor((availH - gridH) / 2);
+            const offsetY = HUD_TOP_H + topMoccPad + Math.floor((availH - gridH) / 2);
             return { cellSize, gridW, gridH, offsetX, offsetY };
         }
 
-        // Ordered 2x2 pixel dither helper for authentic 16-bit SNES shading
         function drawDitherBand(c, x, y, w, h, color, density = 2) {
             c.fillStyle = color;
-            const step = density === 1 ? 2 : 4;
+            const step = density === 1 ? 2 : (density === 2 ? 4 : 6);
             for (let py = y; py < y + h; py += 2) {
                 const rowShift = ((py >> 1) & 1) * (step >> 1);
                 for (let px = x + rowShift; px < x + w; px += step) {
@@ -215,405 +501,715 @@
             }
         }
 
-        function renderStaticCabinBackdrop() {
-            const c = bgCtx;
-            const topY = HUD_TOP_H;
-            const botY = VIEW_H - HUD_BOT_H;
-            const wallH = botY - topY;
-            const floorH = Math.max(46, Math.floor(wallH * 0.16));
-            const floorY = botY - floorH;
+        // ------------------------------------------
+        // SCENE 0: TITLE SCREEN — ASSINIBOINE RIVER BEND
+        // ------------------------------------------
+        function renderStaticAssiniboineBendBackdrop() {
+            const c = titleBgCtx;
+            const horizonY = Math.floor(VIEW_H * 0.44);
+
+            const sky = c.createLinearGradient(0, 0, 0, horizonY);
+            sky.addColorStop(0.0, '#1c355c'); sky.addColorStop(0.38, '#466a94');
+            sky.addColorStop(0.70, '#c78c5c'); sky.addColorStop(0.92, '#edb974'); sky.addColorStop(1.0, '#f7d89c');
+            c.fillStyle = sky; c.fillRect(0, 0, VIEW_W, horizonY);
+
+            c.fillStyle = 'rgba(255, 224, 172, 0.38)';
+            for (let i = 0; i < 5; i++) {
+                const cx = Math.floor((i * 0.24 + 0.08) * VIEW_W);
+                const cy = Math.floor(horizonY * (0.34 + (i % 3) * 0.14));
+                c.fillRect(cx - 28, cy, 56, 6); c.fillRect(cx - 18, cy - 4, 36, 4);
+            }
+
+            c.fillStyle = '#384f34'; c.fillRect(0, horizonY - 4, VIEW_W, 18);
+
+            for (let tx = -8; tx < VIEW_W + 12; tx += 12) {
+                const wave = Math.sin(tx * 0.03) * 8 + ((tx * 17) % 11);
+                const treeH = 18 + Math.floor(Math.abs(wave));
+                c.fillStyle = '#20331e'; c.fillRect(tx - Math.floor(treeH * 0.5), horizonY - Math.floor(treeH * 0.6), Math.floor(treeH), Math.floor(treeH * 0.65));
+                c.fillStyle = '#344f2d'; c.fillRect(tx - Math.floor(treeH * 0.38), horizonY - Math.floor(treeH * 0.72), Math.floor(treeH * 0.76), Math.floor(treeH * 0.48));
+                c.fillStyle = '#63783d'; c.fillRect(tx - Math.floor(treeH * 0.24), horizonY - Math.floor(treeH * 0.78), Math.floor(treeH * 0.44), Math.floor(treeH * 0.24));
+            }
+
+            const groundGrad = c.createLinearGradient(0, horizonY, 0, VIEW_H);
+            groundGrad.addColorStop(0.0, '#4f6934'); groundGrad.addColorStop(0.45, '#3b5227'); groundGrad.addColorStop(1.0, '#223316');
+            c.fillStyle = groundGrad; c.fillRect(0, horizonY + 4, VIEW_W, VIEW_H - horizonY);
+            drawDitherBand(c, 0, horizonY + 8, VIEW_W, VIEW_H - horizonY, 'rgba(22, 36, 14, 0.22)', 2);
+
+            c.save();
+            c.beginPath();
+            c.moveTo(VIEW_W * 0.44, horizonY + 4);
+            c.bezierCurveTo(VIEW_W * 0.68, horizonY + 26, VIEW_W * 0.92, VIEW_H * 0.60, VIEW_W * 0.56, VIEW_H * 0.74);
+            c.bezierCurveTo(VIEW_W * 0.20, VIEW_H * 0.86, VIEW_W * 0.14, VIEW_H * 0.94, VIEW_W * 0.34, VIEW_H);
+            c.lineTo(VIEW_W * 0.0, VIEW_H); c.lineTo(VIEW_W * 0.0, VIEW_H * 0.88);
+            c.bezierCurveTo(VIEW_W * 0.04, VIEW_H * 0.78, VIEW_W * 0.34, VIEW_H * 0.72, VIEW_W * 0.48, VIEW_H * 0.64);
+            c.bezierCurveTo(VIEW_W * 0.64, VIEW_H * 0.54, VIEW_W * 0.42, horizonY + 22, VIEW_W * 0.34, horizonY + 4);
+            c.closePath();
+
+            c.lineWidth = 8; c.strokeStyle = '#6b5335'; c.stroke();
+            const riverGrad = c.createLinearGradient(0, horizonY, 0, VIEW_H);
+            riverGrad.addColorStop(0.0, '#c79e72'); riverGrad.addColorStop(0.32, '#5a84a3');
+            riverGrad.addColorStop(0.72, '#345d7d'); riverGrad.addColorStop(1.0, '#1f3d57');
+            c.fillStyle = riverGrad; c.fill();
+            c.restore();
+
+            for (let gx = 4; gx < VIEW_W; gx += 7) {
+                const gh = 10 + ((gx * 13) % 14);
+                const gy = VIEW_H - gh - ((gx * 7) % 18);
+                c.fillStyle = (gx % 2 === 0) ? '#293d19' : '#4a6129';
+                c.fillRect(gx, gy, 2, gh);
+                if (gx % 21 === 0) { c.fillStyle = '#e6c25a'; c.fillRect(gx - 1, gy - 2, 3, 3); }
+            }
+        }
+
+        function drawAnimatedAssiniboineBendEffects(now) {
+            const horizonY = Math.floor(VIEW_H * 0.44);
+            const shift = (Math.floor(now / 140) * 2) % 24;
+            ctx.fillStyle = 'rgba(255, 232, 184, 0.35)';
+            for (let i = 0; i < 14; i++) {
+                const t = i / 14;
+                const ry = snap2(horizonY + 18 + t * (VIEW_H - horizonY - 40));
+                const centerBendX = VIEW_W * (0.45 + Math.sin(t * Math.PI * 1.45) * 0.22 - t * 0.26);
+                const rx = snap2(centerBendX - 18 + ((shift + i * 7) % 24));
+                ctx.fillRect(rx, ry, 10 + (i % 3) * 4, 2);
+            }
+        }
+
+        // ------------------------------------------
+        // SCENE A: LANE'S POST (HBC TRADING POST ON THE ASSINIBOINE)
+        // ------------------------------------------
+        function renderStaticLanesPostBackdrop() {
+            const c = postBgCtx;
+            const topY = HUD_TOP_H, botY = VIEW_H - HUD_BOT_H;
+            const counterY = botY - Math.max(82, Math.floor((botY - topY) * 0.24));
 
             const isWide = VIEW_W >= 540;
-            const sideSpace = isWide ? Math.floor((VIEW_W - 360) / 2) : 96;
+            const sideSpace = isWide ? Math.floor((VIEW_W - 350) / 2) : 90;
+            const winW = Math.min(104, Math.max(70, Math.floor(sideSpace * 0.80)));
+            const winH = Math.floor(winW * 1.12);
+            const winX = isWide ? Math.floor((sideSpace - winW) / 2) : 8;
+            const winY = topY + 28;
+            const lanternX = isWide ? VIEW_W - Math.floor(sideSpace * 0.48) : VIEW_W - 40;
+            const lanternY = topY + 42;
 
-            const winW = Math.min(118, Math.max(76, Math.floor(sideSpace * 0.78)));
-            const winH = Math.floor(winW * 1.18);
-            const winX = isWide ? Math.floor((sideSpace - winW) / 2) : 10;
-            const winY = topY + 24;
+            postLayout = { winX, winY, winW, winH, lanternX, lanternY, counterY };
 
-            const stoveW = Math.min(92, Math.max(66, Math.floor(sideSpace * 0.68)));
-            const stoveH = Math.floor(stoveW * 1.24);
-            const stoveX = isWide
-                ? VIEW_W - sideSpace + Math.floor((sideSpace - stoveW) / 2)
-                : VIEW_W - stoveW - 10;
-            const stoveY = floorY - stoveH + 14;
+            const logH = 24;
+            c.fillStyle = '#24150c'; c.fillRect(0, topY, VIEW_W, counterY - topY);
 
-            cabinLayout = { winX, winY, winW, winH, stoveX, stoveY, stoveW, stoveH, floorY };
-
-            // 1. HORIZONTAL CHINKED TIMBER LOG WALLS
-            const logH = 26;
-            const logPalette = [
-                { top: '#5e361e', mid: '#472714', bot: '#2c160b', grain: '#3a1f0f' },
-                { top: '#54301a', mid: '#3e2111', bot: '#251208', grain: '#31190c' },
-                { top: '#633a21', mid: '#4c2a16', bot: '#2f180c', grain: '#3d2010' }
-            ];
-
-            c.fillStyle = '#1d0f08';
-            c.fillRect(0, topY, VIEW_W, wallH);
-
-            let logIdx = 0;
-            for (let y = topY; y < floorY; y += logH) {
-                const pal = logPalette[logIdx % logPalette.length];
-                const h = Math.min(logH, floorY - y);
-
-                c.fillStyle = '#8b7a62';
-                c.fillRect(0, y, VIEW_W, 2);
-                c.fillStyle = '#5c4e3d';
-                c.fillRect(0, y + 2, VIEW_W, 1);
-
-                c.fillStyle = pal.top;
-                c.fillRect(0, y + 3, VIEW_W, 5);
-                c.fillStyle = pal.mid;
-                c.fillRect(0, y + 8, VIEW_W, Math.max(0, h - 14));
-                c.fillStyle = pal.bot;
-                c.fillRect(0, y + h - 6, VIEW_W, 6);
-
-                drawDitherBand(c, 0, y + 6, VIEW_W, 4, pal.mid, 2);
-                drawDitherBand(c, 0, y + h - 8, VIEW_W, 4, pal.bot, 2);
-
-                c.fillStyle = pal.grain;
-                for (let gx = (logIdx * 37) % 64; gx < VIEW_W; gx += 64) {
-                    c.fillRect(gx, y + 10, 22, 2);
-                    c.fillRect(gx + 28, y + 15, 16, 2);
-                }
-                const knotX = ((logIdx * 97 + 43) % Math.max(80, VIEW_W - 40)) + 16;
-                c.fillStyle = '#241108';
-                c.fillRect(knotX, y + 11, 8, 4);
-                c.fillStyle = '#6c4228';
-                c.fillRect(knotX + 1, y + 10, 6, 1);
-
-                logIdx++;
+            let idx = 0;
+            for (let y = topY; y < counterY; y += logH) {
+                const h = Math.min(logH, counterY - y);
+                c.fillStyle = '#b8aa91'; c.fillRect(0, y, VIEW_W, 2);
+                c.fillStyle = idx % 2 === 0 ? '#57361e' : '#4d2f1a'; c.fillRect(0, y + 2, VIEW_W, h - 4);
+                c.fillStyle = '#331d0e'; c.fillRect(0, y + h - 2, VIEW_W, 2);
+                drawDitherBand(c, 0, y + h - 6, VIEW_W, 4, '#331d0e', 2);
+                idx++;
             }
 
-            // Corner dovetail vertical log posts
-            for (let side = 0; side < 2; side++) {
-                const px = side === 0 ? 0 : VIEW_W - 10;
-                c.fillStyle = '#2a150a';
-                c.fillRect(px, topY, 10, floorY - topY);
-                c.fillStyle = '#4a2915';
-                c.fillRect(px + (side === 0 ? 2 : 0), topY, 4, floorY - topY);
-                c.fillStyle = '#180b05';
-                for (let y = topY; y < floorY; y += logH) {
-                    c.fillRect(px, y, 10, 3);
-                }
-            }
+            const shelfW = isWide ? Math.max(88, sideSpace - 14) : 86;
+            const shelfX = VIEW_W - shelfW - 8;
+            const shelfY1 = topY + 86, shelfY2 = topY + 158, shelfY3 = topY + 230;
 
-            // 2. CABIN PLANK FLOORBOARDS
-            c.fillStyle = '#2b160b';
-            c.fillRect(0, floorY, VIEW_W, floorH);
-            c.fillStyle = '#180b05';
-            c.fillRect(0, floorY, VIEW_W, 3);
-
-            const plankH = 12;
-            for (let py = floorY + 3; py < botY; py += plankH) {
-                c.fillStyle = ((py - floorY) / plankH) % 2 === 0 ? '#3a2011' : '#311a0e';
-                c.fillRect(0, py, VIEW_W, plankH - 2);
-                c.fillStyle = '#1f0f07';
-                c.fillRect(0, py + plankH - 2, VIEW_W, 2);
-                for (let jx = ((py * 7) % 80) + 20; jx < VIEW_W; jx += 84) {
-                    c.fillRect(jx, py, 2, plankH);
-                }
-            }
-
-            // Woven Métis Ceinture Fléchée (sash) wall accent under window if wide
-            if (isWide) {
-                const sashX = winX + 6;
-                const sashY = winY + winH + 22;
-                const sashW = winW - 12;
-                if (sashY + 22 < floorY) {
-                    c.fillStyle = '#5e1116';
-                    c.fillRect(sashX, sashY, sashW, 14);
-                    c.fillStyle = '#8B1E24';
-                    c.fillRect(sashX, sashY + 2, sashW, 10);
-                    c.fillStyle = '#2c5475';
-                    c.fillRect(sashX, sashY + 5, sashW, 4);
-                    c.fillStyle = '#D99B26';
-                    for (let sx = sashX + 4; sx < sashX + sashW - 6; sx += 10) {
-                        c.fillRect(sx, sashY + 4, 2, 2);
-                        c.fillRect(sx + 2, sashY + 6, 2, 2);
-                        c.fillRect(sx, sashY + 8, 2, 2);
-                    }
-                    c.fillStyle = '#F2EFE9';
-                    c.fillRect(sashX - 4, sashY + 2, 4, 2);
-                    c.fillRect(sashX - 4, sashY + 6, 4, 2);
-                    c.fillRect(sashX - 4, sashY + 10, 4, 2);
-                    c.fillRect(sashX + sashW, sashY + 2, 4, 2);
-                    c.fillRect(sashX + sashW, sashY + 6, 4, 2);
-                    c.fillRect(sashX + sashW, sashY + 10, 4, 2);
-                }
-            }
-
-            // 3. CLEAR COLD WINTER'S NIGHT WINDOW (LEFT WALL)
-            drawWinterWindowStatic(c, winX, winY, winW, winH);
-
-            // 4. CAST-IRON WOOD STOVE & HEARTH (RIGHT WALL)
-            drawWoodStoveStatic(c, stoveX, stoveY, stoveW, stoveH, topY, floorY);
-        }
-
-        function drawWinterWindowStatic(c, x, y, w, h) {
-            c.fillStyle = 'rgba(0, 0, 0, 0.55)';
-            c.fillRect(x + 4, y + 4, w + 4, h + 6);
-
-            const skyGrad = c.createLinearGradient(0, y, 0, y + h);
-            skyGrad.addColorStop(0, '#050b1f');
-            skyGrad.addColorStop(0.52, '#0c1f4a');
-            skyGrad.addColorStop(0.78, '#1a3b6e');
-            skyGrad.addColorStop(1, '#6d8fb8');
-            c.fillStyle = skyGrad;
-            c.fillRect(x + 6, y + 6, w - 12, h - 12);
-
-            const mx = x + Math.floor(w * 0.72);
-            const my = y + Math.floor(h * 0.25);
-            c.fillStyle = '#eef6ff';
-            c.beginPath();
-            c.arc(mx, my, 7, 0, Math.PI * 2);
-            c.fill();
-            c.fillStyle = '#09183a';
-            c.beginPath();
-            c.arc(mx - 3, my - 2, 6, 0, Math.PI * 2);
-            c.fill();
-
-            const snowY = y + Math.floor(h * 0.72);
-            c.fillStyle = '#9bb6d4';
-            c.fillRect(x + 6, snowY, w - 12, y + h - 6 - snowY);
-            c.fillStyle = '#dcebfa';
-            c.fillRect(x + 6, snowY + 6, w - 12, y + h - 6 - (snowY + 6));
-            drawDitherBand(c, x + 6, snowY + 2, w - 12, 6, '#dcebfa', 2);
-
-            const trees = [
-                { tx: x + Math.floor(w * 0.24), ty: snowY + 4, s: 18 },
-                { tx: x + Math.floor(w * 0.45), ty: snowY + 7, s: 14 },
-                { tx: x + Math.floor(w * 0.78), ty: snowY + 5, s: 20 }
-            ];
-            trees.forEach(t => {
-                c.fillStyle = '#0d2238';
-                for (let row = 0; row < t.s; row += 2) {
-                    const halfW = Math.floor((row / t.s) * (t.s * 0.55)) + 1;
-                    c.fillRect(t.tx - halfW, t.ty - t.s + row, halfW * 2, 2);
-                }
-                c.fillStyle = '#d4e9ff';
-                for (let row = 2; row < t.s - 4; row += 6) {
-                    const halfW = Math.floor((row / t.s) * (t.s * 0.42)) + 1;
-                    c.fillRect(t.tx - halfW, t.ty - t.s + row, halfW * 2, 2);
+            [shelfY1, shelfY2, shelfY3].forEach(sy => {
+                if (sy < counterY - 16) {
+                    c.fillStyle = '#261409'; c.fillRect(shelfX - 2, sy + 4, shelfW + 4, 8);
+                    c.fillStyle = '#6e4323'; c.fillRect(shelfX - 2, sy, shelfW + 4, 6);
+                    c.fillStyle = '#8f5a32'; c.fillRect(shelfX - 2, sy, shelfW + 4, 2);
                 }
             });
 
-            c.fillStyle = 'rgba(215, 238, 255, 0.35)';
-            c.fillRect(x + 6, y + 6, 10, 4);
-            c.fillRect(x + 6, y + 10, 5, 6);
-            c.fillRect(x + w - 16, y + h - 12, 10, 6);
+            if (shelfY1 < counterY - 24) {
+                const bx = shelfX + 6, by = shelfY1 - 24;
+                c.fillStyle = '#f2ead8'; c.fillRect(bx, by, 34, 24);
+                c.fillStyle = '#2E663B'; c.fillRect(bx, by + 4, 34, 3);
+                c.fillStyle = '#9E1B32'; c.fillRect(bx, by + 9, 34, 3);
+                c.fillStyle = '#E09F24'; c.fillRect(bx, by + 14, 34, 3);
+                c.fillStyle = '#1E2A4A'; c.fillRect(bx, by + 19, 34, 3);
+                c.strokeStyle = '#241309'; c.lineWidth = 1; c.strokeRect(bx, by, 34, 24);
 
-            c.fillStyle = '#331a0d';
-            c.fillRect(x, y, w, 6);
-            c.fillRect(x, y + h - 6, w, 6);
-            c.fillRect(x, y, 6, h);
-            c.fillRect(x + w - 6, y, 6, h);
-
-            c.fillStyle = '#6b3e22';
-            c.fillRect(x + 1, y + 1, w - 2, 2);
-            c.fillRect(x + 1, y + 1, 2, h - 2);
-
-            const midX = x + Math.floor(w / 2) - 2;
-            const midY = y + Math.floor(h / 2) - 2;
-            c.fillStyle = '#331a0d';
-            c.fillRect(midX, y + 6, 4, h - 12);
-            c.fillRect(x + 6, midY, w - 12, 4);
-            c.fillStyle = '#5c341c';
-            c.fillRect(midX, y + 6, 1, h - 12);
-            c.fillRect(x + 6, midY, w - 12, 1);
-
-            c.fillStyle = '#4e2c17';
-            c.fillRect(x - 4, y + h - 2, w + 8, 7);
-            c.fillStyle = '#754426';
-            c.fillRect(x - 4, y + h - 2, w + 8, 2);
-            c.fillStyle = '#221007';
-            c.fillRect(x - 2, y + h + 5, w + 4, 3);
-        }
-
-        function drawWoodStoveStatic(c, x, y, w, h, topY, floorY) {
-            const hearthX = x - 12;
-            const hearthY = floorY - 2;
-            const hearthW = w + 24;
-            const hearthH = 26;
-            c.fillStyle = '#3c3936';
-            c.fillRect(hearthX, hearthY, hearthW, hearthH);
-            c.fillStyle = '#57524d';
-            c.fillRect(hearthX + 2, hearthY + 2, hearthW - 4, 4);
-            c.fillStyle = '#24211f';
-            for (let sx = hearthX + 18; sx < hearthX + hearthW - 8; sx += 22) {
-                c.fillRect(sx, hearthY, 2, hearthH);
-            }
-            c.fillRect(hearthX, hearthY + 12, hearthW, 2);
-
-            const pipeW = Math.max(14, Math.floor(w * 0.24));
-            const pipeX = x + Math.floor((w - pipeW) / 2);
-            c.fillStyle = '#141315';
-            c.fillRect(pipeX, topY, pipeW, y - topY + 6);
-            c.fillStyle = '#2f2d33';
-            c.fillRect(pipeX + 2, topY, 4, y - topY + 6);
-            c.fillStyle = '#4a4752';
-            c.fillRect(pipeX + 3, topY, 2, y - topY + 6);
-            for (let py = topY + 28; py < y; py += 42) {
-                c.fillStyle = '#09080a';
-                c.fillRect(pipeX - 2, py, pipeW + 4, 4);
-                c.fillStyle = '#3c3a42';
-                c.fillRect(pipeX - 1, py + 1, pipeW + 2, 1);
+                c.fillStyle = '#b57b24'; c.fillRect(bx + 44, by + 8, 18, 16);
+                c.fillStyle = '#f0be59'; c.fillRect(bx + 46, by + 10, 6, 10);
+                c.fillStyle = '#6b450c'; c.fillRect(bx + 47, by + 4, 12, 4);
             }
 
-            const legY = y + h - 14;
-            c.fillStyle = '#121113';
-            c.fillRect(x + 8, legY, 8, 16);
-            c.fillRect(x + w - 16, legY, 8, 16);
-            c.fillStyle = '#2b292e';
-            c.fillRect(x + 10, legY, 2, 14);
-            c.fillRect(x + w - 14, legY, 2, 14);
-
-            const bodyH = h - 14;
-            c.fillStyle = '#19171a';
-            c.fillRect(x, y, w, bodyH);
-            c.fillStyle = '#2f2c33';
-            c.fillRect(x - 4, y, w + 8, 7);
-            c.fillStyle = '#4c4852';
-            c.fillRect(x - 3, y + 1, w + 6, 2);
-            c.fillStyle = '#262329';
-            c.fillRect(x - 3, y + bodyH - 7, w + 6, 7);
-
-            c.fillStyle = '#2c2930';
-            c.fillRect(x + 3, y + 9, 6, bodyH - 18);
-            c.fillStyle = '#0e0d10';
-            c.fillRect(x + w - 8, y + 9, 6, bodyH - 18);
-
-            const kx = x + Math.floor(w * 0.14);
-            const ky = y - 12;
-            c.fillStyle = '#8f4722';
-            c.fillRect(kx, ky + 3, 14, 9);
-            c.fillStyle = '#d47c42';
-            c.fillRect(kx + 2, ky + 4, 6, 4);
-            c.fillStyle = '#5c2b12';
-            c.fillRect(kx + 3, ky, 8, 3);
-
-            const fbX = x + 11;
-            const fbY = y + 18;
-            const fbW = w - 22;
-            const fbH = Math.max(24, bodyH - 36);
-            c.fillStyle = '#0c0a0c';
-            c.fillRect(fbX - 2, fbY - 2, fbW + 4, fbH + 4);
-            c.fillStyle = '#3a353d';
-            c.fillRect(fbX - 2, fbY - 2, fbW + 4, 2);
-
-            const woodX = x - 24;
-            if (woodX > 8) {
-                const logs = [
-                    { lx: woodX, ly: floorY + 2 },
-                    { lx: woodX + 10, ly: floorY + 2 },
-                    { lx: woodX + 5, ly: floorY - 5 }
-                ];
-                logs.forEach(l => {
-                    c.fillStyle = '#4f2c16';
-                    c.fillRect(l.lx, l.ly, 9, 7);
-                    c.fillStyle = '#cfa776';
-                    c.fillRect(l.lx + 2, l.ly + 2, 5, 3);
+            if (shelfY2 < counterY - 24) {
+                ['#8B1E24', '#1D4E9E', '#1C1B22', '#2E663B'].forEach((col, i) => {
+                    const rx = shelfX + 6 + i * 18;
+                    c.fillStyle = col; c.fillRect(rx, shelfY2 - 28, 13, 28);
+                    c.fillStyle = 'rgba(255,255,255,0.22)'; c.fillRect(rx + 2, shelfY2 - 26, 3, 24);
+                    c.strokeStyle = '#1a0d05'; c.lineWidth = 1; c.strokeRect(rx, shelfY2 - 28, 13, 28);
                 });
             }
+
+            if (shelfY3 < counterY - 24) {
+                c.fillStyle = '#7a4b25'; c.fillRect(shelfX + 10, shelfY3 - 26, 26, 26);
+                c.strokeStyle = '#2b1608'; c.lineWidth = 2; c.strokeRect(shelfX + 10, shelfY3 - 26, 26, 26);
+                c.fillStyle = '#383431'; c.fillRect(shelfX + 44, shelfY3 - 22, 22, 22);
+                c.fillStyle = '#8c5c2b'; c.fillRect(shelfX + 44, shelfY3 - 17, 22, 3); c.fillRect(shelfX + 44, shelfY3 - 8, 22, 3);
+            }
+
+            c.fillStyle = 'rgba(0, 0, 0, 0.45)'; c.fillRect(winX + 4, winY + 4, winW + 2, winH + 4);
+            const skyG = c.createLinearGradient(0, winY, 0, winY + winH);
+            skyG.addColorStop(0.0, '#4d7ca8'); skyG.addColorStop(0.55, '#9ec2db');
+            skyG.addColorStop(0.70, '#3a5436'); skyG.addColorStop(1.0, '#447294');
+            c.fillStyle = skyG; c.fillRect(winX + 5, winY + 5, winW - 10, winH - 10);
+
+            const palY = winY + Math.floor(winH * 0.54);
+            c.fillStyle = '#5c3b20';
+            for (let px = winX + 6; px < winX + winW - 6; px += 7) c.fillRect(px, palY, 5, 16);
+
+            c.fillStyle = '#3b2110';
+            c.fillRect(winX, winY, winW, 5); c.fillRect(winX, winY + winH - 5, winW, 5);
+            c.fillRect(winX, winY, 5, winH); c.fillRect(winX + winW - 5, winY, 5, winH);
+            c.fillRect(winX + Math.floor(winW / 2) - 2, winY + 5, 4, winH - 10);
+            c.fillRect(winX + 5, winY + Math.floor(winH / 2) - 2, winW - 10, 4);
+
+            c.fillStyle = '#1f1007'; c.fillRect(0, counterY - 2, VIEW_W, 4);
+            c.fillStyle = '#7d4d27'; c.fillRect(0, counterY + 2, VIEW_W, 14);
+            c.fillStyle = '#9c6638'; c.fillRect(0, counterY + 2, VIEW_W, 3);
+            c.fillStyle = '#472812'; c.fillRect(0, counterY + 16, VIEW_W, botY - (counterY + 16));
+            drawDitherBand(c, 0, counterY + 16, VIEW_W, botY - (counterY + 16), '#2e1809', 2);
+
+            c.fillStyle = '#261307';
+            for (let px = 28; px < VIEW_W; px += 48) c.fillRect(px, counterY + 18, 2, botY - counterY - 18);
         }
 
-        function drawAnimatedCabinEffects(now) {
-            const { winX, winY, winW, winH, stoveX, stoveY, stoveW, stoveH } = cabinLayout;
+        function drawAnimatedPostEffects(now) {
+            const { lanternX, lanternY } = postLayout;
+            const fStep = Math.floor(now / 160) % 4;
+            const flicker = [0.90, 0.96, 0.86, 0.94][fStep];
 
-            for (let i = 0; i < WINTER_STARS.length; i++) {
-                const s = WINTER_STARS[i];
-                const pulse = Math.sin(now * 0.0025 + s.phase);
-                if (pulse > -0.25) {
-                    const sx = winX + 8 + Math.floor(s.nx * (winW - 16));
-                    const sy = winY + 8 + Math.floor(s.ny * (winH * 0.56));
-                    ctx.fillStyle = pulse > 0.55 ? '#ffffff' : '#9ec9ff';
-                    ctx.fillRect(sx, sy, s.size, s.size);
-                }
-            }
-
-            const flicker = 0.85 + Math.sin(now * 0.011) * 0.09 + Math.sin(now * 0.027) * 0.06;
-            const bodyH = stoveH - 14;
-            const fbX = stoveX + 11;
-            const fbY = stoveY + 18;
-            const fbW = stoveW - 22;
-            const fbH = Math.max(24, bodyH - 36);
-            const fireCX = fbX + fbW / 2;
-            const fireCY = fbY + fbH / 2;
-
-            const glowRadius = Math.max(120, VIEW_W * 0.34) * flicker;
-            const fireGlow = ctx.createRadialGradient(fireCX, fireCY, 6, fireCX, fireCY, glowRadius);
-            fireGlow.addColorStop(0, `rgba(255, 132, 36, ${0.36 * flicker})`);
-            fireGlow.addColorStop(0.35, `rgba(230, 82, 18, ${0.18 * flicker})`);
-            fireGlow.addColorStop(0.75, `rgba(140, 38, 10, ${0.07 * flicker})`);
-            fireGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
-            ctx.fillStyle = fireGlow;
+            const glowR = Math.max(130, VIEW_W * 0.36) * flicker;
+            const g = ctx.createRadialGradient(lanternX, lanternY + 12, 4, lanternX, lanternY + 12, glowR);
+            g.addColorStop(0.0, `rgba(255, 206, 102, ${0.34 * flicker})`);
+            g.addColorStop(0.4, `rgba(235, 136, 42, ${0.14 * flicker})`);
+            g.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = g;
             ctx.fillRect(0, HUD_TOP_H, VIEW_W, VIEW_H - HUD_TOP_H - HUD_BOT_H);
 
-            const coalGrad = ctx.createLinearGradient(0, fbY, 0, fbY + fbH);
-            coalGrad.addColorStop(0, '#5c0e06');
-            coalGrad.addColorStop(0.45, '#d9380b');
-            coalGrad.addColorStop(0.78, '#ff8c1a');
-            coalGrad.addColorStop(1, '#ffe478');
-            ctx.fillStyle = coalGrad;
-            ctx.fillRect(fbX, fbY, fbW, fbH);
+            ctx.strokeStyle = '#241309'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(lanternX, HUD_TOP_H); ctx.lineTo(lanternX, lanternY); ctx.stroke();
 
-            const flameStep = Math.floor(now / 120);
-            ctx.fillStyle = '#ffd24d';
-            for (let fx = fbX + 3; fx < fbX + fbW - 4; fx += 6) {
-                const fh = 5 + ((fx * 7 + flameStep * 3) % 9);
-                ctx.fillRect(fx, fbY + fbH - fh - 2, 4, fh);
-            }
-            ctx.fillStyle = '#fff5bd';
-            for (let fx = fbX + 5; fx < fbX + fbW - 5; fx += 9) {
-                const fh = 3 + ((fx * 3 + flameStep * 5) % 5);
-                ctx.fillRect(fx, fbY + fbH - fh - 1, 3, fh);
+            ctx.fillStyle = '#8f5d1e'; ctx.fillRect(lanternX - 7, lanternY, 14, 4);
+            ctx.fillStyle = '#ffe58f'; ctx.fillRect(lanternX - 5, lanternY + 4, 10, 12);
+            ctx.fillStyle = '#fff9db'; ctx.fillRect(lanternX - 2, lanternY + 7, 4, 6);
+            ctx.fillStyle = '#8f5d1e'; ctx.fillRect(lanternX - 7, lanternY + 16, 14, 4);
+        }
+
+        // ------------------------------------------
+        // SCENE B: ZOOMED-IN, PANNABLE CONICAL 13-POLE TIPI INTERIOR
+        // ------------------------------------------
+        function getTipiWallBaseY(x, baseFloorY) {
+            const norm = (x - TIPI_WORLD_W / 2) / (TIPI_WORLD_W / 2);
+            return Math.floor(baseFloorY - 26 + (norm * norm) * 42);
+        }
+
+        function renderStaticTipiBackdrop() {
+            const c = tipiBgCtx;
+            const W = TIPI_WORLD_W;
+            const topY = HUD_TOP_H;
+            const botY = VIEW_H - HUD_BOT_H;
+            const floorY = botY - Math.max(114, Math.floor((botY - topY) * 0.30));
+
+            const doorW = Math.min(48, Math.max(40, Math.floor(VIEW_W * 0.11)));
+            const doorH = 56;
+            const doorCenterX = Math.floor(W * 0.16);
+            const doorX = Math.floor(doorCenterX - doorW / 2);
+            const doorBaseY = getTipiWallBaseY(doorCenterX, floorY);
+            const doorY = doorBaseY - doorH + 2;
+
+            const stashX = Math.floor(W * 0.42);
+            const stashY = getTipiWallBaseY(stashX, floorY) + 4;
+
+            const fireX = Math.floor(W * 0.46);
+            const fireY = floorY + 38;
+
+            const robeSitX = Math.floor(W * 0.28);
+            const robeSitY = floorY + 38;
+
+            const husbandX = Math.floor(W * 0.74);
+            const husbandY = floorY + 36;
+
+            tipiLayout = { doorX, doorY, doorW, doorH, stashX, stashY, fireX, fireY, robeSitX, robeSitY, husbandX, husbandY, floorY };
+
+            const wallGrad = c.createRadialGradient(
+                fireX, floorY - 12, 32,
+                W / 2, topY + 20, Math.max(W, VIEW_H) * 0.75
+            );
+            wallGrad.addColorStop(0.0, '#704120');
+            wallGrad.addColorStop(0.45, '#4c2812');
+            wallGrad.addColorStop(0.80, '#291408');
+            wallGrad.addColorStop(1.0, '#120804');
+            c.fillStyle = wallGrad;
+            c.fillRect(0, topY, W, botY - topY);
+
+            for (let x = 0; x < W; x += 2) {
+                const by = getTipiWallBaseY(x, floorY) - 54;
+                c.fillStyle = '#361b0b'; c.fillRect(x, by, 2, 3);
+                c.fillStyle = '#8B1E24'; c.fillRect(x, by + 3, 2, 6);
+                c.fillStyle = '#D99B26'; c.fillRect(x, by + 9, 2, 3);
             }
 
-            ctx.fillStyle = '#161316';
-            for (let gx = fbX + 6; gx < fbX + fbW - 3; gx += 7) {
-                ctx.fillRect(gx, fbY, 2, fbH);
-            }
-            ctx.fillRect(fbX, fbY + Math.floor(fbH * 0.45), fbW, 2);
+            const apexX = W * 0.46;
+            const apexY = topY - 160;
+            const poleSpecs = [
+                { bx: W * 0.03,           w: 10,  shade: '#3b2110' },
+                { bx: doorX - 2,          w: 6.5, shade: '#5c361c' },
+                { bx: doorX + doorW + 2,  w: 6.5, shade: '#5c361c' },
+                { bx: W * 0.36,           w: 5.5, shade: '#663c1f' },
+                { bx: W * 0.56,           w: 5.5, shade: '#633a1e' },
+                { bx: W * 0.78,           w: 7.5, shade: '#4f2d16' },
+                { bx: W * 0.96,           w: 10,  shade: '#381f0e' }
+            ];
 
-            ctx.fillStyle = '#ffdf70';
+            poleSpecs.forEach(p => {
+                const by = getTipiWallBaseY(p.bx, floorY) + 4;
+                c.strokeStyle = 'rgba(14, 6, 2, 0.65)'; c.lineWidth = p.w + 3;
+                c.beginPath(); c.moveTo(apexX + 3, apexY); c.lineTo(p.bx + 3, by); c.stroke();
+
+                c.strokeStyle = p.shade; c.lineWidth = p.w;
+                c.beginPath(); c.moveTo(apexX, apexY); c.lineTo(p.bx, by); c.stroke();
+
+                c.strokeStyle = 'rgba(168, 108, 62, 0.55)'; c.lineWidth = Math.max(1.5, p.w * 0.25);
+                c.beginPath(); c.moveTo(apexX - 1, apexY); c.lineTo(p.bx - 1, by); c.stroke();
+            });
+
+            const hangX = Math.floor(W * 0.78);
+            const peltY = topY + 78;
+            c.fillStyle = '#8f441c'; c.fillRect(hangX - 10, peltY, 14, 42);
+            c.fillStyle = '#bf642c'; c.fillRect(hangX - 7, peltY + 4, 8, 30);
+            c.fillStyle = '#2b1307'; c.fillRect(hangX - 5, peltY + 38, 5, 10);
+            c.fillStyle = '#f2e8d5'; c.fillRect(hangX - 4, peltY + 46, 3, 3);
+
+            const fX = Math.floor(W * 0.56);
+            const fY = topY + 66;
+            c.strokeStyle = '#efe0be'; c.lineWidth = 1.2;
+            c.beginPath(); c.moveTo(fX, topY + 44); c.lineTo(fX, fY + 4); c.stroke();
+            for (let fi = -1; fi <= 1; fi++) {
+                const fx = fX + fi * 6, fy = fY + Math.abs(fi) * 3;
+                c.fillStyle = '#f2ede4'; c.fillRect(fx - 2, fy, 4, 14);
+                c.fillStyle = '#261c17'; c.fillRect(fx - 2, fy + 12, 4, 7);
+                c.fillStyle = '#8B1E24'; c.fillRect(fx - 1, fy - 2, 2, 3);
+            }
+
+            const wallH = floorY - topY;
+            drawDitherBand(c, 0, topY, W, Math.floor(wallH * 0.22), '#0d0603', 1);
+            drawDitherBand(c, 0, topY + Math.floor(wallH * 0.14), W, Math.floor(wallH * 0.20), 'rgba(14, 6, 3, 0.72)', 2);
+            drawDitherBand(c, 0, topY + Math.floor(wallH * 0.30), W, Math.floor(wallH * 0.22), 'rgba(18, 8, 3, 0.42)', 3);
+
+            c.save();
+            c.beginPath();
+            c.moveTo(0, botY);
+            for (let x = 0; x <= W; x += 8) c.lineTo(x, getTipiWallBaseY(x, floorY));
+            c.lineTo(W, botY);
+            c.closePath();
+            c.fillStyle = '#241309'; c.fill();
+            c.clip();
+            drawDitherBand(c, 0, floorY - 26, W, botY - (floorY - 26), '#331c0e', 2);
+
+            const drawPixelRobe = (rx, ry, rw, rh) => {
+                c.fillStyle = '#261308'; c.fillRect(rx - rw / 2, ry - rh / 2 + 2, rw, rh);
+                c.fillStyle = '#381e0f'; c.fillRect(rx - rw / 2 + 4, ry - rh / 2, rw - 8, rh - 2);
+                c.fillStyle = '#4f2c18'; c.fillRect(rx - rw / 2 + 10, ry - rh / 2 + 4, rw - 20, rh - 10);
+                drawDitherBand(c, rx - rw / 2 + 6, ry - rh / 2 + 2, rw - 12, rh - 6, '#261308', 2);
+            };
+            drawPixelRobe(robeSitX, robeSitY + 8, 96, 32);
+            drawPixelRobe(husbandX, husbandY + 8, 100, 32);
+            c.restore();
+
+            c.strokeStyle = '#120803'; c.lineWidth = 3;
+            c.beginPath();
+            for (let x = 0; x <= W; x += 8) {
+                const y = getTipiWallBaseY(x, floorY);
+                if (x === 0) c.moveTo(x, y); else c.lineTo(x, y);
+            }
+            c.stroke();
+
+            drawFlushPixelHideDoorway(c, doorX, doorY, doorW, doorH);
+            drawTipiStashPileStatic(c, stashX, stashY);
+        }
+
+        function drawFlushPixelHideDoorway(c, x, y, w, h) {
+            const cx = Math.floor(x + w / 2);
+            const steps = [
+                { dy: 0,  inset: 14 }, { dy: 4,  inset: 10 },
+                { dy: 8,  inset: 7  }, { dy: 14, inset: 4  },
+                { dy: 22, inset: 2  }, { dy: 34, inset: 1  },
+                { dy: 46, inset: 2  }
+            ];
+
+            for (let i = 0; i < steps.length; i++) {
+                const s = steps[i];
+                const nextY = (i + 1 < steps.length) ? steps[i + 1].dy : h;
+                const rowH = nextY - s.dy;
+                const rx = x + s.inset;
+                const rw = w - s.inset * 2;
+
+                c.fillStyle = '#241106';
+                c.fillRect(rx - 2, y + s.dy - 2, rw + 4, rowH + 2);
+
+                const frac = s.dy / h;
+                c.fillStyle = frac < 0.30 ? '#4d6580'
+                    : frac < 0.55 ? '#c98e5b'
+                    : frac < 0.72 ? '#2b4024'
+                    : frac < 0.88 ? '#487699'
+                    : '#384f2b';
+                c.fillRect(rx, y + s.dy, rw, rowH);
+            }
+
+            c.fillStyle = '#5c351a';
+            c.fillRect(x - 1, y + 18, 4, h - 22);
+            c.fillRect(x + w - 3, y + 18, 4, h - 22);
+            c.fillStyle = '#7d4c27';
+            c.fillRect(x, y + 20, 2, h - 26);
+            c.fillRect(x + w - 2, y + 20, 2, h - 26);
+
+            for (let ly = y - 18; ly < y - 2; ly += 6) {
+                c.fillStyle = '#241106'; c.fillRect(cx - 3, ly + 1, 7, 2);
+                c.fillStyle = '#d9c49e'; c.fillRect(cx - 2, ly, 5, 2);
+            }
+        }
+
+        function drawTipiStashPileStatic(c, sx, sy) {
+            c.fillStyle = 'rgba(0, 0, 0, 0.48)';
+            c.fillRect(sx - 28, sy + 10, 68, 10);
+
+            c.fillStyle = '#59331c'; c.fillRect(sx - 22, sy - 6, 28, 12);
+            c.fillStyle = '#825030'; c.fillRect(sx - 20, sy - 4, 24, 5);
+            c.fillStyle = '#cfc5b4'; c.fillRect(sx - 16, sy - 13, 22, 9);
+            c.fillStyle = '#f5efe4'; c.fillRect(sx - 14, sy - 11, 18, 4);
+
+            c.fillStyle = '#9c6234'; c.fillRect(sx - 24, sy + 8, 16, 6);
+            c.fillStyle = '#d9a96a'; c.fillRect(sx - 22, sy + 10, 12, 2);
+
+            const cx = sx + 2, cy = sy - 8;
+            c.fillStyle = '#4a2611'; c.fillRect(cx, cy, 30, 21);
+            c.fillStyle = '#6e3c1d'; c.fillRect(cx + 2, cy + 2, 26, 7);
+            c.fillStyle = '#261206'; c.fillRect(cx, cy + 9, 30, 2);
+            c.fillStyle = '#d9a441';
+            c.fillRect(cx + 3, cy, 3, 21); c.fillRect(cx + 24, cy, 3, 21); c.fillRect(cx + 12, cy + 7, 6, 5);
+            c.strokeStyle = '#1c0c04'; c.lineWidth = 1.5; c.strokeRect(cx, cy, 30, 21);
+        }
+
+        function drawPixelRock(x, y, w, h) {
+            const rx = Math.floor(x - w / 2), ry = Math.floor(y - h / 2);
+            ctx.fillStyle = '#141110';
+            ctx.fillRect(rx, ry + 2, w, h - 2); ctx.fillRect(rx + 2, ry, w - 4, h);
+            ctx.fillStyle = '#3b3531';
+            ctx.fillRect(rx + 2, ry + 2, w - 4, h - 4);
+            ctx.fillStyle = '#61564d';
+            ctx.fillRect(rx + 2, ry + 2, w - 6, Math.max(2, Math.floor(h * 0.4)));
+            ctx.fillStyle = '#857363';
+            ctx.fillRect(rx + 3, ry + 2, Math.max(2, Math.floor(w * 0.35)), 2);
+            ctx.fillStyle = '#241f1c';
+            ctx.fillRect(rx + 4, ry + h - 4, w - 6, 2);
+        }
+
+        function drawCentralEmberHearth(now) {
+            const { fireX, fireY } = tipiLayout;
+            const pulseFrame = Math.floor(now / 180) % 4;
+            const pulse = [0.90, 0.96, 0.86, 0.93][pulseFrame];
+
+            const glowR = Math.max(185, VIEW_W * 0.48) * pulse;
+            const fireGlow = ctx.createRadialGradient(fireX, fireY - 4, 8, fireX, fireY - 4, glowR);
+            fireGlow.addColorStop(0.0, `rgba(255, 118, 28, ${0.42 * pulse})`);
+            fireGlow.addColorStop(0.32, `rgba(214, 72, 16, ${0.22 * pulse})`);
+            fireGlow.addColorStop(0.70, `rgba(120, 32, 8, ${0.09 * pulse})`);
+            fireGlow.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = fireGlow;
+            ctx.fillRect(0, HUD_TOP_H, TIPI_WORLD_W, VIEW_H - HUD_TOP_H - HUD_BOT_H);
+
+            [
+                { dx: -24, dy: -6, w: 14, h: 10 }, { dx: -10, dy: -10, w: 16, h: 10 },
+                { dx: 8,   dy: -10, w: 16, h: 10 }, { dx: 22,  dy: -6,  w: 14, h: 10 }
+            ].forEach(s => drawPixelRock(fireX + s.dx, fireY + s.dy, s.w, s.h));
+
+            ctx.fillStyle = '#1f0c06';
+            ctx.fillRect(fireX - 22, fireY - 6, 44, 14);
+            ctx.fillRect(fireX - 18, fireY - 8, 36, 18);
+            ctx.fillStyle = '#6e1606';
+            ctx.fillRect(fireX - 16, fireY - 4, 32, 10);
+
+            ctx.fillStyle = '#1a0e08';
+            for (let i = -14; i <= 14; i += 4) {
+                ctx.fillRect(fireX + i, fireY - Math.floor(i * 0.25) - 2, 6, 4);
+                ctx.fillRect(fireX + i, fireY + Math.floor(i * 0.25) - 1, 6, 4);
+            }
+            ctx.fillStyle = '#3d2417';
+            for (let i = -12; i <= 12; i += 4) {
+                ctx.fillRect(fireX + i, fireY - Math.floor(i * 0.25) - 2, 4, 2);
+            }
+
+            const coalStep = Math.floor(now / 160);
+            HEARTH_COALS.forEach((co, idx) => {
+                const state = (coalStep + idx) % 4;
+                ctx.fillStyle = state === 0 ? '#ffe27a' : (state === 1 || state === 3 ? '#ff7b14' : '#c42408');
+                ctx.fillRect(Math.floor(fireX + co.dx), Math.floor(fireY + co.dy), co.s, Math.max(2, co.s - 1));
+            });
+
+            [
+                { dx: -26, dy: 2,  w: 14, h: 12 }, { dx: -16, dy: 9,  w: 16, h: 12 },
+                { dx: -2,  dy: 12, w: 18, h: 12 }, { dx: 14,  dy: 10, w: 16, h: 12 },
+                { dx: 26,  dy: 3,  w: 14, h: 12 }
+            ].forEach(s => drawPixelRock(fireX + s.dx, fireY + s.dy, s.w, s.h));
+
+            ctx.fillStyle = '#ffcf5c';
+            const sparkTick = Math.floor(now / 120) * 120;
             EMBER_SPARKS.forEach(sp => {
-                const t = ((now * 0.00055) + sp.offset) % 1;
-                const ex = Math.floor(fireCX + sp.drift + Math.sin(now * 0.005 + sp.offset * 10) * 3);
-                const ey = Math.floor(fbY + fbH - 4 - t * (fbH - 6));
+                const t = ((sparkTick * 0.00038) + sp.offset) % 1;
+                const ex = snap2(fireX + sp.drift + Math.sin(sparkTick * 0.0035 + sp.offset * 12) * 6);
+                const ey = snap2(fireY - 4 - t * 110);
+                ctx.globalAlpha = (1 - t) * 0.85;
                 ctx.fillRect(ex, ey, 2, 2);
             });
+            ctx.globalAlpha = 1.0;
+        }
+
+        function drawAnimatedTipiDoorwayShimmer(now) {
+            const { doorX, doorY, doorW, doorH } = tipiLayout;
+            const riverY = doorY + Math.floor(doorH * 0.74);
+            ctx.fillStyle = 'rgba(235, 200, 145, 0.40)';
+            const shift = (Math.floor(now / 160) * 2) % 12;
+            ctx.fillRect(doorX + 6 + shift, riverY, 5, 1);
+            ctx.fillRect(doorX + 18 + (shift % 8), riverY + 4, 4, 1);
+        }
+
+        // ==========================================
+        // 16/32-BIT PIXEL SPRITES (FRAME-BY-FRAME SNES ANIMATION)
+        // ==========================================
+        function drawMini444MoccasinSprite(x, y, hideObj, palObj, furObj, facingLeft = false) {
+            const px = snap2(x), py = snap2(y);
+            ctx.fillStyle = hideObj.mid; ctx.fillRect(px, py, 10, 6);
+            ctx.fillStyle = hideObj.light; ctx.fillRect(px + 2, py + 1, 6, 3);
+            if (facingLeft) {
+                // Toe points LEFT, fur cuff on RIGHT
+                ctx.fillStyle = palObj.beads[1].mid; ctx.fillRect(px + 3, py + 1, 2, 2);
+                ctx.fillStyle = palObj.beads[3].mid; ctx.fillRect(px + 1, py + 2, 2, 1);
+                ctx.fillStyle = furObj.base; ctx.fillRect(px + 5, py - 2, 5, 3);
+                ctx.fillStyle = furObj.hi; ctx.fillRect(px + 6, py - 2, 3, 1);
+            } else {
+                // Toe points RIGHT, fur cuff on LEFT
+                ctx.fillStyle = palObj.beads[1].mid; ctx.fillRect(px + 4, py + 1, 2, 2);
+                ctx.fillStyle = palObj.beads[3].mid; ctx.fillRect(px + 6, py + 2, 2, 1);
+                ctx.fillStyle = furObj.base; ctx.fillRect(px, py - 2, 5, 3);
+                ctx.fillStyle = furObj.hi; ctx.fillRect(px + 1, py - 2, 3, 1);
+            }
+        }
+
+        function drawMotherSprite(x, y, pose, now, hideObj = null, palObj = null, furObj = null) {
+            ctx.save();
+            const px = snap2(x), py = snap2(y);
+            const stepFrame = Math.floor(now / 140) % 4;
+            const bob = (pose === 'walk' || pose === 'carry' || pose === 'carry_mocc' || pose === 'duck') ? (stepFrame % 2 === 1 ? -2 : 0) : 0;
+
+            ctx.fillStyle = 'rgba(10, 4, 2, 0.55)';
+            ctx.fillRect(px - (pose === 'sit_rustle' || pose === 'sit_rustle_fast' ? 20 : 12), py + 2, (pose === 'sit_rustle' || pose === 'sit_rustle_fast' ? 40 : 24), 6);
+
+            if (pose === 'sit_rustle' || pose === 'sit_rustle_fast') {
+                ctx.fillStyle = '#152038'; ctx.fillRect(px - 20, py - 14, 40, 16);
+                ctx.fillStyle = '#22345c'; ctx.fillRect(px - 17, py - 12, 34, 12);
+                ctx.fillStyle = '#9E1B32'; ctx.fillRect(px - 18, py - 2, 36, 3);
+                ctx.fillStyle = '#E09F24'; ctx.fillRect(px - 18, py + 1, 36, 2);
+
+                ctx.fillStyle = '#6b1726'; ctx.fillRect(px - 10, py - 34, 20, 22);
+                ctx.fillStyle = '#9E1B32'; ctx.fillRect(px - 8, py - 32, 16, 16);
+                ctx.fillStyle = '#c49b66'; ctx.fillRect(px - 12, py - 34, 24, 8);
+                ctx.fillStyle = '#8B1E24'; ctx.fillRect(px - 12, py - 30, 24, 2);
+
+                ctx.fillStyle = '#120d0b'; ctx.fillRect(px - 8, py - 50, 16, 16);
+                ctx.fillStyle = '#a86f46'; ctx.fillRect(px - 6, py - 46, 12, 12);
+                ctx.fillStyle = '#c98e63'; ctx.fillRect(px - 4, py - 45, 9, 9);
+                ctx.fillStyle = '#120d0b'; ctx.fillRect(px - 8, py - 50, 16, 5);
+                ctx.fillRect(px - 9, py - 44, 4, 18);
+                ctx.fillStyle = '#9E1B32'; ctx.fillRect(px - 9, py - 28, 4, 2);
+
+                ctx.fillStyle = '#1a0f0a'; ctx.fillRect(px + 1, py - 41, 2, 2); ctx.fillRect(px + 4, py - 41, 2, 2);
+
+                const rFrame = Math.floor(now / (pose === 'sit_rustle_fast' ? 95 : 170)) % 4;
+                const matShift = [0, 2, 0, -2][rFrame];
+                const leftHandX = [px - 2, px, px + 2, px][rFrame];
+                const rightHandX = [px + 10, px + 8, px + 6, px + 8][rFrame];
+
+                const vampCol = hideObj ? hideObj.mid : '#6B3E1D';
+                ctx.fillStyle = vampCol; ctx.fillRect(px + 1 + matShift, py - 14, 15, 9);
+                ctx.fillStyle = hideObj ? hideObj.light : '#8f5a30'; ctx.fillRect(px + 3 + matShift, py - 12, 10, 4);
+
+                ctx.fillStyle = '#c98e63';
+                ctx.fillRect(leftHandX, py - 16 + (rFrame % 2), 5, 4);
+                ctx.fillRect(rightHandX, py - 15 - (rFrame % 2), 5, 4);
+
+                ctx.restore();
+                return;
+            }
+
+            const isDuck = (pose === 'duck');
+            const isKneel = (pose === 'kneel' || pose === 'place_mocc');
+            const yOff = isKneel ? 10 : (isDuck ? 16 + bob : bob);
+            const headLeanX = isDuck ? 6 : 0;
+            const legShift = (pose === 'walk' || pose === 'carry' || pose === 'carry_mocc' || isDuck) ? (stepFrame === 1 ? 4 : stepFrame === 3 ? -4 : 0) : 0;
+
+            ctx.fillStyle = '#6B3E1D';
+            ctx.fillRect(px - 8 + legShift, py - 4, 7, 5); ctx.fillRect(px + 2 - legShift, py - 4, 7, 5);
+            ctx.fillStyle = '#E09F24';
+            ctx.fillRect(px - 6 + legShift, py - 3, 3, 2); ctx.fillRect(px + 4 - legShift, py - 3, 3, 2);
+
+            const skirtH = isDuck ? 14 : (isKneel ? 17 : 25);
+            ctx.fillStyle = '#152038'; ctx.fillRect(px - 13, py - 28 + yOff, 26, skirtH);
+            ctx.fillStyle = '#22345c'; ctx.fillRect(px - 10, py - 26 + yOff, 20, skirtH - 5);
+            ctx.fillStyle = '#344d82'; ctx.fillRect(px + 3, py - 26 + yOff, 5, skirtH - 7);
+            const hemY = py - 28 + yOff + skirtH - 4;
+            ctx.fillStyle = '#9E1B32'; ctx.fillRect(px - 13, hemY, 26, 3);
+            ctx.fillStyle = '#E09F24'; ctx.fillRect(px - 13, hemY + 3, 26, 1.5);
+
+            ctx.fillStyle = '#6b1726'; ctx.fillRect(px - 10 + (isDuck ? 3 : 0), py - 44 + yOff, 20, 18);
+            ctx.fillStyle = '#9E1B32'; ctx.fillRect(px - 8 + (isDuck ? 3 : 0), py - 42 + yOff, 16, 14);
+            ctx.fillStyle = '#d9b482'; ctx.fillRect(px - 12 + (isDuck ? 3 : 0), py - 44 + yOff, 24, 8);
+            ctx.fillStyle = '#8B1E24'; ctx.fillRect(px - 12 + (isDuck ? 3 : 0), py - 40 + yOff, 24, 2);
+            ctx.fillStyle = '#1E2A4A'; ctx.fillRect(px - 12 + (isDuck ? 3 : 0), py - 37 + yOff, 24, 2);
+
+            const hx = px + headLeanX, hy = py - (isDuck ? 54 : 60) + yOff;
+            ctx.fillStyle = '#120d0b'; ctx.fillRect(hx - 8, hy, 16, 16);
+            ctx.fillStyle = '#a86f46'; ctx.fillRect(hx - 6, hy + 4, 12, 12);
+            ctx.fillStyle = '#c98e63'; ctx.fillRect(hx - 3, hy + 5, 8, 9);
+            ctx.fillStyle = '#120d0b'; ctx.fillRect(hx - 8, hy, 16, 5);
+            ctx.fillRect(hx - 9, hy + 6, 4, 18);
+            ctx.fillStyle = '#9E1B32'; ctx.fillRect(hx - 9, hy + 22, 4, 2);
+
+            ctx.fillStyle = '#1a0f0a'; ctx.fillRect(hx + 1, hy + 8, 2, 2); ctx.fillRect(hx + 5, hy + 8, 2, 2);
+
+            if (pose === 'carry') {
+                const hCol = hideObj ? hideObj.mid : '#6B3E1D';
+                ctx.fillStyle = hCol; ctx.fillRect(px + 4, py - 35 + yOff, 16, 10);
+                ctx.fillStyle = '#6e3c1d'; ctx.fillRect(px + 6, py - 41 + yOff, 12, 8);
+                ctx.fillStyle = '#d9a441'; ctx.fillRect(px + 10, py - 38 + yOff, 4, 3);
+                ctx.fillStyle = '#c98e63'; ctx.fillRect(px + 2, py - 32 + yOff, 5, 4); ctx.fillRect(px + 14, py - 32 + yOff, 5, 4);
+            } else if (pose === 'carry_mocc' && hideObj && palObj && furObj) {
+                drawMini444MoccasinSprite(px + 8, py - 35 + yOff, hideObj, palObj, furObj, false);
+                drawMini444MoccasinSprite(px + 12, py - 29 + yOff, hideObj, palObj, furObj, false);
+                ctx.fillStyle = '#c98e63'; ctx.fillRect(px + 4, py - 32 + yOff, 5, 4);
+            } else if (pose === 'place_mocc') {
+                ctx.fillStyle = '#c98e63'; ctx.fillRect(px + 10, py - 14 + yOff, 8, 4);
+            } else if (pose === 'kneel') {
+                ctx.fillStyle = '#c98e63'; ctx.fillRect(px + 8, py - 31 + yOff, 8, 4);
+            }
+
+            ctx.restore();
+        }
+
+        function drawHusbandSprite(x, y, pose, now, wearingMocc, hideObj, palObj, furObj, jigPhase = 0) {
+            ctx.save();
+            const px = snap2(x), py = snap2(y);
+            const stepFrame = Math.floor(now / 140) % 4;
+
+            ctx.fillStyle = 'rgba(10, 4, 2, 0.55)';
+            ctx.fillRect(px - (pose === 'sit' ? 18 : 12), py + 2, pose === 'sit' ? 36 : 24, 6);
+
+            if (pose === 'sit') {
+                ctx.fillStyle = '#26211d'; ctx.fillRect(px - 18, py - 12, 36, 13);
+                ctx.fillStyle = '#183766'; ctx.fillRect(px - 12, py - 38, 24, 28);
+                ctx.fillStyle = '#245294'; ctx.fillRect(px - 9, py - 36, 18, 22);
+                ctx.fillStyle = '#b81d2a'; ctx.fillRect(px - 12, py - 19, 24, 5);
+                ctx.fillStyle = '#f2c938'; ctx.fillRect(px - 10, py - 17, 20, 1.5);
+                ctx.fillStyle = '#17100c'; ctx.fillRect(px - 8, py - 54, 16, 16);
+                ctx.fillStyle = '#b57b52'; ctx.fillRect(px - 6, py - 50, 12, 12);
+                ctx.fillStyle = '#2b1b12'; ctx.fillRect(px - 6, py - 42, 12, 4);
+                ctx.fillStyle = '#17100c'; ctx.fillRect(px - 4, py - 46, 2, 2); ctx.fillRect(px - 1, py - 46, 2, 2);
+
+                if (wearingMocc) {
+                    drawMini444MoccasinSprite(px - 18, py - 5, hideObj, palObj, furObj, true);
+                    drawMini444MoccasinSprite(px - 4, py - 4, hideObj, palObj, furObj, true);
+                } else {
+                    ctx.fillStyle = '#8c7d6b'; ctx.fillRect(px - 16, py - 4, 8, 5); ctx.fillRect(px - 4, py - 4, 8, 5);
+                }
+                ctx.restore();
+                return;
+            }
+
+            const isDuck = (pose === 'duck_left');
+            const isJig = (pose === 'jig');
+            const isKiss = (pose === 'kiss');
+            const facingLeft = (pose === 'walk_left' || pose === 'duck_left' || isKiss || isJig);
+
+            let hopY = 0, leftFootY = 0, rightFootY = 0, kickX = 0;
+            if (isJig) {
+                const beat = Math.floor(jigPhase * 4) % 4;
+                if (beat === 0) { hopY = -4; leftFootY = -6; }
+                else if (beat === 1) { hopY = -4; rightFootY = -6; }
+                else if (beat === 2) { hopY = -4; leftFootY = -6; }
+                else { hopY = -8; rightFootY = -10; kickX = -10; }
+            } else if (pose === 'walk_left' || isDuck) {
+                hopY = (stepFrame % 2 === 1 ? -2 : 0);
+            }
+
+            const yOff = (isDuck ? 16 : 0) + hopY;
+            const legShift = (pose === 'walk_left' || isDuck) ? (stepFrame === 1 ? 4 : stepFrame === 3 ? -4 : 0) : 0;
+
+            ctx.fillStyle = '#26211d';
+            ctx.fillRect(px - 9 + legShift, py - 18 + yOff, 7, 15);
+            ctx.fillRect(px + 2 - legShift + kickX, py - 18 + yOff + Math.floor(rightFootY * 0.4), 7, 15);
+
+            // Feet properly face left when walking/ducking out or jigging toward his wife!
+            if (wearingMocc) {
+                drawMini444MoccasinSprite(px - 12 + legShift, py - 5 + leftFootY, hideObj, palObj, furObj, facingLeft);
+                drawMini444MoccasinSprite(px + 1 - legShift + kickX, py - 5 + rightFootY, hideObj, palObj, furObj, facingLeft);
+            }
+
+            ctx.fillStyle = '#142f59'; ctx.fillRect(px - 13, py - 46 + yOff, 26, 30 - (isDuck ? 8 : 0));
+            ctx.fillStyle = '#214d8c'; ctx.fillRect(px - 10, py - 44 + yOff, 20, 24 - (isDuck ? 8 : 0));
+            ctx.fillStyle = '#3368b5'; ctx.fillRect(px - 8, py - 42 + yOff, 6, 18 - (isDuck ? 8 : 0));
+
+            ctx.fillStyle = '#b81d2a'; ctx.fillRect(px - 13, py - 27 + yOff, 26, 5);
+            ctx.fillStyle = '#f2c938'; ctx.fillRect(px - 11, py - 25 + yOff, 22, 1.5);
+            ctx.fillStyle = '#b81d2a'; ctx.fillRect(px + 7, py - 22 + yOff, 4, 9);
+
+            const leanX = isKiss ? -6 : (isDuck ? -6 : 0);
+            const hx = px + leanX, hy = py - (isDuck ? 54 : 62) + yOff;
+            ctx.fillStyle = '#17100c'; ctx.fillRect(hx - 8, hy, 16, 16);
+            ctx.fillStyle = '#b57b52'; ctx.fillRect(hx - 6, hy + 4, 12, 12);
+            ctx.fillStyle = '#2b1b12'; ctx.fillRect(hx - 6, hy + 12, 12, 4);
+            ctx.fillStyle = '#17100c';
+            if (facingLeft) { ctx.fillRect(hx - 5, hy + 8, 2, 2); ctx.fillRect(hx - 2, hy + 8, 2, 2); }
+            else { ctx.fillRect(hx + 1, hy + 8, 2, 2); ctx.fillRect(hx + 4, hy + 8, 2, 2); }
+
+            if (isKiss) {
+                ctx.fillStyle = '#ff4d6d';
+                ctx.fillRect(hx - 12, hy - 6, 3, 3); ctx.fillRect(hx - 8, hy - 6, 3, 3);
+                ctx.fillRect(hx - 11, hy - 3, 5, 3); ctx.fillRect(hx - 9, hy, 2, 2);
+            }
+
+            ctx.restore();
         }
 
         window.addEventListener('resize', resizeViewport);
         resizeViewport();
 
         // ==========================================
-        // MATRIARCH'S TEARDROP LAMENT AUDIO ENGINE
+        // MATRIARCH'S TEARDROP LAMENT AUDIO & ARCADE SFX
         // ==========================================
         let chiptuneAudioCtx = null;
         let chiptuneInterval = null;
         let chiptuneIsPlaying = false;
         let currentStep = 0;
 
-        const songTitle = "Matriarch's Teardrop Lament";
         const BPM = 75;
         const noteLength = 60 / BPM / 2;
 
-        const NOTES = {};
-        NOTES['F#2'] = 92.50;  NOTES['G2'] = 98.00;   NOTES['A2'] = 110.00;  NOTES['B2'] = 123.47;
-        NOTES['D3'] = 146.83;  NOTES['E3'] = 164.81;  NOTES['F#3'] = 185.00; NOTES['A3'] = 220.00;
-        NOTES['B3'] = 246.94;  NOTES['C#4'] = 277.18; NOTES['D4'] = 293.66;  NOTES['E4'] = 329.63;
-        NOTES['F#4'] = 369.99; NOTES['A4'] = 440.00;  NOTES['B4'] = 493.88;  NOTES['C#5'] = 554.37;
-        NOTES['D5'] = 587.33;  NOTES['E5'] = 659.25;  NOTES['F#5'] = 739.99; NOTES['A5'] = 880.00;
+        const NOTES = {
+            'F#2': 92.50,  'G2': 98.00,   'A2': 110.00,  'B2': 123.47,
+            'D3': 146.83,  'E3': 164.81,  'F#3': 185.00, 'A3': 220.00,
+            'B3': 246.94,  'C#4': 277.18, 'D4': 293.66,  'E4': 329.63,
+            'F#4': 369.99, 'A4': 440.00,  'B4': 493.88,  'C#5': 554.37,
+            'D5': 587.33,  'E5': 659.25,  'F#5': 739.99, 'A5': 880.00
+        };
 
-        var matriarchFiddle = [
+        const matriarchFiddle = [
             'B4', 'C#5', 'D5', 'F#5', 'E5', 'D5', 'B4', null,
             'A4', 'B4', 'D5', 'E5', 'F#5', null, 'A5', null,
             'F#5', 'E5', 'D5', 'B4', 'A4', 'B4', 'D5', 'E5',
             'F#5', 'D5', 'B4', 'A4', 'B4', null, null, null
         ];
 
-        var celloDrone = [
+        const celloDrone = [
             'B2', null, null, null, 'B2', null, null, null,
             'A2', null, null, null, 'A2', null, null, null,
             'G2', null, null, null, 'G2', null, null, null,
@@ -621,12 +1217,8 @@
         ];
 
         function initChiptuneAudio() {
-            if (!chiptuneAudioCtx) {
-                chiptuneAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            if (chiptuneAudioCtx.state === 'suspended' && !isPaused) {
-                chiptuneAudioCtx.resume();
-            }
+            if (!chiptuneAudioCtx) chiptuneAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (chiptuneAudioCtx.state === 'suspended' && !isPaused) chiptuneAudioCtx.resume();
         }
 
         function playTone(freq, type, duration, volume) {
@@ -637,24 +1229,28 @@
             osc.frequency.setValueAtTime(freq, chiptuneAudioCtx.currentTime);
             gainNode.gain.setValueAtTime(volume, chiptuneAudioCtx.currentTime);
             gainNode.gain.exponentialRampToValueAtTime(0.0001, chiptuneAudioCtx.currentTime + duration - 0.015);
-            osc.connect(gainNode);
-            gainNode.connect(chiptuneAudioCtx.destination);
-            osc.start();
-            osc.stop(chiptuneAudioCtx.currentTime + duration);
+            osc.connect(gainNode); gainNode.connect(chiptuneAudioCtx.destination);
+            osc.start(); osc.stop(chiptuneAudioCtx.currentTime + duration);
+        }
+
+        function playSfx(kind) {
+            initChiptuneAudio();
+            if (!chiptuneAudioCtx || isPaused) return;
+            if (kind === 'serve') {
+                playTone(587.33, 'triangle', 0.10, 0.14);
+                setTimeout(() => playTone(880.00, 'triangle', 0.16, 0.14), 75);
+            } else if (kind === 'miss') {
+                playTone(155.00, 'sawtooth', 0.18, 0.10);
+            } else if (kind === 'click') {
+                playTone(440.00, 'square', 0.04, 0.03);
+            }
         }
 
         function sequenceTrack() {
             if (isPaused) return;
-            var leadNote = matriarchFiddle[currentStep];
-            var bassNote = celloDrone[currentStep];
-
-            if (leadNote && NOTES[leadNote]) {
-                playTone(NOTES[leadNote], 'square', noteLength * 1.2, 0.02);
-            }
-            if (bassNote && NOTES[bassNote]) {
-                playTone(NOTES[bassNote], 'sine', noteLength * 3.8, 0.15);
-            }
-
+            const leadNote = matriarchFiddle[currentStep], bassNote = celloDrone[currentStep];
+            if (leadNote && NOTES[leadNote]) playTone(NOTES[leadNote], 'square', noteLength * 1.2, 0.02);
+            if (bassNote && NOTES[bassNote]) playTone(NOTES[bassNote], 'sine', noteLength * 3.8, 0.15);
             currentStep = (currentStep + 1) % 32;
         }
 
@@ -678,719 +1274,1090 @@
         document.addEventListener('touchstart', initChiptuneAudio, { once: true });
         document.addEventListener('mousedown', initChiptuneAudio, { once: true });
 
-        // ---------------------------------------------------------
-        // ARCADE CABINET SIGNAL BRIDGE (SINGLE SOURCE OF TRUTH)
-        // ---------------------------------------------------------
-        window.addEventListener('message', function(event) {
-            const cmd = event.data;
-            if (typeof cmd !== 'string') return;
+        // ==========================================
+        // LANE'S POST 4-4-4 CLERK RUSH LOGIC
+        // ==========================================
+        let nextOrderUid = 1;
 
+        function spawnVisitorOrder() {
+            if (activeOrders.length >= MAX_ACTIVE_ORDERS) return;
+            const basePatience = Math.max(14000, 26000 - orderServedCount * 450);
+            activeOrders.push({
+                id: nextOrderUid++,
+                name: POST_VISITORS[Math.floor(Math.random() * POST_VISITORS.length)],
+                hideId: Math.floor(Math.random() * HIDES.length),
+                palId: Math.floor(Math.random() * PALETTES.length),
+                furId: Math.floor(Math.random() * FURS.length),
+                patience: basePatience,
+                maxPatience: basePatience
+            });
+        }
+
+        function startOrderRush() {
+            activeOrders = [];
+            orderScore = 0; orderCombo = 0; orderServedCount = 0; orderStrikes = 0;
+            orderSpawnTimerMs = 3500;
+            craftHideId = 0; craftPalId = 0; craftFurId = 0; craftRow = 0;
+            feedbackMsg = ''; feedbackTimerMs = 0;
+
+            spawnVisitorOrder(); spawnVisitorOrder();
+            startChiptuneTrack();
+            lastFrameTime = performance.now();
+            gameState = 'ORDER_PLAYING';
+        }
+
+        function serveCurrentMoccasin() {
+            let bestIdx = -1, lowestPatience = Infinity;
+            for (let i = 0; i < activeOrders.length; i++) {
+                const o = activeOrders[i];
+                if (o.hideId === craftHideId && o.palId === craftPalId && o.furId === craftFurId) {
+                    if (o.patience < lowestPatience) { lowestPatience = o.patience; bestIdx = i; }
+                }
+            }
+
+            if (bestIdx >= 0) {
+                const served = activeOrders.splice(bestIdx, 1)[0];
+                orderServedCount++; orderCombo++;
+                const speedBonus = Math.round((served.patience / served.maxPatience) * 50);
+                const pts = (100 + speedBonus) * Math.min(5, orderCombo);
+                orderScore += pts;
+                feedbackMsg = `SERVED ${served.name.toUpperCase()}! +${pts}`;
+                feedbackColor = '#7bed9f'; feedbackTimerMs = 1100;
+                playSfx('serve');
+
+                if (activeOrders.length === 0) {
+                    spawnVisitorOrder();
+                    orderSpawnTimerMs = Math.max(2200, 5000 - orderServedCount * 140);
+                }
+            } else {
+                orderCombo = 0;
+                feedbackMsg = 'NO MATCHING ORDER!';
+                feedbackColor = '#ff6b6b'; feedbackTimerMs = 900;
+                playSfx('miss');
+            }
+        }
+
+        function updateOrderRush(dtMs) {
+            if (feedbackTimerMs > 0) feedbackTimerMs -= dtMs;
+            for (let i = activeOrders.length - 1; i >= 0; i--) {
+                activeOrders[i].patience -= dtMs;
+                if (activeOrders[i].patience <= 0) {
+                    const leftName = activeOrders[i].name;
+                    activeOrders.splice(i, 1);
+                    orderStrikes++; orderCombo = 0;
+                    feedbackMsg = `${leftName.toUpperCase()} WALKED OUT!`;
+                    feedbackColor = '#ff6b6b'; feedbackTimerMs = 1200;
+                    playSfx('miss');
+                    if (orderStrikes >= MAX_STRIKES) {
+                        stopChiptuneTrack();
+                        gameState = 'ORDER_GAMEOVER';
+                        return;
+                    }
+                }
+            }
+            if (activeOrders.length === 0) {
+                spawnVisitorOrder();
+                orderSpawnTimerMs = Math.max(2500, 5500 - orderServedCount * 150);
+            } else if (activeOrders.length < MAX_ACTIVE_ORDERS) {
+                orderSpawnTimerMs -= dtMs;
+                if (orderSpawnTimerMs <= 0) {
+                    spawnVisitorOrder();
+                    orderSpawnTimerMs = Math.max(2500, 6200 - orderServedCount * 160);
+                }
+            }
+        }
+
+        // ==========================================
+        // TIPI STUDIO CUTSCENES (UNSKIPPABLE, STEPPED SNES TIMING)
+        // ==========================================
+        function startTipiIntroCutscene() {
+            tipiCamX = 0;
+            cutsceneElapsedMs = 0;
+            startChiptuneTrack();
+            gameState = 'TIPI_INTRO_CUTSCENE';
+        }
+
+        function startTipiSitCutscene() {
+            tipiCamX = 0;
+            cutsceneElapsedMs = 0;
+            gameState = 'TIPI_SIT_CUTSCENE';
+        }
+
+        function startStudioSession() {
+            board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+            cursor = { x: 4, y: 4, color: 1 };
+            actionBarFocus = false;
+            actionBarIdx = 1;
+            showChalkGuide = (selectedStudioTemplate >= 0);
+            beadingFadeAlpha = 1.0;
+            gameState = 'BEADING';
+        }
+
+        function startTipiOutroCutscene() {
+            actionBarFocus = false;
+            tipiCamX = 0;
+            cutsceneElapsedMs = 0;
+            playSfx('serve');
+            gameState = 'TIPI_OUTRO_CUTSCENE';
+        }
+
+        function updateTipiCutscenes(dtMs) {
+            if (gameState === 'TIPI_INTRO_CUTSCENE') {
+                cutsceneElapsedMs += dtMs;
+                if (cutsceneElapsedMs >= 2800) {
+                    prepRow = 0;
+                    gameState = 'PREP_SELECT';
+                }
+            } else if (gameState === 'TIPI_SIT_CUTSCENE') {
+                cutsceneElapsedMs += dtMs;
+                if (cutsceneElapsedMs >= 2700) {
+                    startStudioSession();
+                }
+            } else if (gameState === 'BEADING' && beadingFadeAlpha > 0) {
+                beadingFadeAlpha = Math.max(0, beadingFadeAlpha - dtMs / 450);
+            } else if (gameState === 'TIPI_OUTRO_CUTSCENE') {
+                cutsceneElapsedMs += dtMs;
+                const maxCam = Math.max(0, TIPI_WORLD_W - VIEW_W);
+
+                if (cutsceneElapsedMs < 2400) {
+                    const t = stepProgress((cutsceneElapsedMs - 500) / 1800, 16);
+                    tipiCamX = snap2(t * maxCam);
+                } else if (cutsceneElapsedMs < 7200) {
+                    tipiCamX = snap2(maxCam);
+                } else {
+                    const t = stepProgress((cutsceneElapsedMs - 7200) / 1800, 16);
+                    tipiCamX = snap2(maxCam * (1 - t));
+                }
+
+                if (cutsceneElapsedMs >= 9600) {
+                    stopChiptuneTrack();
+                    tipiCamX = 0;
+                    gameState = 'MODE_SELECT';
+                }
+            }
+        }
+
+        // ==========================================
+        // DIRECT POSTMESSAGE SIGNAL BRIDGE
+        // ==========================================
+        function handleCommand(cmd) {
             if (cmd === 'PAUSE') {
                 isPaused = true;
-                if (chiptuneAudioCtx && chiptuneAudioCtx.state === 'running') {
-                    chiptuneAudioCtx.suspend();
-                }
+                if (chiptuneAudioCtx && chiptuneAudioCtx.state === 'running') chiptuneAudioCtx.suspend();
                 return;
             }
             if (cmd === 'RESUME') {
                 isPaused = false;
-                lastDropTime = performance.now();
-                if (chiptuneAudioCtx && chiptuneAudioCtx.state === 'suspended') {
-                    chiptuneAudioCtx.resume();
-                }
+                lastFrameTime = performance.now();
+                if (chiptuneAudioCtx && chiptuneAudioCtx.state === 'suspended') chiptuneAudioCtx.resume();
                 return;
             }
             if (isPaused) return;
 
-            const now = performance.now();
-            const isBtnA = (cmd === 'BUTTON_A' || cmd === 'BUTTON_A_PRESS');
-            const isBtnB = (cmd === 'BUTTON_B' || cmd === 'BUTTON_B_PRESS');
-            const isUp = (cmd === 'DPAD_UP' || cmd === 'DPAD_UP_PRESS');
-            const isDown = (cmd === 'DPAD_DOWN' || cmd === 'DPAD_DOWN_PRESS');
-            const isLeft = (cmd === 'DPAD_LEFT' || cmd === 'DPAD_LEFT_PRESS');
-            const isRight = (cmd === 'DPAD_RIGHT' || cmd === 'DPAD_RIGHT_PRESS');
-
-            if (isBtnA) {
-                if (now - lastBtnATime < BTN_DEBOUNCE_MS) return;
-                lastBtnATime = now;
-            }
-            if (isBtnB) {
-                if (now - lastBtnBTime < BTN_DEBOUNCE_MS) return;
-                lastBtnBTime = now;
+            // Cutscenes are unskippable
+            if (gameState === 'TIPI_INTRO_CUTSCENE' || gameState === 'TIPI_SIT_CUTSCENE' || gameState === 'TIPI_OUTRO_CUTSCENE') {
+                return;
             }
 
-            // 1. BOOT SELECTION MENU
             if (gameState === 'MODE_SELECT') {
-                if (isUp || isDown) {
+                if (cmd === 'DPAD_LEFT' || cmd === 'DPAD_RIGHT' || cmd === 'DPAD_UP' || cmd === 'DPAD_DOWN') {
                     menuSelection = menuSelection === 0 ? 1 : 0;
+                    playSfx('click');
                 }
-                if (isBtnA) {
-                    if (menuSelection === 0) {
-                        currentMode = 'PUZZLE';
-                        gameState = 'PUZZLE_START';
-                    } else {
-                        currentMode = 'STUDIO';
-                        gameState = 'STUDIO_START';
-                    }
+                if (cmd === 'BUTTON_A') {
+                    if (menuSelection === 0) startOrderRush();
+                    else startTipiIntroCutscene();
                 }
                 return;
             }
 
-            // 2. PUZZLE MODE CONTROLS
-            if (currentMode === 'PUZZLE') {
-                if (gameState === 'PUZZLE_START') {
-                    if (isBtnA) gameState = 'PUZZLE_DIFFICULTY';
-                    if (isBtnB) gameState = 'MODE_SELECT';
-                    return;
+            if (gameState === 'ORDER_PLAYING') {
+                if (cmd === 'DPAD_UP') { craftRow = (craftRow + 2) % 3; playSfx('click'); }
+                else if (cmd === 'DPAD_DOWN') { craftRow = (craftRow + 1) % 3; playSfx('click'); }
+                else if (cmd === 'DPAD_LEFT') {
+                    if (craftRow === 0) craftHideId = (craftHideId + 3) % 4;
+                    if (craftRow === 1) craftPalId = (craftPalId + 3) % 4;
+                    if (craftRow === 2) craftFurId = (craftFurId + 3) % 4;
+                    playSfx('click');
+                } else if (cmd === 'DPAD_RIGHT' || cmd === 'BUTTON_B') {
+                    if (craftRow === 0) craftHideId = (craftHideId + 1) % 4;
+                    if (craftRow === 1) craftPalId = (craftPalId + 1) % 4;
+                    if (craftRow === 2) craftFurId = (craftFurId + 1) % 4;
+                    playSfx('click');
+                } else if (cmd === 'BUTTON_A') {
+                    serveCurrentMoccasin();
                 }
-
-                if (gameState === 'PUZZLE_DIFFICULTY') {
-                    if (isUp || isDown) {
-                        puzzleDifficulty = puzzleDifficulty === 1 ? 2 : 1;
-                    }
-                    if (isBtnA) {
-                        startChiptuneTrack();
-                        startPuzzleGame();
-                    }
-                    if (isBtnB) gameState = 'PUZZLE_START';
-                    return;
-                }
-
-                if (gameState === 'PUZZLE_GAMEOVER') {
-                    if (isBtnA) {
-                        startChiptuneTrack();
-                        startPuzzleGame();
-                    }
-                    if (isBtnB) {
-                        stopChiptuneTrack();
-                        gameState = 'MODE_SELECT';
-                    }
-                    return;
-                }
-
-                if (gameState === 'PUZZLE_PLAYING') {
-                    if (isLeft) moveActive(-1, 0);
-                    if (isRight) moveActive(1, 0);
-                    if (isDown) moveActive(0, 1);
-                    if (isBtnA) rotateActive(1);
-                    if (isBtnB) rotateActive(-1);
-                }
+                return;
             }
 
-            // 3. STUDIO MODE CONTROLS
-            if (currentMode === 'STUDIO') {
-                if (gameState === 'STUDIO_START') {
-                    if (isBtnA) {
-                        startChiptuneTrack();
-                        startStudioGame();
+            if (gameState === 'ORDER_GAMEOVER') {
+                if (cmd === 'BUTTON_A') startOrderRush();
+                if (cmd === 'BUTTON_B') gameState = 'MODE_SELECT';
+                return;
+            }
+
+            if (gameState === 'PREP_SELECT') {
+                if (cmd === 'DPAD_UP') prepRow = (prepRow + 4) % 5;
+                if (cmd === 'DPAD_DOWN') prepRow = (prepRow + 1) % 5;
+                if (cmd === 'DPAD_LEFT') {
+                    if (prepRow === 0) selectedHideId = (selectedHideId + HIDES.length - 1) % HIDES.length;
+                    if (prepRow === 1) selectedPaletteId = (selectedPaletteId + PALETTES.length - 1) % PALETTES.length;
+                    if (prepRow === 2) selectedStudioFurId = (selectedStudioFurId + FURS.length - 1) % FURS.length;
+                    if (prepRow === 3) selectedStudioTemplate = selectedStudioTemplate <= -1 ? PATTERNS.length - 1 : selectedStudioTemplate - 1;
+                    playSfx('click');
+                }
+                if (cmd === 'DPAD_RIGHT') {
+                    if (prepRow === 0) selectedHideId = (selectedHideId + 1) % HIDES.length;
+                    if (prepRow === 1) selectedPaletteId = (selectedPaletteId + 1) % PALETTES.length;
+                    if (prepRow === 2) selectedStudioFurId = (selectedStudioFurId + 1) % FURS.length;
+                    if (prepRow === 3) selectedStudioTemplate = selectedStudioTemplate >= PATTERNS.length - 1 ? -1 : selectedStudioTemplate + 1;
+                    playSfx('click');
+                }
+                if (cmd === 'BUTTON_A') {
+                    if (prepRow === 4) startTipiSitCutscene();
+                    else prepRow++;
+                }
+                if (cmd === 'BUTTON_B') {
+                    stopChiptuneTrack();
+                    gameState = 'MODE_SELECT';
+                }
+                return;
+            }
+
+            if (gameState === 'BEADING') {
+                if (actionBarFocus) {
+                    if (cmd === 'DPAD_UP') {
+                        actionBarFocus = false;
+                        cursor.y = ROWS - 1;
+                        const { minC, maxC } = getRowColBounds(cursor.y);
+                        cursor.x = Math.max(minC, Math.min(maxC, cursor.x));
+                    } else if (cmd === 'DPAD_LEFT' || cmd === 'DPAD_RIGHT') {
+                        actionBarIdx = actionBarIdx === 0 ? 1 : 0;
+                    } else if (cmd === 'BUTTON_A') {
+                        if (actionBarIdx === 0) {
+                            if (selectedStudioTemplate >= 0) showChalkGuide = !showChalkGuide;
+                            else board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+                        } else {
+                            startTipiOutroCutscene();
+                        }
+                    } else if (cmd === 'BUTTON_B') {
+                        actionBarFocus = false;
                     }
-                    if (isBtnB) gameState = 'MODE_SELECT';
                     return;
                 }
 
-                if (gameState === 'STUDIO_PLAYING') {
-                    if (isLeft) moveCursor(-1, 0);
-                    if (isRight) moveCursor(1, 0);
-                    if (isUp) moveCursor(0, -1);
-                    if (isDown) moveCursor(0, 1);
-                    if (isBtnB) cycleColor();
-                    if (isBtnA) placeBead();
+                if (cmd === 'DPAD_UP') {
+                    if (cursor.y > 0) {
+                        cursor.y--;
+                        const { minC, maxC } = getRowColBounds(cursor.y);
+                        cursor.x = Math.max(minC, Math.min(maxC, cursor.x));
+                    }
+                } else if (cmd === 'DPAD_DOWN') {
+                    if (cursor.y < ROWS - 1) {
+                        cursor.y++;
+                        const { minC, maxC } = getRowColBounds(cursor.y);
+                        cursor.x = Math.max(minC, Math.min(maxC, cursor.x));
+                    } else {
+                        actionBarFocus = true;
+                        actionBarIdx = 1; // Highlight [STITCH]
+                    }
+                } else if (cmd === 'DPAD_LEFT') {
+                    const { minC } = getRowColBounds(cursor.y);
+                    if (cursor.x > minC) cursor.x--;
+                } else if (cmd === 'DPAD_RIGHT') {
+                    const { maxC } = getRowColBounds(cursor.y);
+                    if (cursor.x < maxC) cursor.x++;
+                } else if (cmd === 'BUTTON_B') {
+                    cursor.color = (cursor.color + 1) % 8;
+                } else if (cmd === 'BUTTON_A') {
+                    if (isPlayableCell(cursor.y, cursor.x)) {
+                        board[cursor.y][cursor.x] = cursor.color;
+                    }
                 }
             }
+        }
+
+        window.addEventListener('message', function(event) {
+            handleCommand(event.data);
         });
 
-        // ---------------------------------------------------------
-        // PUZZLE LOGIC (Uses the 3 Primary 1830-1860 Trade Beads)
-        // ---------------------------------------------------------
-        function startPuzzleGame() {
-            puzBoard = Array.from({ length: PUZZLE_ROWS }, () => Array(COLS).fill(0));
+        // ==========================================
+        // 16-BIT BEAD RENDERERS (FLAT & SEWN EDGE-SIDE)
+        // ==========================================
+        function drawFlatBeadAt(cx, cy, radius, beadStyle, alpha = 1.0) {
+            if (!beadStyle) return;
+            ctx.save();
+            ctx.globalAlpha = alpha;
 
-            puzBoard[8][4] = 1; // Cranberry Red
-            puzBoard[8][5] = 2; // Sky Blue
-            puzBoard[9][4] = 3; // Ochre Yellow
-            puzBoard[9][5] = 1; // Cranberry Red
+            ctx.fillStyle = 'rgba(12, 5, 2, 0.72)';
+            ctx.beginPath(); ctx.arc(cx + radius * 0.14, cy + radius * 0.18, radius * 1.02, 0, Math.PI * 2); ctx.fill();
 
-            score = 0;
-            combo = 0;
-            dropInterval = 800;
-            lastDropTime = performance.now();
-            spawnPiece();
-            gameState = 'PUZZLE_PLAYING';
+            const grad = ctx.createRadialGradient(cx - radius * 0.30, cy - radius * 0.32, radius * 0.10, cx, cy, radius);
+            grad.addColorStop(0.0, beadStyle.hi); grad.addColorStop(0.32, beadStyle.mid);
+            grad.addColorStop(0.76, beadStyle.deep); grad.addColorStop(1.0, beadStyle.rim);
+            ctx.fillStyle = grad;
+            ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2); ctx.fill();
+
+            const holeR = Math.max(1.5, radius * 0.32);
+            ctx.strokeStyle = beadStyle.holeRim; ctx.lineWidth = Math.max(0.8, radius * 0.14);
+            ctx.beginPath(); ctx.arc(cx, cy, holeR + 0.3, 0, Math.PI * 2); ctx.stroke();
+
+            ctx.fillStyle = '#120804';
+            ctx.beginPath(); ctx.arc(cx, cy, holeR, 0, Math.PI * 2); ctx.fill();
+
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+            ctx.beginPath();
+            ctx.ellipse(cx - radius * 0.40, cy - radius * 0.40, Math.max(1.0, radius * 0.22), Math.max(0.8, radius * 0.12), -Math.PI / 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
         }
 
-        function spawnPiece() {
-            active.x = 4; active.y = 0; active.dir = 0;
-            active.isSingle = (puzzleDifficulty === 1);
-            active.c1 = Math.floor(Math.random() * 3) + 1;
-            active.c2 = active.isSingle ? 0 : Math.floor(Math.random() * 3) + 1;
-
-            if (!isValid(active.x, active.y, active.dir)) {
-                stopChiptuneTrack();
-                gameState = 'PUZZLE_GAMEOVER';
-            }
+        function traceBeadBarrelPath(ctxRef, cx, cy, halfW, halfH) {
+            const r = Math.min(halfW * 0.55, halfH * 0.92);
+            ctxRef.beginPath();
+            ctxRef.moveTo(cx - halfW + r, cy - halfH);
+            ctxRef.quadraticCurveTo(cx, cy - halfH * 1.14, cx + halfW - r, cy - halfH);
+            ctxRef.quadraticCurveTo(cx + halfW, cy - halfH, cx + halfW, cy);
+            ctxRef.quadraticCurveTo(cx + halfW, cy + halfH, cx + halfW - r, cy + halfH);
+            ctxRef.quadraticCurveTo(cx, cy + halfH * 1.14, cx - halfW + r, cy + halfH);
+            ctxRef.quadraticCurveTo(cx - halfW, cy + halfH, cx - halfW, cy);
+            ctxRef.quadraticCurveTo(cx - halfW, cy - halfH, cx - halfW + r, cy - halfH);
+            ctxRef.closePath();
         }
 
-        function getC2Pos(x, y, dir) {
-            if (dir === 0) return { x: x + 1, y: y };
-            if (dir === 1) return { x: x, y: y + 1 };
-            if (dir === 2) return { x: x - 1, y: y };
-            if (dir === 3) return { x: x, y: y - 1 };
-        }
-
-        function isValid(x, y, dir) {
-            if (x < 0 || x >= COLS || y < 0 || y >= PUZZLE_ROWS || puzBoard[y][x] !== 0) return false;
-
-            if (!active.isSingle) {
-                let p2 = getC2Pos(x, y, dir);
-                if (p2.x < 0 || p2.x >= COLS || p2.y < 0 || p2.y >= PUZZLE_ROWS || puzBoard[p2.y][p2.x] !== 0) return false;
-            }
-            return true;
-        }
-
-        function moveActive(dx, dy) {
-            if (isValid(active.x + dx, active.y + dy, active.dir)) {
-                active.x += dx; active.y += dy;
-                return true;
-            } else if (dy > 0) {
-                lockPiece();
-            }
-            return false;
-        }
-
-        function rotateActive(direction) {
-            if (active.isSingle) return;
-
-            let newDir = (active.dir + direction + 4) % 4;
-            if (isValid(active.x, active.y, newDir)) active.dir = newDir;
-            else {
-                if (isValid(active.x - 1, active.y, newDir)) { active.x -= 1; active.dir = newDir; }
-                else if (isValid(active.x + 1, active.y, newDir)) { active.x += 1; active.dir = newDir; }
-                else if (isValid(active.x, active.y - 1, newDir)) { active.y -= 1; active.dir = newDir; }
-            }
-        }
-
-        function lockPiece() {
-            puzBoard[active.y][active.x] = active.c1;
-            if (!active.isSingle) {
-                let p2 = getC2Pos(active.x, active.y, active.dir);
-                puzBoard[p2.y][p2.x] = active.c2;
-            }
-            combo = 0;
-            gameState = 'PUZZLE_CASCADING';
-            applyGravity();
-        }
-
-        function applyGravity() {
-            if (isPaused) {
-                setTimeout(applyGravity, 150);
-                return;
-            }
-            let moved = false;
-            for (let c = 0; c < COLS; c++) {
-                for (let r = PUZZLE_ROWS - 2; r >= 0; r--) {
-                    if (puzBoard[r][c] !== 0) {
-                        let dropTo = r;
-                        while (dropTo + 1 < PUZZLE_ROWS && puzBoard[dropTo + 1][c] === 0) dropTo++;
-                        if (dropTo !== r) {
-                            puzBoard[dropTo][c] = puzBoard[r][c];
-                            puzBoard[r][c] = 0;
-                            moved = true;
-                        }
-                    }
-                }
-            }
-            if (moved) setTimeout(resolveFlowers, 300);
-            else resolveFlowers();
-        }
-
-        function resolveFlowers() {
-            if (isPaused) {
-                setTimeout(resolveFlowers, 150);
-                return;
-            }
-            let matched = findFlowers();
-            if (matched.length > 0) {
-                combo++;
-                score += (matched.length * 100) * combo;
-                dropInterval = Math.max(200, dropInterval - 10);
-                matched.forEach(p => { puzBoard[p.y][p.x] = 0; });
-                setTimeout(applyGravity, 300);
-            } else {
-                if (gameState === 'PUZZLE_CASCADING') {
-                    gameState = 'PUZZLE_PLAYING';
-                    spawnPiece();
-                }
-            }
-        }
-
-        function findFlowers() {
-            let matched = new Set();
-            for (let r = 1; r < PUZZLE_ROWS - 1; r++) {
-                for (let c = 1; c < COLS - 1; c++) {
-                    let center = puzBoard[r][c];
-                    if (center === 0) continue;
-                    let top = puzBoard[r-1][c], bot = puzBoard[r+1][c], left = puzBoard[r][c-1], right = puzBoard[r][c+1];
-                    if (top !== 0 && top === bot && top === left && top === right && top !== center) {
-                        matched.add(`${r},${c}`); matched.add(`${r-1},${c}`); matched.add(`${r+1},${c}`);
-                        matched.add(`${r},${c-1}`); matched.add(`${r},${c+1}`);
-                    }
-                }
-            }
-            return Array.from(matched).map(str => {
-                let parts = str.split(',');
-                return { y: parseInt(parts[0]), x: parseInt(parts[1]) };
-            });
-        }
-
-        // ---------------------------------------------------------
-        // STUDIO LOGIC (All 5 Trade Beads + Eraser)
-        // ---------------------------------------------------------
-        function startStudioGame() {
-            studioBoard = Array.from({ length: STUDIO_ROWS }, () => Array(COLS).fill(0));
-            gameState = 'STUDIO_PLAYING';
-        }
-
-        function moveCursor(dx, dy) {
-            cursor.x = Math.max(0, Math.min(COLS - 1, cursor.x + dx));
-            cursor.y = Math.max(0, Math.min(STUDIO_ROWS - 1, cursor.y + dy));
-        }
-
-        function cycleColor() {
-            // 0: Eraser, 1: Cranberry Red, 2: Sky Blue, 3: Ochre Yellow, 4: Chalk White, 5: Moss Green
-            cursor.color = (cursor.color + 1) % 6;
-        }
-
-        function placeBead() {
-            studioBoard[cursor.y][cursor.x] = cursor.color;
-        }
-
-        // ---------------------------------------------------------
-        // 16-BIT SHADED RADIAL-GRADIENT BEAD & SMOKED MOOSE HIDE VAMP
-        // ---------------------------------------------------------
-        function drawShadedBeadAt(cx, cy, radius, colorCode, alpha = 1.0) {
-            const st = BEAD_STYLES[colorCode];
-            if (!st) return;
+        function drawSewnBeadAt(cx, cy, cellSize, beadStyle, isSewn = true, alpha = 1.0) {
+            if (!beadStyle) return;
+            const halfW = Math.max(5.5, Math.floor(cellSize * 0.43));
+            const halfH = Math.max(4.0, Math.floor(cellSize * 0.31));
 
             ctx.save();
             ctx.globalAlpha = alpha;
 
-            // 1. Deep grounded shadow on smoked moose hide for crisp bead separation
-            ctx.fillStyle = 'rgba(14, 6, 2, 0.72)';
-            ctx.beginPath();
-            ctx.arc(cx + radius * 0.14, cy + radius * 0.18, radius * 1.01, 0, Math.PI * 2);
-            ctx.fill();
+            if (isSewn) {
+                const threadOut = halfW + 2.5;
+                ctx.fillStyle = '#1a0b04';
+                ctx.fillRect(Math.floor(cx - threadOut - 1), Math.floor(cy - 1), 2, 2);
+                ctx.fillRect(Math.floor(cx + threadOut - 1), Math.floor(cy - 1), 2, 2);
 
-            // 2. Main 3D Radial Gradient Bead Body
-            const grad = ctx.createRadialGradient(
-                cx - radius * 0.30, cy - radius * 0.32, radius * 0.08,
-                cx, cy, radius
-            );
-            grad.addColorStop(0.0, st.highlight);
-            grad.addColorStop(0.30, st.mid);
-            grad.addColorStop(0.76, st.deep);
-            grad.addColorStop(1.0, st.rim);
-
-            ctx.fillStyle = grad;
-            ctx.beginPath();
-            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-            ctx.fill();
-
-            // 3. Subtle warm stove rim-light on lower-right edge
-            ctx.strokeStyle = st.rimGlow;
-            ctx.lineWidth = Math.max(1.2, radius * 0.12);
-            ctx.beginPath();
-            ctx.arc(cx, cy, radius * 0.86, 0.15, Math.PI * 0.58);
-            ctx.stroke();
-
-            // 4. Seed-bead thread core (pale core for Cornaline d'Aleppo, recessed for others)
-            ctx.fillStyle = st.coreColor;
-            ctx.beginPath();
-            ctx.arc(cx, cy, Math.max(1.4, radius * 0.19), 0, Math.PI * 2);
-            ctx.fill();
-
-            // 5. Crisp specular glass highlight (upper-left)
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.86)';
-            ctx.beginPath();
-            ctx.ellipse(
-                cx - radius * 0.32, cy - radius * 0.34,
-                Math.max(1.5, radius * 0.24), Math.max(1.1, radius * 0.15),
-                -Math.PI / 4, 0, Math.PI * 2
-            );
-            ctx.fill();
-
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.52)';
-            ctx.fillRect(Math.floor(cx - radius * 0.14), Math.floor(cy - radius * 0.52), 2, 2);
-
-            ctx.restore();
-        }
-
-        function drawBead(x, y, colorCode, cellSize, alpha = 1.0) {
-            if (colorCode === 0) return;
-            const cx = x * cellSize + (cellSize / 2);
-            const cy = y * cellSize + (cellSize / 2);
-            const radius = Math.floor(cellSize * 0.42);
-            drawShadedBeadAt(cx, cy, radius, colorCode, alpha);
-        }
-
-        // Helper path for the rounded/puckered moccasin vamp silhouette
-        function traceMoccasinVampPath(ctxRef, left, right, topArchY, shoulderY, bottomY) {
-            const cx = (left + right) / 2;
-            const botCurve = 8;
-            ctxRef.beginPath();
-            ctxRef.moveTo(left, bottomY - botCurve);
-            ctxRef.lineTo(left, shoulderY);
-            ctxRef.bezierCurveTo(left, topArchY, cx - (right - left) * 0.32, topArchY, cx, topArchY);
-            ctxRef.bezierCurveTo(cx + (right - left) * 0.32, topArchY, right, topArchY, right, shoulderY);
-            ctxRef.lineTo(right, bottomY - botCurve);
-            ctxRef.quadraticCurveTo(right, bottomY, right - botCurve, bottomY);
-            ctxRef.lineTo(left + botCurve, bottomY);
-            ctxRef.quadraticCurveTo(left, bottomY, left, bottomY - botCurve);
-            ctxRef.closePath();
-        }
-
-        function drawMooseHideVamp(rows, m) {
-            const padSide = 16;
-            const padTop = 28;
-            const padBot = 14;
-
-            const left = m.offsetX - padSide;
-            const right = m.offsetX + m.gridW + padSide;
-            const topArchY = m.offsetY - padTop;
-            const shoulderY = m.offsetY + 26;
-            const bottomY = m.offsetY + m.gridH + padBot;
-            const cx = (left + right) / 2;
-
-            ctx.save();
-
-            // 1. Drop shadow beneath the moccasin vamp
-            ctx.save();
-            ctx.translate(4, 6);
-            traceMoccasinVampPath(ctx, left, right, topArchY, shoulderY, bottomY);
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.62)';
-            ctx.fill();
-            ctx.restore();
-
-            // 2. Clip inside the deeply smoked brain-tanned moose hide silhouette
-            traceMoccasinVampPath(ctx, left, right, topArchY, shoulderY, bottomY);
-            ctx.save();
-            ctx.clip();
-
-            // Darkened, heavily smoked chestnut/walnut moose hide for high bead contrast
-            const hideGrad = ctx.createRadialGradient(
-                cx - 18, m.offsetY + m.gridH * 0.38, 14,
-                cx, m.offsetY + m.gridH * 0.45, Math.max(m.gridW, m.gridH) * 0.85
-            );
-            hideGrad.addColorStop(0.0, '#7a502c'); // Warm firelit smoked hide center
-            hideGrad.addColorStop(0.55, '#613c1e'); // Deep smoked moose hide mid-tone
-            hideGrad.addColorStop(0.88, '#472912'); // Rich dark smoked edge
-            hideGrad.addColorStop(1.0, '#2c1708'); // Burnished seam shadow
-            ctx.fillStyle = hideGrad;
-            ctx.fillRect(left - 2, topArchY - 2, (right - left) + 4, (bottomY - topArchY) + 4);
-
-            // Subtle 16-bit suede/buckskin grain dithering
-            drawDitherBand(ctx, left, topArchY, right - left, bottomY - topArchY, 'rgba(34, 16, 6, 0.20)', 2);
-            drawDitherBand(ctx, left + 2, topArchY + 2, right - left, bottomY - topArchY, 'rgba(220, 175, 120, 0.06)', 2);
-
-            // 3. PUCKERED / GATHERED PLEATS ALONG THE ROUNDED TOP TOE ARCH
-            const pleatCount = 13;
-            const archRadiusX = (right - left) * 0.49;
-            const archRadiusY = (shoulderY - topArchY) * 0.96;
-            const archCenterY = shoulderY + 4;
-
-            for (let i = 0; i < pleatCount; i++) {
-                const t = i / (pleatCount - 1);
-                const angle = Math.PI + 0.18 + t * (Math.PI - 0.36);
-                const ox = cx + Math.cos(angle) * archRadiusX;
-                const oy = archCenterY + Math.sin(angle) * archRadiusY;
-                const ix = cx + Math.cos(angle) * (archRadiusX - 17);
-                const iy = archCenterY + Math.sin(angle) * (archRadiusY - 15);
-
-                // Dark shadow crease of the gathered pucker
-                ctx.strokeStyle = 'rgba(26, 12, 4, 0.68)';
-                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#efe0be'; ctx.lineWidth = 1.4;
                 ctx.beginPath();
-                ctx.moveTo(ox, oy);
-                ctx.lineTo(ix, iy);
-                ctx.stroke();
-
-                // Warm raised highlight ridge next to each pucker fold
-                ctx.strokeStyle = 'rgba(176, 126, 76, 0.42)';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(ox + 2, oy + 1);
-                ctx.lineTo(ix + 2, iy + 1);
+                ctx.moveTo(cx - threadOut, cy); ctx.lineTo(cx - halfW + 1, cy);
+                ctx.moveTo(cx + halfW - 1, cy); ctx.lineTo(cx + threadOut, cy);
                 ctx.stroke();
             }
 
-            // Inner perimeter welt shadow
-            traceMoccasinVampPath(ctx, left + 1, right - 1, topArchY + 1, shoulderY, bottomY - 1);
-            ctx.strokeStyle = 'rgba(24, 11, 4, 0.62)';
-            ctx.lineWidth = 4;
-            ctx.stroke();
-
-            ctx.restore(); // End clip
-
-            // 4. Outer hide edge outline
-            traceMoccasinVampPath(ctx, left, right, topArchY, shoulderY, bottomY);
-            ctx.strokeStyle = '#241106';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-
-            // 5. Sinew / waxed-thread running stitch along the vamp seam
             ctx.save();
-            traceMoccasinVampPath(ctx, left + 5, right - 5, topArchY + 5, shoulderY, bottomY - 5);
-            ctx.setLineDash([4, 4]);
-            ctx.strokeStyle = '#e5d4b3';
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
+            ctx.translate(1.2, isSewn ? 2.0 : 3.2);
+            traceBeadBarrelPath(ctx, cx, cy, halfW, halfH);
+            ctx.fillStyle = isSewn ? 'rgba(12, 5, 2, 0.72)' : 'rgba(12, 5, 2, 0.48)';
+            ctx.fill();
             ctx.restore();
 
-            // 6. Subtle recessed basting-guide grid on the moose hide
-            ctx.fillStyle = 'rgba(28, 14, 5, 0.24)';
-            ctx.fillRect(m.offsetX, m.offsetY, m.gridW, m.gridH);
+            traceBeadBarrelPath(ctx, cx, cy, halfW, halfH);
+            const grad = ctx.createRadialGradient(cx - halfW * 0.24, cy - halfH * 0.42, halfH * 0.12, cx, cy + halfH * 0.10, halfW * 1.18);
+            grad.addColorStop(0.0, beadStyle.hi); grad.addColorStop(0.32, beadStyle.mid);
+            grad.addColorStop(0.76, beadStyle.deep); grad.addColorStop(1.0, beadStyle.rim);
+            ctx.fillStyle = grad;
+            ctx.fill();
 
-            ctx.strokeStyle = 'rgba(186, 142, 92, 0.24)';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(m.offsetX - 1, m.offsetY - 1, m.gridW + 2, m.gridH + 2);
+            ctx.save();
+            traceBeadBarrelPath(ctx, cx, cy, halfW, halfH);
+            ctx.clip();
+            ctx.fillStyle = 'rgba(16, 6, 2, 0.34)';
+            ctx.fillRect(cx - halfW, cy - halfH * 0.55, 2, halfH * 1.1);
+            ctx.fillRect(cx + halfW - 2, cy - halfH * 0.55, 2, halfH * 1.1);
 
-            // Awl-prick stitch guide dots
-            ctx.fillStyle = 'rgba(24, 11, 4, 0.56)';
-            for (let r = 0; r <= rows; r++) {
-                for (let c = 0; c <= COLS; c++) {
-                    ctx.fillRect(m.offsetX + c * m.cellSize - 1, m.offsetY + r * m.cellSize - 1, 2, 2);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.84)';
+            ctx.beginPath();
+            ctx.ellipse(cx - halfW * 0.16, cy - halfH * 0.44, Math.max(2.0, halfW * 0.42), Math.max(1.0, halfH * 0.20), -0.08, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            traceBeadBarrelPath(ctx, cx, cy, halfW, halfH);
+            ctx.strokeStyle = 'rgba(20, 8, 3, 0.65)'; ctx.lineWidth = 1; ctx.stroke();
+            ctx.restore();
+        }
+
+        // ==========================================
+        // BUSHY / FLUFFY ANKLE FUR TRIM RENDERER
+        // ==========================================
+        function drawFluffyFurTrim(x, y, width, height, furObj, bushy = false) {
+            ctx.save();
+            if (bushy) {
+                // Chunky, warm, bushy pixel fur puffs (less fine detail, plush moccasin feel)
+                // 1. Deep under-fur shadow silhouette
+                ctx.fillStyle = furObj.dark;
+                for (let fx = x - 6; fx <= x + width - 2; fx += 8) {
+                    const seed = Math.abs(Math.sin(fx * 12.9898) * 43758.5453) % 1;
+                    const topJut = Math.floor(seed * 5);
+                    const botJut = Math.floor(((seed * 5) % 1) * 6);
+                    ctx.fillRect(fx, y - topJut, 10, height + topJut + botJut);
+                }
+
+                // 2. Main chunky bushy mid-tone fur puffs
+                ctx.fillStyle = furObj.base;
+                for (let fx = x - 4; fx <= x + width - 4; fx += 9) {
+                    const seed = Math.abs(Math.sin(fx * 78.233) * 19341.23) % 1;
+                    const ty = y - Math.floor(seed * 4);
+                    const th = height - 1 + Math.floor(((seed * 4) % 1) * 5);
+                    ctx.fillRect(fx, ty, 10, th);
+                    ctx.fillRect(fx - 2, ty + 3, 14, Math.max(4, th - 6));
+                }
+
+                // 3. Soft warm bushy highlight clusters
+                ctx.fillStyle = furObj.hi;
+                for (let fx = x - 2; fx <= x + width - 6; fx += 10) {
+                    const seed = Math.abs(Math.sin(fx * 41.123) * 9182.77) % 1;
+                    const hy = y - 1 + Math.floor(seed * (height * 0.35));
+                    ctx.fillRect(fx, hy, 6, 5);
+                    ctx.fillRect(fx + 2, hy - 2, 4, 3);
+                }
+                ctx.restore();
+                return;
+            }
+
+            // Compact fuzzy trim for menu swatch & Lane's Post mini moccasin
+            ctx.fillStyle = furObj.dark;
+            for (let fx = x - 3; fx <= x + width + 3; fx += 4) {
+                const seed = Math.abs(Math.sin(fx * 12.9898) * 43758.5453) % 1;
+                const topJut = Math.floor(seed * 3);
+                const botJut = Math.floor(((seed * 7) % 1) * 4);
+                ctx.fillRect(fx, y - topJut, 5, height + topJut + botJut);
+            }
+            ctx.fillStyle = furObj.base;
+            for (let fx = x - 2; fx <= x + width + 2; fx += 5) {
+                const seed = Math.abs(Math.sin(fx * 78.233) * 19341.23) % 1;
+                ctx.fillRect(fx, y - Math.floor(seed * 2), 5, height + Math.floor(seed * 2));
+            }
+            ctx.fillStyle = furObj.hi;
+            for (let fx = x; fx <= x + width - 2; fx += 6) {
+                const seed = Math.abs(Math.sin(fx * 41.123) * 9182.77) % 1;
+                ctx.fillRect(fx, y + Math.floor(seed * 2), 3, 3);
+            }
+            ctx.restore();
+        }
+
+        // ==========================================
+        // 16-BIT MOCCASIN RENDERERS (FLIPPED VAMP: CUFF AT TOP, ROUNDED TOE AT BOTTOM)
+        // ==========================================
+        function traceDomePath(ctxRef, cx, rx, domeCenterY, ry, bottomY, botCorner = 4) {
+            ctxRef.beginPath();
+            ctxRef.moveTo(cx - rx, bottomY - botCorner);
+            ctxRef.lineTo(cx - rx, domeCenterY);
+            ctxRef.ellipse(cx, domeCenterY, rx, ry, 0, Math.PI, 0, false);
+            ctxRef.lineTo(cx + rx, bottomY - botCorner);
+            ctxRef.quadraticCurveTo(cx + rx, bottomY, cx + rx - botCorner, bottomY);
+            ctxRef.lineTo(cx - rx + botCorner, bottomY);
+            ctxRef.quadraticCurveTo(cx - rx, bottomY, cx - rx, bottomY - botCorner);
+            ctxRef.closePath();
+        }
+
+        function traceFlippedDomePath(ctxRef, cx, rx, topY, domeCenterY, ry, topCorner = 4) {
+            ctxRef.beginPath();
+            ctxRef.moveTo(cx - rx + topCorner, topY);
+            ctxRef.lineTo(cx + rx - topCorner, topY);
+            ctxRef.quadraticCurveTo(cx + rx, topY, cx + rx, topY + topCorner);
+            ctxRef.lineTo(cx + rx, domeCenterY);
+            ctxRef.ellipse(cx, domeCenterY, rx, ry, 0, 0, Math.PI, false);
+            ctxRef.lineTo(cx - rx, topY + topCorner);
+            ctxRef.quadraticCurveTo(cx - rx, topY, cx - rx + topCorner, topY);
+            ctxRef.closePath();
+        }
+
+        function drawThickSinewSeamFlipped(cx, rx, topY, domeCenterY, ry, sinewColor) {
+            const pts = [];
+            const sideSteps = 7;
+            for (let i = 0; i < sideSteps; i++) pts.push({ x: cx + rx, y: topY + 4 + (i / sideSteps) * (domeCenterY - (topY + 4)) });
+            const arcSteps = 28;
+            for (let i = 0; i <= arcSteps; i++) {
+                const a = (i / arcSteps) * Math.PI;
+                pts.push({ x: cx + Math.cos(a) * rx, y: domeCenterY + Math.sin(a) * ry });
+            }
+            for (let i = 1; i <= sideSteps; i++) pts.push({ x: cx - rx, y: domeCenterY - (i / sideSteps) * (domeCenterY - (topY + 4)) });
+
+            for (let i = 0; i < pts.length - 1; i += 2) {
+                const p1 = pts[i], p2 = pts[i + 1];
+                ctx.fillStyle = '#1c0c04';
+                ctx.fillRect(Math.floor(p1.x - 1.5), Math.floor(p1.y - 1.5), 3, 3);
+                ctx.fillRect(Math.floor(p2.x - 1.5), Math.floor(p2.y - 1.5), 3, 3);
+
+                ctx.strokeStyle = 'rgba(18, 8, 2, 0.78)'; ctx.lineWidth = 4.0; ctx.lineCap = 'round';
+                ctx.beginPath(); ctx.moveTo(p1.x + 1, p1.y + 1.5); ctx.lineTo(p2.x + 1, p2.y + 1.5); ctx.stroke();
+
+                ctx.strokeStyle = sinewColor; ctx.lineWidth = 2.8;
+                ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+            }
+
+            for (let sx = cx - rx + 8; sx <= cx + rx - 14; sx += 14) {
+                ctx.fillStyle = '#1c0c04';
+                ctx.fillRect(sx - 1, topY + 2, 2, 3); ctx.fillRect(sx + 7, topY + 2, 2, 3);
+                ctx.strokeStyle = sinewColor; ctx.lineWidth = 2.4;
+                ctx.beginPath(); ctx.moveTo(sx, topY + 3); ctx.lineTo(sx + 7, topY + 3); ctx.stroke();
+            }
+        }
+
+        function drawCompactOrderMoccasin(cx, cy, hideObj, palObj, furObj) {
+            const vampRX = 46, vampTopY = cy - 58, vampDomeY = cy - 12, vampRY = vampDomeY - vampTopY, vampBotY = cy + 36;
+            const outerRX = vampRX + 14, outerTopY = vampTopY - 14, outerDomeY = vampDomeY + 4, outerRY = outerDomeY - outerTopY, outerBotY = vampBotY + 8;
+
+            ctx.save();
+            ctx.save();
+            ctx.translate(4, 6);
+            traceDomePath(ctx, cx, outerRX, outerDomeY, outerRY, outerBotY + 18, 5);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.55)'; ctx.fill();
+            ctx.restore();
+
+            traceDomePath(ctx, cx, outerRX, outerDomeY, outerRY, outerBotY, 5);
+            ctx.fillStyle = hideObj.outerMid; ctx.fill();
+            ctx.strokeStyle = '#1c0c04'; ctx.lineWidth = 2; ctx.stroke();
+
+            const cuffTopY = vampBotY + 1, cuffH = 22, cuffW = outerRX * 2 - 4, cuffX = cx - cuffW / 2;
+            ctx.fillStyle = hideObj.cuffMain; ctx.fillRect(cuffX, cuffTopY, cuffW, cuffH);
+            ctx.strokeStyle = '#1c0c04'; ctx.lineWidth = 2; ctx.strokeRect(cuffX, cuffTopY, cuffW, cuffH);
+
+            drawFluffyFurTrim(cuffX, cuffTopY + cuffH - 8, cuffW, 11, furObj, false);
+
+            traceDomePath(ctx, cx, vampRX, vampDomeY, vampRY, vampBotY, 3);
+            const vampGrad = ctx.createRadialGradient(cx + 6, cy - 10, 8, cx, cy, vampRX * 1.3);
+            vampGrad.addColorStop(0.0, hideObj.light); vampGrad.addColorStop(0.5, hideObj.mid); vampGrad.addColorStop(1.0, hideObj.dark);
+            ctx.fillStyle = vampGrad; ctx.fill();
+            ctx.strokeStyle = hideObj.sinew; ctx.lineWidth = 2; ctx.setLineDash([4, 3]); ctx.stroke(); ctx.setLineDash([]);
+
+            const bY = cy - 8, sp = 14;
+            drawFlatBeadAt(cx - sp, bY + sp, 5, palObj.beads[5]);
+            drawFlatBeadAt(cx + sp, bY + sp, 5, palObj.beads[5]);
+            drawFlatBeadAt(cx, bY - sp, 6.5, palObj.beads[1]);
+            drawFlatBeadAt(cx, bY + sp, 6.5, palObj.beads[1]);
+            drawFlatBeadAt(cx - sp, bY, 6.5, palObj.beads[2]);
+            drawFlatBeadAt(cx + sp, bY, 6.5, palObj.beads[2]);
+            drawFlatBeadAt(cx, bY, 7, palObj.beads[3]);
+            ctx.restore();
+        }
+
+        function drawMoccasin(m, hideObj, guidePatternGrid, guidePalette, furObj) {
+            const cx = m.offsetX + m.gridW / 2;
+            const vampRX = Math.floor(m.gridW / 2) + 12;
+            const vampTopY = m.offsetY - 10;
+            const vampDomeCenterY = m.offsetY + m.gridH - Math.floor(m.cellSize * 3.1);
+            const vampBotY = m.offsetY + m.gridH + 12;
+            const vampRY = vampBotY - vampDomeCenterY;
+
+            const outerRX = vampRX + 20;
+            const outerTopY = vampTopY - 12;
+            const outerDomeCenterY = vampDomeCenterY - 6;
+            const outerBotY = vampBotY + 24;
+            const outerRY = outerBotY - outerDomeCenterY;
+
+            ctx.save();
+
+            // 1. Grounded drop shadow
+            ctx.save();
+            ctx.translate(5, 8);
+            traceFlippedDomePath(ctx, cx, outerRX, outerTopY - 18, outerDomeCenterY, outerRY, 6);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.58)'; ctx.fill();
+            ctx.restore();
+
+            // 2. Outer puckered lower-hide toe wrap
+            traceFlippedDomePath(ctx, cx, outerRX, outerTopY, outerDomeCenterY, outerRY, 6);
+            ctx.save();
+            ctx.clip();
+            const outerGrad = ctx.createRadialGradient(cx + 14, outerDomeCenterY, 18, cx, outerDomeCenterY - 20, outerRX * 1.45);
+            outerGrad.addColorStop(0.0, hideObj.outerLight); outerGrad.addColorStop(0.65, hideObj.outerMid); outerGrad.addColorStop(1.0, hideObj.outerDark);
+            ctx.fillStyle = outerGrad;
+            ctx.fillRect(cx - outerRX - 2, outerTopY - 2, outerRX * 2 + 4, (outerBotY - outerTopY) + 4);
+
+            const pleatCount = 21;
+            for (let i = 0; i < pleatCount; i++) {
+                const t = i / (pleatCount - 1);
+                const a = 0.06 + t * (Math.PI - 0.12);
+                const ox = cx + Math.cos(a) * (outerRX + 2), oy = outerDomeCenterY + Math.sin(a) * (outerRY + 2);
+                const ix = cx + Math.cos(a) * (vampRX - 2), iy = vampDomeCenterY + Math.sin(a) * (vampRY - 2);
+                ctx.strokeStyle = 'rgba(18, 8, 2, 0.68)'; ctx.lineWidth = 3;
+                ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ix, iy); ctx.stroke();
+                ctx.strokeStyle = 'rgba(255, 230, 190, 0.24)'; ctx.lineWidth = 1.2;
+                ctx.beginPath(); ctx.moveTo(ox + 2.5, oy - 1); ctx.lineTo(ix + 2, iy - 1); ctx.stroke();
+            }
+            ctx.restore();
+
+            traceFlippedDomePath(ctx, cx, outerRX, outerTopY, outerDomeCenterY, outerRY, 6);
+            ctx.strokeStyle = '#1c0c04'; ctx.lineWidth = 2.5; ctx.stroke();
+
+            // 3. Central Moccasin Vamp (Squared top, rounded toe dome at bottom)
+            traceFlippedDomePath(ctx, cx, vampRX + 3, vampTopY - 2, vampDomeCenterY, vampRY + 3, 3);
+            ctx.fillStyle = '#211005'; ctx.fill();
+
+            traceFlippedDomePath(ctx, cx, vampRX, vampTopY, vampDomeCenterY, vampRY, 3);
+            ctx.save();
+            ctx.clip();
+            const vampGrad = ctx.createRadialGradient(cx + 12, m.offsetY + m.gridH * 0.58, 16, cx, m.offsetY + m.gridH * 0.52, Math.max(vampRX, m.gridH) * 1.15);
+            vampGrad.addColorStop(0.0, hideObj.light); vampGrad.addColorStop(0.42, hideObj.mid);
+            vampGrad.addColorStop(0.84, hideObj.dark); vampGrad.addColorStop(1.0, hideObj.edge);
+            ctx.fillStyle = vampGrad;
+            ctx.fillRect(cx - vampRX - 2, vampTopY - 2, vampRX * 2 + 4, (vampBotY - vampTopY) + 4);
+            drawDitherBand(ctx, cx - vampRX, vampTopY, vampRX * 2, vampBotY - vampTopY, 'rgba(20, 10, 4, 0.12)', 2);
+            ctx.restore();
+
+            traceFlippedDomePath(ctx, cx, vampRX, vampTopY, vampDomeCenterY, vampRY, 3);
+            ctx.strokeStyle = '#261206'; ctx.lineWidth = 2; ctx.stroke();
+
+            // 4. Thick hand-stitched sinew around flipped vamp
+            drawThickSinewSeamFlipped(cx, vampRX - 1, vampTopY, vampDomeCenterY, vampRY - 1, hideObj.sinew);
+
+            // 5. Turned-down ankle cuff + Warm Bushy Fur at the TOP (ends just before Row 0 of beads)
+            const cuffH = 26;
+            const cuffTopY = vampTopY - cuffH - 2;
+            const cuffW = outerRX * 2 - 2, cuffX = cx - cuffW / 2;
+            ctx.fillStyle = hideObj.cuffMain; ctx.fillRect(cuffX, cuffTopY, cuffW, cuffH);
+            ctx.strokeStyle = '#1c0c04'; ctx.lineWidth = 2; ctx.strokeRect(cuffX, cuffTopY + 2, cuffW, cuffH - 2);
+
+            // Warm bushy fur covering the cuff and draping gently right up to the top seam above Row 0
+            drawFluffyFurTrim(cuffX, cuffTopY - 2, cuffW, 24, furObj || FURS[0], true);
+
+            // 6. Playable 9x9 cells
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    if (!isPlayableCell(r, c)) continue;
+                    const cellX = m.offsetX + c * m.cellSize, cellY = m.offsetY + r * m.cellSize;
+                    const midX = cellX + m.cellSize / 2, midY = cellY + m.cellSize / 2;
+
+                    const roleId = guidePatternGrid ? guidePatternGrid[r][c] : 0;
+                    if (roleId > 0 && guidePalette) {
+                        const bStyle = guidePalette.beads[roleId];
+                        ctx.strokeStyle = bStyle.mid; ctx.globalAlpha = 0.72; ctx.lineWidth = 1.8;
+                        ctx.strokeRect(cellX + 3, cellY + 3, m.cellSize - 6, m.cellSize - 6);
+                        ctx.fillStyle = bStyle.mid;
+                        ctx.beginPath(); ctx.arc(midX, midY, Math.max(2.5, m.cellSize * 0.14), 0, Math.PI * 2); ctx.fill();
+                        ctx.globalAlpha = 1.0;
+                    } else {
+                        ctx.fillStyle = hideObj.guideDot;
+                        ctx.fillRect(Math.floor(midX - 1), Math.floor(midY - 1), 2, 2);
+                    }
                 }
             }
 
             ctx.restore();
+            return { moccBottomY: outerBotY + 6 };
         }
 
+        // ==========================================
+        // UI HELPERS & SCENE RENDERING
+        // ==========================================
         function drawPixelText(text, x, y, color, font, align = 'center') {
-            ctx.font = font;
-            ctx.textAlign = align;
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-            ctx.fillText(text, x + 2, y + 2);
-            ctx.fillStyle = color;
-            ctx.fillText(text, x, y);
+            ctx.font = font; ctx.textAlign = align;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; ctx.fillText(text, x + 2, y + 2);
+            ctx.fillStyle = color; ctx.fillText(text, x, y);
         }
 
         function drawTopHudBar() {
             const grad = ctx.createLinearGradient(0, 0, 0, HUD_TOP_H);
-            grad.addColorStop(0, '#2a160c');
-            grad.addColorStop(0.5, '#1d0e07');
-            grad.addColorStop(1, '#120804');
-            ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, VIEW_W, HUD_TOP_H);
-
-            ctx.fillStyle = '#784c23';
-            ctx.fillRect(0, HUD_TOP_H - 3, VIEW_W, 2);
-            ctx.fillStyle = '#cfa04e';
-            ctx.fillRect(0, HUD_TOP_H - 2, VIEW_W, 1);
+            grad.addColorStop(0, '#2a160c'); grad.addColorStop(0.5, '#1d0e07'); grad.addColorStop(1, '#120804');
+            ctx.fillStyle = grad; ctx.fillRect(0, 0, VIEW_W, HUD_TOP_H);
+            ctx.fillStyle = '#784c23'; ctx.fillRect(0, HUD_TOP_H - 3, VIEW_W, 2);
+            ctx.fillStyle = '#cfa04e'; ctx.fillRect(0, HUD_TOP_H - 2, VIEW_W, 1);
         }
 
         function drawBottomHudBar(text) {
             const y = VIEW_H - HUD_BOT_H;
-            ctx.fillStyle = '#180c06';
-            ctx.fillRect(0, y, VIEW_W, HUD_BOT_H);
-            ctx.fillStyle = '#8c5c2b';
-            ctx.fillRect(0, y, VIEW_W, 2);
-
+            ctx.fillStyle = '#180c06'; ctx.fillRect(0, y, VIEW_W, HUD_BOT_H);
+            ctx.fillStyle = '#8c5c2b'; ctx.fillRect(0, y, VIEW_W, 2);
             drawPixelText(text, VIEW_W / 2, y + 17, '#d9c29c', 'bold 12px Courier New', 'center');
         }
 
+        function drawModalPanel(cx, cy, w, h) {
+            const x = Math.floor(cx - w / 2), y = Math.floor(cy - h / 2);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.60)'; ctx.fillRect(x + 4, y + 4, w, h);
+            ctx.fillStyle = 'rgba(24, 13, 7, 0.94)'; ctx.fillRect(x, y, w, h);
+            ctx.strokeStyle = '#c9933b'; ctx.lineWidth = 2.5; ctx.strokeRect(x, y, w, h);
+            ctx.strokeStyle = '#5c3318'; ctx.lineWidth = 1; ctx.strokeRect(x + 4, y + 4, w - 8, h - 8);
+        }
+
+        function drawGriddedPatternPreview(cx, cy, cellPx, patternObj, paletteObj, hideObj) {
+            const totalW = COLS * cellPx, totalH = ROWS * cellPx;
+            const ox = Math.floor(cx - totalW / 2), oy = Math.floor(cy - totalH / 2);
+
+            ctx.save();
+            ctx.fillStyle = '#120804'; ctx.fillRect(ox - 4, oy - 4, totalW + 8, totalH + 8);
+            ctx.strokeStyle = '#9c7132'; ctx.lineWidth = 1.5; ctx.strokeRect(ox - 4, oy - 4, totalW + 8, totalH + 8);
+
+            const isDarkHide = (hideObj.id === 2);
+            const gridStroke = isDarkHide ? 'rgba(220, 210, 195, 0.18)' : 'rgba(24, 11, 4, 0.28)';
+
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const x = ox + c * cellPx, y = oy + r * cellPx;
+                    if (!isPlayableCell(r, c)) {
+                        ctx.fillStyle = '#170c06'; ctx.fillRect(x, y, cellPx, cellPx);
+                        continue;
+                    }
+                    ctx.fillStyle = hideObj.mid; ctx.fillRect(x, y, cellPx, cellPx);
+                    ctx.strokeStyle = gridStroke; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, cellPx - 1, cellPx - 1);
+
+                    if (patternObj) {
+                        const role = patternObj.grid[r][c];
+                        if (role > 0) drawFlatBeadAt(x + cellPx / 2, y + cellPx / 2, Math.max(2.2, cellPx * 0.42), paletteObj.beads[role]);
+                    }
+                }
+            }
+
+            if (!patternObj) drawPixelText("BLANK", cx, cy + 4, isDarkHide ? '#d9c29c' : '#2b1507', 'bold 10px Courier New');
+            ctx.restore();
+        }
+
+        function drawOrderTicketCard(x, y, w, h, order) {
+            const hideObj = HIDES[order.hideId], palObj = PALETTES[order.palId], furObj = FURS[order.furId];
+            const isMatch = (order.hideId === craftHideId && order.palId === craftPalId && order.furId === craftFurId);
+
+            ctx.fillStyle = 'rgba(20, 11, 6, 0.92)'; ctx.fillRect(x, y, w, h);
+            ctx.strokeStyle = isMatch ? '#7bed9f' : '#a87832'; ctx.lineWidth = isMatch ? 2.5 : 1.5; ctx.strokeRect(x, y, w, h);
+
+            drawPixelText(order.name.toUpperCase(), x + w / 2, y + 14, '#ffe49e', 'bold 11px Courier New');
+
+            const pct = Math.max(0, order.patience / order.maxPatience);
+            const barX = x + 6, barY = y + 20, barW = w - 12, barH = 6;
+            ctx.fillStyle = '#120804'; ctx.fillRect(barX, barY, barW, barH);
+            ctx.fillStyle = pct > 0.5 ? '#7bed9f' : (pct > 0.25 ? '#f2c938' : '#ff5252');
+            ctx.fillRect(barX, barY, Math.floor(barW * pct), barH);
+
+            ctx.fillStyle = hideObj.mid; ctx.fillRect(x + 8, y + 32, 14, 11);
+            ctx.strokeStyle = '#f6e7c8'; ctx.lineWidth = 1; ctx.strokeRect(x + 8, y + 32, 14, 11);
+            drawPixelText(hideObj.shortName, x + 28, y + 41, '#f6e7c8', 'bold 10px Courier New', 'left');
+
+            drawFlatBeadAt(x + 11, y + 57, 3.6, palObj.beads[1]);
+            drawFlatBeadAt(x + 17, y + 57, 3.6, palObj.beads[3]);
+            drawFlatBeadAt(x + 23, y + 57, 3.6, palObj.beads[5]);
+            drawPixelText(palObj.shortName, x + 31, y + 60, '#7BAFD4', 'bold 10px Courier New', 'left');
+
+            ctx.fillStyle = furObj.base; ctx.fillRect(x + 10, y + 71, 10, 9);
+            ctx.fillStyle = furObj.hi; ctx.fillRect(x + 11, y + 72, 6, 4);
+            drawPixelText(furObj.shortName, x + 28, y + 79, '#ffe169', 'bold 10px Courier New', 'left');
+        }
+
         function drawScene(now) {
-            // 1. Blit pre-rendered 16-bit French-Métis log cabin
-            ctx.drawImage(bgCanvas, 0, 0);
+            const midY = Math.floor(HUD_TOP_H + (VIEW_H - HUD_TOP_H - HUD_BOT_H) / 2);
 
-            // 2. Layer animated winter stars & flickering woodstove embers/glow
-            drawAnimatedCabinEffects(now);
-
-            // --- BOOT SELECTION MENU ---
+            // 1. TITLE SCREEN — NATURAL ASSINIBOINE RIVER BEND
             if (gameState === 'MODE_SELECT') {
-                drawTopHudBar();
-                drawPixelText("li rassad di fleur", VIEW_W / 2, 40, '#ffe49e', 'bold 22px Courier New');
+                ctx.drawImage(titleBgCanvas, 0, 0);
+                drawAnimatedAssiniboineBendEffects(now);
 
-                const boxW = Math.min(310, VIEW_W - 44);
-                const boxH = 216;
-                const boxX = Math.floor((VIEW_W - boxW) / 2);
-                const boxY = Math.floor(HUD_TOP_H + (VIEW_H - HUD_TOP_H - HUD_BOT_H - boxH) / 2);
+                drawPixelText("li rassad di fleur", VIEW_W / 2, 56, '#fff2cc', 'bold 26px Courier New');
+                drawPixelText("ASSINIBOINE RIVER • ST. FRANCOIS XAVIER", VIEW_W / 2, 80, '#f7e0b5', 'bold 11px Courier New');
 
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-                ctx.fillRect(boxX + 4, boxY + 4, boxW, boxH);
-                ctx.fillStyle = 'rgba(26, 15, 9, 0.92)';
-                ctx.fillRect(boxX, boxY, boxW, boxH);
-                ctx.strokeStyle = '#c9933b';
-                ctx.lineWidth = 3;
-                ctx.strokeRect(boxX, boxY, boxW, boxH);
-                ctx.strokeStyle = '#5c3318';
-                ctx.lineWidth = 1;
-                ctx.strokeRect(boxX + 4, boxY + 4, boxW - 8, boxH - 8);
+                const boxW = Math.min(168, Math.floor((VIEW_W - 44) / 2));
+                const boxH = 74, gap = 14, totalW = boxW * 2 + gap;
+                const leftX = Math.floor((VIEW_W - totalW) / 2);
+                const boxY = Math.floor(VIEW_H - HUD_BOT_H - boxH - 36);
 
-                // Prairie rose emblem using authentic Cranberry Red, Ochre Yellow & Moss Green leaves
-                const ex = VIEW_W / 2;
-                const ey = boxY + 44;
-                const sp = 18;
-                drawShadedBeadAt(ex - sp, ey + sp, 6, 5); // Moss Green leaf
-                drawShadedBeadAt(ex + sp, ey + sp, 6, 5); // Moss Green leaf
-                drawShadedBeadAt(ex, ey - sp, 8, 1);      // Cranberry Red petal
-                drawShadedBeadAt(ex, ey + sp, 8, 1);      // Cranberry Red petal
-                drawShadedBeadAt(ex - sp, ey, 8, 1);      // Cranberry Red petal
-                drawShadedBeadAt(ex + sp, ey, 8, 1);      // Cranberry Red petal
-                drawShadedBeadAt(ex, ey, 8, 3);           // Ochre Yellow center
+                [
+                    { title: "LANE'S POST", sub: "HBC CLERK RUSH", idx: 0 },
+                    { title: "TIPI STUDIO", sub: "FREEFORM BEADWORK", idx: 1 }
+                ].forEach((ch, i) => {
+                    const bx = leftX + i * (boxW + gap);
+                    const sel = (menuSelection === ch.idx);
+                    ctx.fillStyle = 'rgba(18, 10, 5, 0.86)'; ctx.fillRect(bx, boxY, boxW, boxH);
+                    ctx.strokeStyle = sel ? '#ffe169' : '#8c6232'; ctx.lineWidth = sel ? 3 : 1.5; ctx.strokeRect(bx, boxY, boxW, boxH);
+                    drawPixelText(sel ? `> ${ch.title} <` : ch.title, bx + boxW / 2, boxY + 32, sel ? '#ffe169' : '#c7b8a1', 'bold 14px Courier New');
+                    drawPixelText(ch.sub, bx + boxW / 2, boxY + 54, sel ? '#f6e7c8' : '#8c7a66', 'bold 10px Courier New');
+                });
 
-                drawPixelText(
-                    menuSelection === 0 ? "> PUZZLE SOLVER <" : "  PUZZLE SOLVER  ",
-                    VIEW_W / 2, boxY + 118,
-                    menuSelection === 0 ? '#ffe169' : '#8c7a66',
-                    'bold 20px Courier New'
-                );
-
-                drawPixelText(
-                    menuSelection === 1 ? "> BEAD STUDIO <" : "  BEAD STUDIO  ",
-                    VIEW_W / 2, boxY + 162,
-                    menuSelection === 1 ? '#ffe169' : '#8c7a66',
-                    'bold 20px Courier New'
-                );
-
-                drawBottomHudBar("D-PAD: SELECT  |  A: START");
+                drawBottomHudBar("D-PAD: SELECT  |  A: ENTER");
                 drawPauseOverlay();
                 return;
             }
 
-            // --- PUZZLE RENDERING ---
-            if (currentMode === 'PUZZLE') {
-                const m = getGridMetrics(PUZZLE_ROWS);
+            // 2. LANE'S POST 4-4-4 CLERK RUSH
+            if (gameState === 'ORDER_PLAYING' || gameState === 'ORDER_GAMEOVER') {
+                ctx.drawImage(postBgCanvas, 0, 0);
+                drawAnimatedPostEffects(now);
+
                 drawTopHudBar();
+                drawPixelText(`SCORE: ${orderScore}`, 12, 26, '#ffe49e', 'bold 16px Courier New', 'left');
+                drawPixelText(`SERVED: ${orderServedCount}`, VIEW_W / 2, 26, '#7BAFD4', 'bold 14px Courier New', 'center');
 
-                drawPixelText(`SCORE: ${score}`, 14, 28, '#ffe49e', 'bold 19px Courier New', 'left');
-                if (combo > 1) {
-                    drawPixelText(`COMBO x${combo}`, VIEW_W - 14, 28, '#D99B26', 'bold 19px Courier New', 'right');
-                }
-                drawPixelText(`PUZZLE MODE (${puzzleDifficulty === 1 ? 'I' : 'II'})`, VIEW_W / 2, 52, '#d9c29c', 'bold 13px Courier New', 'center');
+                const livesLeft = Math.max(0, MAX_STRIKES - orderStrikes);
+                drawPixelText(`LIVES: ${'♥'.repeat(livesLeft)}${'·'.repeat(orderStrikes)}`, VIEW_W - 12, 26, livesLeft <= 1 ? '#ff5252' : '#ff6b6b', 'bold 14px Courier New', 'right');
+                drawPixelText(
+                    orderCombo > 1 ? `LANE'S POST • STREAK x${orderCombo}!` : "LANE'S POST • MATCH HIDE + HANK + FUR",
+                    VIEW_W / 2, 52, orderCombo > 1 ? '#7bed9f' : '#d9c29c', 'bold 11px Courier New', 'center'
+                );
 
-                drawMooseHideVamp(PUZZLE_ROWS, m);
-                drawBottomHudBar("D-PAD: MOVE  |  A/B: ROTATE");
+                const cardW = Math.min(122, Math.floor((VIEW_W - 28) / 3)), cardH = 90, gap = 8;
+                const totalRowW = activeOrders.length * cardW + Math.max(0, activeOrders.length - 1) * gap;
+                const startX = Math.floor((VIEW_W - totalRowW) / 2), cardY = HUD_TOP_H + 10;
 
-                if (gameState === 'PUZZLE_START') {
-                    ctx.fillStyle = 'rgba(26, 14, 7, 0.88)';
-                    ctx.fillRect(m.offsetX, m.offsetY, m.gridW, m.gridH);
-                    const cx = m.offsetX + m.gridW / 2;
-                    const cy = m.offsetY + m.gridH / 2;
-
-                    drawPixelText("MAKE 3x3 FLOWERS", cx, cy - 96, '#d9535c', 'bold 21px Courier New');
-
-                    const spacing = Math.min(26, Math.floor(m.cellSize * 0.78));
-                    const miniR = Math.floor(spacing * 0.42);
-                    const exY = cy - 34;
-                    drawShadedBeadAt(cx, exY - spacing, miniR, 1);
-                    drawShadedBeadAt(cx, exY + spacing, miniR, 1);
-                    drawShadedBeadAt(cx - spacing, exY, miniR, 1);
-                    drawShadedBeadAt(cx + spacing, exY, miniR, 1);
-                    drawShadedBeadAt(cx, exY, miniR, 3);
-
-                    drawPixelText("PETALS MUST MATCH", cx, cy + 34, '#F2EFE9', 'bold 14px Courier New');
-                    drawPixelText("CENTER MUST DIFFER", cx, cy + 56, '#F2EFE9', 'bold 14px Courier New');
-                    drawPixelText("PRESS 'A' TO CONTINUE", cx, cy + 98, '#D99B26', 'bold 15px Courier New');
-                    drawPixelText("PRESS 'B' TO RETURN", cx, cy + 122, '#a3907a', 'bold 12px Courier New');
-                    drawPauseOverlay();
-                    return;
+                for (let i = 0; i < activeOrders.length; i++) {
+                    drawOrderTicketCard(startX + i * (cardW + gap), cardY, cardW, cardH, activeOrders[i]);
                 }
 
-                if (gameState === 'PUZZLE_DIFFICULTY') {
-                    ctx.fillStyle = 'rgba(26, 14, 7, 0.88)';
-                    ctx.fillRect(m.offsetX, m.offsetY, m.gridW, m.gridH);
-                    const cx = m.offsetX + m.gridW / 2;
-                    const cy = m.offsetY + m.gridH / 2;
+                const curHide = HIDES[craftHideId], curPal = PALETTES[craftPalId], curFur = FURS[craftFurId];
+                const moccCY = cardY + cardH + 74;
+                drawCompactOrderMoccasin(VIEW_W / 2, moccCY, curHide, curPal, curFur);
 
-                    drawPixelText("SELECT DIFFICULTY", cx, cy - 78, '#D99B26', 'bold 21px Courier New');
-                    drawPixelText(
-                        puzzleDifficulty === 1 ? "> I - SINGLE BEAD <" : "  I - SINGLE BEAD  ",
-                        cx, cy - 12,
-                        puzzleDifficulty === 1 ? '#7BAFD4' : '#8c7a66',
-                        'bold 18px Courier New'
-                    );
-                    drawPixelText(
-                        puzzleDifficulty === 2 ? "> II - DOUBLE BEAD <" : "  II - DOUBLE BEAD  ",
-                        cx, cy + 32,
-                        puzzleDifficulty === 2 ? '#7BAFD4' : '#8c7a66',
-                        'bold 18px Courier New'
-                    );
-                    drawPixelText("PRESS 'A' TO START", cx, cy + 94, '#F2EFE9', 'bold 16px Courier New');
-                    drawPixelText("PRESS 'B' TO RETURN", cx, cy + 120, '#a3907a', 'bold 12px Courier New');
-                    drawPauseOverlay();
-                    return;
-                }
+                const panelW = Math.min(346, VIEW_W - 24), panelH = 114, panelCY = moccCY + 124;
+                drawModalPanel(VIEW_W / 2, panelCY, panelW, panelH);
 
-                ctx.save();
-                ctx.translate(m.offsetX, m.offsetY);
-                for (let r = 0; r < PUZZLE_ROWS; r++) {
-                    for (let c = 0; c < COLS; c++) drawBead(c, r, puzBoard[r][c], m.cellSize);
-                }
-                if (gameState === 'PUZZLE_PLAYING') {
-                    drawBead(active.x, active.y, active.c1, m.cellSize);
-                    if (!active.isSingle) {
-                        let p2 = getC2Pos(active.x, active.y, active.dir);
-                        drawBead(p2.x, p2.y, active.c2, m.cellSize);
+                const pTop = panelCY - panelH / 2;
+                [
+                    { label: 'HIDE', val: curHide.name, idx: 0 },
+                    { label: 'HANK', val: curPal.name,  idx: 1 },
+                    { label: 'FUR ', val: curFur.name,  idx: 2 }
+                ].forEach(r => {
+                    const ry = pTop + 28 + r.idx * 32;
+                    const active = (craftRow === r.idx);
+                    if (active) {
+                        ctx.fillStyle = 'rgba(217, 155, 38, 0.22)';
+                        ctx.fillRect(VIEW_W / 2 - panelW / 2 + 8, ry - 15, panelW - 16, 22);
                     }
-                }
-                ctx.restore();
+                    drawPixelText(r.label + ':', VIEW_W / 2 - panelW / 2 + 18, ry, active ? '#ffe169' : '#a3907a', 'bold 13px Courier New', 'left');
+                    drawPixelText(`< ${r.val} >`, VIEW_W / 2 + 28, ry, active ? '#ffffff' : '#c7b8a1', 'bold 14px Courier New', 'center');
+                });
 
-                if (gameState === 'PUZZLE_GAMEOVER') {
-                    ctx.fillStyle = 'rgba(22, 11, 6, 0.90)';
-                    ctx.fillRect(m.offsetX, m.offsetY, m.gridW, m.gridH);
-                    const cx = m.offsetX + m.gridW / 2;
-                    const cy = m.offsetY + m.gridH / 2;
+                if (feedbackTimerMs > 0) drawPixelText(feedbackMsg, VIEW_W / 2, panelCY + panelH / 2 + 22, feedbackColor, 'bold 14px Courier New');
+                else drawPixelText("PRESS 'A' TO SERVE CUSTOMER", VIEW_W / 2, panelCY + panelH / 2 + 22, '#ffe169', 'bold 12px Courier New');
 
-                    drawPixelText("GAME OVER", cx, cy - 38, '#d9535c', 'bold 26px Courier New');
-                    drawPixelText(`FINAL SCORE: ${score}`, cx, cy + 10, '#ffe49e', 'bold 17px Courier New');
-                    drawPixelText("PRESS 'A' TO REPLAY", cx, cy + 58, '#F2EFE9', 'bold 16px Courier New');
-                    drawPixelText("PRESS 'B' TO RETURN", cx, cy + 86, '#a3907a', 'bold 12px Courier New');
+                drawBottomHudBar("D-PAD: PICK 4-4-4  |  A: SERVE  |  B: NEXT");
+
+                if (gameState === 'ORDER_GAMEOVER') {
+                    drawModalPanel(VIEW_W / 2, midY, Math.min(310, VIEW_W - 28), 210);
+                    drawPixelText("POST CLOSED!", VIEW_W / 2, midY - 62, '#ffe169', 'bold 22px Courier New');
+                    drawPixelText(`FINAL SCORE: ${orderScore}`, VIEW_W / 2, midY - 18, '#F2EFE9', 'bold 17px Courier New');
+                    drawPixelText(`ORDERS SERVED: ${orderServedCount}`, VIEW_W / 2, midY + 12, '#7BAFD4', 'bold 15px Courier New');
+                    drawPixelText("PRESS 'A' TO PLAY AGAIN", VIEW_W / 2, midY + 56, '#7bed9f', 'bold 14px Courier New');
+                    drawPixelText("PRESS 'B' FOR MAIN MENU", VIEW_W / 2, midY + 82, '#a3907a', 'bold 12px Courier New');
                 }
+
+                drawPauseOverlay();
+                return;
             }
 
-            // --- STUDIO RENDERING ---
-            if (currentMode === 'STUDIO') {
-                const m = getGridMetrics(STUDIO_ROWS);
+            // 3. ZOOMED-IN PANNABLE CONICAL TIPI STUDIO SCENES
+            ctx.save();
+            ctx.translate(-Math.floor(tipiCamX), 0);
+            ctx.drawImage(tipiBgCanvas, 0, 0);
+            drawAnimatedTipiDoorwayShimmer(now);
+
+            const chosenHide = HIDES[selectedHideId];
+            const chosenPal = PALETTES[selectedPaletteId];
+            const chosenFur = FURS[selectedStudioFurId];
+
+            // 3A. TIPI INTRO CUTSCENE (UNSKIPPABLE)
+            if (gameState === 'TIPI_INTRO_CUTSCENE') {
+                const doorEntryX = tipiLayout.doorX + tipiLayout.doorW * 0.50;
+                const doorEntryY = tipiLayout.doorY + tipiLayout.doorH + 2;
+                const standX = doorEntryX + 26, standY = doorEntryY + 10;
+                const stashEndX = tipiLayout.stashX - 18, stashEndY = tipiLayout.stashY + 14;
+
+                if (cutsceneElapsedMs < 700) {
+                    const t = stepProgress(cutsceneElapsedMs / 700, 6);
+                    drawMotherSprite(doorEntryX + (standX - doorEntryX) * t, doorEntryY + (standY - doorEntryY) * t, 'duck', now);
+                } else if (cutsceneElapsedMs < 2100) {
+                    const t = stepProgress((cutsceneElapsedMs - 700) / 1400, 12);
+                    drawMotherSprite(standX + (stashEndX - standX) * t, standY + (stashEndY - standY) * t, 'walk', now);
+                } else {
+                    drawMotherSprite(stashEndX, stashEndY, 'kneel', now);
+                    ctx.fillStyle = '#ffe57f'; ctx.fillRect(tipiLayout.stashX + 14, tipiLayout.stashY - 11, 4, 4);
+                }
+
+                drawCentralEmberHearth(now);
+                ctx.restore();
+
                 drawTopHudBar();
+                drawPixelText("TIPI BEAD STUDIO", VIEW_W / 2, 28, '#ffe49e', 'bold 18px Courier New');
+                drawPixelText("GATHERING HIDES & BEADS...", VIEW_W / 2, 52, '#d9c29c', 'bold 12px Courier New');
+                drawBottomHudBar("ASSINIBOINE RIVER TIPI");
+                drawPauseOverlay();
+                return;
+            }
 
-                drawPixelText("BEADWORK STUDIO", VIEW_W / 2, 26, '#ffe49e', 'bold 18px Courier New');
+            // 3B. STASH-CRAFT SETUP SCREEN (MOTIF NAME ONLY — NO NATION LABELS)
+            if (gameState === 'PREP_SELECT') {
+                drawMotherSprite(tipiLayout.stashX - 18, tipiLayout.stashY + 14, 'kneel', now);
+                drawCentralEmberHearth(now);
+                ctx.restore();
 
-                if (gameState === 'STUDIO_PLAYING') {
-                    const brushColor = cursor.color === 0 ? '#d9535c' : BEAD_STYLES[cursor.color].uiColor;
-                    const brushName = cursor.color === 0 ? 'ERASER' : BEAD_STYLES[cursor.color].name;
-                    drawPixelText(`BRUSH: ${brushName}`, VIEW_W / 2, 52, brushColor, 'bold 15px Courier New');
+                drawTopHudBar();
+                drawPixelText("STASH-CRAFT SUPPLIES", VIEW_W / 2, 28, '#ffe49e', 'bold 17px Courier New');
+                drawPixelText("HIDE • BEAD HANK • FUR • TEMPLATE", VIEW_W / 2, 52, '#d9c29c', 'bold 11px Courier New');
+
+                const boxW = Math.min(344, VIEW_W - 22), boxH = 372;
+                drawModalPanel(VIEW_W / 2, midY, boxW, boxH);
+
+                const topY = Math.floor(midY - boxH / 2);
+
+                drawPixelText(`< ${chosenHide.name} >`, VIEW_W / 2, topY + 28, prepRow === 0 ? '#ffe169' : '#c7b8a1', 'bold 15px Courier New');
+                ctx.fillStyle = chosenHide.mid; ctx.fillRect(VIEW_W / 2 - 26, topY + 35, 52, 10);
+                ctx.strokeStyle = '#f6e7c8'; ctx.lineWidth = 1; ctx.strokeRect(VIEW_W / 2 - 26, topY + 35, 52, 10);
+
+                drawPixelText(`< ${chosenPal.name} >`, VIEW_W / 2, topY + 72, prepRow === 1 ? '#ffe169' : '#c7b8a1', 'bold 15px Courier New');
+                for (let i = 1; i <= 7; i++) drawFlatBeadAt(VIEW_W / 2 - 66 + (i - 1) * 22, topY + 90, 6.5, chosenPal.beads[i]);
+
+                drawPixelText(`< ${chosenFur.name} >`, VIEW_W / 2, topY + 124, prepRow === 2 ? '#ffe169' : '#c7b8a1', 'bold 15px Courier New');
+                drawFluffyFurTrim(VIEW_W / 2 - 28, topY + 131, 56, 8, chosenFur, false);
+
+                const selPat = selectedStudioTemplate >= 0 ? PATTERNS[selectedStudioTemplate] : null;
+                const tplLabel = selPat ? selPat.name : 'Blank';
+                drawPixelText(`< ${tplLabel} >`, VIEW_W / 2, topY + 170, prepRow === 3 ? '#ffe169' : '#c7b8a1', 'bold 15px Courier New');
+                drawGriddedPatternPreview(VIEW_W / 2, topY + 226, 9, selPat, chosenPal, chosenHide);
+
+                drawPixelText(prepRow === 4 ? "> SIT BY THE EMBERS <" : "  SIT BY THE EMBERS  ", VIEW_W / 2, topY + 314, prepRow === 4 ? '#7bed9f' : '#8c7a66', 'bold 16px Courier New');
+                drawPixelText("LEFT/RIGHT: CHANGE  |  A: NEXT", VIEW_W / 2, topY + 344, '#a3907a', 'bold 10px Courier New');
+
+                drawBottomHudBar("D-PAD: PICK OPTIONS  |  A: GO");
+                drawPauseOverlay();
+                return;
+            }
+
+            // 3C. TIPI SIT CUTSCENE (UNSKIPPABLE)
+            if (gameState === 'TIPI_SIT_CUTSCENE') {
+                const startX = tipiLayout.stashX - 18, startY = tipiLayout.stashY + 14;
+                const sitX = tipiLayout.robeSitX, sitY = tipiLayout.robeSitY + 8;
+
+                drawCentralEmberHearth(now);
+
+                if (cutsceneElapsedMs < 1450) {
+                    const t = stepProgress(cutsceneElapsedMs / 1450, 12);
+                    drawMotherSprite(startX + (sitX - startX) * t, startY + (sitY - startY) * t, 'carry', now, chosenHide);
+                } else {
+                    drawMotherSprite(sitX, sitY, 'sit_rustle', now, chosenHide);
+                }
+                ctx.restore();
+
+                if (cutsceneElapsedMs > 2150) {
+                    const fade = stepProgress((cutsceneElapsedMs - 2150) / 550, 6);
+                    ctx.fillStyle = `rgba(18, 9, 5, ${fade})`;
+                    ctx.fillRect(0, HUD_TOP_H, VIEW_W, VIEW_H - HUD_TOP_H - HUD_BOT_H);
                 }
 
-                drawMooseHideVamp(STUDIO_ROWS, m);
-                drawBottomHudBar("A: PLACE/ERASE  |  B: COLOR");
+                drawTopHudBar();
+                drawPixelText("BY THE GLOWING EMBERS", VIEW_W / 2, 28, '#ffe49e', 'bold 17px Courier New');
+                drawPixelText("SETTLING IN TO BEAD...", VIEW_W / 2, 52, '#d9c29c', 'bold 12px Courier New');
+                drawBottomHudBar("ASSINIBOINE RIVER TIPI");
+                drawPauseOverlay();
+                return;
+            }
 
-                if (gameState === 'STUDIO_START') {
-                    ctx.fillStyle = 'rgba(26, 14, 7, 0.88)';
-                    ctx.fillRect(m.offsetX, m.offsetY, m.gridW, m.gridH);
-                    const cx = m.offsetX + m.gridW / 2;
-                    const cy = m.offsetY + m.gridH / 2;
+            // 3D. POST-GAME OUTRO CUTSCENE (UNSKIPPABLE)
+            if (gameState === 'TIPI_OUTRO_CUTSCENE') {
+                const sitX = tipiLayout.robeSitX, sitY = tipiLayout.robeSitY + 8;
+                const husX = tipiLayout.husbandX, husY = tipiLayout.husbandY + 8;
+                const doorExitX = tipiLayout.doorX + tipiLayout.doorW * 0.50;
+                const doorExitY = tipiLayout.doorY + tipiLayout.doorH + 2;
 
-                    drawPixelText("BEADWORK STUDIO", cx, cy - 78, '#D99B26', 'bold 22px Courier New');
-                    drawPixelText("DPAD   : MOVE CURSOR", cx, cy - 16, '#F2EFE9', 'bold 14px Courier New');
-                    drawPixelText("BTN B  : CHANGE COLOR", cx, cy + 16, '#F2EFE9', 'bold 14px Courier New');
-                    drawPixelText("BTN A  : PLACE/ERASE", cx, cy + 48, '#F2EFE9', 'bold 14px Courier New');
-                    drawPixelText("PRESS 'A' TO START", cx, cy + 102, '#7BAFD4', 'bold 16px Courier New');
-                    drawPixelText("PRESS 'B' TO RETURN", cx, cy + 128, '#a3907a', 'bold 12px Courier New');
-                    drawPauseOverlay();
-                    return;
+                drawCentralEmberHearth(now);
+
+                if (cutsceneElapsedMs < 2400) {
+                    drawMotherSprite(sitX, sitY, 'sit_rustle_fast', now, chosenHide);
+                    drawHusbandSprite(husX, husY, 'sit', now, false, chosenHide, chosenPal, chosenFur);
+                } else if (cutsceneElapsedMs < 3600) {
+                    const t = stepProgress((cutsceneElapsedMs - 2400) / 1200, 10);
+                    drawMotherSprite(sitX + (husX - 30 - sitX) * t, sitY + (husY - sitY) * t, 'carry_mocc', now, chosenHide, chosenPal, chosenFur);
+                    drawHusbandSprite(husX, husY, 'sit', now, false, chosenHide, chosenPal, chosenFur);
+                } else if (cutsceneElapsedMs < 4300) {
+                    drawMotherSprite(husX - 30, husY, 'place_mocc', now, chosenHide, chosenPal, chosenFur);
+                    drawHusbandSprite(husX, husY, 'sit', now, true, chosenHide, chosenPal, chosenFur);
+                } else if (cutsceneElapsedMs < 6100) {
+                    const jigPhase = (cutsceneElapsedMs - 4300) / 900;
+                    drawMotherSprite(husX - 36, husY, 'walk', 0);
+                    drawHusbandSprite(husX, husY, 'jig', now, true, chosenHide, chosenPal, chosenFur, jigPhase);
+                } else if (cutsceneElapsedMs < 7200) {
+                    drawMotherSprite(husX - 32, husY, 'walk', 0);
+                    drawHusbandSprite(husX - 10, husY, 'kiss', now, true, chosenHide, chosenPal, chosenFur);
+                } else {
+                    drawMotherSprite(husX - 32, husY, 'walk', 0);
+                    const t = stepProgress((cutsceneElapsedMs - 7200) / 2100, 18);
+                    const hx = (husX - 10) + (doorExitX - (husX - 10)) * t;
+                    const hy = husY + (doorExitY - husY) * t;
+                    const hPose = t > 0.78 ? 'duck_left' : 'walk_left';
+                    if (t < 0.96) {
+                        drawHusbandSprite(hx, hy, hPose, now, true, chosenHide, chosenPal, chosenFur);
+                    }
                 }
+
+                ctx.restore();
+
+                if (cutsceneElapsedMs > 8400) {
+                    const fade = stepProgress((cutsceneElapsedMs - 8400) / 1100, 8);
+                    ctx.fillStyle = `rgba(0, 0, 0, ${fade})`;
+                    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+                }
+
+                drawTopHudBar();
+                const caption = cutsceneElapsedMs < 2400 ? "FINISHING THE MOCCASINS..."
+                    : cutsceneElapsedMs < 4300 ? "A FRESH PAIR FOR THE TRAIL..."
+                    : cutsceneElapsedMs < 6100 ? "1 - 2 - 3 - KICK!"
+                    : cutsceneElapsedMs < 7200 ? "MERCI, MA CHERE!"
+                    : "OFF DOWN THE ASSINIBOINE...";
+                drawPixelText(caption, VIEW_W / 2, 38, '#ffe49e', 'bold 16px Courier New');
+                drawBottomHudBar("ASSINIBOINE RIVER TIPI");
+                drawPauseOverlay();
+                return;
+            }
+
+            // 4. TIPI STUDIO BEADING WORKBENCH (FLIPPED VAMP + BUSHY FUR + GUIDE/STITCH ONLY)
+            if (gameState === 'BEADING') {
+                drawCentralEmberHearth(now);
+                ctx.restore();
+
+                const m = getGridMetrics();
+                const guideGrid = (showChalkGuide && selectedStudioTemplate >= 0) ? PATTERNS[selectedStudioTemplate].grid : null;
+
+                drawTopHudBar();
+                const stTitle = selectedStudioTemplate >= 0 ? `TIPI: ${PATTERNS[selectedStudioTemplate].shortName}` : 'TIPI STUDIO';
+                drawPixelText(stTitle, 12, 26, '#ffe49e', 'bold 15px Courier New', 'left');
+
+                if (cursor.color === 0) {
+                    drawPixelText("BRUSH: ERASER", VIEW_W - 12, 26, '#ff6b6b', 'bold 14px Courier New', 'right');
+                } else {
+                    const bSt = chosenPal.beads[cursor.color];
+                    drawPixelText(`#${cursor.color} ${bSt.name}`, VIEW_W / 2, 52, bSt.hi, 'bold 13px Courier New', 'center');
+                    drawFlatBeadAt(VIEW_W - 22, 22, 9, bSt);
+                }
+
+                const { moccBottomY } = drawMoccasin(m, chosenHide, guideGrid, chosenPal, chosenFur);
 
                 ctx.save();
                 ctx.translate(m.offsetX, m.offsetY);
-                for (let r = 0; r < STUDIO_ROWS; r++) {
-                    for (let c = 0; c < COLS; c++) drawBead(c, r, studioBoard[r][c], m.cellSize);
+                for (let r = 0; r < ROWS; r++) {
+                    for (let c = 0; c < COLS; c++) {
+                        if (!isPlayableCell(r, c) || board[r][c] === 0) continue;
+                        drawSewnBeadAt(c * m.cellSize + m.cellSize / 2, r * m.cellSize + m.cellSize / 2, m.cellSize, chosenPal.beads[board[r][c]], true);
+                    }
                 }
-                if (cursor.color !== 0) drawBead(cursor.x, cursor.y, cursor.color, m.cellSize, 0.62);
 
-                let isBlinkOn = Math.floor(now / 280) % 2 === 0;
-                ctx.strokeStyle = isBlinkOn ? '#F2EFE9' : '#3a1f0b';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(cursor.x * m.cellSize + 1, cursor.y * m.cellSize + 1, m.cellSize - 2, m.cellSize - 2);
+                if (!actionBarFocus) {
+                    if (cursor.color > 0) {
+                        drawSewnBeadAt(cursor.x * m.cellSize + m.cellSize / 2, cursor.y * m.cellSize + m.cellSize / 2, m.cellSize, chosenPal.beads[cursor.color], false, 0.62);
+                    }
+                    const blink = Math.floor(now / 260) % 2 === 0;
+                    ctx.strokeStyle = blink ? '#ffe49e' : '#3a1f0b'; ctx.lineWidth = 2;
+                    ctx.strokeRect(cursor.x * m.cellSize + 1, cursor.y * m.cellSize + 1, m.cellSize - 2, m.cellSize - 2);
+                }
                 ctx.restore();
+
+                // Clean 2-Option Action Bar: [GUIDE: ON/OFF] (or [CLEAR]) and [STITCH]
+                const barY = Math.min(VIEW_H - HUD_BOT_H - 12, moccBottomY + 14);
+                const leftLabel = selectedStudioTemplate >= 0 ? (showChalkGuide ? 'Guide: ON' : 'Guide: OFF') : 'Clear';
+                const rightLabel = 'Stitch';
+
+                drawPixelText(
+                    (actionBarFocus && actionBarIdx === 0) ? `[ ${leftLabel} ]` : leftLabel,
+                    VIEW_W / 2 - 76, barY,
+                    (actionBarFocus && actionBarIdx === 0) ? '#ffe169' : '#a3907a',
+                    'bold 13px Courier New'
+                );
+                drawPixelText(
+                    (actionBarFocus && actionBarIdx === 1) ? `[ ${rightLabel} ]` : rightLabel,
+                    VIEW_W / 2 + 76, barY,
+                    (actionBarFocus && actionBarIdx === 1) ? '#7bed9f' : '#a3907a',
+                    'bold 13px Courier New'
+                );
+
+                drawBottomHudBar("A: PLACE  |  B: BEAD COLOR  |  DOWN: STITCH");
+
+                if (beadingFadeAlpha > 0) {
+                    ctx.fillStyle = `rgba(18, 9, 5, ${beadingFadeAlpha})`;
+                    ctx.fillRect(0, HUD_TOP_H, VIEW_W, VIEW_H - HUD_TOP_H - HUD_BOT_H);
+                }
             }
 
             drawPauseOverlay();
@@ -1398,23 +2365,54 @@
 
         function drawPauseOverlay() {
             if (!isPaused) return;
-            ctx.fillStyle = 'rgba(10, 6, 4, 0.78)';
-            ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+            ctx.fillStyle = 'rgba(10, 6, 4, 0.78)'; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
             drawPixelText("PAUSED", VIEW_W / 2, VIEW_H / 2, '#D99B26', 'bold 28px Courier New');
         }
 
         function gameLoop(timestamp) {
-            if (!isPaused && currentMode === 'PUZZLE' && gameState === 'PUZZLE_PLAYING') {
-                if (timestamp - lastDropTime > dropInterval) {
-                    moveActive(0, 1);
-                    lastDropTime = timestamp;
-                }
+            if (!lastFrameTime) lastFrameTime = timestamp;
+            const dtMs = Math.min(100, timestamp - lastFrameTime);
+            lastFrameTime = timestamp;
+
+            if (!isPaused) {
+                if (gameState === 'ORDER_PLAYING') updateOrderRush(dtMs);
+                else updateTipiCutscenes(dtMs);
             }
+
             drawScene(timestamp);
             requestAnimationFrame(gameLoop);
         }
 
         requestAnimationFrame(gameLoop);
+
+        // === TEMPORARY DEV KEYBOARD MAP (REMOVE BEFORE CABINET DEPLOY) ===
+        // Mapping: Arrow Keys = D-Pad | Z = Button B | X = Button A | Escape = Start / Pause
+        window.addEventListener('keydown', function(e) {
+            const k = e.key.toLowerCase();
+            if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'z', 'x', 'escape'].includes(k)) {
+                e.preventDefault();
+            }
+
+            if (e.key === 'Escape') {
+                if (e.repeat) return;
+                if (gameState === 'BEADING' || gameState === 'ORDER_PLAYING') {
+                    handleCommand(isPaused ? 'RESUME' : 'PAUSE');
+                } else {
+                    handleCommand('BUTTON_A');
+                }
+                return;
+            }
+
+            if (isPaused) return;
+
+            if (e.key === 'ArrowUp') handleCommand('DPAD_UP');
+            else if (e.key === 'ArrowDown') handleCommand('DPAD_DOWN');
+            else if (e.key === 'ArrowLeft') handleCommand('DPAD_LEFT');
+            else if (e.key === 'ArrowRight') handleCommand('DPAD_RIGHT');
+            else if (k === 'x' && !e.repeat) handleCommand('BUTTON_A');
+            else if (k === 'z' && !e.repeat) handleCommand('BUTTON_B');
+        });
+        // === END TEMPORARY DEV KEYBOARD MAP ===
     </script>
 </body>
 </html>
