@@ -51,10 +51,10 @@
         let VIEW_W = 400;
         let VIEW_H = 533;
         let TIPI_WORLD_W = 600;
-        const HUD_TOP_H = 64; // Used for Lane's Post only
+        const HUD_TOP_H = 44; // Compact score/lives bar for Lane's Post
         const HUD_BOT_H = 26;
 
-        // Odd-numbered 9x9 Grid
+        // Odd-numbered 9x9 Grid for The Tipi
         const COLS = 9;
         const ROWS = 9;
 
@@ -69,13 +69,37 @@
             husbandX: 435, husbandY: 428,
             floorY: 390
         };
+
+        // Spatial Layout for Lane's Post (Vertical Counter ~3/4 across from left doorway)
         let postLayout = {
-            winX: 16, winY: 104, winW: 84, winH: 96,
-            lanternX: 330, lanternY: 108,
-            counterY: 390
+            floorTopY: 88,
+            floorBotY: 500,
+            doorX: 6,
+            doorY: 265,
+            counterX: 248,
+            counterW: 22,
+            aisleMinX: 278,
+            aisleMaxX: 342,
+            shelfX: 350,
+            shelfW: 44,
+            spotYs: [165, 265, 365],
+            queueBaseX: 150,
+            queueBaseY: 265,
+            shelves: [],
+            benchX: 292,
+            benchY: 462,
+            benchStandY: 434, // Collision stop ahead of the crafting workbench
+            stoveX: 42,
+            stoveY: 118,
+            bandX: 52,
+            bandY: 446,
+            workersX: 148,
+            workersY: 120,
+            lanternX: 195,
+            lanternY: 56
         };
 
-        // Tipi Camera X offset (stepped for crisp SNES panning)
+        // Tipi Camera X offset
         let tipiCamX = 0;
 
         // Frame-by-frame SNES stepping helpers
@@ -153,7 +177,7 @@
                 id: 1, name: 'Lower Fort Garry', shortName: 'LOWER FT.', pref: 'Saulteaux',
                 beads: [
                     null,
-                    { name: 'Cobalt Blue',         mid: '#1D4E9E', hi: '#6ea0eb', deep: '#0e2c61', rim: '#051430', holeRim: '#628ed1' },
+                    { name: 'Deep Royal Cobalt',   mid: '#143A82', hi: '#5686e0', deep: '#091d47', rim: '#030b1f', holeRim: '#4876cf' },
                     { name: 'Periwinkle Blue',     mid: '#7CA3D6', hi: '#c7defa', deep: '#466ca1', rim: '#1e3557', holeRim: '#a9c7ed' },
                     { name: 'Vermilion Red',       mid: '#D93829', hi: '#ff8a7d', deep: '#8f1a0f', rim: '#420803', holeRim: '#f28c80' },
                     { name: 'Sunlit Yellow',       mid: '#F2C938', hi: '#fff3a8', deep: '#b08b12', rim: '#574204', holeRim: '#fae389' },
@@ -179,7 +203,7 @@
                 id: 3, name: 'York Factory', shortName: 'YORK FACT.', pref: 'Cree',
                 beads: [
                     null,
-                    { name: 'Boreal Turquoise',    mid: '#239B9B', hi: '#7be0e0', deep: '#106161', rim: '#053030', holeRim: '#66c9c9' },
+                    { name: 'Boreal Turquoise',    mid: '#18B5A0', hi: '#8ff7ea', deep: '#0b7365', rim: '#043831', holeRim: '#6be3d4' },
                     { name: 'Aqua Mist',           mid: '#8ED6CF', hi: '#d6faf6', deep: '#4f9992', rim: '#204f4b', holeRim: '#b5ebe5' },
                     { name: 'Copper Orange',       mid: '#D96B27', hi: '#ffb07d', deep: '#8f3c0b', rim: '#451a03', holeRim: '#f29e68' },
                     { name: 'Wild Rose Pink',      mid: '#DE7395', hi: '#ffbdd2', deep: '#993d5a', rim: '#4a1727', holeRim: '#f5a6bf' },
@@ -201,7 +225,7 @@
         ];
 
         // ==========================================
-        // 4. TWELVE 9x9 BEAD PATTERNS (TOE AT BOTTOM / ROW 8, CUFF AT TOP / ROW 0)
+        // 4. TWELVE 9x9 BEAD PATTERNS (THE TIPI)
         // ==========================================
         const ROLE_TO_HANK = [0, 1, 2, 3, 5, 6, 7];
         function mapPatternGrid(rawGrid, keepTopToBottom = false) {
@@ -380,8 +404,48 @@
             }
         ];
 
-        const POST_VISITORS = [
-            'Baptiste', 'Marie', 'Angelique', 'Gabriel', 'Josette', 'Pierre', 'Marguerite', 'Louis'
+        // Four Customer Archetypes with Regional Accents & Multilingual Thank-You Lines
+        const CUSTOMER_ARCHETYPES = [
+            {
+                type: 'TRIPMAN',
+                coat: '#1d4782', coatHi: '#3468b0', coatDark: '#10294d', trim: '#b81d2a', hat: 'TUQUE',
+                requests: [
+                    "It's going to be a cold winter, mon ami!",
+                    "For ma femme back at St. Boniface!",
+                    "My last pair has holes, bonami!"
+                ],
+                thanks: ["Marsi, bonami!", "Marsi ben!"]
+            },
+            {
+                type: 'COUNTRY_WIFE',
+                coat: '#7d1c28', coatHi: '#ad2f3f', coatDark: '#4a0d15', trim: '#d9b482', hat: 'SHAWL',
+                requests: [
+                    "Winter's comin' cold... please...",
+                    "For my husband... on the trail...",
+                    "My old ones got holes in 'em..."
+                ],
+                thanks: ["Marsi... thank you...", "Tapwe, marsi..."]
+            },
+            {
+                type: 'SETTLER',
+                coat: '#6e5236', coatHi: '#94704d', coatDark: '#42301e', trim: '#384d2b', hat: 'BONNET',
+                requests: [
+                    "Ach, it'll be a braw cold winter!",
+                    "For ma guidwife at Kildonan!",
+                    "Ma auld pair has holes clean through!"
+                ],
+                thanks: ["Aye, thank ye kindly!", "Braw work, thank ye!"]
+            },
+            {
+                type: 'HBC_OFFICER',
+                coat: '#192338', coatHi: '#2d3e61', coatDark: '#0d121f', trim: '#d9a441', hat: 'TOPHAT',
+                requests: [
+                    "A bitter winter ahead, clerk!",
+                    "A fine pair for my wife, if you please.",
+                    "My last pair has worn right through!"
+                ],
+                thanks: ["Thank you, good clerk!", "Splendid work, thank you!"]
+            }
         ];
 
         // ==========================================
@@ -396,24 +460,43 @@
         let cutsceneElapsedMs = 0;
         let beadingFadeAlpha = 0;
 
-        // --- LANE'S POST (4-4-4 CLERK RUSH) STATE ---
-        const MAX_ACTIVE_ORDERS = 3;
+        // --- LANE'S POST SPATIAL CLERK RUSH STATE ---
+        const MAX_COUNTER_SPOTS = 3;
+        const MAX_WAIT_QUEUE = 4; // Only 4 customers allowed in queue; a 5th triggers Game Over
         const MAX_STRIKES = 3;
-        let activeOrders = [];
+        const STITCH_SEQ = ['B', 'A', 'B', 'A', 'B', 'A', 'B']; // 7-input sewing rhythm at workbench
+
+        let postCustomers = [];
+        let lastSpawnedCustomer = null;
+        let postElapsedMs = 0;
+        let postStage = 0;
+        let postGameOverReason = 'POST CLOSED!';
+        let shelfStockIdx = [0, 0, 0];
+
+        let clerk = {
+            x: 306,
+            y: 265,
+            facing: 1,
+            movingMs: 0,
+            rustleAnimMs: 0,
+            stitchProgress: 0, // 0..7 steps along STITCH_SEQ
+            heldHide: null,
+            heldPal: null,
+            heldFur: null,
+            craftedMocc: null
+        };
+
         let orderScore = 0;
         let orderCombo = 0;
         let orderServedCount = 0;
         let orderStrikes = 0;
         let orderSpawnTimerMs = 0;
-
-        let craftHideId = 0;
-        let craftPalId = 0;
-        let craftFurId = 0;
-        let craftRow = 0;
-
         let feedbackMsg = '';
         let feedbackColor = '#ffe169';
         let feedbackTimerMs = 0;
+
+        let moveDir = { dx: 0, dy: 0, pulseMs: 0 };
+        let keysHeld = { up: false, down: false, left: false, right: false };
 
         // --- TIPI FREEFORM BEADING STATE ---
         let selectedHideId = 1;
@@ -424,11 +507,11 @@
         let board = [];
         let cursor = { x: 4, y: 4, color: 1 };
         let actionBarFocus = false;
-        let actionBarIdx = 1; // 0 = Guide/Clear, 1 = Stitch
+        let actionBarIdx = 1;
         let showChalkGuide = true;
 
         // ==========================================
-        // 9x9 ROUNDED MOCCASIN MASK (FLIPPED: SQUARED CUFF TOP, ROUNDED TOE BOTTOM)
+        // 9x9 ROUNDED MOCCASIN MASK (THE TIPI)
         // ==========================================
         function getRowColBounds(r) {
             if (r === ROWS - 1) return { minC: 2, maxC: 6 };
@@ -504,8 +587,7 @@
         }
 
         // ------------------------------------------
-        // SCENE 0: TITLE SCREEN — LANE'S POST ALONG THE ASSINIBOINE RIVER
-        // WITH OUR TIPI CAMPED NEARBY UP THE BANKING (SQUARE 16/32-BIT PIXEL STYLE)
+        // SCENE 0: TITLE SCREEN — LANE'S POST ALONG THE ASSINIBOINE + OUR TIPI UP THE BANKING
         // ------------------------------------------
         function drawPixelCampTipi(c, cx, baseY, w, h) {
             const halfW = Math.floor(w / 2);
@@ -541,35 +623,25 @@
         }
 
         function drawPixelLanesPostExterior(c, x, baseY) {
-            // Ground shadow
             c.fillStyle = 'rgba(20, 14, 8, 0.48)';
             c.fillRect(x - 6, baseY - 2, 118, 6);
 
-            // Squared timber palisade fence flanking the trading house
             c.fillStyle = '#3b2412';
             for (let px = x - 14; px < x + 114; px += 5) {
                 c.fillRect(px, baseY - 22, 4, 22);
                 c.fillStyle = '#5c3a1e'; c.fillRect(px, baseY - 22, 2, 20);
                 c.fillStyle = '#3b2412';
             }
-            // Horizontal palisade rail
             c.fillStyle = '#2b180b'; c.fillRect(x - 14, baseY - 14, 128, 2);
 
-            // Main Red River Frame HBC Trading House
             const hx = x + 6, hy = baseY - 40, hw = 72, hh = 40;
-            // Squared timber walls (sunlit left, shaded right)
             c.fillStyle = '#6b4426'; c.fillRect(hx, hy, hw, hh);
             c.fillStyle = '#523219'; c.fillRect(hx + hw - 18, hy, 18, hh);
-            // Horizontal log chinking lines
             c.fillStyle = '#b5a68c';
-            for (let ly = hy + 6; ly < baseY; ly += 6) {
-                c.fillRect(hx + 2, ly, hw - 4, 1);
-            }
-            // Corner timber posts
+            for (let ly = hy + 6; ly < baseY; ly += 6) c.fillRect(hx + 2, ly, hw - 4, 1);
             c.fillStyle = '#361e0d';
             c.fillRect(hx, hy, 4, hh); c.fillRect(hx + hw - 4, hy, 4, hh);
 
-            // Stepped Pitched Shingle Roof
             for (let r = 0; r < 18; r += 2) {
                 const inset = Math.floor((1 - r / 18) * 14);
                 c.fillStyle = r < 6 ? '#3a2d24' : '#4f3d30';
@@ -578,14 +650,12 @@
                 c.fillRect(hx + hw - 16 - inset + 4, hy - 18 + r, 16, 2);
             }
 
-            // Stone Chimney on left gable
             const chX = hx + 8, chY = hy - 26;
             c.fillStyle = '#4d4640'; c.fillRect(chX, chY, 10, 18);
             c.fillStyle = '#73685e'; c.fillRect(chX + 1, chY + 2, 4, 12);
             c.fillStyle = '#2b2622'; c.fillRect(chX - 1, chY, 12, 3);
             titleSmokePoints.push({ x: chX + 4, y: chY - 3 });
 
-            // Warm glowing multi-pane trading post windows & plank door
             const drawPostWin = (wx, wy) => {
                 c.fillStyle = '#2b180b'; c.fillRect(wx, wy, 12, 12);
                 c.fillStyle = '#f5ca69'; c.fillRect(wx + 2, wy + 2, 8, 8);
@@ -594,11 +664,9 @@
             drawPostWin(hx + 10, hy + 12);
             drawPostWin(hx + 46, hy + 12);
 
-            // Heavy timber door
             c.fillStyle = '#2b180b'; c.fillRect(hx + 28, hy + 16, 12, 24);
             c.fillStyle = '#4a2b14'; c.fillRect(hx + 30, hy + 18, 8, 22);
 
-            // HBC Flagpole & Red Ensign flying beside the post
             const fpX = hx + hw + 12;
             c.fillStyle = '#3b2412'; c.fillRect(fpX, baseY - 64, 2, 64);
             c.fillStyle = '#b81d2a'; c.fillRect(fpX + 2, baseY - 62, 16, 9);
@@ -625,7 +693,6 @@
             const horizonY = Math.floor(VIEW_H * 0.42);
             titleSmokePoints = [];
 
-            // 1. Wide Manitoba Golden-Hour Sky (Stepped & dithered bands)
             const skyBands = [
                 { y: 0.00, h: 0.24, col: '#24416b' },
                 { y: 0.24, h: 0.22, col: '#3e628f' },
@@ -640,7 +707,6 @@
                 if (i > 0) drawDitherBand(c, 0, by - 4, VIEW_W, 8, b.col, 2);
             });
 
-            // Painterly square-pixel prairie clouds
             [
                 { x: VIEW_W * 0.20, y: horizonY * 0.26, w: 74, h: 16 },
                 { x: VIEW_W * 0.64, y: horizonY * 0.20, w: 92, h: 20 },
@@ -653,7 +719,6 @@
                 c.fillStyle = '#fff5de'; c.fillRect(cx - cl.w / 2 + 12, cy - 4, cl.w - 24, 6);
             });
 
-            // 2. Distant Horizon & Assiniboine Oak/Cottonwood Treeline
             c.fillStyle = '#475742'; c.fillRect(0, horizonY - 4, VIEW_W, 10);
             for (let tx = 0; tx < VIEW_W; tx += 10) {
                 const h = 5 + ((tx * 13) % 11);
@@ -661,7 +726,6 @@
                 c.fillRect(tx, horizonY - h, 10, h + 2);
             }
 
-            // 3. Upper Grassy Banking (where Lane's Post & our Tipi sit)
             const riverTopY = horizonY + 116;
             const riverH = 56;
             titleRiverBounds = { y: riverTopY, h: riverH };
@@ -676,27 +740,22 @@
                 if (i > 0) drawDitherBand(c, 0, b.y - 5, VIEW_W, 10, b.col, 2);
             });
 
-            // Slightly elevated grassy rise on the right banking for our tipi
             const riseX = Math.floor(VIEW_W * 0.56);
             c.fillStyle = '#656e37';
             c.fillRect(riseX, horizonY + 56, VIEW_W - riseX, 34);
             drawDitherBand(c, riseX - 12, horizonY + 54, 16, 36, '#656e37', 2);
 
-            // 4. Lane's Post along the Assiniboine (left/center-left)
             const postX = Math.floor(VIEW_W * 0.14);
             const postBaseY = riverTopY - 12;
             drawPixelLanesPostExterior(c, postX, postBaseY);
 
-            // 5. Our Tipi camped nearby a little up the banking (right)
             const tipiX = Math.floor(VIEW_W * 0.78);
             const tipiBaseY = riverTopY - 30;
             drawPixelCampTipi(c, tipiX, tipiBaseY, 60, 70);
             titleSmokePoints.push({ x: tipiX, y: tipiBaseY - 72 });
 
-            // Small Red River cart parked between the post and tipi
             drawPixelRedRiverCart(c, Math.floor(VIEW_W * 0.58), tipiBaseY + 10);
 
-            // 6. Muddy-Gold Clay Riverbank & Flowing Assiniboine River
             c.fillStyle = '#755e3d'; c.fillRect(0, riverTopY - 8, VIEW_W, 10);
             drawDitherBand(c, 0, riverTopY - 10, VIEW_W, 6, '#755e3d', 2);
 
@@ -705,13 +764,11 @@
             c.fillStyle = '#2d4f6b'; c.fillRect(0, riverTopY + riverH - 14, VIEW_W, 14);
             drawDitherBand(c, 0, riverTopY + 6, VIEW_W, 6, '#527fa1', 2);
 
-            // Birchbark canoe pulled up on the muddy landing below Lane's Post
             const canX = postX + 26, canY = riverTopY - 2;
             c.fillStyle = '#c49b66'; c.fillRect(canX, canY, 24, 5);
             c.fillStyle = '#8f6738'; c.fillRect(canX + 2, canY + 3, 20, 2);
             c.fillStyle = '#c49b66'; c.fillRect(canX - 2, canY - 2, 3, 4); c.fillRect(canX + 23, canY - 2, 3, 4);
 
-            // 7. Near Grassy Foreground Bank below the river
             const nearY = riverTopY + riverH;
             c.fillStyle = '#6b5638'; c.fillRect(0, nearY, VIEW_W, 6);
             c.fillStyle = '#394520'; c.fillRect(0, nearY + 6, VIEW_W, VIEW_H - nearY);
@@ -719,7 +776,6 @@
             c.fillStyle = '#263015'; c.fillRect(0, nearY + 46, VIEW_W, VIEW_H - (nearY + 46));
             drawDitherBand(c, 0, nearY + 40, VIEW_W, 12, '#263015', 2);
 
-            // Foreground prairie grasses & prairie roses
             for (let gx = 2; gx < VIEW_W; gx += 6) {
                 const gh = 8 + ((gx * 17) % 14);
                 const gy = VIEW_H - HUD_BOT_H - gh - ((gx * 11) % 24);
@@ -731,7 +787,6 @@
         }
 
         function drawAnimatedTitleEffects(now) {
-            // 1. Stepped SNES pixel smoke rising from Lane's Post chimney & our Tipi
             const tick = Math.floor(now / 180);
             titleSmokePoints.forEach((pt, idx) => {
                 for (let i = 0; i < 4; i++) {
@@ -744,7 +799,6 @@
                 }
             });
 
-            // 2. Stepped pixel ripples drifting along the Assiniboine River
             const rShift = (Math.floor(now / 150) * 2) % 32;
             ctx.fillStyle = 'rgba(245, 220, 175, 0.36)';
             for (let ry = titleRiverBounds.y + 8; ry < titleRiverBounds.y + titleRiverBounds.h - 6; ry += 10) {
@@ -755,125 +809,404 @@
         }
 
         // ------------------------------------------
-        // SCENE A: LANE'S POST INTERIOR (HBC TRADING POST)
+        // SCENE A: LANE'S POST SPATIAL INTERIOR (LIVELY TRADING POST + 3 PHYSICAL STOCK STATIONS)
         // ------------------------------------------
-        function renderStaticLanesPostBackdrop() {
-            const c = postBgCtx;
-            const topY = HUD_TOP_H, botY = VIEW_H - HUD_BOT_H;
-            const counterY = botY - Math.max(82, Math.floor((botY - topY) * 0.24));
+        function drawStockStationProps(c, sh, shelfX, shelfW) {
+            const menuW = 12;
+            const slotH = Math.floor((sh.h - 6) / 4);
+            c.fillStyle = '#241208';
+            c.fillRect(shelfX, sh.y + 2, menuW, sh.h - 4);
+            c.strokeStyle = '#59361b'; c.lineWidth = 1;
+            c.strokeRect(shelfX, sh.y + 2, menuW, sh.h - 4);
 
-            const isWide = VIEW_W >= 540;
-            const sideSpace = isWide ? Math.floor((VIEW_W - 350) / 2) : 90;
-            const winW = Math.min(104, Math.max(70, Math.floor(sideSpace * 0.80)));
-            const winH = Math.floor(winW * 1.12);
-            const winX = isWide ? Math.floor((sideSpace - winW) / 2) : 8;
-            const winY = topY + 28;
-            const lanternX = isWide ? VIEW_W - Math.floor(sideSpace * 0.48) : VIEW_W - 40;
-            const lanternY = topY + 42;
-
-            postLayout = { winX, winY, winW, winH, lanternX, lanternY, counterY };
-
-            const logH = 24;
-            c.fillStyle = '#24150c'; c.fillRect(0, topY, VIEW_W, counterY - topY);
-
-            let idx = 0;
-            for (let y = topY; y < counterY; y += logH) {
-                const h = Math.min(logH, counterY - y);
-                c.fillStyle = '#b8aa91'; c.fillRect(0, y, VIEW_W, 2);
-                c.fillStyle = idx % 2 === 0 ? '#57361e' : '#4d2f1a'; c.fillRect(0, y + 2, VIEW_W, h - 4);
-                c.fillStyle = '#331d0e'; c.fillRect(0, y + h - 2, VIEW_W, 2);
-                drawDitherBand(c, 0, y + h - 6, VIEW_W, 4, '#331d0e', 2);
-                idx++;
-            }
-
-            const shelfW = isWide ? Math.max(88, sideSpace - 14) : 86;
-            const shelfX = VIEW_W - shelfW - 8;
-            const shelfY1 = topY + 86, shelfY2 = topY + 158, shelfY3 = topY + 230;
-
-            [shelfY1, shelfY2, shelfY3].forEach(sy => {
-                if (sy < counterY - 16) {
-                    c.fillStyle = '#261409'; c.fillRect(shelfX - 2, sy + 4, shelfW + 4, 8);
-                    c.fillStyle = '#6e4323'; c.fillRect(shelfX - 2, sy, shelfW + 4, 6);
-                    c.fillStyle = '#8f5a32'; c.fillRect(shelfX - 2, sy, shelfW + 4, 2);
+            for (let i = 0; i < 4; i++) {
+                const sy = sh.y + 4 + i * slotH;
+                if (sh.kind === 'HIDE') {
+                    c.fillStyle = HIDES[i].mid;
+                    c.fillRect(shelfX + 2, sy + 1, menuW - 4, Math.max(4, slotH - 3));
+                } else if (sh.kind === 'PAL') {
+                    c.fillStyle = PALETTES[i].beads[1].mid;
+                    c.fillRect(shelfX + 2, sy + 1, menuW - 4, Math.max(4, slotH - 3));
+                } else {
+                    c.fillStyle = FURS[i].base;
+                    c.fillRect(shelfX + 2, sy + 1, menuW - 4, Math.max(4, slotH - 3));
                 }
-            });
-
-            if (shelfY1 < counterY - 24) {
-                const bx = shelfX + 6, by = shelfY1 - 24;
-                c.fillStyle = '#f2ead8'; c.fillRect(bx, by, 34, 24);
-                c.fillStyle = '#2E663B'; c.fillRect(bx, by + 4, 34, 3);
-                c.fillStyle = '#9E1B32'; c.fillRect(bx, by + 9, 34, 3);
-                c.fillStyle = '#E09F24'; c.fillRect(bx, by + 14, 34, 3);
-                c.fillStyle = '#1E2A4A'; c.fillRect(bx, by + 19, 34, 3);
-                c.strokeStyle = '#241309'; c.lineWidth = 1; c.strokeRect(bx, by, 34, 24);
-
-                c.fillStyle = '#b57b24'; c.fillRect(bx + 44, by + 8, 18, 16);
-                c.fillStyle = '#f0be59'; c.fillRect(bx + 46, by + 10, 6, 10);
-                c.fillStyle = '#6b450c'; c.fillRect(bx + 47, by + 4, 12, 4);
             }
 
-            if (shelfY2 < counterY - 24) {
-                ['#8B1E24', '#1D4E9E', '#1C1B22', '#2E663B'].forEach((col, i) => {
-                    const rx = shelfX + 6 + i * 18;
-                    c.fillStyle = col; c.fillRect(rx, shelfY2 - 28, 13, 28);
-                    c.fillStyle = 'rgba(255,255,255,0.22)'; c.fillRect(rx + 2, shelfY2 - 26, 3, 24);
-                    c.strokeStyle = '#1a0d05'; c.lineWidth = 1; c.strokeRect(rx, shelfY2 - 28, 13, 28);
+            const px = shelfX + menuW + 3;
+            const pw = shelfW - menuW - 5;
+            const py = sh.y + 4;
+            const ph = sh.h - 8;
+
+            c.fillStyle = 'rgba(10, 4, 2, 0.55)';
+            c.fillRect(px - 1, py + ph - 3, pw + 3, 6);
+
+            if (sh.kind === 'HIDE') {
+                // 1. PILE OF FLATTENED HIDES OF VARIOUS COLOURS ON LOW SLAT TABLE
+                c.fillStyle = '#3d2210'; c.fillRect(px, py + ph - 10, pw, 10);
+                c.fillStyle = '#693f20'; c.fillRect(px + 1, py + ph - 12, pw - 2, 4);
+                const layers = [HIDES[2], HIDES[1], HIDES[0], HIDES[3]];
+                layers.forEach((hd, idx) => {
+                    const ly = py + ph - 16 - idx * 9;
+                    const offX = (idx % 2 === 0) ? 1 : 3;
+                    c.fillStyle = hd.edge;  c.fillRect(px + offX - 1, ly + 1, pw - 4, 10);
+                    c.fillStyle = hd.mid;   c.fillRect(px + offX, ly, pw - 5, 8);
+                    c.fillStyle = hd.light; c.fillRect(px + offX + 2, ly + 1, pw - 10, 3);
+                    c.fillStyle = hd.mid;
+                    c.fillRect(px + offX - 2, ly + 2, 3, 2);
+                    c.fillRect(px + offX + pw - 6, ly + 5, 3, 2);
                 });
+            } else if (sh.kind === 'PAL') {
+                // 2. LARGE WOODEN & BRASS TRUNK FULL OF COLOURFUL BEAD HANKS
+                const ty = py + Math.floor(ph * 0.22);
+                const th = ph - Math.floor(ph * 0.22) - 2;
+                c.fillStyle = '#2e170a'; c.fillRect(px, py + 2, pw, Math.floor(ph * 0.24));
+                c.fillStyle = '#4f2a14'; c.fillRect(px + 2, py + 4, pw - 4, Math.floor(ph * 0.20));
+                c.fillStyle = '#d9a441'; c.fillRect(px + 4, py + 2, 2, Math.floor(ph * 0.24)); c.fillRect(px + pw - 6, py + 2, 2, Math.floor(ph * 0.24));
+
+                c.fillStyle = '#3b1f0e'; c.fillRect(px, ty, pw, th);
+                c.fillStyle = '#63371c'; c.fillRect(px + 2, ty + 10, pw - 4, th - 12);
+                c.fillStyle = '#170b04'; c.fillRect(px + 2, ty + 1, pw - 4, 11);
+                const hankCols = [
+                    PALETTES[0].beads[1].mid, PALETTES[1].beads[1].mid,
+                    PALETTES[2].beads[1].mid, PALETTES[3].beads[1].mid,
+                    PALETTES[0].beads[3].mid, PALETTES[2].beads[3].mid
+                ];
+                hankCols.forEach((col, i) => {
+                    const hx = px + 3 + (i * 4) % (pw - 8);
+                    const hy = ty + 2 + (i % 2) * 2;
+                    c.fillStyle = col;
+                    c.fillRect(hx, hy, 4, 9);
+                    c.fillStyle = 'rgba(255,255,255,0.45)';
+                    c.fillRect(hx + 1, hy + 1, 1, 5);
+                });
+
+                c.fillStyle = '#d9a441';
+                c.fillRect(px + 4, ty + 10, 2, th - 10);
+                c.fillRect(px + pw - 6, ty + 10, 2, th - 10);
+                c.fillRect(px + Math.floor(pw / 2) - 3, ty + 11, 6, 5);
+                c.strokeStyle = '#1a0c04'; c.lineWidth = 1; c.strokeRect(px, ty, pw, th);
+            } else {
+                // 3. BUSHY FUR TAILS HANGING ON A TIMBER POST & CROSSBAR
+                const postCX = px + Math.floor(pw / 2);
+                c.fillStyle = '#2b160a'; c.fillRect(postCX - 7, py + ph - 5, 14, 5);
+                c.fillStyle = '#4f2d16'; c.fillRect(postCX - 2, py + 4, 5, ph - 7);
+                c.fillStyle = '#754625'; c.fillRect(postCX - 2, py + 4, 2, ph - 7);
+                c.fillStyle = '#3d210f'; c.fillRect(px, py + 8, pw, 5);
+                c.fillStyle = '#6e4122'; c.fillRect(px + 1, py + 8, pw - 2, 2);
+
+                for (let i = 0; i < 4; i++) {
+                    const f = FURS[i];
+                    const tx = px + 2 + i * Math.max(6, Math.floor((pw - 4) / 4));
+                    const ty = py + 13;
+                    const tailLen = Math.min(28, ph - 18);
+                    c.fillStyle = '#d9c29c'; c.fillRect(tx + 2, ty - 2, 1, 3);
+                    c.fillStyle = f.dark; c.fillRect(tx, ty + 1, 6, tailLen - 2);
+                    c.fillStyle = f.base; c.fillRect(tx + 1, ty + 2, 4, tailLen - 4);
+                    c.fillStyle = f.hi;   c.fillRect(tx + 1, ty + tailLen - 6, 3, 5);
+                }
             }
-
-            if (shelfY3 < counterY - 24) {
-                c.fillStyle = '#7a4b25'; c.fillRect(shelfX + 10, shelfY3 - 26, 26, 26);
-                c.strokeStyle = '#2b1608'; c.lineWidth = 2; c.strokeRect(shelfX + 10, shelfY3 - 26, 26, 26);
-                c.fillStyle = '#383431'; c.fillRect(shelfX + 44, shelfY3 - 22, 22, 22);
-                c.fillStyle = '#8c5c2b'; c.fillRect(shelfX + 44, shelfY3 - 17, 22, 3); c.fillRect(shelfX + 44, shelfY3 - 8, 22, 3);
-            }
-
-            c.fillStyle = 'rgba(0, 0, 0, 0.45)'; c.fillRect(winX + 4, winY + 4, winW + 2, winH + 4);
-            const skyG = c.createLinearGradient(0, winY, 0, winY + winH);
-            skyG.addColorStop(0.0, '#4d7ca8'); skyG.addColorStop(0.55, '#9ec2db');
-            skyG.addColorStop(0.70, '#3a5436'); skyG.addColorStop(1.0, '#447294');
-            c.fillStyle = skyG; c.fillRect(winX + 5, winY + 5, winW - 10, winH - 10);
-
-            const palY = winY + Math.floor(winH * 0.54);
-            c.fillStyle = '#5c3b20';
-            for (let px = winX + 6; px < winX + winW - 6; px += 7) c.fillRect(px, palY, 5, 16);
-
-            c.fillStyle = '#3b2110';
-            c.fillRect(winX, winY, winW, 5); c.fillRect(winX, winY + winH - 5, winW, 5);
-            c.fillRect(winX, winY, 5, winH); c.fillRect(winX + winW - 5, winY, 5, winH);
-            c.fillRect(winX + Math.floor(winW / 2) - 2, winY + 5, 4, winH - 10);
-            c.fillRect(winX + 5, winY + Math.floor(winH / 2) - 2, winW - 10, 4);
-
-            c.fillStyle = '#1f1007'; c.fillRect(0, counterY - 2, VIEW_W, 4);
-            c.fillStyle = '#7d4d27'; c.fillRect(0, counterY + 2, VIEW_W, 14);
-            c.fillStyle = '#9c6638'; c.fillRect(0, counterY + 2, VIEW_W, 3);
-            c.fillStyle = '#472812'; c.fillRect(0, counterY + 16, VIEW_W, botY - (counterY + 16));
-            drawDitherBand(c, 0, counterY + 16, VIEW_W, botY - (counterY + 16), '#2e1809', 2);
-
-            c.fillStyle = '#261307';
-            for (let px = 28; px < VIEW_W; px += 48) c.fillRect(px, counterY + 18, 2, botY - counterY - 18);
         }
 
-        function drawAnimatedPostEffects(now) {
-            const { lanternX, lanternY } = postLayout;
-            const fStep = Math.floor(now / 160) % 4;
-            const flicker = [0.90, 0.96, 0.86, 0.94][fStep];
+        function renderStaticLanesPostBackdrop() {
+            const c = postBgCtx;
+            const topY = HUD_TOP_H;
+            const botY = VIEW_H - HUD_BOT_H;
+            const wallH = 54;
+            const floorTopY = topY + wallH;
+            const floorBotY = botY;
+            const playH = floorBotY - floorTopY;
 
-            const glowR = Math.max(130, VIEW_W * 0.36) * flicker;
-            const g = ctx.createRadialGradient(lanternX, lanternY + 12, 4, lanternX, lanternY + 12, glowR);
-            g.addColorStop(0.0, `rgba(255, 206, 102, ${0.34 * flicker})`);
-            g.addColorStop(0.4, `rgba(235, 136, 42, ${0.14 * flicker})`);
+            const shelfW = Math.min(58, Math.max(46, Math.floor(VIEW_W * 0.135)));
+            const shelfX = VIEW_W - shelfW - 6;
+            const clerkAisleW = Math.min(68, Math.max(54, Math.floor(VIEW_W * 0.145)));
+            const counterW = 22;
+            const counterX = shelfX - clerkAisleW - counterW;
+
+            const spot1Y = Math.floor(floorTopY + playH * 0.22);
+            const spot2Y = Math.floor(floorTopY + playH * 0.48);
+            const spot3Y = Math.floor(floorTopY + playH * 0.74);
+            const doorY = spot2Y;
+
+            const shH = Math.floor(playH * 0.21);
+            const shelves = [
+                { idx: 0, kind: 'HIDE', y: Math.floor(floorTopY + playH * 0.05), h: shH },
+                { idx: 1, kind: 'PAL',  y: Math.floor(floorTopY + playH * 0.30), h: shH },
+                { idx: 2, kind: 'FUR',  y: Math.floor(floorTopY + playH * 0.55), h: shH }
+            ];
+
+            const benchX = counterX + counterW + Math.floor(clerkAisleW * 0.50);
+            const benchY = floorBotY - 22;
+            const benchStandY = benchY - 24; // Collision stop ahead of crafting workbench
+
+            const stoveX = 36;
+            const stoveY = floorTopY + 26;
+            const workersX = Math.max(108, Math.floor(counterX * 0.54));
+            const workersY = floorTopY + 28;
+            const bandX = 48;
+            const bandY = floorBotY - 34;
+
+            postLayout = {
+                floorTopY,
+                floorBotY,
+                doorX: 0,
+                doorY,
+                counterX,
+                counterW,
+                aisleMinX: counterX + counterW + 14,
+                aisleMaxX: shelfX - 14,
+                shelfX,
+                shelfW,
+                spotYs: [spot1Y, spot2Y, spot3Y],
+                queueBaseX: Math.max(76, counterX - 78),
+                queueBaseY: doorY + 10,
+                shelves,
+                benchX,
+                benchY,
+                benchStandY,
+                stoveX,
+                stoveY,
+                workersX,
+                workersY,
+                bandX,
+                bandY,
+                lanternX: counterX + 10,
+                lanternY: topY + 18
+            };
+
+            // 1. North Back Hewn-Timber Wall
+            c.fillStyle = '#24140b';
+            c.fillRect(0, topY, VIEW_W, wallH);
+            for (let y = topY; y < floorTopY; y += 14) {
+                c.fillStyle = '#b5a68c'; c.fillRect(0, y, VIEW_W, 2);
+                c.fillStyle = ((y / 14) | 0) % 2 === 0 ? '#57361e' : '#4a2d18';
+                c.fillRect(0, y + 2, VIEW_W, 10);
+                c.fillStyle = '#2e190c'; c.fillRect(0, y + 12, VIEW_W, 2);
+            }
+
+            const winX = Math.floor(counterX * 0.42), winY = topY + 6, winW = 54, winH = 38;
+            c.fillStyle = '#1f1007'; c.fillRect(winX - 2, winY - 2, winW + 4, winH + 4);
+            c.fillStyle = '#6d9bc2'; c.fillRect(winX, winY, winW, 18);
+            c.fillStyle = '#3a5436'; c.fillRect(winX, winY + 18, winW, 8);
+            c.fillStyle = '#487699'; c.fillRect(winX, winY + 26, winW, 12);
+            c.fillStyle = '#3b2110';
+            c.fillRect(winX, winY, winW, 3); c.fillRect(winX, winY + winH - 3, winW, 3);
+            c.fillRect(winX, winY, 3, winH); c.fillRect(winX + winW - 3, winY, 3, winH);
+            c.fillRect(winX + Math.floor(winW / 2) - 1, winY, 3, winH);
+            c.fillRect(winX, winY + Math.floor(winH / 2) - 1, winW, 3);
+
+            const pbX = Math.floor(counterX * 0.78), pbY = topY + 8;
+            c.fillStyle = '#f2ead8'; c.fillRect(pbX, pbY, 26, 34);
+            c.fillStyle = '#2E663B'; c.fillRect(pbX, pbY + 6, 26, 3);
+            c.fillStyle = '#9E1B32'; c.fillRect(pbX, pbY + 13, 26, 3);
+            c.fillStyle = '#E09F24'; c.fillRect(pbX, pbY + 20, 26, 3);
+            c.fillStyle = '#1E2A4A'; c.fillRect(pbX, pbY + 27, 26, 3);
+            c.strokeStyle = '#1f1007'; c.lineWidth = 1; c.strokeRect(pbX, pbY, 26, 34);
+
+            // 2. Wide-Plank Pine Trading Post Floor
+            c.fillStyle = '#4a2e19';
+            c.fillRect(0, floorTopY, VIEW_W, playH);
+            for (let py = floorTopY; py < floorBotY; py += 16) {
+                c.fillStyle = ((py / 16) | 0) % 2 === 0 ? '#59381f' : '#4f311a';
+                c.fillRect(0, py, VIEW_W, 15);
+                c.fillStyle = '#2b180b';
+                c.fillRect(0, py + 15, VIEW_W, 1);
+                for (let px = ((py * 3) % 64); px < VIEW_W; px += 64) {
+                    c.fillRect(px, py, 2, 15);
+                }
+            }
+            drawDitherBand(c, 0, floorTopY, VIEW_W, 10, 'rgba(14, 6, 2, 0.55)', 2);
+
+            // 3. Non-Playable Atmosphere Props (Wood Stove, Cargo Bales, Barrels, Michif Band Corner)
+            c.fillStyle = '#2b2724'; c.fillRect(stoveX - 18, stoveY - 12, 38, 28);
+            c.strokeStyle = '#171412'; c.lineWidth = 1; c.strokeRect(stoveX - 18, stoveY - 12, 38, 28);
+            c.fillStyle = '#18181c'; c.fillRect(stoveX - 12, stoveY - 22, 24, 24);
+            c.fillStyle = '#32323b'; c.fillRect(stoveX - 10, stoveY - 20, 8, 16);
+            c.fillStyle = '#121216'; c.fillRect(stoveX - 4, topY, 8, stoveY - 22 - topY);
+            c.fillStyle = '#2b2b33'; c.fillRect(stoveX - 2, topY, 2, stoveY - 22 - topY);
+            c.fillStyle = '#3d2210'; c.fillRect(stoveX + 14, stoveY - 8, 14, 12);
+            c.fillStyle = '#c49b66';
+            c.fillRect(stoveX + 15, stoveY - 6, 4, 3); c.fillRect(stoveX + 21, stoveY - 6, 4, 3);
+            c.fillRect(stoveX + 18, stoveY - 2, 4, 3);
+
+            const bx = workersX - 28, by = workersY - 14;
+            c.fillStyle = 'rgba(10,4,2,0.45)'; c.fillRect(bx - 2, by + 16, 56, 6);
+            c.fillStyle = '#bfa882'; c.fillRect(bx, by, 24, 18);
+            c.fillStyle = '#9c845e'; c.fillRect(bx + 2, by + 12, 20, 5);
+            c.strokeStyle = '#4a3219'; c.lineWidth = 1;
+            c.strokeRect(bx, by, 24, 18);
+            c.beginPath(); c.moveTo(bx + 8, by); c.lineTo(bx + 8, by + 18); c.moveTo(bx + 16, by); c.lineTo(bx + 16, by + 18); c.stroke();
+            c.fillStyle = '#ab936e'; c.fillRect(bx + 26, by + 3, 20, 15);
+            c.strokeRect(bx + 26, by + 3, 20, 15);
+
+            c.fillStyle = '#4f1b1d'; c.fillRect(bandX - 30, bandY - 16, 78, 36);
+            c.fillStyle = '#b8862d'; c.fillRect(bandX - 27, bandY - 13, 72, 30);
+            c.fillStyle = '#2c3d28'; c.fillRect(bandX - 24, bandY - 10, 66, 24);
+            c.fillStyle = '#3b2110'; c.fillRect(bandX - 22, bandY - 14, 16, 18);
+            c.fillStyle = '#6e4223'; c.fillRect(bandX - 20, bandY - 12, 12, 14);
+            c.fillStyle = '#242220'; c.fillRect(bandX - 22, bandY - 10, 16, 2); c.fillRect(bandX - 22, bandY - 2, 16, 2);
+
+            // 4. Left Wall Entrance Doorway & Threshold Mat
+            c.fillStyle = '#2b170b';
+            c.fillRect(0, floorTopY, 10, playH);
+            const dTop = doorY - 34, dH = 68;
+            c.fillStyle = '#759e68'; c.fillRect(0, dTop, 10, dH);
+            c.fillStyle = '#c4a470'; c.fillRect(4, dTop + 4, 8, dH - 8);
+            c.fillStyle = '#382417'; c.fillRect(12, doorY - 24, 28, 48);
+            c.fillStyle = '#7d2828'; c.fillRect(15, doorY - 20, 22, 40);
+            c.fillStyle = '#c9933b'; c.fillRect(19, doorY - 14, 14, 28);
+
+            drawDitherBand(c, 42, spot2Y - 18, counterX - 54, 36, 'rgba(34, 18, 8, 0.35)', 2);
+            [spot1Y, spot2Y, spot3Y].forEach(sy => {
+                c.fillStyle = '#361f0e'; c.fillRect(counterX - 28, sy - 10, 20, 20);
+                c.fillStyle = '#6e4523'; c.fillRect(counterX - 26, sy - 8, 16, 16);
+            });
+
+            // 5. Long Vertical Oak Counter
+            const cTop = floorTopY + 12;
+            const cH = playH - 24;
+            c.fillStyle = 'rgba(12, 6, 2, 0.55)';
+            c.fillRect(counterX - 5, cTop + 6, counterW + 9, cH);
+            c.fillStyle = '#3d2210';
+            c.fillRect(counterX, cTop, counterW, cH);
+            c.fillStyle = '#85532b';
+            c.fillRect(counterX + 2, cTop + 2, counterW - 4, cH - 8);
+            c.fillStyle = '#ab7040';
+            c.fillRect(counterX + 3, cTop + 2, 4, cH - 8);
+            [spot1Y, spot2Y, spot3Y].forEach(sy => {
+                c.fillStyle = '#291508'; c.fillRect(counterX + 2, sy - 12, counterW - 4, 24);
+                c.strokeStyle = '#cfa04e'; c.lineWidth = 1;
+                c.strokeRect(counterX + 3, sy - 11, counterW - 6, 22);
+            });
+
+            // 6. Right Back Stock Wall (Category Menu Strip + Physical Stock Props)
+            c.fillStyle = '#241308';
+            c.fillRect(VIEW_W - 6, floorTopY, 6, playH);
+            shelves.forEach(sh => drawStockStationProps(c, sh, shelfX, shelfW));
+
+            // 7. Solid Crafting / Stitching Workbench (with collision block ahead of it!)
+            const wbx = benchX - 24, wby = benchY - 14, wbw = 54, wbh = 28;
+            c.fillStyle = 'rgba(10, 4, 2, 0.60)'; c.fillRect(wbx + 3, wby + 4, wbw, wbh);
+            c.fillStyle = '#3b2110'; c.fillRect(wbx, wby, wbw, wbh);
+            c.fillStyle = '#7d4d27'; c.fillRect(wbx + 2, wby + 2, wbw - 4, wbh - 6);
+            c.fillStyle = '#472a14'; c.fillRect(wbx + 8, wby + 5, 24, 15);
+            c.fillStyle = '#efe0be'; c.fillRect(wbx + 36, wby + 6, 6, 6);
+            c.fillStyle = '#c49b66'; c.fillRect(wbx + 38, wby + 15, 10, 2);
+            c.strokeStyle = '#cfa04e'; c.lineWidth = 1.5;
+            c.strokeRect(wbx + 1, wby + 1, wbw - 2, wbh - 4);
+        }
+
+        // Animated Background Life in Non-Playable Post Area
+        function drawLanesPostAmbientLife(now) {
+            const { stoveX, stoveY, workersX, workersY, bandX, bandY, lanternX, lanternY } = postLayout;
+            const currentBpm = getPostCurrentBPM();
+
+            // 1. Glowing Cast-Iron Wood Stove
+            const stFlicker = [0.88, 0.98, 0.84, 0.94][Math.floor(now / 150) % 4];
+            const stGlow = ctx.createRadialGradient(stoveX, stoveY - 6, 4, stoveX, stoveY - 6, 68 * stFlicker);
+            stGlow.addColorStop(0.0, `rgba(255, 128, 36, ${0.34 * stFlicker})`);
+            stGlow.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = stGlow;
+            ctx.fillRect(0, postLayout.floorTopY - 20, 130, 120);
+
+            ctx.fillStyle = stFlicker > 0.9 ? '#ffe27a' : '#ff6b14';
+            ctx.fillRect(stoveX - 7, stoveY - 10, 4, 4);
+            ctx.fillRect(stoveX - 1, stoveY - 10, 4, 4);
+            ctx.fillRect(stoveX + 5, stoveY - 10, 3, 4);
+
+            // 2. Background HBC Clerk & Tripman Working Cargo Bales
+            const workStep = Math.floor(now / 420) % 4;
+            const hbcX = workersX + 26, hbcY = workersY + 6;
+            ctx.fillStyle = 'rgba(10,4,2,0.45)'; ctx.fillRect(hbcX - 8, hbcY + 1, 16, 4);
+            ctx.fillStyle = '#141824'; ctx.fillRect(hbcX - 6, hbcY - 12, 5, 12); ctx.fillRect(hbcX + 1, hbcY - 12, 5, 12);
+            ctx.fillStyle = '#192338'; ctx.fillRect(hbcX - 8, hbcY - 28, 16, 17);
+            ctx.fillStyle = '#2d3e61'; ctx.fillRect(hbcX - 6, hbcY - 27, 5, 14);
+            ctx.fillStyle = '#d9a441'; ctx.fillRect(hbcX - 2, hbcY - 25, 2, 2); ctx.fillRect(hbcX - 2, hbcY - 20, 2, 2);
+            ctx.fillStyle = '#cf966d'; ctx.fillRect(hbcX - 5, hbcY - 38, 10, 10);
+            ctx.fillStyle = '#2b1d12'; ctx.fillRect(hbcX - 6, hbcY - 40, 12, 4);
+            ctx.fillStyle = '#f2ead8'; ctx.fillRect(hbcX - 12, hbcY - 22 + (workStep % 2), 6, 7);
+
+            const trpX = workersX - 38, trpY = workersY + 10;
+            const heaveY = (workStep === 1 || workStep === 2) ? -3 : 0;
+            ctx.fillStyle = 'rgba(10,4,2,0.45)'; ctx.fillRect(trpX - 8, trpY + 1, 16, 4);
+            ctx.fillStyle = '#2b221b'; ctx.fillRect(trpX - 6, trpY - 11, 5, 11); ctx.fillRect(trpX + 1, trpY - 11, 5, 11);
+            ctx.fillStyle = '#6e4c2e'; ctx.fillRect(trpX - 8, trpY - 26 + heaveY, 16, 16);
+            ctx.fillStyle = '#b81d2a'; ctx.fillRect(trpX - 8, trpY - 16 + heaveY, 16, 3);
+            ctx.fillStyle = '#b57b52'; ctx.fillRect(trpX - 5, trpY - 36 + heaveY, 10, 10);
+            ctx.fillStyle = '#b81d2a'; ctx.fillRect(trpX - 6, trpY - 40 + heaveY, 12, 5);
+            ctx.fillStyle = '#59331c'; ctx.fillRect(trpX + 5, trpY - 23 + heaveY * 1.5, 10, 8);
+            ctx.fillStyle = '#8c5838'; ctx.fillRect(trpX + 6, trpY - 22 + heaveY * 1.5, 7, 4);
+
+            // 3. Michif Band in Lower-Left Non-Playable Corner (Synced to Live 60->160 BPM Tempo)
+            const beatDurMs = (60 / currentBpm) * 1000;
+            const bowFrame = Math.floor(now / (beatDurMs / 2)) % 2;
+            const tapFoot = Math.floor(now / beatDurMs) % 2;
+
+            // 3A. Seated Michif Pipe-Smoker on Barrel
+            const smX = bandX - 14, smY = bandY + 4;
+            ctx.fillStyle = '#1f2633'; ctx.fillRect(smX - 7, smY - 11, 14, 11);
+            ctx.fillStyle = '#1d4782'; ctx.fillRect(smX - 9, smY - 27, 18, 17);
+            ctx.fillStyle = '#3468b0'; ctx.fillRect(smX - 7, smY - 25, 6, 13);
+            ctx.fillStyle = '#b81d2a'; ctx.fillRect(smX - 9, smY - 15, 18, 3);
+            ctx.fillStyle = '#b57b52'; ctx.fillRect(smX - 5, smY - 37, 10, 10);
+            ctx.fillStyle = '#17100c'; ctx.fillRect(smX - 7, smY - 40, 14, 4);
+            ctx.fillRect(smX - 9, smY - 37, 18, 2);
+            ctx.fillStyle = '#d9cbb4'; ctx.fillRect(smX + 5, smY - 31, 7, 2);
+            ctx.fillStyle = '#8f2424'; ctx.fillRect(smX + 11, smY - 33, 3, 4);
+            const puffPhase = Math.floor(now / 260) % 8;
+            if (puffPhase < 6) {
+                ctx.fillStyle = puffPhase > 3 ? 'rgba(235, 228, 215, 0.28)' : 'rgba(235, 228, 215, 0.55)';
+                ctx.fillRect(smX + 12 + (puffPhase % 2) * 2, smY - 37 - puffPhase * 3, 4, 3);
+            }
+
+            // 3B. Michif Fiddler Sawing Bow & Tapping Moccasin in Sync with BPM
+            const fdX = bandX + 18, fdY = bandY + 8;
+            ctx.fillStyle = 'rgba(10,4,2,0.48)'; ctx.fillRect(fdX - 9, fdY + 1, 18, 4);
+            ctx.fillStyle = '#6B3E1D';
+            ctx.fillRect(fdX - 7, fdY - 4, 6, 5);
+            ctx.fillRect(fdX + 2, fdY - 4 - tapFoot * 2, 7, 5);
+            ctx.fillStyle = '#26211d'; ctx.fillRect(fdX - 7, fdY - 15, 6, 12); ctx.fillRect(fdX + 1, fdY - 15, 6, 12);
+            const sway = bowFrame === 0 ? -1 : 1;
+            ctx.fillStyle = '#2b4238'; ctx.fillRect(fdX - 9 + sway, fdY - 32, 18, 18);
+            ctx.fillStyle = '#406152'; ctx.fillRect(fdX - 7 + sway, fdY - 30, 6, 14);
+            ctx.fillStyle = '#b81d2a'; ctx.fillRect(fdX - 9 + sway, fdY - 19, 18, 4);
+            ctx.fillStyle = '#f2c938'; ctx.fillRect(fdX - 7 + sway, fdY - 18, 14, 1);
+            ctx.fillStyle = '#b57b52'; ctx.fillRect(fdX - 5 + sway, fdY - 43, 10, 11);
+            ctx.fillStyle = '#c98e63'; ctx.fillRect(fdX - 3 + sway, fdY - 42, 6, 8);
+            ctx.fillStyle = '#17100c'; ctx.fillRect(fdX - 6 + sway, fdY - 45, 12, 4);
+            ctx.fillRect(fdX - 2 + sway, fdY - 39, 2, 2); ctx.fillRect(fdX + 2 + sway, fdY - 39, 2, 2);
+            ctx.fillStyle = '#a85219'; ctx.fillRect(fdX + 2 + sway, fdY - 33, 9, 5);
+            ctx.fillStyle = '#d97b30'; ctx.fillRect(fdX + 3 + sway, fdY - 32, 6, 3);
+            ctx.strokeStyle = '#f5efe4'; ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            if (bowFrame === 0) {
+                ctx.moveTo(fdX + 4 + sway, fdY - 37); ctx.lineTo(fdX + 11 + sway, fdY - 26);
+            } else {
+                ctx.moveTo(fdX + 2 + sway, fdY - 27); ctx.lineTo(fdX + 12 + sway, fdY - 36);
+            }
+            ctx.stroke();
+
+            const noteBob = Math.floor(now / 280) % 4;
+            ctx.fillStyle = '#ffe169';
+            ctx.fillRect(fdX + 10, fdY - 52 - noteBob, 3, 3);
+            ctx.fillRect(fdX + 12, fdY - 57 - noteBob, 1, 6);
+            ctx.fillRect(fdX + 12, fdY - 57 - noteBob, 4, 2);
+
+            // 4. Hanging Brass Oil Lantern
+            const fStep = Math.floor(now / 160) % 4;
+            const flicker = [0.92, 0.98, 0.88, 0.95][fStep];
+            const glowR = Math.max(180, VIEW_W * 0.48) * flicker;
+            const g = ctx.createRadialGradient(lanternX, lanternY + 60, 10, lanternX, lanternY + 60, glowR);
+            g.addColorStop(0.0, `rgba(255, 206, 102, ${0.20 * flicker})`);
+            g.addColorStop(0.5, `rgba(235, 136, 42, ${0.08 * flicker})`);
             g.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
             ctx.fillStyle = g;
             ctx.fillRect(0, HUD_TOP_H, VIEW_W, VIEW_H - HUD_TOP_H - HUD_BOT_H);
 
-            ctx.strokeStyle = '#241309'; ctx.lineWidth = 2;
-            ctx.beginPath(); ctx.moveTo(lanternX, HUD_TOP_H); ctx.lineTo(lanternX, lanternY); ctx.stroke();
-
-            ctx.fillStyle = '#8f5d1e'; ctx.fillRect(lanternX - 7, lanternY, 14, 4);
-            ctx.fillStyle = '#ffe58f'; ctx.fillRect(lanternX - 5, lanternY + 4, 10, 12);
-            ctx.fillStyle = '#fff9db'; ctx.fillRect(lanternX - 2, lanternY + 7, 4, 6);
-            ctx.fillStyle = '#8f5d1e'; ctx.fillRect(lanternX - 7, lanternY + 16, 14, 4);
+            ctx.fillStyle = '#8f5d1e'; ctx.fillRect(lanternX - 6, lanternY, 12, 3);
+            ctx.fillStyle = '#ffe58f'; ctx.fillRect(lanternX - 4, lanternY + 3, 8, 9);
+            ctx.fillStyle = '#fff9db'; ctx.fillRect(lanternX - 2, lanternY + 5, 4, 5);
+            ctx.fillStyle = '#8f5d1e'; ctx.fillRect(lanternX - 6, lanternY + 12, 12, 3);
         }
 
         // ------------------------------------------
@@ -1156,10 +1489,11 @@
         }
 
         // ==========================================
-        // 16/32-BIT PIXEL SPRITES (FRAME-BY-FRAME SNES ANIMATION)
+        // HIGH-DETAIL SHADED 16/32-BIT PIXEL SPRITES
         // ==========================================
         function drawMini444MoccasinSprite(x, y, hideObj, palObj, furObj, facingLeft = false) {
             const px = snap2(x), py = snap2(y);
+            ctx.fillStyle = '#140904'; ctx.fillRect(px - 1, py - 1, 12, 8);
             ctx.fillStyle = hideObj.mid; ctx.fillRect(px, py, 10, 6);
             ctx.fillStyle = hideObj.light; ctx.fillRect(px + 2, py + 1, 6, 3);
             if (facingLeft) {
@@ -1173,6 +1507,313 @@
                 ctx.fillStyle = furObj.base; ctx.fillRect(px, py - 2, 5, 3);
                 ctx.fillStyle = furObj.hi; ctx.fillRect(px + 1, py - 2, 3, 1);
             }
+        }
+
+        // Slightly Enlarged 4-4-4 Icon Trio for Customer Yelling Speech Bubbles & HUD
+        function draw444IconSet(cx, cy, hideId, palId, furId, scale = 1.25) {
+            const hObj = HIDES[hideId];
+            const pObj = PALETTES[palId];
+            const fObj = FURS[furId];
+
+            const span = Math.round(20 * scale);
+            const boxS = Math.round(11 * scale);
+
+            const hx = Math.floor(cx - span - boxS / 2), hy = Math.floor(cy - boxS / 2);
+            ctx.fillStyle = '#120804';  ctx.fillRect(hx - 1, hy - 1, boxS + 2, boxS + 2);
+            ctx.fillStyle = hObj.dark;  ctx.fillRect(hx, hy, boxS, boxS);
+            ctx.fillStyle = hObj.mid;   ctx.fillRect(hx, hy, boxS - 2, boxS - 2);
+            ctx.fillStyle = hObj.light; ctx.fillRect(hx + 1, hy + 1, Math.max(3, boxS - 5), Math.max(3, boxS - 6));
+
+            const br = 3.4 * scale;
+            const bo = 3.2 * scale;
+            drawFlatBeadAt(cx - bo * 0.85, cy - bo * 0.75, br, pObj.beads[1]);
+            drawFlatBeadAt(cx + bo * 0.95, cy - bo * 0.75, br, pObj.beads[3]);
+            drawFlatBeadAt(cx + 0.2,       cy + bo * 0.90, br, pObj.beads[5]);
+
+            const fx = Math.floor(cx + span - boxS / 2), fy = Math.floor(cy - boxS / 2);
+            ctx.fillStyle = '#120804'; ctx.fillRect(fx - 1, fy, boxS + 2, boxS + 1);
+            ctx.fillStyle = fObj.dark; ctx.fillRect(fx, fy, boxS + 1, boxS);
+            ctx.fillStyle = fObj.base; ctx.fillRect(fx + 1, fy - 1, boxS - 1, boxS - 1);
+            ctx.fillStyle = fObj.hi;   ctx.fillRect(fx + 2, fy, Math.max(4, boxS - 5), Math.max(4, boxS - 5));
+        }
+
+        // High-Detail Shaded Customer Sprite (Tripman, Country Wife, Settler, HBC Officer)
+        function drawPostCustomerSprite(cust, now) {
+            ctx.save();
+            const px = snap2(cust.x), py = snap2(cust.y);
+            const isMoving = (cust.state === 'WALK_IN' || cust.state === 'WALK_OUT' || Math.hypot(cust.targetX - cust.x, cust.targetY - cust.y) > 2);
+            const stepFrame = isMoving ? (Math.floor(now / 130) % 4) : 0;
+            const bob = isMoving ? (stepFrame % 2 === 1 ? -2 : 0) : 0;
+            const legShift = isMoving ? (stepFrame === 1 ? 3 : stepFrame === 3 ? -3 : 0) : 0;
+            const facingLeft = (cust.state === 'WALK_OUT');
+            const shouting = (cust.shoutAnimMs > 0);
+            const arch = cust.arch;
+
+            ctx.fillStyle = 'rgba(10, 4, 2, 0.55)';
+            ctx.fillRect(px - 12, py + 1, 24, 5);
+
+            ctx.fillStyle = '#1c0f07';
+            ctx.fillRect(px - 8 + legShift, py - 4, 7, 5);
+            ctx.fillRect(px + 1 - legShift, py - 4, 7, 5);
+            ctx.fillStyle = '#59361c';
+            ctx.fillRect(px - 7 + legShift, py - 3, 5, 3);
+            ctx.fillRect(px + 2 - legShift, py - 3, 5, 3);
+
+            if (arch.type === 'COUNTRY_WIFE') {
+                ctx.fillStyle = '#0e1626'; ctx.fillRect(px - 12, py - 21 + bob, 24, 18);
+                ctx.fillStyle = '#1b2b4a'; ctx.fillRect(px - 10, py - 20 + bob, 20, 16);
+                ctx.fillStyle = '#2d4473'; ctx.fillRect(px + 2,  py - 19 + bob, 6, 14);
+                ctx.fillStyle = '#9E1B32'; ctx.fillRect(px - 11, py - 7 + bob, 22, 2);
+                ctx.fillStyle = '#E09F24'; ctx.fillRect(px - 11, py - 5 + bob, 22, 1);
+            } else {
+                const trDark = arch.type === 'HBC_OFFICER' ? '#10131c' : '#1d1713';
+                const trMid  = arch.type === 'HBC_OFFICER' ? '#202638' : '#362c24';
+                ctx.fillStyle = trDark;
+                ctx.fillRect(px - 8 + legShift, py - 16 + bob, 7, 13);
+                ctx.fillRect(px + 1 - legShift, py - 16 + bob, 7, 13);
+                ctx.fillStyle = trMid;
+                ctx.fillRect(px - 6 + legShift, py - 15 + bob, 4, 11);
+                ctx.fillRect(px + 3 - legShift, py - 15 + bob, 4, 11);
+            }
+
+            ctx.fillStyle = '#120a06'; ctx.fillRect(px - 12, py - 36 + bob, 24, 21);
+            ctx.fillStyle = arch.coatDark; ctx.fillRect(px - 11, py - 35 + bob, 22, 19);
+            ctx.fillStyle = arch.coat;     ctx.fillRect(px - 9,  py - 34 + bob, 18, 17);
+            ctx.fillStyle = arch.coatHi;   ctx.fillRect(px + 2,  py - 33 + bob, 6, 14);
+
+            if (arch.type === 'TRIPMAN') {
+                ctx.fillStyle = '#82101a'; ctx.fillRect(px - 11, py - 22 + bob, 22, 5);
+                ctx.fillStyle = '#cf2331'; ctx.fillRect(px - 10, py - 21 + bob, 20, 3);
+                ctx.fillStyle = '#f2c938'; ctx.fillRect(px - 6, py - 20 + bob, 3, 1); ctx.fillRect(px + 2, py - 20 + bob, 3, 1);
+                ctx.fillStyle = '#b81d2a'; ctx.fillRect(px - 9, py - 17 + bob, 3, 6);
+            } else if (arch.type === 'COUNTRY_WIFE') {
+                ctx.fillStyle = '#a88454'; ctx.fillRect(px - 12, py - 35 + bob, 24, 10);
+                ctx.fillStyle = '#d9b482'; ctx.fillRect(px - 10, py - 34 + bob, 20, 7);
+                ctx.fillStyle = '#8B1E24'; ctx.fillRect(px - 11, py - 30 + bob, 22, 2);
+                ctx.fillStyle = '#2E663B'; ctx.fillRect(px - 5, py - 34 + bob, 2, 8); ctx.fillRect(px + 4, py - 34 + bob, 2, 8);
+            } else if (arch.type === 'HBC_OFFICER') {
+                ctx.fillStyle = '#f5f0e6'; ctx.fillRect(px - 2, py - 34 + bob, 5, 5);
+                ctx.fillStyle = '#d9a441';
+                ctx.fillRect(px - 11, py - 35 + bob, 5, 3); ctx.fillRect(px + 6, py - 35 + bob, 5, 3);
+                ctx.fillRect(px - 4, py - 30 + bob, 2, 2); ctx.fillRect(px + 3, py - 30 + bob, 2, 2);
+                ctx.fillRect(px - 4, py - 25 + bob, 2, 2); ctx.fillRect(px + 3, py - 25 + bob, 2, 2);
+            } else {
+                ctx.fillStyle = arch.trim; ctx.fillRect(px - 6, py - 33 + bob, 12, 15);
+                ctx.fillStyle = '#c43a2b'; ctx.fillRect(px - 4, py - 34 + bob, 8, 3);
+            }
+
+            if (shouting) {
+                ctx.fillStyle = arch.coatDark; ctx.fillRect(px + 9, py - 42 + bob, 5, 11);
+                ctx.fillStyle = arch.coatHi;   ctx.fillRect(px + 10, py - 41 + bob, 3, 9);
+                ctx.fillStyle = '#d99e73';     ctx.fillRect(px + 10, py - 44 + bob, 4, 3);
+            }
+
+            const hy = py - 48 + bob;
+            ctx.fillStyle = '#170e09'; ctx.fillRect(px - 7, hy + 1, 14, 13);
+            ctx.fillStyle = '#ab734b'; ctx.fillRect(px - 6, hy + 2, 12, 11);
+            ctx.fillStyle = '#d4996e'; ctx.fillRect(px - 2, hy + 3, 8, 9);
+            if (arch.type === 'TRIPMAN' || arch.type === 'SETTLER') {
+                ctx.fillStyle = '#2b1b10';
+                ctx.fillRect(px - 5, hy + 10, 11, 3);
+            }
+
+            ctx.fillStyle = '#140c08';
+            if (facingLeft) {
+                ctx.fillRect(px - 5, hy + 6, 2, 2);
+            } else {
+                ctx.fillRect(px + 3, hy + 6, 2, 2);
+                if (shouting) {
+                    ctx.fillStyle = '#4a1010';
+                    ctx.fillRect(px + 3, hy + 9, 3, 3);
+                }
+            }
+
+            if (arch.hat === 'TUQUE') {
+                ctx.fillStyle = '#750d16'; ctx.fillRect(px - 8, hy - 4, 16, 7);
+                ctx.fillStyle = '#c72230'; ctx.fillRect(px - 7, hy - 3, 13, 5);
+                ctx.fillStyle = '#e84855'; ctx.fillRect(px - 3, hy - 3, 6, 2);
+                ctx.fillStyle = '#8f111c'; ctx.fillRect(px - 9, hy - 7, 10, 4);
+            } else if (arch.hat === 'SHAWL') {
+                ctx.fillStyle = '#120d0b'; ctx.fillRect(px - 8, hy - 1, 15, 5);
+                ctx.fillStyle = '#2e221d'; ctx.fillRect(px - 4, hy, 7, 2);
+                ctx.fillStyle = '#120d0b'; ctx.fillRect(px - 7, hy + 3, 3, 15);
+                ctx.fillStyle = '#9E1B32'; ctx.fillRect(px - 7, hy + 16, 3, 2);
+            } else if (arch.hat === 'TOPHAT') {
+                ctx.fillStyle = '#0d0d10';
+                ctx.fillRect(px - 10, hy, 20, 3);
+                ctx.fillRect(px - 7, hy - 11, 14, 11);
+                ctx.fillStyle = '#2b2b36'; ctx.fillRect(px - 2, hy - 10, 5, 8);
+                ctx.fillStyle = '#d9a441'; ctx.fillRect(px - 7, hy - 3, 14, 2);
+            } else {
+                ctx.fillStyle = '#1b2730'; ctx.fillRect(px - 9, hy - 3, 18, 6);
+                ctx.fillStyle = '#324859'; ctx.fillRect(px - 6, hy - 2, 12, 4);
+                ctx.fillStyle = '#c72230'; ctx.fillRect(px - 2, hy - 5, 4, 2);
+            }
+
+            if (cust.state === 'WALK_OUT' && cust.servedMocc) {
+                drawMini444MoccasinSprite(px - 15, py - 25 + bob, HIDES[cust.hideId], PALETTES[cust.palId], FURS[cust.furId], true);
+            }
+
+            // Enlarged Yelling Speech Bubble + Dialect Request Line + 4-4-4 Request Icons
+            if (cust.state === 'AT_COUNTER') {
+                const bw = 64, bh = 30;
+                const bx = px - Math.floor(bw / 2);
+                const by = hy - (arch.hat === 'TOPHAT' ? 46 : 38) + (shouting ? -3 : 0);
+
+                const clerkMatches = (
+                    clerk.craftedMocc &&
+                    clerk.craftedMocc.hideId === cust.hideId &&
+                    clerk.craftedMocc.palId === cust.palId &&
+                    clerk.craftedMocc.furId === cust.furId
+                );
+
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+                ctx.fillRect(bx + 2, by + 2, bw, bh);
+                ctx.fillStyle = 'rgba(18, 10, 5, 0.95)';
+                ctx.fillRect(bx, by, bw, bh);
+                ctx.strokeStyle = clerkMatches ? '#7bed9f' : (shouting ? '#ffe169' : '#f2e4c9');
+                ctx.lineWidth = clerkMatches || shouting ? 2 : 1.5;
+                ctx.strokeRect(bx, by, bw, bh);
+
+                ctx.fillStyle = clerkMatches ? '#7bed9f' : '#f2e4c9';
+                ctx.fillRect(px - 3, by + bh, 6, 4);
+                ctx.fillRect(px - 1, by + bh + 4, 3, 2);
+
+                draw444IconSet(bx + bw / 2, by + 13, cust.hideId, cust.palId, cust.furId, 1.25);
+
+                const pct = Math.max(0, cust.patience / cust.maxPatience);
+                ctx.fillStyle = '#261208';
+                ctx.fillRect(bx + 4, by + bh - 5, bw - 8, 3);
+                ctx.fillStyle = pct > 0.5 ? '#7bed9f' : (pct > 0.25 ? '#f2c938' : '#ff5252');
+                ctx.fillRect(bx + 4, by + bh - 5, Math.floor((bw - 8) * pct), 3);
+
+                // Dialect-specific request line spoken when shouting or when clerk stands across from them
+                const target = getClerkInteractionTarget();
+                const isFocused = (target.zone === 'CUSTOMER' && target.customer.id === cust.id);
+                if (shouting || isFocused) {
+                    const lineX = Math.max(92, Math.min(postLayout.counterX - 78, px - 18));
+                    drawPixelText(`"${cust.requestLine}"`, lineX, by - 6, '#ffe49e', 'bold 10px Courier New', 'center');
+                }
+            }
+
+            ctx.restore();
+        }
+
+        // High-Detail Shaded HBC Clerk Player Sprite (includes Hand-Rustle Workbench Pose!)
+        function drawClerkSprite(now) {
+            ctx.save();
+            const px = snap2(clerk.x), py = snap2(clerk.y);
+            const isRustling = clerk.rustleAnimMs > 0;
+            const isMoving = clerk.movingMs > 0 && !isRustling;
+            const stepFrame = isMoving ? (Math.floor(now / 115) % 4) : 0;
+            const bob = isMoving ? (stepFrame % 2 === 1 ? -2 : 0) : 0;
+            const legShift = isMoving ? (stepFrame === 1 ? 3 : stepFrame === 3 ? -3 : 0) : 0;
+
+            ctx.fillStyle = 'rgba(10, 4, 2, 0.58)';
+            ctx.fillRect(px - 12, py + 1, 24, 5);
+
+            ctx.fillStyle = '#140d08';
+            ctx.fillRect(px - 8 + legShift, py - 4, 7, 5);
+            ctx.fillRect(px + 1 - legShift, py - 4, 7, 5);
+            ctx.fillStyle = '#1f1b18';
+            ctx.fillRect(px - 8 + legShift, py - 16 + bob, 7, 13);
+            ctx.fillRect(px + 1 - legShift, py - 16 + bob, 7, 13);
+            ctx.fillStyle = '#38322d';
+            ctx.fillRect(px - 6 + legShift, py - 15 + bob, 4, 11);
+            ctx.fillRect(px + 3 - legShift, py - 15 + bob, 4, 11);
+
+            ctx.fillStyle = '#140c06'; ctx.fillRect(px - 12, py - 35 + bob, 24, 20);
+            ctx.fillStyle = '#d4ccb8'; ctx.fillRect(px - 11, py - 34 + bob, 22, 16);
+            ctx.fillStyle = '#f5efe2'; ctx.fillRect(px - 10, py - 33 + bob, 20, 12);
+            ctx.fillStyle = '#233320'; ctx.fillRect(px - 9,  py - 35 + bob, 18, 19);
+            ctx.fillStyle = '#3c5437'; ctx.fillRect(px - 7,  py - 34 + bob, 14, 16);
+            ctx.fillStyle = '#8c2222'; ctx.fillRect(px - 2,  py - 34 + bob, 4, 5);
+            ctx.fillStyle = '#d9a441'; ctx.fillRect(px - 1,  py - 28 + bob, 2, 2); ctx.fillRect(px - 1, py - 24 + bob, 2, 2);
+
+            ctx.fillStyle = '#a8967a'; ctx.fillRect(px - 8, py - 22 + bob, 16, 13);
+            ctx.fillStyle = '#ded1ba'; ctx.fillRect(px - 7, py - 21 + bob, 13, 11);
+            ctx.fillStyle = '#8c7a61'; ctx.fillRect(px - 5, py - 16 + bob, 10, 1);
+
+            const hy = py - 49 + bob;
+            ctx.fillStyle = '#1a0f09'; ctx.fillRect(px - 8, hy - 2, 16, 15);
+            ctx.fillStyle = '#b07850'; ctx.fillRect(px - 6, hy + 2, 12, 11);
+            ctx.fillStyle = '#d99e73'; ctx.fillRect(px - 4, hy + 3, 9, 9);
+            ctx.fillStyle = '#3b2414';
+            ctx.fillRect(px - 8, hy - 2, 16, 5);
+            ctx.fillRect(px - 6, hy + 3, 2, 5); ctx.fillRect(px + 5, hy + 3, 2, 5);
+            ctx.fillStyle = '#5c3a22'; ctx.fillRect(px - 4, hy - 1, 7, 2);
+
+            ctx.fillStyle = '#140b07';
+            if (isRustling) {
+                // Looking down at hands rustling materials on the workbench
+                ctx.fillRect(px - 2, hy + 7, 2, 2); ctx.fillRect(px + 2, hy + 7, 2, 2);
+            } else if (clerk.facing < 0) {
+                ctx.fillRect(px - 4, hy + 6, 2, 2);
+            } else {
+                ctx.fillRect(px + 2, hy + 6, 2, 2);
+            }
+
+            // Hand-Rustle Sewing Animation at the Crafting Workbench (driven by B-A-B-A-B-A-B inputs!)
+            if (isRustling) {
+                const rStep = clerk.stitchProgress % 4;
+                const matShift = [0, 2, 0, -2][rStep];
+                const lHandX = [px - 8, px - 6, px - 4, px - 6][rStep];
+                const rHandX = [px + 4, px + 2, px + 0, px + 2][rStep];
+
+                // Materials rustling on workbench top ahead of clerk
+                const wMatY = postLayout.benchY - 8;
+                if (clerk.heldHide !== null) {
+                    ctx.fillStyle = HIDES[clerk.heldHide].mid;
+                    ctx.fillRect(px - 6 + matShift, wMatY, 13, 6);
+                }
+                if (clerk.heldPal !== null) {
+                    drawFlatBeadAt(px + matShift, wMatY + 2, 2.5, PALETTES[clerk.heldPal].beads[1]);
+                }
+                if (clerk.heldFur !== null) {
+                    ctx.fillStyle = FURS[clerk.heldFur].base;
+                    ctx.fillRect(px - 4 + matShift, wMatY - 2, 9, 3);
+                }
+                // Animated rustling hands
+                ctx.fillStyle = '#d99e73';
+                ctx.fillRect(lHandX, py - 19 + (rStep % 2), 5, 4);
+                ctx.fillRect(rHandX, py - 18 - (rStep % 2), 5, 4);
+                ctx.restore();
+                return;
+            }
+
+            const handX = clerk.facing < 0 ? (px - 15) : (px + 6);
+            const handY = py - 25 + bob;
+            if (clerk.craftedMocc) {
+                drawMini444MoccasinSprite(
+                    handX - 1, handY,
+                    HIDES[clerk.craftedMocc.hideId],
+                    PALETTES[clerk.craftedMocc.palId],
+                    FURS[clerk.craftedMocc.furId],
+                    clerk.facing < 0
+                );
+            } else {
+                let stackOff = 0;
+                if (clerk.heldHide !== null) {
+                    ctx.fillStyle = HIDES[clerk.heldHide].mid;
+                    ctx.fillRect(handX, handY - stackOff, 10, 5);
+                    ctx.strokeStyle = '#1a0d05'; ctx.lineWidth = 1; ctx.strokeRect(handX, handY - stackOff, 10, 5);
+                    stackOff += 5;
+                }
+                if (clerk.heldPal !== null) {
+                    const p = PALETTES[clerk.heldPal];
+                    drawFlatBeadAt(handX + 2, handY - stackOff + 2, 2.7, p.beads[1]);
+                    drawFlatBeadAt(handX + 7, handY - stackOff + 2, 2.7, p.beads[3]);
+                    stackOff += 5;
+                }
+                if (clerk.heldFur !== null) {
+                    const f = FURS[clerk.heldFur];
+                    ctx.fillStyle = f.dark; ctx.fillRect(handX, handY - stackOff, 10, 5);
+                    ctx.fillStyle = f.base; ctx.fillRect(handX + 1, handY - stackOff, 8, 4);
+                    ctx.fillStyle = f.hi;   ctx.fillRect(handX + 2, handY - stackOff + 1, 5, 2);
+                }
+            }
+
+            ctx.restore();
         }
 
         function drawMotherSprite(x, y, pose, now, hideObj = null, palObj = null, furObj = null) {
@@ -1365,22 +2006,22 @@
         resizeViewport();
 
         // ==========================================
-        // MATRIARCH'S TEARDROP LAMENT AUDIO & ARCADE SFX
+        // DUAL CHIPTUNE ENGINE:
+        // 1. TIPI TRACK: "Matriarch's Teardrop Lament" (Fixed 75 BPM)
+        // 2. LANE'S POST TRACK: "Galleon Squeezebox × Dakota Plains Fiddle" (10 Stages: 60 -> 160 BPM)
         // ==========================================
         let chiptuneAudioCtx = null;
-        let chiptuneInterval = null;
+        let chiptuneTimeout = null;
         let chiptuneIsPlaying = false;
+        let activeTrackMode = 'TIPI';
         let currentStep = 0;
 
-        const BPM = 75;
-        const noteLength = 60 / BPM / 2;
-
         const NOTES = {
-            'F#2': 92.50,  'G2': 98.00,   'A2': 110.00,  'B2': 123.47,
-            'D3': 146.83,  'E3': 164.81,  'F#3': 185.00, 'A3': 220.00,
-            'B3': 246.94,  'C#4': 277.18, 'D4': 293.66,  'E4': 329.63,
-            'F#4': 369.99, 'A4': 440.00,  'B4': 493.88,  'C#5': 554.37,
-            'D5': 587.33,  'E5': 659.25,  'F#5': 739.99, 'A5': 880.00
+            'D2': 73.42,   'F2': 87.31,   'F#2': 92.50,  'G2': 98.00,   'A2': 110.00,  'B2': 123.47,  'C3': 130.81,
+            'D3': 146.83,  'E3': 164.81,  'F3': 174.61,  'F#3': 185.00, 'G3': 196.00,  'A3': 220.00,  'B3': 246.94,
+            'C4': 261.63,  'C#4': 277.18, 'D4': 293.66,  'E4': 329.63,  'F4': 349.23,  'F#4': 369.99, 'G4': 392.00,
+            'A4': 440.00,  'B4': 493.88,  'C5': 523.25,  'C#5': 554.37, 'D5': 587.33,  'E5': 659.25,  'F5': 698.46,
+            'F#5': 739.99, 'G5': 783.99,  'A5': 880.00
         };
 
         const matriarchFiddle = [
@@ -1389,7 +2030,6 @@
             'F#5', 'E5', 'D5', 'B4', 'A4', 'B4', 'D5', 'E5',
             'F#5', 'D5', 'B4', 'A4', 'B4', null, null, null
         ];
-
         const celloDrone = [
             'B2', null, null, null, 'B2', null, null, null,
             'A2', null, null, null, 'A2', null, null, null,
@@ -1397,21 +2037,112 @@
             'F#2', null, null, null, 'B2', null, null, null
         ];
 
+        const galleonPlainsFiddle = [
+            'A4', null, 'D5', 'E5', 'F5', 'E5', 'D5', 'C5',
+            'A4', 'G4', 'A4', 'C5', 'D5', null, 'A4', null,
+            'A5', null, 'G5', 'F5', 'E5', 'D5', 'C5', 'A4',
+            'G4', 'A4', 'C5', 'A4', 'D4', null, 'D4', null
+        ];
+        const galleonAccordionDyad = [
+            ['D3', 'A3'], null, null, ['F3', 'A3'], ['D3', 'A3'], null, null, ['C3', 'G3'],
+            ['A2', 'E3'], null, null, ['C3', 'G3'], ['D3', 'A3'], null, null, null,
+            ['F3', 'C4'], null, null, ['F3', 'A3'], ['C3', 'G3'], null, null, ['A2', 'E3'],
+            ['G2', 'D3'], null, ['A2', 'E3'], null, ['D3', 'A3'], null, null, null
+        ];
+        const plainsHeartbeatDrone = [
+            'D2', null, null, null, 'D2', null, 'A2', null,
+            'A2', null, null, null, 'D2', null, null, null,
+            'F2', null, null, null, 'C3', null, 'A2', null,
+            'G2', null, 'A2', null, 'D2', null, 'D2', null
+        ];
+
+        function getPostCurrentBPM() {
+            const st = Math.max(0, Math.min(9, postStage));
+            return Math.round(60 + st * (100 / 9)); // 60 -> 160 BPM across 10 stages
+        }
+
         function initChiptuneAudio() {
             if (!chiptuneAudioCtx) chiptuneAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
             if (chiptuneAudioCtx.state === 'suspended' && !isPaused) chiptuneAudioCtx.resume();
         }
 
-        function playTone(freq, type, duration, volume) {
+        function playTone(freq, type, duration, volume, swell = false) {
             if (!freq || !chiptuneAudioCtx || isPaused) return;
+            const nowT = chiptuneAudioCtx.currentTime;
             const osc = chiptuneAudioCtx.createOscillator();
             const gainNode = chiptuneAudioCtx.createGain();
             osc.type = type;
-            osc.frequency.setValueAtTime(freq, chiptuneAudioCtx.currentTime);
-            gainNode.gain.setValueAtTime(volume, chiptuneAudioCtx.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.0001, chiptuneAudioCtx.currentTime + duration - 0.015);
-            osc.connect(gainNode); gainNode.connect(chiptuneAudioCtx.destination);
-            osc.start(); osc.stop(chiptuneAudioCtx.currentTime + duration);
+            osc.frequency.setValueAtTime(freq, nowT);
+
+            if (swell) {
+                gainNode.gain.setValueAtTime(0.0005, nowT);
+                gainNode.gain.linearRampToValueAtTime(volume, nowT + duration * 0.38);
+                gainNode.gain.exponentialRampToValueAtTime(0.0001, nowT + duration);
+            } else {
+                gainNode.gain.setValueAtTime(volume, nowT);
+                gainNode.gain.exponentialRampToValueAtTime(0.0001, nowT + Math.max(0.02, duration - 0.012));
+            }
+
+            osc.connect(gainNode);
+            gainNode.connect(chiptuneAudioCtx.destination);
+            osc.start(nowT);
+            osc.stop(nowT + duration + 0.01);
+        }
+
+        function scheduleNextChiptuneStep() {
+            if (!chiptuneIsPlaying) return;
+
+            let stepDurSec = 60 / 75 / 2;
+            if (activeTrackMode === 'POST') {
+                const bpm = getPostCurrentBPM();
+                stepDurSec = 60 / bpm / 2;
+            }
+
+            if (!isPaused && chiptuneAudioCtx) {
+                if (activeTrackMode === 'TIPI') {
+                    const lead = matriarchFiddle[currentStep];
+                    const bass = celloDrone[currentStep];
+                    if (lead && NOTES[lead]) playTone(NOTES[lead], 'square', stepDurSec * 1.2, 0.02, false);
+                    if (bass && NOTES[bass]) playTone(NOTES[bass], 'sine', stepDurSec * 3.8, 0.15, false);
+                } else {
+                    const fid = galleonPlainsFiddle[currentStep];
+                    const acc = galleonAccordionDyad[currentStep];
+                    const drn = plainsHeartbeatDrone[currentStep];
+
+                    if (fid && NOTES[fid]) {
+                        const gate = postStage < 3 ? 1.25 : 0.90;
+                        playTone(NOTES[fid], 'square', stepDurSec * gate, 0.028, false);
+                    }
+                    if (acc) {
+                        playTone(NOTES[acc[0]], 'sawtooth', stepDurSec * 2.4, 0.018, true);
+                        playTone(NOTES[acc[1]] * 1.003, 'triangle', stepDurSec * 2.4, 0.045, true);
+                    }
+                    if (drn && NOTES[drn]) {
+                        playTone(NOTES[drn], 'sine', stepDurSec * 2.8, 0.16, false);
+                    }
+                }
+                currentStep = (currentStep + 1) % 32;
+            }
+
+            chiptuneTimeout = setTimeout(scheduleNextChiptuneStep, stepDurSec * 1000);
+        }
+
+        function startChiptuneTrack(mode = 'TIPI') {
+            initChiptuneAudio();
+            stopChiptuneTrack();
+            activeTrackMode = mode;
+            chiptuneIsPlaying = true;
+            currentStep = 0;
+            scheduleNextChiptuneStep();
+        }
+
+        function stopChiptuneTrack() {
+            chiptuneIsPlaying = false;
+            if (chiptuneTimeout) {
+                clearTimeout(chiptuneTimeout);
+                chiptuneTimeout = null;
+            }
+            currentStep = 0;
         }
 
         function playSfx(kind) {
@@ -1420,6 +2151,13 @@
             if (kind === 'serve') {
                 playTone(587.33, 'triangle', 0.10, 0.14);
                 setTimeout(() => playTone(880.00, 'triangle', 0.16, 0.14), 75);
+            } else if (kind === 'craft') {
+                playTone(392.00, 'square', 0.07, 0.06);
+                setTimeout(() => playTone(523.25, 'triangle', 0.12, 0.12), 65);
+            } else if (kind === 'stitch_step') {
+                playTone(620 + clerk.stitchProgress * 45, 'triangle', 0.05, 0.08);
+            } else if (kind === 'pickup') {
+                playTone(493.88, 'triangle', 0.06, 0.08);
             } else if (kind === 'miss') {
                 playTone(155.00, 'sawtooth', 0.18, 0.10);
             } else if (kind === 'click') {
@@ -1427,124 +2165,401 @@
             }
         }
 
-        function sequenceTrack() {
-            if (isPaused) return;
-            const leadNote = matriarchFiddle[currentStep], bassNote = celloDrone[currentStep];
-            if (leadNote && NOTES[leadNote]) playTone(NOTES[leadNote], 'square', noteLength * 1.2, 0.02);
-            if (bassNote && NOTES[bassNote]) playTone(NOTES[bassNote], 'sine', noteLength * 3.8, 0.15);
-            currentStep = (currentStep + 1) % 32;
-        }
-
-        function startChiptuneTrack() {
-            initChiptuneAudio();
-            if (!chiptuneIsPlaying) {
-                chiptuneIsPlaying = true;
-                currentStep = 0;
-                chiptuneInterval = setInterval(sequenceTrack, noteLength * 1000);
-            }
-        }
-
-        function stopChiptuneTrack() {
-            if (chiptuneIsPlaying) {
-                clearInterval(chiptuneInterval);
-                chiptuneIsPlaying = false;
-                currentStep = 0;
-            }
-        }
-
         document.addEventListener('touchstart', initChiptuneAudio, { once: true });
         document.addEventListener('mousedown', initChiptuneAudio, { once: true });
 
         // ==========================================
-        // LANE'S POST 4-4-4 CLERK RUSH LOGIC
+        // LANE'S POST SPATIAL CLERK RUSH LOGIC
         // ==========================================
-        let nextOrderUid = 1;
+        let nextCustomerUid = 1;
 
-        function spawnVisitorOrder() {
-            if (activeOrders.length >= MAX_ACTIVE_ORDERS) return;
-            const basePatience = Math.max(14000, 26000 - orderServedCount * 450);
-            activeOrders.push({
-                id: nextOrderUid++,
-                name: POST_VISITORS[Math.floor(Math.random() * POST_VISITORS.length)],
-                hideId: Math.floor(Math.random() * HIDES.length),
-                palId: Math.floor(Math.random() * PALETTES.length),
-                furId: Math.floor(Math.random() * FURS.length),
-                patience: basePatience,
-                maxPatience: basePatience
+        function getFreeCounterSpot() {
+            const taken = new Set();
+            postCustomers.forEach(c => {
+                if (c.spotIdx !== -1 && c.state !== 'WALK_OUT') taken.add(c.spotIdx);
+            });
+            for (let i = 0; i < MAX_COUNTER_SPOTS; i++) {
+                if (!taken.has(i)) return i;
+            }
+            return -1;
+        }
+
+        function getQueuedCustomerCount() {
+            return postCustomers.filter(c => c.state !== 'WALK_OUT' && c.spotIdx === -1).length;
+        }
+
+        function refreshQueuePositions() {
+            let freeSpot = getFreeCounterSpot();
+            while (freeSpot !== -1) {
+                const nextInLine = postCustomers.find(c => (c.state === 'IN_QUEUE' || c.state === 'WALK_IN') && c.spotIdx === -1);
+                if (!nextInLine) break;
+                nextInLine.spotIdx = freeSpot;
+                nextInLine.queueIdx = -1;
+                nextInLine.state = 'WALK_IN';
+                nextInLine.targetX = postLayout.counterX - 20;
+                nextInLine.targetY = postLayout.spotYs[freeSpot];
+                freeSpot = getFreeCounterSpot();
+            }
+
+            const queued = postCustomers.filter(c => c.state !== 'WALK_OUT' && c.spotIdx === -1);
+            queued.forEach((c, idx) => {
+                c.queueIdx = idx;
+                c.targetX = Math.max(26, postLayout.queueBaseX - idx * 30);
+                c.targetY = postLayout.queueBaseY + ((idx % 2) * 8 - 4);
             });
         }
 
-        function startOrderRush() {
-            activeOrders = [];
-            orderScore = 0; orderCombo = 0; orderServedCount = 0; orderStrikes = 0;
-            orderSpawnTimerMs = 3500;
-            craftHideId = 0; craftPalId = 0; craftFurId = 0; craftRow = 0;
-            feedbackMsg = ''; feedbackTimerMs = 0;
+        function spawnPostCustomer() {
+            const spotIdx = getFreeCounterSpot();
+            const queuedCount = getQueuedCustomerCount();
 
-            spawnVisitorOrder(); spawnVisitorOrder();
-            startChiptuneTrack();
+            if (spotIdx === -1 && queuedCount >= MAX_WAIT_QUEUE) {
+                postGameOverReason = 'QUEUE OVERRUN!';
+                stopChiptuneTrack();
+                playSfx('miss');
+                gameState = 'ORDER_GAMEOVER';
+                return;
+            }
+
+            const arch = CUSTOMER_ARCHETYPES[Math.floor(Math.random() * CUSTOMER_ARCHETYPES.length)];
+            const reqLine = arch.requests[Math.floor(Math.random() * arch.requests.length)];
+            const basePatience = Math.max(24000, 36000 - postStage * 1300);
+
+            const cust = {
+                id: nextCustomerUid++,
+                arch,
+                requestLine: reqLine,
+                x: postLayout.doorX - 12,
+                y: postLayout.doorY,
+                targetX: spotIdx !== -1 ? (postLayout.counterX - 20) : postLayout.queueBaseX,
+                targetY: spotIdx !== -1 ? postLayout.spotYs[spotIdx] : postLayout.queueBaseY,
+                state: 'WALK_IN',
+                spotIdx,
+                queueIdx: spotIdx === -1 ? queuedCount : -1,
+                hideId: Math.floor(Math.random() * 4),
+                palId: Math.floor(Math.random() * 4),
+                furId: Math.floor(Math.random() * 4),
+                patience: basePatience,
+                maxPatience: basePatience,
+                shoutAnimMs: 0,
+                servedMocc: false
+            };
+
+            postCustomers.push(cust);
+            lastSpawnedCustomer = cust;
+            refreshQueuePositions();
+        }
+
+        function startOrderRush() {
+            postCustomers = [];
+            lastSpawnedCustomer = null;
+            postElapsedMs = 0;
+            postStage = 0;
+            postGameOverReason = 'POST CLOSED!';
+            shelfStockIdx = [0, 0, 0];
+            clerk = {
+                x: Math.floor((postLayout.aisleMinX + postLayout.aisleMaxX) / 2),
+                y: postLayout.spotYs[1],
+                facing: -1,
+                movingMs: 0,
+                rustleAnimMs: 0,
+                stitchProgress: 0,
+                heldHide: null,
+                heldPal: null,
+                heldFur: null,
+                craftedMocc: null
+            };
+            moveDir = { dx: 0, dy: 0, pulseMs: 0 };
+            orderScore = 0;
+            orderCombo = 0;
+            orderServedCount = 0;
+            orderStrikes = 0;
+            orderSpawnTimerMs = 24000;
+            feedbackMsg = '';
+            feedbackTimerMs = 0;
+
+            spawnPostCustomer();
+            startChiptuneTrack('POST');
             lastFrameTime = performance.now();
             gameState = 'ORDER_PLAYING';
         }
 
-        function serveCurrentMoccasin() {
-            let bestIdx = -1, lowestPatience = Infinity;
-            for (let i = 0; i < activeOrders.length; i++) {
-                const o = activeOrders[i];
-                if (o.hideId === craftHideId && o.palId === craftPalId && o.furId === craftFurId) {
-                    if (o.patience < lowestPatience) { lowestPatience = o.patience; bestIdx = i; }
+        function getClerkInteractionTarget() {
+            if (clerk.x >= postLayout.aisleMaxX - 16) {
+                for (const sh of postLayout.shelves) {
+                    if (clerk.y >= sh.y - 8 && clerk.y <= sh.y + sh.h + 8) {
+                        return { zone: 'SHELF', shelf: sh };
+                    }
                 }
             }
+            // Workbench interaction zone right in front of the workbench collider
+            if (clerk.y >= postLayout.benchStandY - 14 && Math.abs(clerk.x - postLayout.benchX) <= 34) {
+                return { zone: 'WORKBENCH' };
+            }
+            if (clerk.x <= postLayout.aisleMinX + 18) {
+                let bestCust = null;
+                let bestDist = 36;
+                postCustomers.forEach(c => {
+                    if (c.state === 'AT_COUNTER') {
+                        const d = Math.abs(clerk.y - c.y);
+                        if (d < bestDist) {
+                            bestDist = d;
+                            bestCust = c;
+                        }
+                    }
+                });
+                if (bestCust) return { zone: 'CUSTOMER', customer: bestCust };
+            }
+            return { zone: 'NONE' };
+        }
 
-            if (bestIdx >= 0) {
-                const served = activeOrders.splice(bestIdx, 1)[0];
-                orderServedCount++; orderCombo++;
-                const speedBonus = Math.round((served.patience / served.maxPatience) * 50);
-                const pts = (100 + speedBonus) * Math.min(5, orderCombo);
-                orderScore += pts;
-                feedbackMsg = `SERVED ${served.name.toUpperCase()}! +${pts}`;
-                feedbackColor = '#7bed9f'; feedbackTimerMs = 1100;
-                playSfx('serve');
+        // Handle B-A-B-A-B-A-B stitching rhythm at the workbench
+        function advanceWorkbenchStitch(btn) {
+            if (clerk.craftedMocc) return true;
+            if (clerk.heldHide === null || clerk.heldPal === null || clerk.heldFur === null) {
+                feedbackMsg = 'NEED HIDE + BEAD + FUR';
+                feedbackColor = '#ff6b6b';
+                feedbackTimerMs = 850;
+                playSfx('miss');
+                return true;
+            }
 
-                if (activeOrders.length === 0) {
-                    spawnVisitorOrder();
-                    orderSpawnTimerMs = Math.max(2200, 5000 - orderServedCount * 140);
+            const expectedBtn = STITCH_SEQ[clerk.stitchProgress];
+            if (btn === expectedBtn) {
+                clerk.stitchProgress++;
+                clerk.rustleAnimMs = 280;
+                playSfx('stitch_step');
+
+                if (clerk.stitchProgress >= STITCH_SEQ.length) {
+                    // Completed B-A-B-A-B-A-B! Craft finished moccasin pair
+                    clerk.craftedMocc = {
+                        hideId: clerk.heldHide,
+                        palId: clerk.heldPal,
+                        furId: clerk.heldFur
+                    };
+                    clerk.heldHide = null;
+                    clerk.heldPal = null;
+                    clerk.heldFur = null;
+                    clerk.stitchProgress = 0;
+                    playSfx('craft');
                 }
             } else {
-                orderCombo = 0;
-                feedbackMsg = 'NO MATCHING ORDER!';
-                feedbackColor = '#ff6b6b'; feedbackTimerMs = 900;
-                playSfx('miss');
+                // Wrong button in B-A-B-A-B-A-B rhythm: if they pressed B when expecting A, restart at step 1 (B); otherwise reset to 0
+                clerk.stitchProgress = (btn === 'B') ? 1 : 0;
+                clerk.rustleAnimMs = 180;
+                playSfx('click');
+            }
+            return true;
+        }
+
+        function handleClerkActionA() {
+            const target = getClerkInteractionTarget();
+
+            if (target.zone === 'SHELF') {
+                if (clerk.craftedMocc) {
+                    feedbackMsg = 'DELIVER FIRST!';
+                    feedbackColor = '#ffe169';
+                    feedbackTimerMs = 800;
+                    playSfx('miss');
+                    return;
+                }
+                const sIdx = target.shelf.idx;
+                const itemVal = shelfStockIdx[sIdx];
+                if (target.shelf.kind === 'HIDE') {
+                    if (clerk.heldHide === itemVal) shelfStockIdx[sIdx] = (shelfStockIdx[sIdx] + 1) % 4;
+                    clerk.heldHide = shelfStockIdx[sIdx];
+                } else if (target.shelf.kind === 'PAL') {
+                    if (clerk.heldPal === itemVal) shelfStockIdx[sIdx] = (shelfStockIdx[sIdx] + 1) % 4;
+                    clerk.heldPal = shelfStockIdx[sIdx];
+                } else if (target.shelf.kind === 'FUR') {
+                    if (clerk.heldFur === itemVal) shelfStockIdx[sIdx] = (shelfStockIdx[sIdx] + 1) % 4;
+                    clerk.heldFur = shelfStockIdx[sIdx];
+                }
+                clerk.stitchProgress = 0;
+                clerk.facing = 1;
+                playSfx('pickup');
+                return;
+            }
+
+            if (target.zone === 'WORKBENCH') {
+                advanceWorkbenchStitch('A');
+                return;
+            }
+
+            if (target.zone === 'CUSTOMER') {
+                clerk.facing = -1;
+                const cust = target.customer;
+                if (!clerk.craftedMocc) {
+                    cust.shoutAnimMs = 900;
+                    playSfx('click');
+                    return;
+                }
+                if (
+                    clerk.craftedMocc.hideId === cust.hideId &&
+                    clerk.craftedMocc.palId === cust.palId &&
+                    clerk.craftedMocc.furId === cust.furId
+                ) {
+                    clerk.craftedMocc = null;
+                    cust.servedMocc = true;
+                    cust.state = 'WALK_OUT';
+                    cust.spotIdx = -1;
+                    cust.targetX = postLayout.doorX - 24;
+                    cust.targetY = postLayout.doorY;
+
+                    orderServedCount++;
+                    orderCombo++;
+                    const speedBonus = Math.round((cust.patience / cust.maxPatience) * 50);
+                    const pts = (100 + speedBonus) * Math.min(5, orderCombo);
+                    orderScore += pts;
+                    const thx = cust.arch.thanks[Math.floor(Math.random() * cust.arch.thanks.length)];
+                    feedbackMsg = `${thx} (+${pts})`;
+                    feedbackColor = '#7bed9f';
+                    feedbackTimerMs = 1300;
+                    playSfx('serve');
+                    refreshQueuePositions();
+                } else {
+                    orderCombo = 0;
+                    cust.shoutAnimMs = 900;
+                    feedbackMsg = 'Wrong material used!';
+                    feedbackColor = '#ff5252';
+                    feedbackTimerMs = 1200;
+                    playSfx('miss');
+                }
+            }
+        }
+
+        function handleClerkActionB() {
+            const target = getClerkInteractionTarget();
+            if (target.zone === 'SHELF') {
+                const sIdx = target.shelf.idx;
+                shelfStockIdx[sIdx] = (shelfStockIdx[sIdx] + 1) % 4;
+                clerk.facing = 1;
+                playSfx('click');
+                return;
+            }
+            // In the workbench zone with all 3 materials ready, B starts/advances the B-A-B-A-B-A-B stitch!
+            if (target.zone === 'WORKBENCH' && !clerk.craftedMocc && clerk.heldHide !== null && clerk.heldPal !== null && clerk.heldFur !== null) {
+                advanceWorkbenchStitch('B');
+                return;
+            }
+            if (clerk.craftedMocc || clerk.heldHide !== null || clerk.heldPal !== null || clerk.heldFur !== null) {
+                clerk.craftedMocc = null;
+                clerk.heldHide = null;
+                clerk.heldPal = null;
+                clerk.heldFur = null;
+                clerk.stitchProgress = 0;
+                playSfx('click');
             }
         }
 
         function updateOrderRush(dtMs) {
+            postElapsedMs += dtMs;
+            postStage = Math.min(9, Math.floor(postElapsedMs / 60000));
+
             if (feedbackTimerMs > 0) feedbackTimerMs -= dtMs;
-            for (let i = activeOrders.length - 1; i >= 0; i--) {
-                activeOrders[i].patience -= dtMs;
-                if (activeOrders[i].patience <= 0) {
-                    const leftName = activeOrders[i].name;
-                    activeOrders.splice(i, 1);
-                    orderStrikes++; orderCombo = 0;
-                    feedbackMsg = `${leftName.toUpperCase()} WALKED OUT!`;
-                    feedbackColor = '#ff6b6b'; feedbackTimerMs = 1200;
-                    playSfx('miss');
-                    if (orderStrikes >= MAX_STRIKES) {
-                        stopChiptuneTrack();
-                        gameState = 'ORDER_GAMEOVER';
-                        return;
+            if (clerk.rustleAnimMs > 0) clerk.rustleAnimMs = Math.max(0, clerk.rustleAnimMs - dtMs);
+
+            // Clerk Movement (blocked from standing on top of the workbench by benchStandY collider!)
+            let vx = (keysHeld.right ? 1 : 0) - (keysHeld.left ? 1 : 0);
+            let vy = (keysHeld.down ? 1 : 0) - (keysHeld.up ? 1 : 0);
+            if (vx === 0 && vy === 0 && moveDir.pulseMs > 0) {
+                vx = moveDir.dx;
+                vy = moveDir.dy;
+                moveDir.pulseMs = Math.max(0, moveDir.pulseMs - dtMs);
+            }
+
+            if (vx !== 0 || vy !== 0) {
+                const len = Math.hypot(vx, vy);
+                const speed = 0.165 * dtMs;
+                const nextX = Math.max(postLayout.aisleMinX, Math.min(postLayout.aisleMaxX, clerk.x + (vx / len) * speed));
+                // Solid collision block ahead of the crafting workbench (postLayout.benchStandY)
+                const nextY = Math.max(postLayout.floorTopY + 24, Math.min(postLayout.benchStandY, clerk.y + (vy / len) * speed));
+
+                // Reset stitch sequence if clerk walks away from the workbench
+                if (nextY < postLayout.benchStandY - 14) {
+                    clerk.stitchProgress = 0;
+                }
+
+                clerk.x = nextX;
+                clerk.y = nextY;
+                if (vx < 0) clerk.facing = -1;
+                else if (vx > 0) clerk.facing = 1;
+                clerk.movingMs = 120;
+            } else if (clerk.movingMs > 0) {
+                clerk.movingMs = Math.max(0, clerk.movingMs - dtMs);
+            }
+
+            // Update Customers
+            const walkSpeed = 0.082 * dtMs;
+            for (let i = postCustomers.length - 1; i >= 0; i--) {
+                const c = postCustomers[i];
+                if (c.shoutAnimMs > 0) c.shoutAnimMs = Math.max(0, c.shoutAnimMs - dtMs);
+
+                const dx = c.targetX - c.x;
+                const dy = c.targetY - c.y;
+                const dist = Math.hypot(dx, dy);
+
+                if (dist > 2) {
+                    c.x += (dx / dist) * Math.min(dist, walkSpeed);
+                    c.y += (dy / dist) * Math.min(dist, walkSpeed);
+                } else {
+                    c.x = c.targetX;
+                    c.y = c.targetY;
+                    if (c.state === 'WALK_IN') {
+                        if (c.spotIdx !== -1) {
+                            c.state = 'AT_COUNTER';
+                            c.shoutAnimMs = 1400; // Shouts accent-specific request on arrival!
+                            playSfx('click');
+                        } else {
+                            c.state = 'IN_QUEUE';
+                        }
+                    } else if (c.state === 'WALK_OUT') {
+                        postCustomers.splice(i, 1);
+                        continue;
+                    }
+                }
+
+                if (c.state === 'AT_COUNTER') {
+                    c.patience -= dtMs;
+                    if (c.patience <= 0) {
+                        c.state = 'WALK_OUT';
+                        c.spotIdx = -1;
+                        c.targetX = postLayout.doorX - 24;
+                        c.targetY = postLayout.doorY;
+                        orderStrikes++;
+                        orderCombo = 0;
+                        playSfx('miss');
+                        refreshQueuePositions();
+
+                        if (orderStrikes >= MAX_STRIKES) {
+                            postGameOverReason = 'POST CLOSED!';
+                            stopChiptuneTrack();
+                            gameState = 'ORDER_GAMEOVER';
+                            return;
+                        }
                     }
                 }
             }
-            if (activeOrders.length === 0) {
-                spawnVisitorOrder();
-                orderSpawnTimerMs = Math.max(2500, 5500 - orderServedCount * 150);
-            } else if (activeOrders.length < MAX_ACTIVE_ORDERS) {
-                orderSpawnTimerMs -= dtMs;
-                if (orderSpawnTimerMs <= 0) {
-                    spawnVisitorOrder();
-                    orderSpawnTimerMs = Math.max(2500, 6200 - orderServedCount * 160);
-                }
+
+            // Spawn Cadence synced with 10-Stage Tempo (0..9)
+            const activeCustomers = postCustomers.filter(c => c.state !== 'WALK_OUT');
+            const stageIntervalMs = Math.round(24000 - postStage * 2050);
+            const patienceTriggerRatio = Math.min(0.85, 0.35 + postStage * 0.055);
+
+            orderSpawnTimerMs -= dtMs;
+
+            let prevBelowThreshold = false;
+            if (
+                lastSpawnedCustomer &&
+                lastSpawnedCustomer.state === 'AT_COUNTER' &&
+                (lastSpawnedCustomer.patience / lastSpawnedCustomer.maxPatience) <= patienceTriggerRatio
+            ) {
+                prevBelowThreshold = true;
+            }
+
+            if (activeCustomers.length === 0 || orderSpawnTimerMs <= 0 || (prevBelowThreshold && orderSpawnTimerMs < stageIntervalMs - 2500)) {
+                spawnPostCustomer();
+                orderSpawnTimerMs = stageIntervalMs;
             }
         }
 
@@ -1554,7 +2569,7 @@
         function startTipiIntroCutscene() {
             tipiCamX = 0;
             cutsceneElapsedMs = 0;
-            startChiptuneTrack();
+            startChiptuneTrack('TIPI');
             gameState = 'TIPI_INTRO_CUTSCENE';
         }
 
@@ -1649,21 +2664,12 @@
             }
 
             if (gameState === 'ORDER_PLAYING') {
-                if (cmd === 'DPAD_UP') { craftRow = (craftRow + 2) % 3; playSfx('click'); }
-                else if (cmd === 'DPAD_DOWN') { craftRow = (craftRow + 1) % 3; playSfx('click'); }
-                else if (cmd === 'DPAD_LEFT') {
-                    if (craftRow === 0) craftHideId = (craftHideId + 3) % 4;
-                    if (craftRow === 1) craftPalId = (craftPalId + 3) % 4;
-                    if (craftRow === 2) craftFurId = (craftFurId + 3) % 4;
-                    playSfx('click');
-                } else if (cmd === 'DPAD_RIGHT' || cmd === 'BUTTON_B') {
-                    if (craftRow === 0) craftHideId = (craftHideId + 1) % 4;
-                    if (craftRow === 1) craftPalId = (craftPalId + 1) % 4;
-                    if (craftRow === 2) craftFurId = (craftFurId + 1) % 4;
-                    playSfx('click');
-                } else if (cmd === 'BUTTON_A') {
-                    serveCurrentMoccasin();
-                }
+                if (cmd === 'DPAD_UP')    { moveDir = { dx: 0,  dy: -1, pulseMs: 135 }; }
+                if (cmd === 'DPAD_DOWN')  { moveDir = { dx: 0,  dy: 1,  pulseMs: 135 }; }
+                if (cmd === 'DPAD_LEFT')  { moveDir = { dx: -1, dy: 0,  pulseMs: 135 }; clerk.facing = -1; }
+                if (cmd === 'DPAD_RIGHT') { moveDir = { dx: 1,  dy: 0,  pulseMs: 135 }; clerk.facing = 1; }
+                if (cmd === 'BUTTON_A')   { handleClerkActionA(); }
+                if (cmd === 'BUTTON_B')   { handleClerkActionB(); }
                 return;
             }
 
@@ -1775,8 +2781,8 @@
             ctx.fillStyle = grad;
             ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2); ctx.fill();
 
-            const holeR = Math.max(1.5, radius * 0.32);
-            ctx.strokeStyle = beadStyle.holeRim; ctx.lineWidth = Math.max(0.8, radius * 0.14);
+            const holeR = Math.max(1.2, radius * 0.32);
+            ctx.strokeStyle = beadStyle.holeRim; ctx.lineWidth = Math.max(0.7, radius * 0.14);
             ctx.beginPath(); ctx.arc(cx, cy, holeR + 0.3, 0, Math.PI * 2); ctx.stroke();
 
             ctx.fillStyle = '#120804';
@@ -1784,7 +2790,7 @@
 
             ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
             ctx.beginPath();
-            ctx.ellipse(cx - radius * 0.40, cy - radius * 0.40, Math.max(1.0, radius * 0.22), Math.max(0.8, radius * 0.12), -Math.PI / 4, 0, Math.PI * 2);
+            ctx.ellipse(cx - radius * 0.40, cy - radius * 0.40, Math.max(0.9, radius * 0.22), Math.max(0.7, radius * 0.12), -Math.PI / 4, 0, Math.PI * 2);
             ctx.fill();
             ctx.restore();
         }
@@ -1910,20 +2916,8 @@
         }
 
         // ==========================================
-        // 16-BIT MOCCASIN RENDERERS (FLIPPED VAMP: CUFF AT TOP, ROUNDED TOE AT BOTTOM)
+        // 16-BIT MOCCASIN RENDERER (THE TIPI)
         // ==========================================
-        function traceDomePath(ctxRef, cx, rx, domeCenterY, ry, bottomY, botCorner = 4) {
-            ctxRef.beginPath();
-            ctxRef.moveTo(cx - rx, bottomY - botCorner);
-            ctxRef.lineTo(cx - rx, domeCenterY);
-            ctxRef.ellipse(cx, domeCenterY, rx, ry, 0, Math.PI, 0, false);
-            ctxRef.lineTo(cx + rx, bottomY - botCorner);
-            ctxRef.quadraticCurveTo(cx + rx, bottomY, cx + rx - botCorner, bottomY);
-            ctxRef.lineTo(cx - rx + botCorner, bottomY);
-            ctxRef.quadraticCurveTo(cx - rx, bottomY, cx - rx, bottomY - botCorner);
-            ctxRef.closePath();
-        }
-
         function traceFlippedDomePath(ctxRef, cx, rx, topY, domeCenterY, ry, topCorner = 4) {
             ctxRef.beginPath();
             ctxRef.moveTo(cx - rx + topCorner, topY);
@@ -1966,44 +2960,6 @@
                 ctx.strokeStyle = sinewColor; ctx.lineWidth = 2.4;
                 ctx.beginPath(); ctx.moveTo(sx, topY + 3); ctx.lineTo(sx + 7, topY + 3); ctx.stroke();
             }
-        }
-
-        function drawCompactOrderMoccasin(cx, cy, hideObj, palObj, furObj) {
-            const vampRX = 46, vampTopY = cy - 58, vampDomeY = cy - 12, vampRY = vampDomeY - vampTopY, vampBotY = cy + 36;
-            const outerRX = vampRX + 14, outerTopY = vampTopY - 14, outerDomeY = vampDomeY + 4, outerRY = outerDomeY - outerTopY, outerBotY = vampBotY + 8;
-
-            ctx.save();
-            ctx.save();
-            ctx.translate(4, 6);
-            traceDomePath(ctx, cx, outerRX, outerDomeY, outerRY, outerBotY + 18, 5);
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.55)'; ctx.fill();
-            ctx.restore();
-
-            traceDomePath(ctx, cx, outerRX, outerDomeY, outerRY, outerBotY, 5);
-            ctx.fillStyle = hideObj.outerMid; ctx.fill();
-            ctx.strokeStyle = '#1c0c04'; ctx.lineWidth = 2; ctx.stroke();
-
-            const cuffTopY = vampBotY + 1, cuffH = 22, cuffW = outerRX * 2 - 4, cuffX = cx - cuffW / 2;
-            ctx.fillStyle = hideObj.cuffMain; ctx.fillRect(cuffX, cuffTopY, cuffW, cuffH);
-            ctx.strokeStyle = '#1c0c04'; ctx.lineWidth = 2; ctx.strokeRect(cuffX, cuffTopY, cuffW, cuffH);
-
-            drawFluffyFurTrim(cuffX, cuffTopY + cuffH - 8, cuffW, 11, furObj, false);
-
-            traceDomePath(ctx, cx, vampRX, vampDomeY, vampRY, vampBotY, 3);
-            const vampGrad = ctx.createRadialGradient(cx + 6, cy - 10, 8, cx, cy, vampRX * 1.3);
-            vampGrad.addColorStop(0.0, hideObj.light); vampGrad.addColorStop(0.5, hideObj.mid); vampGrad.addColorStop(1.0, hideObj.dark);
-            ctx.fillStyle = vampGrad; ctx.fill();
-            ctx.strokeStyle = hideObj.sinew; ctx.lineWidth = 2; ctx.setLineDash([4, 3]); ctx.stroke(); ctx.setLineDash([]);
-
-            const bY = cy - 8, sp = 14;
-            drawFlatBeadAt(cx - sp, bY + sp, 5, palObj.beads[5]);
-            drawFlatBeadAt(cx + sp, bY + sp, 5, palObj.beads[5]);
-            drawFlatBeadAt(cx, bY - sp, 6.5, palObj.beads[1]);
-            drawFlatBeadAt(cx, bY + sp, 6.5, palObj.beads[1]);
-            drawFlatBeadAt(cx - sp, bY, 6.5, palObj.beads[2]);
-            drawFlatBeadAt(cx + sp, bY, 6.5, palObj.beads[2]);
-            drawFlatBeadAt(cx, bY, 7, palObj.beads[3]);
-            ctx.restore();
         }
 
         function drawMoccasin(m, hideObj, guidePatternGrid, guidePalette, furObj) {
@@ -2115,7 +3071,7 @@
 
         function drawTopHudBar() {
             const grad = ctx.createLinearGradient(0, 0, 0, HUD_TOP_H);
-            grad.addColorStop(0, '#2a160c'); grad.addColorStop(0.5, '#1d0e07'); grad.addColorStop(1, '#120804');
+            grad.addColorStop(0, '#2a160c'); grad.addColorStop(0.6, '#1d0e07'); grad.addColorStop(1, '#120804');
             ctx.fillStyle = grad; ctx.fillRect(0, 0, VIEW_W, HUD_TOP_H);
             ctx.fillStyle = '#784c23'; ctx.fillRect(0, HUD_TOP_H - 3, VIEW_W, 2);
             ctx.fillStyle = '#cfa04e'; ctx.fillRect(0, HUD_TOP_H - 2, VIEW_W, 1);
@@ -2168,36 +3124,6 @@
             ctx.restore();
         }
 
-        function drawOrderTicketCard(x, y, w, h, order) {
-            const hideObj = HIDES[order.hideId], palObj = PALETTES[order.palId], furObj = FURS[order.furId];
-            const isMatch = (order.hideId === craftHideId && order.palId === craftPalId && order.furId === craftFurId);
-
-            ctx.fillStyle = 'rgba(20, 11, 6, 0.92)'; ctx.fillRect(x, y, w, h);
-            ctx.strokeStyle = isMatch ? '#7bed9f' : '#a87832'; ctx.lineWidth = isMatch ? 2.5 : 1.5; ctx.strokeRect(x, y, w, h);
-
-            drawPixelText(order.name.toUpperCase(), x + w / 2, y + 14, '#ffe49e', 'bold 11px Courier New');
-
-            const pct = Math.max(0, order.patience / order.maxPatience);
-            const barX = x + 6, barY = y + 20, barW = w - 12, barH = 6;
-            ctx.fillStyle = '#120804'; ctx.fillRect(barX, barY, barW, barH);
-            ctx.fillStyle = pct > 0.5 ? '#7bed9f' : (pct > 0.25 ? '#f2c938' : '#ff5252');
-            ctx.fillRect(barX, barY, Math.floor(barW * pct), barH);
-
-            ctx.fillStyle = hideObj.mid; ctx.fillRect(x + 8, y + 32, 14, 11);
-            ctx.strokeStyle = '#f6e7c8'; ctx.lineWidth = 1; ctx.strokeRect(x + 8, y + 32, 14, 11);
-            drawPixelText(hideObj.shortName, x + 28, y + 41, '#f6e7c8', 'bold 10px Courier New', 'left');
-
-            drawFlatBeadAt(x + 11, y + 57, 3.6, palObj.beads[1]);
-            drawFlatBeadAt(x + 17, y + 57, 3.6, palObj.beads[3]);
-            drawFlatBeadAt(x + 23, y + 57, 3.6, palObj.beads[5]);
-            drawPixelText(palObj.shortName, x + 31, y + 60, '#7BAFD4', 'bold 10px Courier New', 'left');
-
-            ctx.fillStyle = furObj.base; ctx.fillRect(x + 10, y + 71, 10, 9);
-            ctx.fillStyle = furObj.hi; ctx.fillRect(x + 11, y + 72, 6, 4);
-            drawPixelText(furObj.shortName, x + 28, y + 79, '#ffe169', 'bold 10px Courier New', 'left');
-        }
-
-        // Square SNES Pixel Iris-Out with Dithered Pixel Edge
         function drawPixelSquareIrisOut(cx, cy, progress) {
             if (progress >= 0.96) {
                 ctx.fillStyle = '#000000';
@@ -2227,6 +3153,115 @@
             }
         }
 
+        function drawLanesPostInteractiveProps(now) {
+            const target = getClerkInteractionTarget();
+
+            // 1. Highlight active category menu swatch + green interaction outline on active stock station
+            postLayout.shelves.forEach(sh => {
+                const selIdx = shelfStockIdx[sh.idx];
+                const slotH = Math.floor((sh.h - 6) / 4);
+                const sy = sh.y + 4 + selIdx * slotH;
+
+                ctx.strokeStyle = '#ffe169';
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(postLayout.shelfX + 1, sy, 10, slotH - 1);
+
+                if (target.zone === 'SHELF' && target.shelf.idx === sh.idx) {
+                    ctx.strokeStyle = '#7bed9f';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(postLayout.shelfX - 2, sh.y, postLayout.shelfW + 3, sh.h);
+                }
+            });
+
+            // 2. Workbench highlight & B-A-B-A-B-A-B stitch rhythm pips
+            const bx = postLayout.benchX - 24, by = postLayout.benchY - 14, bw = 54, bh = 28;
+            const readyToCraft = (clerk.heldHide !== null && clerk.heldPal !== null && clerk.heldFur !== null && !clerk.craftedMocc);
+            if (target.zone === 'WORKBENCH' || readyToCraft) {
+                const pulse = Math.floor(now / 220) % 2 === 0;
+                ctx.strokeStyle = readyToCraft ? (pulse ? '#7bed9f' : '#ffe169') : '#ffe169';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(bx - 1, by - 1, bw + 2, bh + 2);
+            }
+
+            // 7-step B-A-B-A-B-A-B progress pips floating over the workbench when ready or stitching
+            if (readyToCraft && (target.zone === 'WORKBENCH' || clerk.stitchProgress > 0)) {
+                const pipBarW = 52, pipBarH = 14;
+                const px0 = postLayout.benchX - Math.floor(pipBarW / 2) + 3;
+                const py0 = by - 20;
+                ctx.fillStyle = 'rgba(14, 8, 4, 0.92)';
+                ctx.fillRect(px0, py0, pipBarW, pipBarH);
+                ctx.strokeStyle = '#cfa04e'; ctx.lineWidth = 1;
+                ctx.strokeRect(px0, py0, pipBarW, pipBarH);
+
+                for (let i = 0; i < STITCH_SEQ.length; i++) {
+                    const stepBtn = STITCH_SEQ[i];
+                    const sx = px0 + 3 + i * 7;
+                    const done = i < clerk.stitchProgress;
+                    const isNext = i === clerk.stitchProgress;
+                    // Button B = Crimson (#d63333), Button A = Teal (#12AEA2)
+                    ctx.fillStyle = done
+                        ? '#7bed9f'
+                        : (stepBtn === 'B' ? '#d63333' : '#12AEA2');
+                    ctx.globalAlpha = done ? 1.0 : (isNext ? 1.0 : 0.35);
+                    ctx.fillRect(sx, py0 + (isNext ? 2 : 4), 5, isNext ? 10 : 7);
+                }
+                ctx.globalAlpha = 1.0;
+            }
+
+            // 3. Customer service tray highlight
+            if (target.zone === 'CUSTOMER') {
+                const cy = target.customer.y;
+                ctx.strokeStyle = '#7bed9f';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(postLayout.counterX + 1, cy - 13, postLayout.counterW - 2, 26);
+            }
+        }
+
+        function drawClerkInventoryBar() {
+            drawBottomHudBar(null);
+            const botY = VIEW_H - HUD_BOT_H;
+            const cy = botY + 13;
+
+            if (clerk.craftedMocc) {
+                drawMini444MoccasinSprite(
+                    VIEW_W / 2 - 44, cy - 2,
+                    HIDES[clerk.craftedMocc.hideId],
+                    PALETTES[clerk.craftedMocc.palId],
+                    FURS[clerk.craftedMocc.furId],
+                    false
+                );
+                draw444IconSet(VIEW_W / 2 + 14, cy, clerk.craftedMocc.hideId, clerk.craftedMocc.palId, clerk.craftedMocc.furId, 1.0);
+                return;
+            }
+
+            const slotCenters = [VIEW_W / 2 - 48, VIEW_W / 2, VIEW_W / 2 + 48];
+            slotCenters.forEach(sx => {
+                ctx.fillStyle = '#0f0703';
+                ctx.fillRect(sx - 12, cy - 8, 24, 16);
+                ctx.strokeStyle = '#5c3b1e';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(sx - 12, cy - 8, 24, 16);
+            });
+
+            if (clerk.heldHide !== null) {
+                const h = HIDES[clerk.heldHide];
+                ctx.fillStyle = h.mid;   ctx.fillRect(slotCenters[0] - 8, cy - 5, 16, 10);
+                ctx.fillStyle = h.light; ctx.fillRect(slotCenters[0] - 6, cy - 4, 10, 4);
+            }
+            if (clerk.heldPal !== null) {
+                const p = PALETTES[clerk.heldPal];
+                drawFlatBeadAt(slotCenters[1] - 4, cy - 2, 3.4, p.beads[1]);
+                drawFlatBeadAt(slotCenters[1] + 4, cy - 2, 3.4, p.beads[3]);
+                drawFlatBeadAt(slotCenters[1],     cy + 3, 3.4, p.beads[5]);
+            }
+            if (clerk.heldFur !== null) {
+                const f = FURS[clerk.heldFur];
+                ctx.fillStyle = f.dark; ctx.fillRect(slotCenters[2] - 7, cy - 5, 14, 10);
+                ctx.fillStyle = f.base; ctx.fillRect(slotCenters[2] - 6, cy - 6, 12, 9);
+                ctx.fillStyle = f.hi;   ctx.fillRect(slotCenters[2] - 4, cy - 4, 6, 4);
+            }
+        }
+
         function drawScene(now) {
             const midY = Math.floor((VIEW_H - HUD_BOT_H) / 2);
 
@@ -2235,7 +3270,6 @@
                 ctx.drawImage(titleBgCanvas, 0, 0);
                 drawAnimatedTitleEffects(now);
 
-                // Clean title card (no location subtext)
                 drawPixelText("li rassad di fleur", VIEW_W / 2, 62, '#fff2cc', 'bold 26px Courier New');
 
                 const boxW = Math.min(168, Math.floor((VIEW_W - 44) / 2));
@@ -2260,68 +3294,54 @@
                 return;
             }
 
-            // 2. LANE'S POST 4-4-4 CLERK RUSH
+            // 2. LANE'S POST SPATIAL CLERK RUSH
             if (gameState === 'ORDER_PLAYING' || gameState === 'ORDER_GAMEOVER') {
                 ctx.drawImage(postBgCanvas, 0, 0);
-                drawAnimatedPostEffects(now);
+                drawLanesPostInteractiveProps(now);
+                drawLanesPostAmbientLife(now);
 
+                const renderQueue = postCustomers.map(c => ({ y: c.y, fn: () => drawPostCustomerSprite(c, now) }));
+                renderQueue.push({ y: clerk.y, fn: () => drawClerkSprite(now) });
+                renderQueue.sort((a, b) => a.y - b.y);
+                renderQueue.forEach(item => item.fn());
+
+                // Compact Score, 4-Slot Queue Gauge & Lives Header
                 drawTopHudBar();
-                drawPixelText(`SCORE: ${orderScore}`, 12, 26, '#ffe49e', 'bold 16px Courier New', 'left');
-                drawPixelText(`SERVED: ${orderServedCount}`, VIEW_W / 2, 26, '#7BAFD4', 'bold 14px Courier New', 'center');
+                drawPixelText(`${orderScore}`, 14, 28, '#ffe49e', 'bold 17px Courier New', 'left');
+
+                const qCount = getQueuedCustomerCount();
+                if (orderCombo > 1) {
+                    drawPixelText(`x${orderCombo}`, VIEW_W / 2 - 28, 28, '#7bed9f', 'bold 14px Courier New', 'center');
+                }
+                for (let qi = 0; qi < MAX_WAIT_QUEUE; qi++) {
+                    const qx = Math.floor(VIEW_W / 2 + (orderCombo > 1 ? 4 : -22) + qi * 11);
+                    ctx.fillStyle = qi < qCount ? (qCount >= 3 ? '#ff5252' : '#ffe169') : '#382214';
+                    ctx.fillRect(qx, 19, 7, 7);
+                    ctx.strokeStyle = '#8c5c2b'; ctx.lineWidth = 1; ctx.strokeRect(qx, 19, 7, 7);
+                }
 
                 const livesLeft = Math.max(0, MAX_STRIKES - orderStrikes);
-                drawPixelText(`LIVES: ${'♥'.repeat(livesLeft)}${'·'.repeat(orderStrikes)}`, VIEW_W - 12, 26, livesLeft <= 1 ? '#ff5252' : '#ff6b6b', 'bold 14px Courier New', 'right');
-                if (orderCombo > 1) {
-                    drawPixelText(`STREAK x${orderCombo}!`, VIEW_W / 2, 52, '#7bed9f', 'bold 11px Courier New', 'center');
+                drawPixelText(`${'♥'.repeat(livesLeft)}${'·'.repeat(orderStrikes)}`, VIEW_W - 14, 28, livesLeft <= 1 ? '#ff5252' : '#ff6b6b', 'bold 16px Courier New', 'right');
+
+                if (feedbackTimerMs > 0) {
+                    const fbX = Math.max(96, Math.min(VIEW_W - 96, clerk.x - 16));
+                    drawPixelText(feedbackMsg, fbX, Math.max(HUD_TOP_H + 18, clerk.y - 60), feedbackColor, 'bold 12px Courier New');
                 }
 
-                const cardW = Math.min(122, Math.floor((VIEW_W - 28) / 3)), cardH = 90, gap = 8;
-                const totalRowW = activeOrders.length * cardW + Math.max(0, activeOrders.length - 1) * gap;
-                const startX = Math.floor((VIEW_W - totalRowW) / 2), cardY = HUD_TOP_H + 10;
-
-                for (let i = 0; i < activeOrders.length; i++) {
-                    drawOrderTicketCard(startX + i * (cardW + gap), cardY, cardW, cardH, activeOrders[i]);
-                }
-
-                const curHide = HIDES[craftHideId], curPal = PALETTES[craftPalId], curFur = FURS[craftFurId];
-                const moccCY = cardY + cardH + 74;
-                drawCompactOrderMoccasin(VIEW_W / 2, moccCY, curHide, curPal, curFur);
-
-                const panelW = Math.min(346, VIEW_W - 24), panelH = 114, panelCY = moccCY + 124;
-                drawModalPanel(VIEW_W / 2, panelCY, panelW, panelH);
-
-                const pTop = panelCY - panelH / 2;
-                [
-                    { label: 'HIDE', val: curHide.name, idx: 0 },
-                    { label: 'HANK', val: curPal.name,  idx: 1 },
-                    { label: 'FUR ', val: curFur.name,  idx: 2 }
-                ].forEach(r => {
-                    const ry = pTop + 28 + r.idx * 32;
-                    const active = (craftRow === r.idx);
-                    if (active) {
-                        ctx.fillStyle = 'rgba(217, 155, 38, 0.22)';
-                        ctx.fillRect(VIEW_W / 2 - panelW / 2 + 8, ry - 15, panelW - 16, 22);
-                    }
-                    drawPixelText(r.label + ':', VIEW_W / 2 - panelW / 2 + 18, ry, active ? '#ffe169' : '#a3907a', 'bold 13px Courier New', 'left');
-                    drawPixelText(`< ${r.val} >`, VIEW_W / 2 + 28, ry, active ? '#ffffff' : '#c7b8a1', 'bold 14px Courier New', 'center');
-                });
-
-                if (feedbackTimerMs > 0) drawPixelText(feedbackMsg, VIEW_W / 2, panelCY + panelH / 2 + 22, feedbackColor, 'bold 14px Courier New');
-
-                drawBottomHudBar(null);
+                drawClerkInventoryBar();
 
                 if (gameState === 'ORDER_GAMEOVER') {
                     drawModalPanel(VIEW_W / 2, midY, Math.min(310, VIEW_W - 28), 166);
-                    drawPixelText("POST CLOSED!", VIEW_W / 2, midY - 40, '#ffe169', 'bold 22px Courier New');
-                    drawPixelText(`FINAL SCORE: ${orderScore}`, VIEW_W / 2, midY + 6, '#F2EFE9', 'bold 17px Courier New');
-                    drawPixelText(`ORDERS SERVED: ${orderServedCount}`, VIEW_W / 2, midY + 38, '#7BAFD4', 'bold 15px Courier New');
+                    drawPixelText(postGameOverReason, VIEW_W / 2, midY - 40, '#ffe169', 'bold 21px Courier New');
+                    drawPixelText(`SCORE: ${orderScore}`, VIEW_W / 2, midY + 6, '#F2EFE9', 'bold 17px Courier New');
+                    drawPixelText(`SERVED: ${orderServedCount}`, VIEW_W / 2, midY + 38, '#7BAFD4', 'bold 15px Courier New');
                 }
 
                 drawPauseOverlay();
                 return;
             }
 
-            // 3. ZOOMED-IN PANNABLE CONICAL TIPI SCENES (NO TOP HUD BAR, NO LEVEL TITLES, NO CONTROL HINTS)
+            // 3. ZOOMED-IN PANNABLE CONICAL TIPI SCENES
             ctx.save();
             ctx.translate(-Math.floor(tipiCamX), 0);
             ctx.drawImage(tipiBgCanvas, 0, 0);
@@ -2331,7 +3351,6 @@
             const chosenPal = PALETTES[selectedPaletteId];
             const chosenFur = FURS[selectedTipiFurId];
 
-            // 3A. TIPI INTRO CUTSCENE
             if (gameState === 'TIPI_INTRO_CUTSCENE') {
                 const doorEntryX = tipiLayout.doorX + tipiLayout.doorW * 0.50;
                 const doorEntryY = tipiLayout.doorY + tipiLayout.doorH + 2;
@@ -2357,7 +3376,6 @@
                 return;
             }
 
-            // 3B. STASH-CRAFT SETUP SCREEN
             if (gameState === 'PREP_SELECT') {
                 drawMotherSprite(tipiLayout.stashX - 18, tipiLayout.stashY + 14, 'kneel', now);
                 drawCentralEmberHearth(now);
@@ -2390,7 +3408,6 @@
                 return;
             }
 
-            // 3C. TIPI SIT CUTSCENE
             if (gameState === 'TIPI_SIT_CUTSCENE') {
                 const startX = tipiLayout.stashX - 18, startY = tipiLayout.stashY + 14;
                 const sitX = tipiLayout.robeSitX, sitY = tipiLayout.robeSitY + 8;
@@ -2416,7 +3433,6 @@
                 return;
             }
 
-            // 3D. POST-GAME OUTRO CUTSCENE
             if (gameState === 'TIPI_OUTRO_CUTSCENE') {
                 const sitX = tipiLayout.robeSitX, sitY = tipiLayout.robeSitY + 8;
                 const husX = tipiLayout.husbandX, husY = tipiLayout.husbandY + 8;
@@ -2457,7 +3473,7 @@
                 return;
             }
 
-            // 4. FREEFORM BEADING WORKBENCH
+            // 4. FREEFORM BEADING WORKBENCH (THE TIPI)
             if (gameState === 'BEADING') {
                 drawCentralEmberHearth(now);
                 ctx.restore();
@@ -2503,7 +3519,6 @@
                     'bold 13px Courier New'
                 );
 
-                // Bottom bar shows only the active bead swatch & name (no control hints)
                 drawBottomHudBar(null);
                 const botY = VIEW_H - HUD_BOT_H;
                 if (cursor.color === 0) {
@@ -2565,12 +3580,20 @@
 
             if (isPaused) return;
 
-            if (e.key === 'ArrowUp') handleCommand('DPAD_UP');
-            else if (e.key === 'ArrowDown') handleCommand('DPAD_DOWN');
-            else if (e.key === 'ArrowLeft') handleCommand('DPAD_LEFT');
-            else if (e.key === 'ArrowRight') handleCommand('DPAD_RIGHT');
-            else if (k === 'x' && !e.repeat) handleCommand('BUTTON_A');
-            else if (k === 'z' && !e.repeat) handleCommand('BUTTON_B');
+            if (e.key === 'ArrowUp')    { keysHeld.up = true;    if (gameState !== 'ORDER_PLAYING') handleCommand('DPAD_UP'); }
+            if (e.key === 'ArrowDown')  { keysHeld.down = true;  if (gameState !== 'ORDER_PLAYING') handleCommand('DPAD_DOWN'); }
+            if (e.key === 'ArrowLeft')  { keysHeld.left = true;  if (gameState !== 'ORDER_PLAYING') handleCommand('DPAD_LEFT'); }
+            if (e.key === 'ArrowRight') { keysHeld.right = true; if (gameState !== 'ORDER_PLAYING') handleCommand('DPAD_RIGHT'); }
+
+            if (k === 'x' && !e.repeat) handleCommand('BUTTON_A');
+            if (k === 'z' && !e.repeat) handleCommand('BUTTON_B');
+        });
+
+        window.addEventListener('keyup', function(e) {
+            if (e.key === 'ArrowUp')    keysHeld.up = false;
+            if (e.key === 'ArrowDown')  keysHeld.down = false;
+            if (e.key === 'ArrowLeft')  keysHeld.left = false;
+            if (e.key === 'ArrowRight') keysHeld.right = false;
         });
         // === END TEMPORARY DEV KEYBOARD MAP ===
     </script>
