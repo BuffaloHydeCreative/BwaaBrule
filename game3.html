@@ -54,13 +54,14 @@
         const HUD_TOP_H = 44; // Compact score/lives bar for Lane's Post
         const HUD_BOT_H = 26;
 
-        // Odd-numbered 9x9 Grid for The Tipi
+        // Odd-numbered 9x9 Grid for Tipi
         const COLS = 9;
         const ROWS = 9;
 
         // Cached scenic anchor coordinates
         let titleSmokePoints = [];
         let titleRiverBounds = { y: 340, h: 64 };
+        let titleTipiAnchor = { x: 312, y: 275 };
         let tipiLayout = {
             doorX: 60, doorY: 300, doorW: 44, doorH: 56,
             stashX: 255, stashY: 365,
@@ -225,7 +226,7 @@
         ];
 
         // ==========================================
-        // 4. TWELVE 9x9 BEAD PATTERNS (THE TIPI)
+        // 4. TWELVE 9x9 BEAD PATTERNS (TIPI)
         // ==========================================
         const ROLE_TO_HANK = [0, 1, 2, 3, 5, 6, 7];
         function mapPatternGrid(rawGrid, keepTopToBottom = false) {
@@ -452,25 +453,26 @@
         // MASTER STATE MACHINE
         // ==========================================
         // MODE_SELECT | POST_INTRO | ORDER_PLAYING | ORDER_GAMEOVER
-        // TIPI_INTRO_CUTSCENE | PREP_SELECT | TIPI_SIT_CUTSCENE | BEADING | TIPI_OUTRO_CUTSCENE
+        // TIPI_TRANSITION | TIPI_INTRO_CUTSCENE | PREP_SELECT | TIPI_SIT_CUTSCENE | BEADING | TIPI_OUTRO_CUTSCENE
         let gameState = 'MODE_SELECT';
-        let menuSelection = 0; // 0 = Lane's Post, 1 = The Tipi
+        let menuSelection = 0; // 0 = Lane's Post, 1 = Tipi
         let isPaused = false;
         let lastFrameTime = 0;
 
-        // --- LANE'S POST TYPEWRITER INTRO STATE (2 SCREENS OVER TITLE BACKDROP) ---
+        // --- LANE'S POST TYPEWRITER INTRO STATE ---
         const POST_INTRO_PAGES = [
             "Welcome to Lane's Post, a small but lively HBc Post on the Assiniboine in the White Horse Plains. Rumor has gotten out that trade has been good this season, and pelts, furs, and beads are in full stock! Many have come from close and far to get their moccasins before stock runs out!",
             "Take orders, grab the right hide, string of beads, and fur and take them to your workstation to stitch [by alternating pressing B & A] and bring them back before they leave!"
         ];
-        let postIntroPage = 0;          // 0 = Screen 1/2, 1 = Screen 2/2
-        let postIntroTitleAlpha = 1.0;  // Fades title & buttons off screen (1 -> 0)
-        let postIntroBoxAlpha = 0.0;    // Fades transparent white text box in (0 -> 1)
-        let postIntroTextAlpha = 1.0;   // Fades page 1 text out before page 2 (1 -> 0)
-        let postIntroChars = 0;         // Typewriter revealed character count
-        let postIntroPhase = 'FADE_TITLE'; // 'FADE_TITLE' | 'TYPE' | 'FADE_TEXT' | 'START_FADE'
+        let postIntroPage = 0;
+        let postIntroTitleAlpha = 1.0;
+        let postIntroBoxAlpha = 0.0;
+        let postIntroTextAlpha = 1.0;
+        let postIntroChars = 0;
+        let postIntroPhase = 'FADE_TITLE';
 
-        // --- TIPI CUTSCENE STATE ---
+        // --- TIPI TITLE TRANSITION & CUTSCENE STATE ---
+        let tipiTransElapsedMs = 0; // 0..2000ms hold scene; 2000..3800ms zoom in + diffused square pixel iris-out
         let cutsceneElapsedMs = 0;
         let beadingFadeAlpha = 0;
 
@@ -525,7 +527,7 @@
         let showChalkGuide = true;
 
         // ==========================================
-        // 9x9 ROUNDED MOCCASIN MASK (THE TIPI)
+        // 9x9 ROUNDED MOCCASIN MASK (TIPI)
         // ==========================================
         function getRowColBounds(r) {
             if (r === ROWS - 1) return { minC: 2, maxC: 6 };
@@ -765,6 +767,7 @@
 
             const tipiX = Math.floor(VIEW_W * 0.78);
             const tipiBaseY = riverTopY - 30;
+            titleTipiAnchor = { x: tipiX, y: tipiBaseY - 34 };
             drawPixelCampTipi(c, tipiX, tipiBaseY, 60, 70);
             titleSmokePoints.push({ x: tipiX, y: tipiBaseY - 72 });
 
@@ -823,7 +826,7 @@
         }
 
         // ------------------------------------------
-        // SCENE A: LANE'S POST SPATIAL INTERIOR (LIVELY TRADING POST + 3 PHYSICAL STOCK STATIONS)
+        // SCENE A: LANE'S POST SPATIAL INTERIOR
         // ------------------------------------------
         function drawStockStationProps(c, sh, shelfX, shelfW) {
             const menuW = 12;
@@ -1207,7 +1210,7 @@
         }
 
         // ------------------------------------------
-        // SCENE B: ZOOMED-IN, PANNABLE CONICAL 13-POLE TIPI (FADES TO PURE BLACK AT y=0)
+        // SCENE B: ZOOMED-IN, PANNABLE CONICAL 13-POLE TIPI
         // ------------------------------------------
         function getTipiWallBaseY(x, baseFloorY) {
             const norm = (x - TIPI_WORLD_W / 2) / (TIPI_WORLD_W / 2);
@@ -1678,9 +1681,7 @@
         resizeViewport();
 
         // ==========================================
-        // DUAL CHIPTUNE ENGINE:
-        // 1. TIPI TRACK: "Matriarch's Teardrop Lament" (Fixed 75 BPM)
-        // 2. LANE'S POST TRACK: "Galleon Squeezebox × Dakota Plains Fiddle" (10 Stages: 60 -> 160 BPM)
+        // DUAL CHIPTUNE ENGINE
         // ==========================================
         let chiptuneAudioCtx = null;
         let chiptuneTimeout = null;
@@ -1841,7 +1842,7 @@
         document.addEventListener('mousedown', initChiptuneAudio, { once: true });
 
         // ==========================================
-        // LANE'S POST TYPEWRITER INTRO FLOW (2 SCREENS OVER TITLE BACKDROP)
+        // LANE'S POST TYPEWRITER INTRO FLOW
         // ==========================================
         function startPostIntro() {
             postIntroPage = 0;
@@ -1865,7 +1866,7 @@
             } else if (postIntroPhase === 'TYPE') {
                 const fullLen = POST_INTRO_PAGES[postIntroPage].length;
                 const prevInt = Math.floor(postIntroChars);
-                postIntroChars = Math.min(fullLen, postIntroChars + dtMs * 0.042); // ~42 chars/sec typewriter
+                postIntroChars = Math.min(fullLen, postIntroChars + dtMs * 0.042);
                 const curInt = Math.floor(postIntroChars);
                 if (curInt > prevInt && curInt % 4 === 0 && POST_INTRO_PAGES[postIntroPage][curInt - 1] !== ' ') {
                     playTone(520, 'square', 0.018, 0.015);
@@ -1896,15 +1897,12 @@
             }
             if (postIntroPhase === 'TYPE') {
                 if (postIntroChars < fullLen) {
-                    // Instant-finish current page typewriter
                     postIntroChars = fullLen;
                     playSfx('click');
                 } else if (postIntroPage === 0) {
-                    // Fade out screen 1/2 text -> reveal screen 2/2
                     postIntroPhase = 'FADE_TEXT';
                     playSfx('click');
                 } else {
-                    // Screen 2/2 complete -> start Lane's Post!
                     postIntroPhase = 'START_FADE';
                     playSfx('serve');
                 }
@@ -2315,8 +2313,14 @@
         }
 
         // ==========================================
-        // TIPI CUTSCENES (UNSKIPPABLE, STEPPED SNES TIMING)
+        // TIPI TITLE TRANSITION & CUTSCENES (UNSKIPPABLE, STEPPED SNES TIMING)
         // ==========================================
+        function startTipiTransition() {
+            tipiTransElapsedMs = 0;
+            playSfx('click');
+            gameState = 'TIPI_TRANSITION';
+        }
+
         function startTipiIntroCutscene() {
             tipiCamX = 0;
             cutsceneElapsedMs = 0;
@@ -2349,7 +2353,13 @@
         }
 
         function updateTipiCutscenes(dtMs) {
-            if (gameState === 'TIPI_INTRO_CUTSCENE') {
+            if (gameState === 'TIPI_TRANSITION') {
+                tipiTransElapsedMs += dtMs;
+                // 0..2000ms hold untouched title scene; 2000..3800ms zoom into tipi + diffused square pixel iris-out
+                if (tipiTransElapsedMs >= 3800) {
+                    startTipiIntroCutscene();
+                }
+            } else if (gameState === 'TIPI_INTRO_CUTSCENE') {
                 cutsceneElapsedMs += dtMs;
                 if (cutsceneElapsedMs >= 2800) {
                     prepRow = 0;
@@ -2398,7 +2408,7 @@
             }
             if (isPaused) return;
 
-            if (gameState === 'TIPI_INTRO_CUTSCENE' || gameState === 'TIPI_SIT_CUTSCENE' || gameState === 'TIPI_OUTRO_CUTSCENE') {
+            if (gameState === 'TIPI_TRANSITION' || gameState === 'TIPI_INTRO_CUTSCENE' || gameState === 'TIPI_SIT_CUTSCENE' || gameState === 'TIPI_OUTRO_CUTSCENE') {
                 return;
             }
 
@@ -2409,7 +2419,7 @@
                 }
                 if (cmd === 'BUTTON_A') {
                     if (menuSelection === 0) startPostIntro();
-                    else startTipiIntroCutscene();
+                    else startTipiTransition();
                 }
                 return;
             }
@@ -2672,7 +2682,7 @@
         }
 
         // ==========================================
-        // 16-BIT MOCCASIN RENDERER (THE TIPI)
+        // 16-BIT MOCCASIN RENDERER (TIPI)
         // ==========================================
         function traceFlippedDomePath(ctxRef, cx, rx, topY, domeCenterY, ry, topCorner = 4) {
             ctxRef.beginPath();
@@ -3016,13 +3026,32 @@
         function drawScene(now) {
             const midY = Math.floor((VIEW_H - HUD_BOT_H) / 2);
 
-            // 1. TITLE SCREEN & LANE'S POST 2-SCREEN TYPEWRITER BRIEFING OVER TITLE BACKDROP
-            if (gameState === 'MODE_SELECT' || gameState === 'POST_INTRO') {
+            // 1. TITLE SCREEN, LANE'S POST BRIEFING & TIPI ZOOM-AND-IRIS TRANSITION
+            if (gameState === 'MODE_SELECT' || gameState === 'POST_INTRO' || gameState === 'TIPI_TRANSITION') {
+                // When TIPI_TRANSITION reaches >2000ms, zoom toward the tipi on the banking as the diffused square iris closes
+                let zoomScale = 1.0;
+                let irisProgress = 0.0;
+                if (gameState === 'TIPI_TRANSITION' && tipiTransElapsedMs > 2000) {
+                    const t = stepProgress((tipiTransElapsedMs - 2000) / 1800, 18);
+                    zoomScale = 1.0 + t * 1.45;
+                    irisProgress = t;
+                }
+
+                ctx.save();
+                if (zoomScale > 1.0) {
+                    const ax = titleTipiAnchor.x;
+                    const ay = titleTipiAnchor.y;
+                    ctx.translate(ax, ay);
+                    ctx.scale(zoomScale, zoomScale);
+                    ctx.translate(-ax, -ay);
+                }
                 ctx.drawImage(titleBgCanvas, 0, 0);
                 drawAnimatedTitleEffects(now);
+                ctx.restore();
 
-                const titleAlpha = (gameState === 'MODE_SELECT') ? 1.0 : postIntroTitleAlpha;
-                if (titleAlpha > 0.01) {
+                // Top game title & mode selector boxes only appear on MODE_SELECT or fading out in POST_INTRO
+                if (gameState === 'MODE_SELECT' || (gameState === 'POST_INTRO' && postIntroTitleAlpha > 0.01)) {
+                    const titleAlpha = (gameState === 'MODE_SELECT') ? 1.0 : postIntroTitleAlpha;
                     ctx.save();
                     ctx.globalAlpha = titleAlpha;
                     drawPixelText("li rassad di fleur", VIEW_W / 2, 62, '#fff2cc', 'bold 26px Courier New');
@@ -3034,7 +3063,7 @@
 
                     [
                         { title: "LANE'S POST", sub: "HBC CLERK RUSH", idx: 0 },
-                        { title: "THE TIPI",    sub: "FREEFORM BEADWORK", idx: 1 }
+                        { title: "TIPI",        sub: "FREEFORM BEADWORK", idx: 1 }
                     ].forEach((ch, i) => {
                         const bx = leftX + i * (boxW + gap);
                         const sel = (menuSelection === ch.idx);
@@ -3046,7 +3075,6 @@
                     ctx.restore();
                 }
 
-                // Large Screen-Sized Transparent White Text Box for Lane's Post Intro (1/2 & 2/2)
                 if (gameState === 'POST_INTRO' && postIntroBoxAlpha > 0.01) {
                     const pad = 16;
                     const bx = pad;
@@ -3056,7 +3084,6 @@
 
                     ctx.save();
                     ctx.globalAlpha = postIntroBoxAlpha;
-                    // Transparent white parchment-glass backdrop so the Title Card scene faintly shows through
                     ctx.fillStyle = 'rgba(252, 248, 240, 0.84)';
                     ctx.fillRect(bx, by, bw, bh);
                     ctx.strokeStyle = '#3b2412';
@@ -3082,7 +3109,6 @@
                             ctx.fillText(ln, bx + 18, startY + idx * lineH);
                         });
 
-                        // Blinking (A) prompt once typewriter finishes the screen
                         if (Math.floor(postIntroChars) >= fullText.length) {
                             const blinkOn = Math.floor(now / 360) % 2 === 0;
                             if (blinkOn) {
@@ -3097,7 +3123,16 @@
                     ctx.restore();
                 }
 
-                drawBottomHudBar(null);
+                // Bottom game menu bar dropped during TIPI_TRANSITION
+                if (gameState !== 'TIPI_TRANSITION') {
+                    drawBottomHudBar(null);
+                }
+
+                // Diffused square pixel iris-out closing onto the tipi after the 2-second hold
+                if (gameState === 'TIPI_TRANSITION' && irisProgress > 0) {
+                    drawPixelSquareIrisOut(titleTipiAnchor.x, titleTipiAnchor.y, irisProgress);
+                }
+
                 drawPauseOverlay();
                 return;
             }
@@ -3280,7 +3315,7 @@
                 return;
             }
 
-            // 4. FREEFORM BEADING WORKBENCH (THE TIPI)
+            // 4. FREEFORM BEADING WORKBENCH (TIPI)
             if (gameState === 'BEADING') {
                 drawCentralEmberHearth(now);
                 ctx.restore();
